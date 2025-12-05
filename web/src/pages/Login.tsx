@@ -1,5 +1,7 @@
-export default function Dashboard() {
+export default function Login() {
   return (
-    <h1 className="text-2xl font-bold">لوحة التحكم</h1>
+    <div className="text-center mt-20">
+      <h1 className="text-3xl font-bold">تسجيل دخول المشرف</h1>
+    </div>
   );
 }
