@@ -22,8 +22,12 @@ export default function Dashboard() {
         } else {
           setHealthStatus("API responded successfully");
         }
-      } catch (err: any) {
-        setError("Failed to reach backend API.");
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Failed to reach backend API.";
+        setError(message);
         console.error(err);
       } finally {
         setLoading(false);
@@ -46,10 +50,6 @@ export default function Dashboard() {
 
         {!loading && !error && healthStatus && (
           <p className="text-green-600">API Status: {healthStatus}</p>
-        )}
-
-        {!loading && !error && !healthStatus && (
-          <p>No response received from the API.</p>
         )}
       </div>
     </div>
