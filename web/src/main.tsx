@@ -14,11 +14,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
+        {/* صفحة اللوجين بدون الـ layout */}
+        <Route path="/login" element={<Login />} />
+
+        {/* باقي الصفحات جوّا الـ layout */}
         <Route path="/" element={<App />}>
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/tasks" element={<Tasks />} />
-          <Route path="/zones" element={<Zones />} />
+          {/* index route: لما نروح على "/" يفتح Dashboard */}
+          <Route index element={<Dashboard />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="tasks" element={<Tasks />} />
+          <Route path="zones" element={<Zones />} />
         </Route>
       </Routes>
     </BrowserRouter>
