@@ -31,9 +31,6 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
         builder.Property(e => e.CreatedAt)
             .IsRequired();
 
-        builder.Property(e => e.FcmToken)
-            .HasMaxLength(500);
-
         builder.Property(e => e.FcmMessageId)
             .HasMaxLength(200);
 

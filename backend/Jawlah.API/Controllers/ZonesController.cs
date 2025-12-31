@@ -1,58 +1,78 @@
+using AutoMapper;
 using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.DTOs.Zones;
 using Jawlah.Core.Entities;
 using Jawlah.Core.Interfaces.Repositories;
 using Jawlah.Core.Interfaces.Services;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jawlah.API.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-[Authorize]
-public class ZonesController : ControllerBase
+public class ZonesController : BaseApiController
 {
-    private readonly IZoneRepository _zoneRepo;
-    private readonly JawlahDbContext _context;
-    private readonly IGisService _gisService;
+    private readonly IZoneRepository _zones;
+    private readonly IUserRepository _users;
+    private readonly IGisService _gis;
     private readonly ILogger<ZonesController> _logger;
+    private readonly IMapper _mapper;
 
-    public ZonesController(IZoneRepository zoneRepo, JawlahDbContext context, IGisService gisService, ILogger<ZonesController> logger)
+    public ZonesController(IZoneRepository zones, IUserRepository users, IGisService gis, ILogger<ZonesController> logger, IMapper mapper)
     {
-        _zoneRepo = zoneRepo;
-        _context = context;
-        _gisService = gisService;
+        _zones = zones;
+        _users = users;
+        _gis = gis;
         _logger = logger;
+        _mapper = mapper;
+    }
+
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMyZones()
+    {
+        // 1. get the current user ID
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+            return Unauthorized();
+
+        // 2. find the user and his assigned zones
+        var user = await _users.GetUserWithZonesAsync(userId.Value);
+        if (user == null)
+            return NotFound(ApiResponse<object>.ErrorResponse("User not found"));
+
+        // 3. extract the zone list for the worker
+        var zones = user.AssignedZones.Select(uz => uz.Zone).Where(z => z.IsActive).ToList();
+
+        return Ok(ApiResponse<IEnumerable<ZoneResponse>>.SuccessResponse(
+            zones.Select(z => _mapper.Map<ZoneResponse>(z))));
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAllZones()
     {
-        var zones = await _zoneRepo.GetActiveZonesAsync();
+        var zones = await _zones.GetActiveZonesAsync();
         return Ok(ApiResponse<IEnumerable<ZoneResponse>>.SuccessResponse(
-            zones.Select(z => MapToZoneResponse(z))));
+            zones.Select(z => _mapper.Map<ZoneResponse>(z))));
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetZoneById(int id)
     {
-        var zone = await _zoneRepo.GetByIdAsync(id);
+        var zone = await _zones.GetByIdAsync(id);
         if (zone == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("Zone not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("المنطقة غير موجودة"));
 
-        return Ok(ApiResponse<ZoneResponse>.SuccessResponse(MapToZoneResponse(zone)));
+        return Ok(ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone)));
     }
 
     [HttpGet("by-code/{code}")]
     public async Task<IActionResult> GetZoneByCode(string code)
     {
-        var zone = await _zoneRepo.GetByCodeAsync(code);
+        var zone = await _zones.GetByCodeAsync(code);
         if (zone == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("Zone not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("المنطقة غير موجودة"));
 
-        return Ok(ApiResponse<ZoneResponse>.SuccessResponse(MapToZoneResponse(zone)));
+        return Ok(ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone)));
     }
 
     [HttpPost("validate-location")]
@@ -61,7 +81,8 @@ public class ZonesController : ControllerBase
     {
         try
         {
-            var zone = await _gisService.ValidateLocationAsync(request.Latitude, request.Longitude);
+            // check if the GPS point is inside any zone
+            var zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude);
 
             if (zone == null)
             {
@@ -69,7 +90,7 @@ public class ZonesController : ControllerBase
                     new ValidateLocationResponse
                     {
                         IsValid = false,
-                        Message = "Location is outside all defined zones",
+                        Message = "الموقع خارج جميع المناطق المحددة",
                         Zone = null
                     }));
             }
@@ -79,7 +100,7 @@ public class ZonesController : ControllerBase
                 {
                     IsValid = true,
                     Message = $"Location is within {zone.ZoneName}",
-                    Zone = MapToZoneResponse(zone)
+                    Zone = _mapper.Map<ZoneResponse>(zone)
                 }));
         }
         catch (ArgumentException ex)
@@ -88,10 +109,7 @@ public class ZonesController : ControllerBase
         }
     }
 
-    // NOTE: Zone creation/editing is NOT part of the project scope.
-    // Zones are imported from GIS shapefiles provided by the municipality.
-    // Zone management is read-only + import functionality only.
-
+    // zones are imported from shapefiles only (read-only + import)
     [HttpPost("import-shapefile")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ImportShapefile([FromBody] ImportShapefileRequest request)
@@ -110,10 +128,10 @@ public class ZonesController : ControllerBase
 
             _logger.LogInformation("Starting shapefile import from: {FilePath}", request.FilePath);
 
-            await _gisService.ImportShapefileAsync(request.FilePath);
-            await _context.SaveChangesAsync();
+            await _gis.ImportShapefileAsync(request.FilePath);
+            await _zones.SaveChangesAsync();
 
-            var zones = await _zoneRepo.GetActiveZonesAsync();
+            var zones = await _zones.GetActiveZonesAsync();
             var count = zones.Count();
 
             _logger.LogInformation("Shapefile import completed. Total zones: {Count}", count);
@@ -125,25 +143,7 @@ public class ZonesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to import shapefile from: {FilePath}", request.FilePath);
-            return StatusCode(500, ApiResponse<object>.ErrorResponse($"Failed to import shapefile: {ex.Message}"));
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("Failed to import shapefile. Please check the file format and try again."));
         }
-    }
-
-    private ZoneResponse MapToZoneResponse(Zone zone)
-    {
-        return new ZoneResponse
-        {
-            ZoneId = zone.ZoneId,
-            ZoneName = zone.ZoneName,
-            ZoneCode = zone.ZoneCode,
-            Description = zone.Description,
-            CenterLatitude = zone.CenterLatitude,
-            CenterLongitude = zone.CenterLongitude,
-            AreaSquareMeters = zone.AreaSquareMeters,
-            District = zone.District,
-            Version = zone.Version,
-            IsActive = zone.IsActive,
-            CreatedAt = zone.CreatedAt
-        };
     }
 }

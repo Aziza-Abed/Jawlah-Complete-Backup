@@ -86,7 +86,11 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.HasKey("AttendanceId");
 
+                    b.HasIndex("CheckInEventTime");
+
                     b.HasIndex("Status");
+
+                    b.HasIndex("UserId");
 
                     b.HasIndex("ZoneId");
 
@@ -94,58 +98,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasDatabaseName("IX_Attendance_User_CheckIn");
 
                     b.ToTable("Attendances");
-                });
-
-            modelBuilder.Entity("Jawlah.Core.Entities.AuditLog", b =>
-                {
-                    b.Property<int>("AuditLogId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AuditLogId"));
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int?>("EntityId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("EntityType")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UserAgent")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int?>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("AuditLogId");
-
-                    b.HasIndex("EntityType");
-
-                    b.HasIndex("Timestamp");
-
-                    b.HasIndex("UserId", "Timestamp")
-                        .HasDatabaseName("IX_AuditLog_User_Timestamp");
-
-                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("Jawlah.Core.Entities.Issue", b =>
@@ -203,6 +155,11 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<int?>("ResolvedByUserId")
                         .HasColumnType("int");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<int>("Severity")
                         .HasColumnType("int");
 
@@ -230,9 +187,13 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.HasIndex("ReportedAt");
 
+                    b.HasIndex("ReportedByUserId");
+
                     b.HasIndex("ResolvedByUserId");
 
                     b.HasIndex("Severity");
+
+                    b.HasIndex("Status");
 
                     b.HasIndex("Type");
 
@@ -348,6 +309,71 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.ToTable("Notifications");
                 });
 
+            modelBuilder.Entity("Jawlah.Core.Entities.Photo", b =>
+                {
+                    b.Property<int>("PhotoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PhotoId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int>("EntityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<long?>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("IssueId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderIndex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("PhotoUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("TaskId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int?>("UploadedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("PhotoId");
+
+                    b.HasIndex("IssueId");
+
+                    b.HasIndex("TaskId");
+
+                    b.HasIndex("UploadedAt")
+                        .HasDatabaseName("IX_Photos_UploadedAt");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("IX_Photos_EntityType_EntityId");
+
+                    b.ToTable("Photos");
+                });
+
             modelBuilder.Entity("Jawlah.Core.Entities.RefreshToken", b =>
                 {
                     b.Property<int>("Id")
@@ -359,20 +385,8 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("DeviceInfo")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("ReplacedByToken")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("datetime2");
@@ -393,66 +407,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens");
-                });
-
-            modelBuilder.Entity("Jawlah.Core.Entities.SyncLog", b =>
-                {
-                    b.Property<int>("SyncLogId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SyncLogId"));
-
-                    b.Property<int>("Action")
-                        .HasColumnType("int");
-
-                    b.Property<string>("AppVersion")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("ConflictDetails")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("ConflictResolution")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("DeviceId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("EntityId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("EventTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("HadConflict")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime>("SyncTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("SyncLogId");
-
-                    b.HasIndex("HadConflict");
-
-                    b.HasIndex("EntityType", "EntityId")
-                        .HasDatabaseName("IX_SyncLog_Entity");
-
-                    b.HasIndex("UserId", "SyncTime")
-                        .HasDatabaseName("IX_SyncLog_User_SyncTime");
-
-                    b.ToTable("SyncLogs");
                 });
 
             modelBuilder.Entity("Jawlah.Core.Entities.Task", b =>
@@ -487,6 +441,9 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("EstimatedDurationMinutes")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("EventTime")
                         .HasColumnType("datetime2");
 
@@ -512,6 +469,14 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("int");
 
+                    b.Property<bool>("RequiresPhotoProof")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");
 
@@ -522,6 +487,9 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("SyncVersion")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TaskType")
                         .HasColumnType("int");
 
                     b.Property<string>("Title")
@@ -536,9 +504,15 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.HasIndex("AssignedByUserId");
 
+                    b.HasIndex("AssignedToUserId");
+
                     b.HasIndex("DueDate");
 
                     b.HasIndex("Priority");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("SyncTime");
 
                     b.HasIndex("ZoneId");
 
@@ -613,8 +587,14 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasFilter("[Pin] IS NOT NULL");
 
+                    b.HasIndex("Role");
+
+                    b.HasIndex("Status");
+
                     b.HasIndex("Username")
                         .IsUnique();
+
+                    b.HasIndex("Role", "Status");
 
                     b.ToTable("Users");
                 });
@@ -744,16 +724,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Navigation("Zone");
                 });
 
-            modelBuilder.Entity("Jawlah.Core.Entities.AuditLog", b =>
-                {
-                    b.HasOne("Jawlah.Core.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Jawlah.Core.Entities.Issue", b =>
                 {
                     b.HasOne("Jawlah.Core.Entities.User", "ReportedByUser")
@@ -801,23 +771,30 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Jawlah.Core.Entities.Photo", b =>
+                {
+                    b.HasOne("Jawlah.Core.Entities.Issue", null)
+                        .WithMany("Photos")
+                        .HasForeignKey("IssueId");
+
+                    b.HasOne("Jawlah.Core.Entities.Task", null)
+                        .WithMany("Photos")
+                        .HasForeignKey("TaskId");
+
+                    b.HasOne("Jawlah.Core.Entities.User", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("UploadedByUser");
+                });
+
             modelBuilder.Entity("Jawlah.Core.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Jawlah.Core.Entities.User", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Jawlah.Core.Entities.SyncLog", b =>
-                {
-                    b.HasOne("Jawlah.Core.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("User");
@@ -865,6 +842,16 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Navigation("User");
 
                     b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("Jawlah.Core.Entities.Issue", b =>
+                {
+                    b.Navigation("Photos");
+                });
+
+            modelBuilder.Entity("Jawlah.Core.Entities.Task", b =>
+                {
+                    b.Navigation("Photos");
                 });
 
             modelBuilder.Entity("Jawlah.Core.Entities.User", b =>

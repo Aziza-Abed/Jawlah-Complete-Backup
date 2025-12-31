@@ -14,6 +14,6 @@ public class LocationHistory
     public DateTime Timestamp { get; set; }
     public bool IsSync { get; set; }
     
-    // Navigation property
+    // navigation property
     public virtual User User { get; set; } = null!;
 }

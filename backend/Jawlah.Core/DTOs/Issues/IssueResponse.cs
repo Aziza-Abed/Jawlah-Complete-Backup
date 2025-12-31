@@ -15,7 +15,7 @@ public class IssueResponse
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public string? LocationDescription { get; set; }
-    public string? PhotoUrl { get; set; }
+    public List<string> Photos { get; set; } = new();
     public DateTime ReportedAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
     public string? ResolutionNotes { get; set; }

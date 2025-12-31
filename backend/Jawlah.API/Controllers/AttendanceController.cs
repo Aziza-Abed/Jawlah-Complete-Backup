@@ -1,10 +1,10 @@
-﻿using Jawlah.Core.DTOs.Attendance;
+﻿using AutoMapper;
+using Jawlah.Core.DTOs.Attendance;
 using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.Entities;
 using Jawlah.Core.Enums;
 using Jawlah.Core.Interfaces.Repositories;
 using Jawlah.Core.Interfaces.Services;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jawlah.API.Controllers;
@@ -12,140 +12,97 @@ namespace Jawlah.API.Controllers;
 [Route("api/[controller]")]
 public class AttendanceController : BaseApiController
 {
-    private readonly IAttendanceRepository _attendanceRepo;
-    private readonly IUserRepository _userRepo;
-    private readonly IZoneRepository _zoneRepo;
-    private readonly JawlahDbContext _context;
-    private readonly IGisService _gisService;
+    private readonly IAttendanceRepository _attendance;
+    private readonly IGisService _gis;
     private readonly ILogger<AttendanceController> _logger;
+    private readonly IMapper _mapper;
 
     public AttendanceController(
-        IAttendanceRepository attendanceRepo,
-        IUserRepository userRepo,
-        IZoneRepository zoneRepo,
-        JawlahDbContext context,
-        IGisService gisService,
-        ILogger<AttendanceController> logger)
+        IAttendanceRepository attendance,
+        IGisService gis,
+        ILogger<AttendanceController> logger,
+        IMapper mapper)
     {
-        _attendanceRepo = attendanceRepo;
-        _userRepo = userRepo;
-        _zoneRepo = zoneRepo;
-        _context = context;
-        _gisService = gisService;
+        _attendance = attendance;
+        _gis = gis;
         _logger = logger;
+        _mapper = mapper;
     }
 
     [HttpPost("checkin")]
-    [ProducesResponseType(typeof(ApiResponse<AttendanceResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<AttendanceResponse>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CheckIn([FromBody] CheckInRequest request)
     {
         try
         {
+            // 1. check if the user is logged in
             var userId = GetCurrentUserId();
             if (userId == null)
-                return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResult("Invalid token"));
+                return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("رمز غير صالح"));
 
-            _logger.LogInformation("Check-in attempt for user {UserId} at ({Lat}, {Lon})",
-                userId, request.Latitude, request.Longitude);
-
-            // Use transaction to prevent concurrent check-ins
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-
-            try
+            // 2. check if the user already has an active attendance session
+            var hasActive = await _attendance.HasActiveAttendanceAsync(userId.Value);
+            if (hasActive)
             {
-                var hasActive = await _attendanceRepo.HasActiveAttendanceAsync(userId.Value);
-                if (hasActive)
-                {
-                    await transaction.RollbackAsync();
-                    return BadRequest(ApiResponse<AttendanceResponse>.ErrorResult("You already have an active check-in"));
-                }
+                return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لديك تسجيل حضور نشط بالفعل"));
+            }
 
-                var zone = await _gisService.ValidateLocationAsync(request.Latitude, request.Longitude);
+            // 3. validate the user location using GIS service
+            var zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude, userId.Value);
 
-                // Manual check-in requires being inside the zone
-                if (zone == null)
-                {
-                    await transaction.RollbackAsync();
-                    return BadRequest(ApiResponse<AttendanceResponse>.ErrorResult("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور."));
-                }
-
-                var attendance = new Attendance
-                {
-                    UserId = userId.Value,
-                    ZoneId = zone.ZoneId,
-                    CheckInEventTime = DateTime.UtcNow,
-                    CheckInSyncTime = DateTime.UtcNow,
-                    CheckInLatitude = request.Latitude,
-                    CheckInLongitude = request.Longitude,
-                    IsValidated = true,
-                    ValidationMessage = "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة",
-                    Status = AttendanceStatus.CheckedIn,
-                    IsSynced = true,
-                    SyncVersion = 1
-                };
-
-                await _attendanceRepo.AddAsync(attendance);
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                var user = await _userRepo.GetByIdAsync(userId.Value);
-
-                var response = new AttendanceResponse
+            if (zone == null)
             {
-                AttendanceId = attendance.AttendanceId,
-                UserId = attendance.UserId,
-                UserName = user?.FullName ?? "Unknown",
-                ZoneId = attendance.ZoneId,
-                ZoneName = zone?.ZoneName,
-                CheckInEventTime = attendance.CheckInEventTime,
-                CheckInLatitude = attendance.CheckInLatitude,
-                CheckInLongitude = attendance.CheckInLongitude,
-                IsValidated = attendance.IsValidated,
-                ValidationMessage = attendance.ValidationMessage,
-                Status = attendance.Status,
-                CreatedAt = attendance.CheckInEventTime
+                return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور"));
+            }
+
+            // 4. if location is valid, create a new record
+            var attendance = new Attendance
+            {
+                UserId = userId.Value,
+                ZoneId = zone.ZoneId,
+                CheckInEventTime = DateTime.UtcNow,
+                CheckInSyncTime = DateTime.UtcNow,
+                CheckInLatitude = request.Latitude,
+                CheckInLongitude = request.Longitude,
+                IsValidated = true,
+                ValidationMessage = "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة",
+                Status = AttendanceStatus.CheckedIn,
+                IsSynced = true,
+                SyncVersion = 1
             };
 
-                _logger.LogInformation("User {UserId} checked in successfully at zone {ZoneId}", userId, zone?.ZoneId);
+            await _attendance.AddAsync(attendance);
+            await _attendance.SaveChangesAsync();
 
-                return Ok(ApiResponse<AttendanceResponse>.SuccessResult(response, "Checked in successfully"));
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
+            // 5. return the saved record
+            var response = _mapper.Map<AttendanceResponse>(attendance);
+
+            return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم تسجيل الحضور بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during check-in");
-            return StatusCode(500, ApiResponse<AttendanceResponse>.ErrorResult("An error occurred during check-in"));
+            return StatusCode(500, ApiResponse<AttendanceResponse>.ErrorResponse("حدث خطأ أثناء تسجيل الحضور"));
         }
     }
 
     [HttpPost("checkout")]
-    [ProducesResponseType(typeof(ApiResponse<AttendanceResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<AttendanceResponse>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CheckOut([FromBody] CheckOutRequest request)
     {
         try
         {
             var userId = GetCurrentUserId();
             if (userId == null)
-                return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResult("Invalid token"));
+                return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("رمز غير صالح"));
 
-            _logger.LogInformation("Check-out attempt for user {UserId}", userId);
-
-            var attendance = await _attendanceRepo.GetTodayAttendanceAsync(userId.Value);
+            var attendance = await _attendance.GetTodayAttendanceAsync(userId.Value);
             if (attendance == null)
             {
-                return BadRequest(ApiResponse<AttendanceResponse>.ErrorResult("No active check-in found"));
+                return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لا يوجد تسجيل حضور نشط"));
             }
 
             if (attendance.Status != AttendanceStatus.CheckedIn)
             {
-                return BadRequest(ApiResponse<AttendanceResponse>.ErrorResult("You are not currently checked in"));
+                return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت لست مسجلاً للحضور حالياً"));
             }
 
             attendance.CheckOutEventTime = DateTime.UtcNow;
@@ -153,141 +110,84 @@ public class AttendanceController : BaseApiController
             attendance.CheckOutLatitude = request.Latitude;
             attendance.CheckOutLongitude = request.Longitude;
             attendance.Status = AttendanceStatus.CheckedOut;
+
             attendance.WorkDuration = attendance.CheckOutEventTime - attendance.CheckInEventTime;
 
-            await _attendanceRepo.UpdateAsync(attendance);
-            await _context.SaveChangesAsync();
+            await _attendance.UpdateAsync(attendance);
+            await _attendance.SaveChangesAsync();
 
-            var user = await _userRepo.GetByIdAsync(userId.Value);
-            var zone = attendance.ZoneId.HasValue
-                ? await _zoneRepo.GetByIdAsync(attendance.ZoneId.Value)
-                : null;
+            var response = _mapper.Map<AttendanceResponse>(attendance);
 
-            var response = new AttendanceResponse
-            {
-                AttendanceId = attendance.AttendanceId,
-                UserId = attendance.UserId,
-                UserName = user?.FullName ?? "Unknown",
-                ZoneId = attendance.ZoneId,
-                ZoneName = zone?.ZoneName,
-                CheckInEventTime = attendance.CheckInEventTime,
-                CheckOutEventTime = attendance.CheckOutEventTime,
-                CheckInLatitude = attendance.CheckInLatitude,
-                CheckInLongitude = attendance.CheckInLongitude,
-                CheckOutLatitude = attendance.CheckOutLatitude,
-                CheckOutLongitude = attendance.CheckOutLongitude,
-                WorkDuration = attendance.WorkDuration,
-                IsValidated = attendance.IsValidated,
-                ValidationMessage = attendance.ValidationMessage,
-                Status = attendance.Status,
-                CreatedAt = attendance.CheckInEventTime
-            };
-
-            _logger.LogInformation("User {UserId} checked out successfully. Work duration: {Duration}",
-                userId, attendance.WorkDuration);
-
-            return Ok(ApiResponse<AttendanceResponse>.SuccessResult(response, "Checked out successfully"));
+            return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم تسجيل الانصراف بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during check-out");
-            return StatusCode(500, ApiResponse<AttendanceResponse>.ErrorResult("An error occurred during check-out"));
+            return StatusCode(500, ApiResponse<AttendanceResponse>.ErrorResponse("حدث خطأ أثناء تسجيل الانصراف"));
         }
     }
 
     [HttpGet("today")]
-    [ProducesResponseType(typeof(ApiResponse<AttendanceResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTodayAttendance()
     {
         try
         {
             var userId = GetCurrentUserId();
             if (userId == null)
-                return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResult("Invalid token"));
+                return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("رمز غير صالح"));
 
-            var attendance = await _attendanceRepo.GetTodayAttendanceAsync(userId.Value);
+            var attendance = await _attendance.GetTodayAttendanceAsync(userId.Value);
             if (attendance == null)
             {
-                return Ok(ApiResponse<AttendanceResponse?>.SuccessResult(null, "No attendance record for today"));
+                return Ok(ApiResponse<AttendanceResponse?>.SuccessResponse(null, "لا يوجد سجل حضور لهذا اليوم"));
             }
 
-            var user = await _userRepo.GetByIdAsync(userId.Value);
-            var zone = attendance.ZoneId.HasValue
-                ? await _zoneRepo.GetByIdAsync(attendance.ZoneId.Value)
-                : null;
+            var response = _mapper.Map<AttendanceResponse>(attendance);
 
-            var response = new AttendanceResponse
-            {
-                AttendanceId = attendance.AttendanceId,
-                UserId = attendance.UserId,
-                UserName = user?.FullName ?? "Unknown",
-                ZoneId = attendance.ZoneId,
-                ZoneName = zone?.ZoneName,
-                CheckInEventTime = attendance.CheckInEventTime,
-                CheckOutEventTime = attendance.CheckOutEventTime,
-                CheckInLatitude = attendance.CheckInLatitude,
-                CheckInLongitude = attendance.CheckInLongitude,
-                CheckOutLatitude = attendance.CheckOutLatitude,
-                CheckOutLongitude = attendance.CheckOutLongitude,
-                WorkDuration = attendance.WorkDuration,
-                IsValidated = attendance.IsValidated,
-                ValidationMessage = attendance.ValidationMessage,
-                Status = attendance.Status,
-                CreatedAt = attendance.CheckInEventTime
-            };
-
-            return Ok(ApiResponse<AttendanceResponse>.SuccessResult(response));
+            return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving today's attendance");
-            return StatusCode(500, ApiResponse<AttendanceResponse>.ErrorResult("An error occurred"));
+            return StatusCode(500, ApiResponse<AttendanceResponse>.ErrorResponse("حدث خطأ"));
         }
     }
 
     [HttpGet("history")]
-    [ProducesResponseType(typeof(ApiResponse<List<AttendanceResponse>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAttendanceHistory(
         [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null)
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
     {
         try
         {
             var userId = GetCurrentUserId();
             if (userId == null)
-                return Unauthorized(ApiResponse<List<AttendanceResponse>>.ErrorResult("Invalid token"));
+                return Unauthorized(ApiResponse<List<AttendanceResponse>>.ErrorResponse("رمز غير صالح"));
 
             var from = fromDate ?? DateTime.Today.AddMonths(-1);
             var to = toDate ?? DateTime.Today.AddDays(1);
 
-            var attendances = await _attendanceRepo.GetUserAttendanceHistoryAsync(userId.Value, from, to);
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 50;
 
-            var responses = attendances.Select(a => new AttendanceResponse
-            {
-                AttendanceId = a.AttendanceId,
-                UserId = a.UserId,
-                UserName = a.User?.FullName ?? "Unknown",
-                ZoneId = a.ZoneId,
-                ZoneName = a.Zone?.ZoneName,
-                CheckInEventTime = a.CheckInEventTime,
-                CheckOutEventTime = a.CheckOutEventTime,
-                CheckInLatitude = a.CheckInLatitude,
-                CheckInLongitude = a.CheckInLongitude,
-                CheckOutLatitude = a.CheckOutLatitude,
-                CheckOutLongitude = a.CheckOutLongitude,
-                WorkDuration = a.WorkDuration,
-                IsValidated = a.IsValidated,
-                ValidationMessage = a.ValidationMessage,
-                Status = a.Status,
-                CreatedAt = a.CheckInEventTime
-            }).ToList();
+            var attendances = await _attendance.GetUserAttendanceHistoryAsync(userId.Value, from, to);
 
-            return Ok(ApiResponse<List<AttendanceResponse>>.SuccessResult(responses));
+            var totalCount = attendances.Count();
+            var pagedAttendances = attendances
+                .OrderByDescending(a => a.CheckInEventTime)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize);
+
+            var responses = pagedAttendances.Select(a => _mapper.Map<AttendanceResponse>(a)).ToList();
+
+            return Ok(ApiResponse<List<AttendanceResponse>>.SuccessResponse(responses));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving attendance history");
-            return StatusCode(500, ApiResponse<List<AttendanceResponse>>.ErrorResult("An error occurred"));
+            return StatusCode(500, ApiResponse<List<AttendanceResponse>>.ErrorResponse("حدث خطأ"));
         }
     }
 

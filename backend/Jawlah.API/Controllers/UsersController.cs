@@ -1,10 +1,11 @@
 using System.Security.Claims;
+using AutoMapper;
+using Jawlah.API;
 using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.DTOs.Users;
 using Jawlah.Core.Enums;
 using Jawlah.Core.Interfaces.Repositories;
 using Jawlah.Core.Interfaces.Services;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,128 +14,80 @@ namespace Jawlah.API.Controllers;
 [Route("api/[controller]")]
 public class UsersController : BaseApiController
 {
-    private readonly IUserRepository _userRepo;
-    private readonly JawlahDbContext _context;
-    private readonly IAuthService _authService;
+    private readonly IUserRepository _users;
+    private readonly IAuthService _auth;
     private readonly ILogger<UsersController> _logger;
+    private readonly IMapper _mapper;
 
-    public UsersController(IUserRepository userRepo, JawlahDbContext context, IAuthService authService, ILogger<UsersController> logger)
+    public UsersController(IUserRepository users, IAuthService auth, ILogger<UsersController> logger, IMapper mapper)
     {
-        _userRepo = userRepo;
-        _context = context;
-        _authService = authService;
+        _users = users;
+        _auth = auth;
         _logger = logger;
+        _mapper = mapper;
     }
 
     [HttpGet]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetAllUsers([FromQuery] UserStatus? status = null)
     {
-        var users = await _userRepo.GetAllAsync();
+        // 1. get all users from the database
+        var users = await _users.GetAllAsync();
 
+        // 2. filter by status if the supervisor wants only active or inactive users
         if (status.HasValue)
         {
             users = users.Where(u => u.Status == status.Value);
         }
 
+        // 3. return the list
         return Ok(ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(
-            users.Select(u => new UserResponse
-            {
-                UserId = u.UserId,
-                Username = u.Username,
-                Email = u.Email,
-                PhoneNumber = u.PhoneNumber,
-                FullName = u.FullName,
-                Role = u.Role,
-                WorkerType = u.WorkerType,
-                Department = u.Department,
-                Status = u.Status,
-                CreatedAt = u.CreatedAt,
-                LastLoginAt = u.LastLoginAt
-            })));
+            users.Select(u => _mapper.Map<UserResponse>(u))));
     }
 
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetUserById(int id)
     {
-        var user = await _userRepo.GetByIdAsync(id);
+        var user = await _users.GetByIdAsync(id);
         if (user == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("User not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
-        return Ok(ApiResponse<UserResponse>.SuccessResponse(new UserResponse
-        {
-            UserId = user.UserId,
-            Username = user.Username,
-            Email = user.Email,
-            PhoneNumber = user.PhoneNumber,
-            FullName = user.FullName,
-            Role = user.Role,
-            WorkerType = user.WorkerType,
-            Department = user.Department,
-            Status = user.Status,
-            CreatedAt = user.CreatedAt,
-            LastLoginAt = user.LastLoginAt
-        }));
+        return Ok(ApiResponse<UserResponse>.SuccessResponse(_mapper.Map<UserResponse>(user)));
     }
 
     [HttpGet("by-role/{role}")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetUsersByRole(UserRole role)
     {
-        var users = await _userRepo.GetByRoleAsync(role);
+        var users = await _users.GetByRoleAsync(role);
 
         return Ok(ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(
-            users.Select(u => new UserResponse
-            {
-                UserId = u.UserId,
-                Username = u.Username,
-                Email = u.Email,
-                PhoneNumber = u.PhoneNumber,
-                FullName = u.FullName,
-                Role = u.Role,
-                WorkerType = u.WorkerType,
-                Department = u.Department,
-                Status = u.Status,
-                CreatedAt = u.CreatedAt,
-                LastLoginAt = u.LastLoginAt
-            })));
+            users.Select(u => _mapper.Map<UserResponse>(u))));
     }
 
     [HttpPut("profile")]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
     {
+        // 1. find the current user
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
             return Unauthorized();
 
-        var user = await _userRepo.GetByIdAsync(userId.Value);
+        var user = await _users.GetByIdAsync(userId.Value);
         if (user == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("User not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
+        // 2. update the fields with new values
         user.Email = request.Email;
         user.PhoneNumber = request.PhoneNumber;
         user.FullName = request.FullName;
 
-        await _userRepo.UpdateAsync(user);
-        await _context.SaveChangesAsync();
+        // 3. save changes
+        await _users.UpdateAsync(user);
+        await _users.SaveChangesAsync();
 
-        _logger.LogInformation("User {UserId} updated profile", userId);
-
-        return Ok(ApiResponse<UserResponse>.SuccessResponse(new UserResponse
-        {
-            UserId = user.UserId,
-            Username = user.Username,
-            Email = user.Email,
-            PhoneNumber = user.PhoneNumber,
-            FullName = user.FullName,
-            Role = user.Role,
-            WorkerType = user.WorkerType,
-            Department = user.Department,
-            Status = user.Status,
-            CreatedAt = user.CreatedAt,
-            LastLoginAt = user.LastLoginAt
-        }));
+        return Ok(ApiResponse<UserResponse>.SuccessResponse(_mapper.Map<UserResponse>(user)));
     }
 
     [HttpPut("change-password")]
@@ -144,19 +97,24 @@ public class UsersController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized();
 
-        var user = await _userRepo.GetByIdAsync(userId.Value);
+        var user = await _users.GetByIdAsync(userId.Value);
         if (user == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("User not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
-        if (!_authService.VerifyPassword(request.OldPassword, user.PasswordHash))
+        if (!_auth.VerifyPassword(request.OldPassword, user.PasswordHash))
         {
-            return BadRequest(ApiResponse<object>.ErrorResponse("Current password is incorrect"));
+            return BadRequest(ApiResponse<object>.ErrorResponse("رقم التعريف أو كلمة المرور غير صحيحة"));
         }
 
-        user.PasswordHash = _authService.HashPassword(request.NewPassword);
+        if (!Utils.InputSanitizer.IsStrongPassword(request.NewPassword))
+        {
+            return BadRequest(ApiResponse<object>.ErrorResponse("كلمة المرور يجب أن تكون 8 أحرف على الأقل"));
+        }
 
-        await _userRepo.UpdateAsync(user);
-        await _context.SaveChangesAsync();
+        user.PasswordHash = _auth.HashPassword(request.NewPassword);
+
+        await _users.UpdateAsync(user);
+        await _users.SaveChangesAsync();
 
         _logger.LogInformation("User {UserId} changed password", userId);
 
@@ -167,38 +125,25 @@ public class UsersController : BaseApiController
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateUserStatus(int id, [FromBody] UpdateUserStatusRequest request)
     {
-        var user = await _userRepo.GetByIdAsync(id);
+        var user = await _users.GetByIdAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("User not found"));
 
         user.Status = request.Status;
 
-        await _userRepo.UpdateAsync(user);
-        await _context.SaveChangesAsync();
+        await _users.UpdateAsync(user);
+        await _users.SaveChangesAsync();
 
         _logger.LogInformation("User {UserId} status updated to {Status}", id, request.Status);
 
-        return Ok(ApiResponse<UserResponse>.SuccessResponse(new UserResponse
-        {
-            UserId = user.UserId,
-            Username = user.Username,
-            Email = user.Email,
-            PhoneNumber = user.PhoneNumber,
-            FullName = user.FullName,
-            Role = user.Role,
-            WorkerType = user.WorkerType,
-            Department = user.Department,
-            Status = user.Status,
-            CreatedAt = user.CreatedAt,
-            LastLoginAt = user.LastLoginAt
-        }));
+        return Ok(ApiResponse<UserResponse>.SuccessResponse(_mapper.Map<UserResponse>(user)));
     }
 
     [HttpGet("active-workers-count")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetActiveWorkersCount()
     {
-        var workers = await _userRepo.GetByRoleAsync(UserRole.Worker);
+        var workers = await _users.GetByRoleAsync(UserRole.Worker);
         var activeCount = workers.Count(w => w.Status == UserStatus.Active);
 
         return Ok(ApiResponse<int>.SuccessResponse(activeCount));

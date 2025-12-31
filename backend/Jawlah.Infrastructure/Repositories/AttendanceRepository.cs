@@ -14,11 +14,13 @@ public class AttendanceRepository : Repository<Attendance>, IAttendanceRepositor
 
     public async Task<Attendance?> GetTodayAttendanceAsync(int userId)
     {
-        //
-        var today = DateTime.UtcNow.Date;  // Midnight UTC today
-        var tomorrow = today.AddDays(1);   // Midnight UTC tomorrow
+        // define today's range
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
 
+        // find the first attendance record for this user today
         return await _dbSet
+            .AsNoTracking()
             .Include(a => a.Zone)
             .Where(a => a.UserId == userId &&
                        a.CheckInEventTime >= today &&
@@ -30,6 +32,7 @@ public class AttendanceRepository : Repository<Attendance>, IAttendanceRepositor
     public async Task<IEnumerable<Attendance>> GetUserAttendanceHistoryAsync(int userId, DateTime fromDate, DateTime toDate)
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(a => a.Zone)
             .Where(a => a.UserId == userId &&
                        a.CheckInEventTime >= fromDate &&
@@ -43,6 +46,7 @@ public class AttendanceRepository : Repository<Attendance>, IAttendanceRepositor
         var nextDay = date.AddDays(1);
 
         return await _dbSet
+            .AsNoTracking()
             .Include(a => a.User)
             .Where(a => a.ZoneId == zoneId &&
                        a.CheckInEventTime >= date &&
@@ -53,7 +57,6 @@ public class AttendanceRepository : Repository<Attendance>, IAttendanceRepositor
 
     public async Task<bool> HasActiveAttendanceAsync(int userId)
     {
-        //
         var today = DateTime.UtcNow.Date;
         var tomorrow = today.AddDays(1);
 
@@ -67,6 +70,7 @@ public class AttendanceRepository : Repository<Attendance>, IAttendanceRepositor
     public async Task<IEnumerable<Attendance>> GetFilteredAttendanceAsync(int? userId, int? zoneId, DateTime? fromDate, DateTime? toDate)
     {
         var query = _dbSet
+            .AsNoTracking()
             .Include(a => a.User)
             .Include(a => a.Zone)
             .AsQueryable();

@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Jawlah.API.Filters;
-using Jawlah.API.Middleware;
 using Jawlah.API.LiveTracking;
 using Jawlah.Core.Interfaces.Repositories;
 using Jawlah.Core.Interfaces.Services;
@@ -10,6 +10,7 @@ using Jawlah.Infrastructure.Data;
 using Jawlah.Infrastructure.Repositories;
 using Jawlah.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -17,15 +18,15 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// setup logging
 Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
     .WriteTo.Console()
-    .WriteTo.File("logs/jawlah-.log", rollingInterval: RollingInterval.Day)
+    .WriteTo.File("logs/jawlah.log")
     .CreateLogger();
 
 builder.Host.UseSerilog();
 
+// 1. add controllers and json settings
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -41,14 +42,9 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Jawlah API - Smart Field Management System",
-        Version = "v1",
-        Description = "RESTful API for Al-Bireh Municipality Field Management System",
-        Contact = new OpenApiContact
-        {
-            Name = "Jawlah Team",
-            Email = "support@jawlah.ps"
-        }
+        Title = "Jawlah API",
+        Version = "v1.0",
+        Description = "API for Al-Bireh Municipality field worker management system. Handles authentication, task tracking, GPS location services, and issue reporting."
     });
 
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -58,7 +54,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter your JWT token in the format: Bearer {your token}"
+        Description = "JWT token"
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -76,19 +72,31 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 
-    // Add support for file upload endpoints
     options.OperationFilter<FileUploadOperationFilter>();
 });
 
+// 2. setup the database connection
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<JawlahDbContext>(options =>
     options.UseSqlServer(
         connectionString,
-        sqlOptions => sqlOptions.UseNetTopologySuite()
+        sqlOptions =>
+        {
+            sqlOptions.UseNetTopologySuite();
+            // increase command timeout to 60 seconds (default is 30)
+            sqlOptions.CommandTimeout(60);
+            // enable connection resiliency with retry logic
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(5),
+                errorNumbersToAdd: null
+            );
+        }
     ));
 
+// 3. setup authentication using JWT tokens
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"]
     ?? throw new InvalidOperationException("JWT SecretKey not configured");
@@ -130,6 +138,9 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+var productionOrigins = builder.Configuration.GetSection("Cors:ProductionOrigins").Get<string[]>()
+    ?? new[] { "https://jawlah.ps", "https://www.jawlah.ps" };
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -141,40 +152,79 @@ builder.Services.AddCors(options =>
 
     options.AddPolicy("Production", policy =>
     {
-        policy.WithOrigins("https://jawlah.ps", "https://www.jawlah.ps")
+        policy.WithOrigins(productionOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
     });
 });
 
+// 4. register all repositories and services (Dependency Injection)
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
+builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<IIssueRepository, IssueRepository>();
 builder.Services.AddScoped<IZoneRepository, ZoneRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<ILocationHistoryRepository, LocationHistoryRepository>();
+builder.Services.AddScoped<IPhotoRepository, PhotoRepository>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IGisService, GisService>();
-builder.Services.AddScoped<ISyncService, SyncService>();
+
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 
 builder.Services.AddScoped<DataSeeder>();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 100,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+});
+
+// request size limits
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB max
+});
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
-    await seeder.SeedAsync();
+    if (app.Environment.IsDevelopment())
+    {
+        var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
+        await seeder.SeedAsync();
+    }
 }
 
-// Global exception handling - must be first
-app.UseExceptionHandling();
+var disableGeofencing = app.Configuration.GetValue<bool>("DeveloperMode:DisableGeofencing", false);
+
+if (disableGeofencing && !app.Environment.IsDevelopment())
+{
+    Log.Fatal("SECURITY WARNING: Geofencing is DISABLED in non-Development environment!");
+    throw new InvalidOperationException("Geofencing can only be disabled in Development environment");
+}
+
+if (disableGeofencing)
+{
+    Console.WriteLine("WARNING: Geofencing validation is DISABLED!");
+    Console.WriteLine("Workers can login from any location. This is for development only.");
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -188,10 +238,26 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Enable static files for serving uploaded images
-app.UseStaticFiles();
+// basic security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
 
-// Use restrictive CORS in production
+    // remove server info headers
+    context.Response.Headers.Remove("Server");
+    context.Response.Headers.Remove("X-Powered-By");
+
+    await next();
+});
+
+app.UseRateLimiter();
+
+// static files disabled - files served through FilesController for authentication
+// app.UseStaticFiles();
+
 if (app.Environment.IsDevelopment())
     app.UseCors("AllowAll");
 else
@@ -219,3 +285,5 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+public partial class Program { }

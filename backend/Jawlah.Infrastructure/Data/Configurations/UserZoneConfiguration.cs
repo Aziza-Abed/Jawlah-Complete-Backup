@@ -37,5 +37,10 @@ public class UserZoneConfiguration : IEntityTypeConfiguration<UserZone>
             .WithMany(z => z.AssignedUsers)
             .HasForeignKey(e => e.ZoneId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(e => e.AssignedByUser)
+            .WithMany()
+            .HasForeignKey(e => e.AssignedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

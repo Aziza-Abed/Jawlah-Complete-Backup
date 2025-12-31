@@ -90,5 +90,8 @@ appsettings.Production.json
 firebase-credentials.json
 
 # Exclude from initial push (can add later)
-Jawlah.Tests/
+
 Scripts/
+
+# Windows-specific issue: nul file created by tools
+nul

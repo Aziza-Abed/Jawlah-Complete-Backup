@@ -9,4 +9,5 @@ public class UserZone
     public bool IsActive { get; set; }
     public User User { get; set; } = null!;
     public Zone Zone { get; set; } = null!;
+    public User AssignedByUser { get; set; } = null!;
 }

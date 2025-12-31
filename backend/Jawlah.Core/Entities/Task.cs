@@ -1,4 +1,5 @@
 using Jawlah.Core.Enums;
+using System.ComponentModel.DataAnnotations;
 
 namespace Jawlah.Core.Entities;
 
@@ -12,6 +13,16 @@ public class Task
     public string Description { get; set; } = string.Empty;
     public TaskPriority Priority { get; set; }
     public Enums.TaskStatus Status { get; set; }
+
+    // concurrency token for optimistic locking
+    [Timestamp]
+    public byte[]? RowVersion { get; set; }
+
+    // new fields for enhanced task management
+    public TaskType? TaskType { get; set; }
+    public bool RequiresPhotoProof { get; set; } = true;
+    public int? EstimatedDurationMinutes { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime? DueDate { get; set; }
     public DateTime? StartedAt { get; set; }
@@ -20,12 +31,58 @@ public class Task
     public double? Longitude { get; set; }
     public string? LocationDescription { get; set; }
     public string? CompletionNotes { get; set; }
+
+    // legacy photo storage (semicolon-separated urls) - kept for backward compatibility
+    // use Photos collection for new uploads
     public string? PhotoUrl { get; set; }
+
     public DateTime EventTime { get; set; }
+
+    // modern photo storage - use this for new uploads
+    public virtual ICollection<Photo> Photos { get; set; } = new List<Photo>();
     public DateTime? SyncTime { get; set; }
     public bool IsSynced { get; set; }
     public int SyncVersion { get; set; }
     public User AssignedToUser { get; set; } = null!;
     public User? AssignedByUser { get; set; }
     public Zone? Zone { get; set; }
+
+    // helper method to get all photos (both legacy PhotoUrl and Photos collection)
+    public IEnumerable<string> GetAllPhotoUrls()
+    {
+        var urls = new List<string>();
+
+        // add photos from Photos collection first (preferred)
+        urls.AddRange(Photos.OrderBy(p => p.OrderIndex).Select(p => p.PhotoUrl));
+
+        // fallback to legacy PhotoUrl if Photos collection is empty
+        if (urls.Count == 0 && !string.IsNullOrEmpty(PhotoUrl))
+        {
+            urls.AddRange(PhotoUrl.Split(';', StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        return urls;
+    }
+
+    // helper method to migrate legacy PhotoUrl to Photos collection
+    public void MigratePhotosToCollection(int uploadedByUserId)
+    {
+        if (string.IsNullOrEmpty(PhotoUrl) || Photos.Any())
+            return;
+
+        var urls = PhotoUrl.Split(';', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < urls.Length; i++)
+        {
+            Photos.Add(new Photo
+            {
+                PhotoUrl = urls[i],
+                EntityType = "Task",
+                EntityId = TaskId,
+                OrderIndex = i,
+                UploadedAt = DateTime.UtcNow,
+                UploadedByUserId = uploadedByUserId,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+    }
 }

@@ -13,7 +13,8 @@ public class LocationHistoryRepository : Repository<LocationHistory>, ILocationH
 
     public async Task<IEnumerable<LocationHistory>> GetUserHistoryAsync(int userId, DateTime startDate, DateTime endDate)
     {
-        return await _context.Set<LocationHistory>()
+        return await _dbSet
+            .AsNoTracking()
             .Where(x => x.UserId == userId && x.Timestamp >= startDate && x.Timestamp <= endDate)
             .OrderBy(x => x.Timestamp)
             .ToListAsync();

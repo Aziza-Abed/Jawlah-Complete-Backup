@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Jawlah.Core.DTOs.Auth;
 
-/// <summary>
-/// Request for GPS-based login (auto check-in) using 4-digit PIN
-/// </summary>
+// request for GPS-based login (auto check-in) using 4-digit PIN
 public class LoginWithGPSRequest
 {
     [Required(ErrorMessage = "الرقم السري مطلوب")]
@@ -19,4 +17,8 @@ public class LoginWithGPSRequest
     [Required(ErrorMessage = "Longitude is required")]
     [Range(-180, 180, ErrorMessage = "Longitude must be between -180 and 180")]
     public double Longitude { get; set; }
+
+    // GPS accuracy in meters (optional but recommended for validation)
+    [Range(0, 1000, ErrorMessage = "Accuracy must be between 0 and 1000 meters")]
+    public double? Accuracy { get; set; }
 }

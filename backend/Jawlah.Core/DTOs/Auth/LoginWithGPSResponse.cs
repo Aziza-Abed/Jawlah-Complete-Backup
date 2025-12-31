@@ -2,9 +2,7 @@ using Jawlah.Core.DTOs.Attendance;
 
 namespace Jawlah.Core.DTOs.Auth;
 
-/// <summary>
-/// Response for GPS-based login with auto check-in
-/// </summary>
+// response for GPS-based login with auto check-in
 public class LoginWithGPSResponse
 {
     public bool Success { get; set; }
