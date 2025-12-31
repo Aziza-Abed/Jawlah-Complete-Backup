@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "633012354866",
+    "project_id": "jawlah-2945f",
+    "storage_bucket": "jawlah-2945f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:633012354866:android:b5e604f33f29f570f2e12b",
+        "android_client_info": {
+          "package_name": "com.albireh.jawlah"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtDj97ema8-U3GjIGaou5egPtNyZQYGCI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:633012354866:android:322be7baca3d35d2f2e12b",
+        "android_client_info": {
+          "package_name": "com.example.jawlah"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtDj97ema8-U3GjIGaou5egPtNyZQYGCI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

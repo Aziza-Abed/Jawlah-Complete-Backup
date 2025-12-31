@@ -10,6 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="wwwroot\**" />
+    <Content Remove="wwwroot\**" />
+    <EmbeddedResource Remove="wwwroot\**" />
+    <None Remove="wwwroot\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Jawlah.Core\Jawlah.Core.csproj" />
     <ProjectReference Include="..\Jawlah.Infrastructure\Jawlah.Infrastructure.csproj" />
   </ItemGroup>
@@ -31,8 +38,6 @@
 
   <ItemGroup>
     <Folder Include="Storage\uploads\issues\" />
-    <Folder Include="wwwroot\uploads\issues\" />
-    <Folder Include="wwwroot\uploads\tasks\" />
   </ItemGroup>
 
 </Project>
