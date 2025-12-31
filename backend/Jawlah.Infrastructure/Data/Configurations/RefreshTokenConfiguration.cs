@@ -14,15 +14,6 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .IsRequired()
             .HasMaxLength(500);
 
-        builder.Property(e => e.DeviceInfo)
-            .HasMaxLength(500);
-
-        builder.Property(e => e.IpAddress)
-            .HasMaxLength(50);
-
-        builder.Property(e => e.ReplacedByToken)
-            .HasMaxLength(500);
-
         builder.Property(e => e.ExpiresAt)
             .IsRequired();
 

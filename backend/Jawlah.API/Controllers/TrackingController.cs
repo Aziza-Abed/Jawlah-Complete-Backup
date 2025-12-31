@@ -2,7 +2,6 @@ using Jawlah.API.LiveTracking;
 using Jawlah.Core.DTOs.Tracking;
 using Jawlah.Core.Entities;
 using Jawlah.Core.Interfaces.Repositories;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -15,26 +14,24 @@ namespace Jawlah.API.Controllers;
 [Route("api/[controller]")]
 public class TrackingController : ControllerBase
 {
-    private readonly ILocationHistoryRepository _locationHistoryRepo;
-    private readonly JawlahDbContext _context;
-    private readonly IHubContext<TrackingHub, ITrackingClient> _hubContext;
+    private readonly ILocationHistoryRepository _history;
+    private readonly IHubContext<TrackingHub, ITrackingClient> _hub;
     private readonly ILogger<TrackingController> _logger;
 
     public TrackingController(
-        ILocationHistoryRepository locationHistoryRepo,
-        JawlahDbContext context,
-        IHubContext<TrackingHub, ITrackingClient> hubContext,
+        ILocationHistoryRepository history,
+        IHubContext<TrackingHub, ITrackingClient> hub,
         ILogger<TrackingController> logger)
     {
-        _locationHistoryRepo = locationHistoryRepo;
-        _context = context;
-        _hubContext = hubContext;
+        _history = history;
+        _hub = hub;
         _logger = logger;
     }
 
     [HttpPost("location")]
     public async Task<IActionResult> UpdateLocation([FromBody] LocationUpdateDto dto)
     {
+        // 1. get current user ID
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId))
         {
@@ -43,7 +40,7 @@ public class TrackingController : ControllerBase
 
         try
         {
-            // 1. Store in Database
+            // 2. save the location to the history table
             var history = new LocationHistory
             {
                 UserId = userId,
@@ -53,22 +50,27 @@ public class TrackingController : ControllerBase
                 Accuracy = dto.Accuracy,
                 Heading = dto.Heading,
                 Timestamp = dto.Timestamp == default ? DateTime.UtcNow : dto.Timestamp,
-                IsSync = true // Coming from offline batch or direct API
+                IsSync = true
             };
 
-            await _locationHistoryRepo.AddAsync(history);
-            await _context.SaveChangesAsync();
+            await _history.AddAsync(history);
+            await _history.SaveChangesAsync();
 
-            // 2. Broadcast via SignalR (optional, if we want REST updates to also move the map)
-            // Useful if the client falls back to REST but we still want live updates if possible
-            await _hubContext.Clients.Group("Supervisors").ReceiveLocationUpdate(userId, dto.Latitude, dto.Longitude);
+            // 3. tell the supervisor about the new location live
+            var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
+            await _hub.Clients.Group("Supervisors").ReceiveLocationUpdate(
+                userId,
+                userName,
+                dto.Latitude,
+                dto.Longitude,
+                history.Timestamp);
 
             return Ok(new { success = true });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating location for user {UserId}", userId);
-            return StatusCode(500, new { success = false, message = "Internal Server Error" });
+            return StatusCode(500, new { success = false, message = "حدث خطأ داخلي" });
         }
     }
 
@@ -76,12 +78,12 @@ public class TrackingController : ControllerBase
     [HttpGet("history/{userId}")]
     public async Task<IActionResult> GetHistory(int userId, [FromQuery] DateTime? date)
     {
-        // Default to today if not provided
+        // default to today if not provided
         var targetDate = date ?? DateTime.UtcNow.Date;
         var startOfDay = targetDate.Date;
         var endOfDay = targetDate.Date.AddDays(1).AddTicks(-1);
 
-        var history = await _locationHistoryRepo.GetUserHistoryAsync(userId, startOfDay, endOfDay);
+        var history = await _history.GetUserHistoryAsync(userId, startOfDay, endOfDay);
 
         var dtos = history.Select(x => new LocationUpdateDto
         {

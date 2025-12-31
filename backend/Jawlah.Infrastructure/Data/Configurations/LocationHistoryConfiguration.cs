@@ -11,10 +11,12 @@ public class LocationHistoryConfiguration : IEntityTypeConfiguration<LocationHis
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Latitude)
-            .IsRequired();
+            .IsRequired()
+            .HasPrecision(18, 15);
 
         builder.Property(x => x.Longitude)
-            .IsRequired();
+            .IsRequired()
+            .HasPrecision(18, 15);
 
         builder.Property(x => x.Timestamp)
             .IsRequired();
@@ -24,7 +26,8 @@ public class LocationHistoryConfiguration : IEntityTypeConfiguration<LocationHis
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Restrict);
             
-        // Index for faster queries
-        builder.HasIndex(x => new { x.UserId, x.Timestamp });
+        // index for faster queries
+        builder.HasIndex(x => new { x.UserId, x.Timestamp })
+            .HasDatabaseName("IX_LocationHistory_User_Timestamp");
     }
 }

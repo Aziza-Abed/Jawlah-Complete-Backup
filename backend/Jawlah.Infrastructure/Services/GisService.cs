@@ -17,7 +17,7 @@ public class GisService : IGisService
     private readonly GeometryFactory _geometryFactory;
     private readonly ICoordinateTransformation? _transformation;
 
-    // Palestine 1923 Palestine Grid (EPSG:28191) WKT
+    // palestine 1923 grid coordinate system for shapefile import
     private const string Palestine1923Wkt = @"PROJCS[""Palestine 1923 Palestine Grid"",
         GEOGCS[""GCS_Palestine_1923"",
             DATUM[""D_Palestine_1923"",
@@ -37,7 +37,6 @@ public class GisService : IGisService
         _logger = logger;
         _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-        // Setup coordinate transformation from Palestine 1923 to WGS84
         try
         {
             var csFactory = new CoordinateSystemFactory();
@@ -57,13 +56,62 @@ public class GisService : IGisService
         }
     }
 
-    public async Task<Zone?> ValidateLocationAsync(double latitude, double longitude)
+    public async Task<Zone?> ValidateLocationAsync(double latitude, double longitude, int? userId = null, double? accuracy = null)
     {
+        // 1. check if the coordinates are valid
         if (latitude < -90 || latitude > 90)
             throw new ArgumentException("Latitude must be between -90 and 90", nameof(latitude));
 
         if (longitude < -180 || longitude > 180)
             throw new ArgumentException("Longitude must be between -180 and 180", nameof(longitude));
+
+        // 2. check if the GPS accuracy is good
+        if (accuracy.HasValue && accuracy.Value > Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters)
+        {
+            _logger.LogWarning(
+                "GPS accuracy too low: {Accuracy}m (max: {MaxAccuracy}m) at ({Lat}, {Lon})",
+                accuracy.Value, Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters, latitude, longitude);
+            throw new ArgumentException(
+                $"GPS accuracy too low ({accuracy:F1}m). Please wait for better signal (required: <{Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters}m).",
+                nameof(accuracy));
+        }
+
+        if (latitude == 0 && longitude == 0)
+        {
+            _logger.LogWarning("Received null island coordinates (0, 0) - likely GPS error");
+            throw new ArgumentException("Invalid GPS coordinates received (0, 0). Please ensure GPS is enabled.");
+        }
+
+        // 3. check if the location is inside Palestine
+        if (latitude < Core.Constants.GeofencingConstants.MinLatitude ||
+            latitude > Core.Constants.GeofencingConstants.MaxLatitude ||
+            longitude < Core.Constants.GeofencingConstants.MinLongitude ||
+            longitude > Core.Constants.GeofencingConstants.MaxLongitude)
+        {
+            _logger.LogWarning(
+                "Coordinates outside Palestine operational area: ({Lat}, {Lon})",
+                latitude, longitude);
+            throw new ArgumentException("Coordinates outside operational area (Palestine region).");
+        }
+
+        // 4. check if the location is inside the assigned zones
+        if (userId.HasValue)
+        {
+            var userZones = await _zoneRepository.GetUserZonesAsync(userId.Value);
+            var point = _geometryFactory.CreatePoint(new Coordinate(longitude, latitude));
+
+            foreach (var zone in userZones)
+            {
+                if (zone.Boundary != null && zone.Boundary.Contains(point))
+                {
+                    return zone;
+                }
+            }
+
+            _logger.LogWarning("User {UserId} is outside all their {Count} assigned zones at ({Lat}, {Lon})",
+                userId, userZones.Count(), latitude, longitude);
+            return null;
+        }
 
         return await _zoneRepository.ValidateLocationAsync(latitude, longitude);
     }
@@ -90,7 +138,7 @@ public class GisService : IGisService
 
     public async Task ImportShapefileAsync(string filePath)
     {
-        // NetTopologySuite expects path without .shp extension
+        // 1. check if the file exists and prepare the path
         var basePath = filePath.EndsWith(".shp", StringComparison.OrdinalIgnoreCase)
             ? filePath[..^4]
             : filePath;
@@ -101,7 +149,7 @@ public class GisService : IGisService
 
         try
         {
-            // Register code pages for shapefile reading
+            // register code pages for shapefile reading
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
 
             var shapeFileDataReader = Shapefile.CreateDataReader(basePath, _geometryFactory);
@@ -116,10 +164,10 @@ public class GisService : IGisService
                 if (geometry == null)
                     continue;
 
-                // Transform coordinates from Palestine 1923 to WGS84
+                // transform coordinates from Palestine 1923 to WGS84
                 var transformedGeometry = TransformGeometry(geometry);
 
-                // Extract attributes
+                // extract attributes
                 string zoneName = GetAttributeValue(shapeFileDataReader, new[] { "BlockName_E", "QuarterNam", "NAME", "Name" })
                     ?? $"Zone {featureIndex}";
                 string zoneCode = GetAttributeValue(shapeFileDataReader, new[] { "BlockNumbe", "Quarter_Nu", "CODE", "Code", "ID" })
@@ -129,7 +177,7 @@ public class GisService : IGisService
                 string district = GetAttributeValue(shapeFileDataReader, new[] { "Governorat", "District" })
                     ?? "Al-Bireh";
 
-                // Calculate center point
+                // calculate center point
                 var centroid = transformedGeometry.Centroid;
 
                 var zone = new Zone
@@ -155,14 +203,14 @@ public class GisService : IGisService
 
             shapeFileDataReader.Close();
 
-            // Save to database
+            // save to database
             foreach (var zone in zones)
             {
-                // Check if zone already exists by code
+                // check if zone already exists by code
                 var existing = await _zoneRepository.GetByCodeAsync(zone.ZoneCode);
                 if (existing != null)
                 {
-                    // Update existing zone
+                    // update existing zone
                     existing.ZoneName = zone.ZoneName;
                     existing.Description = zone.Description;
                     existing.Boundary = zone.Boundary;
@@ -198,7 +246,7 @@ public class GisService : IGisService
         else if (geometry is Polygon polygon)
         {
             var shell = TransformCoordinates(polygon.Shell.Coordinates);
-            // SQL Server requires counter-clockwise orientation for outer ring
+            // sQL Server requires counter-clockwise orientation for outer ring
             if (!NetTopologySuite.Algorithm.Orientation.IsCCW(shell))
             {
                 shell = shell.Reverse().ToArray();
@@ -206,7 +254,7 @@ public class GisService : IGisService
             var holes = polygon.Holes.Select(h =>
             {
                 var holeCoords = TransformCoordinates(h.Coordinates);
-                // Holes should be clockwise
+                // holes should be clockwise
                 if (NetTopologySuite.Algorithm.Orientation.IsCCW(holeCoords))
                 {
                     holeCoords = holeCoords.Reverse().ToArray();
@@ -238,7 +286,7 @@ public class GisService : IGisService
     {
         if (_transformation == null)
         {
-            // No transformation available - assume coordinates are already WGS84
+            // no transformation available - assume coordinates are already WGS84
             return coord;
         }
 
@@ -262,7 +310,7 @@ public class GisService : IGisService
             }
             catch
             {
-                // Column doesn't exist, try next
+                // column doesn't exist, try next
             }
         }
         return null;

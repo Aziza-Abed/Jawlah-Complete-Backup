@@ -1,9 +1,7 @@
 namespace Jawlah.API.Models;
 
-/// <summary>
-/// Request model for reporting an issue with a photo upload
-/// Title and Severity are optional - defaults will be provided if not specified
-/// </summary>
+// request model for reporting an issue with a photo upload
+// title and Severity are optional - defaults will be provided if not specified
 public class ReportIssueWithPhotoRequest
 {
     public string? Title { get; set; }  // Optional - will be generated from Type if not provided

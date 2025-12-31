@@ -1,7 +1,7 @@
+using AutoMapper;
 using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.DTOs.Notifications;
 using Jawlah.Core.Interfaces.Repositories;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jawlah.API.Controllers;
@@ -9,39 +9,31 @@ namespace Jawlah.API.Controllers;
 [Route("api/[controller]")]
 public class NotificationsController : BaseApiController
 {
-    private readonly INotificationRepository _notificationRepo;
-    private readonly JawlahDbContext _context;
+    private readonly INotificationRepository _notices;
     private readonly ILogger<NotificationsController> _logger;
+    private readonly IMapper _mapper;
 
-    public NotificationsController(INotificationRepository notificationRepo, JawlahDbContext context, ILogger<NotificationsController> logger)
+    public NotificationsController(INotificationRepository notices, ILogger<NotificationsController> logger, IMapper mapper)
     {
-        _notificationRepo = notificationRepo;
-        _context = context;
+        _notices = notices;
         _logger = logger;
+        _mapper = mapper;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetMyNotifications()
     {
+        // 1. get the current user ID
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
             return Unauthorized();
 
-        var notifications = await _notificationRepo.GetUserNotificationsAsync(userId.Value);
+        // 2. load all notifications for this user
+        var notifications = await _notices.GetUserNotificationsAsync(userId.Value);
 
+        // 3. return them as a list
         return Ok(ApiResponse<IEnumerable<NotificationResponse>>.SuccessResponse(
-            notifications.Select(n => new NotificationResponse
-            {
-                NotificationId = n.NotificationId,
-                Title = n.Title,
-                Message = n.Message,
-                Type = n.Type,
-                IsRead = n.IsRead,
-                IsSent = n.IsSent,
-                CreatedAt = n.CreatedAt,
-                SentAt = n.SentAt,
-                ReadAt = n.ReadAt
-            })));
+            notifications.Select(n => _mapper.Map<NotificationResponse>(n))));
     }
 
     [HttpGet("unread")]
@@ -51,21 +43,10 @@ public class NotificationsController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized();
 
-        var notifications = await _notificationRepo.GetUserNotificationsAsync(userId.Value, unreadOnly: true);
+        var notifications = await _notices.GetUserNotificationsAsync(userId.Value, unreadOnly: true);
 
         return Ok(ApiResponse<IEnumerable<NotificationResponse>>.SuccessResponse(
-            notifications.Select(n => new NotificationResponse
-            {
-                NotificationId = n.NotificationId,
-                Title = n.Title,
-                Message = n.Message,
-                Type = n.Type,
-                IsRead = n.IsRead,
-                IsSent = n.IsSent,
-                CreatedAt = n.CreatedAt,
-                SentAt = n.SentAt,
-                ReadAt = n.ReadAt
-            })));
+            notifications.Select(n => _mapper.Map<NotificationResponse>(n))));
     }
 
     [HttpGet("unread-count")]
@@ -75,7 +56,7 @@ public class NotificationsController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized();
 
-        var count = await _notificationRepo.GetUnreadCountAsync(userId.Value);
+        var count = await _notices.GetUnreadCountAsync(userId.Value);
 
         return Ok(ApiResponse<int>.SuccessResponse(count));
     }
@@ -87,9 +68,9 @@ public class NotificationsController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized();
 
-        var notification = await _notificationRepo.GetByIdAsync(id);
+        var notification = await _notices.GetByIdAsync(id);
         if (notification == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("Notification not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("الإشعار غير موجود"));
 
         if (notification.UserId != userId.Value)
             return Forbid();
@@ -97,12 +78,10 @@ public class NotificationsController : BaseApiController
         notification.IsRead = true;
         notification.ReadAt = DateTime.UtcNow;
 
-        await _notificationRepo.UpdateAsync(notification);
-        await _context.SaveChangesAsync();
+        await _notices.UpdateAsync(notification);
+        await _notices.SaveChangesAsync();
 
-        _logger.LogInformation("Notification {NotificationId} marked as read by user {UserId}", id, userId);
-
-        return Ok(ApiResponse<object?>.SuccessResponse(null, "Notification marked as read"));
+        return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تحديد الإشعار كمقروء"));
     }
 
     [HttpPut("mark-all-read")]
@@ -112,12 +91,10 @@ public class NotificationsController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized();
 
-        await _notificationRepo.MarkAllAsReadAsync(userId.Value);
-        await _context.SaveChangesAsync();
+        await _notices.MarkAllAsReadAsync(userId.Value);
+        await _notices.SaveChangesAsync();
 
-        _logger.LogInformation("All notifications marked as read for user {UserId}", userId);
-
-        return Ok(ApiResponse<object?>.SuccessResponse(null, "All notifications marked as read"));
+        return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تحديد جميع الإشعارات كمقروءة"));
     }
 
     [HttpDelete("{id}")]
@@ -127,18 +104,16 @@ public class NotificationsController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized();
 
-        var notification = await _notificationRepo.GetByIdAsync(id);
+        var notification = await _notices.GetByIdAsync(id);
         if (notification == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("Notification not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("الإشعار غير موجود"));
 
         if (notification.UserId != userId.Value)
             return Forbid();
 
-        await _notificationRepo.DeleteAsync(notification);
-        await _context.SaveChangesAsync();
+        await _notices.DeleteAsync(notification);
+        await _notices.SaveChangesAsync();
 
-        _logger.LogInformation("Notification {NotificationId} deleted by user {UserId}", id, userId);
-
-        return Ok(ApiResponse<object?>.SuccessResponse(null, "Notification deleted successfully"));
+        return Ok(ApiResponse<object?>.SuccessResponse(null, "تم حذف الإشعار بنجاح"));
     }
 }

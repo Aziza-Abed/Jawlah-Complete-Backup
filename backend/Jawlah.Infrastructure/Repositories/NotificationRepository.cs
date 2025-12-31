@@ -14,7 +14,9 @@ public class NotificationRepository : Repository<Notification>, INotificationRep
 
     public async Task<IEnumerable<Notification>> GetUserNotificationsAsync(int userId, bool unreadOnly = false)
     {
-        var query = _dbSet.Where(n => n.UserId == userId);
+        var query = _dbSet
+            .AsNoTracking()
+            .Where(n => n.UserId == userId);
 
         if (unreadOnly)
         {
@@ -59,6 +61,7 @@ public class NotificationRepository : Repository<Notification>, INotificationRep
     public async Task<IEnumerable<Notification>> GetNotificationsCreatedAfterAsync(int userId, DateTime lastSyncTime)
     {
         return await _dbSet
+            .AsNoTracking()
             .Where(n => n.UserId == userId && n.CreatedAt > lastSyncTime)
             .OrderByDescending(n => n.CreatedAt)
             .ToListAsync();

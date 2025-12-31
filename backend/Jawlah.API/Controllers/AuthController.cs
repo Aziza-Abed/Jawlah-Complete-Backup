@@ -1,76 +1,73 @@
 ﻿using System.Security.Claims;
+using AutoMapper;
 using Jawlah.Core.DTOs.Auth;
 using Jawlah.Core.DTOs.Attendance;
 using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.Entities;
 using Jawlah.Core.Interfaces.Repositories;
 using Jawlah.Core.Interfaces.Services;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jawlah.API.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class AuthController : ControllerBase
+public class AuthController : BaseApiController
 {
-    private readonly IAuthService _authService;
-    private readonly IUserRepository _userRepo;
-    private readonly IZoneRepository _zoneRepo;
-    private readonly IAttendanceRepository _attendanceRepo;
-    private readonly JawlahDbContext _context;
+    private readonly IAuthService _auth;
+    private readonly IUserRepository _users;
+    private readonly IZoneRepository _zones;
+    private readonly IAttendanceRepository _attendance;
     private readonly ILogger<AuthController> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly IConfiguration _config;
+    private readonly IWebHostEnvironment _env;
+    private readonly IMapper _mapper;
 
     public AuthController(
-        IAuthService authService,
-        IUserRepository userRepo,
-        IZoneRepository zoneRepo,
-        IAttendanceRepository attendanceRepo,
-        JawlahDbContext context,
+        IAuthService auth,
+        IUserRepository users,
+        IZoneRepository zones,
+        IAttendanceRepository attendance,
         ILogger<AuthController> logger,
-        IConfiguration configuration)
+        IConfiguration config,
+        IWebHostEnvironment env,
+        IMapper mapper)
     {
-        _authService = authService;
-        _userRepo = userRepo;
-        _zoneRepo = zoneRepo;
-        _attendanceRepo = attendanceRepo;
-        _context = context;
+        _auth = auth;
+        _users = users;
+        _zones = zones;
+        _attendance = attendance;
         _logger = logger;
-        _configuration = configuration;
+        _config = config;
+        _env = env;
+        _mapper = mapper;
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
-    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         try
         {
-            _logger.LogInformation("Login attempt for username: {Username}", request.Username);
-
             if (!ModelState.IsValid)
             {
-                return BadRequest(ApiResponse<LoginResponse>.ErrorResult("Invalid request"));
+                return BadRequest(ApiResponse<LoginResponse>.ErrorResponse("طلب غير صالح"));
             }
 
-            var (success, token, refreshToken, error) = await _authService.LoginAsync(request.Username, request.Password);
+            var (success, token, refreshToken, error) = await _auth.LoginAsync(request.Username, request.Password);
 
             if (!success)
             {
-                _logger.LogWarning("Login failed for username: {Username}. Error: {Error}", request.Username, error);
-                return Unauthorized(ApiResponse<LoginResponse>.ErrorResult(error ?? "Login failed"));
+                return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse(error ?? "فشل تسجيل الدخول"));
             }
 
-            var user = await _userRepo.GetByUsernameAsync(request.Username);
+            var user = await _users.GetByUsernameAsync(request.Username);
             if (user == null)
             {
-                return Unauthorized(ApiResponse<LoginResponse>.ErrorResult("User not found"));
+                return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse("المستخدم غير موجود"));
             }
 
-            var expirationMinutes = int.Parse(_configuration["JwtSettings:ExpirationMinutes"] ?? "1440");
+            var expirationMinutes = int.Parse(_config["JwtSettings:ExpirationMinutes"] ?? "1440");
 
             var response = new LoginResponse
             {
@@ -78,195 +75,169 @@ public class AuthController : ControllerBase
                 Token = token,
                 RefreshToken = refreshToken,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes),
-                User = new UserDto
-                {
-                    UserId = user.UserId,
-                    Username = user.Username,
-                    FullName = user.FullName,
-                    Email = user.Email,
-                    Role = user.Role.ToString(),
-                    WorkerType = user.WorkerType?.ToString(),
-                    Pin = user.Pin,
-                    EmployeeId = user.Pin ?? user.Username,  // PIN is employeeId for workers
-                    PhoneNumber = user.PhoneNumber,
-                    CreatedAt = user.CreatedAt
-                }
+                User = _mapper.Map<UserDto>(user)
             };
 
-            _logger.LogInformation("User {Username} logged in successfully", request.Username);
-
-            return Ok(ApiResponse<LoginResponse>.SuccessResult(response, "Login successful"));
+            return Ok(ApiResponse<LoginResponse>.SuccessResponse(response, "تم تسجيل الدخول بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login for username: {Username}", request.Username);
-            return StatusCode(500, ApiResponse<LoginResponse>.ErrorResult("An error occurred during login"));
+            return StatusCode(500, ApiResponse<LoginResponse>.ErrorResponse("حدث خطأ أثناء تسجيل الدخول"));
         }
     }
 
+    [AllowAnonymous]
     [HttpPost("login-gps")]
-    [ProducesResponseType(typeof(ApiResponse<LoginWithGPSResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<LoginWithGPSResponse>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<LoginWithGPSResponse>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> LoginWithGPS([FromBody] LoginWithGPSRequest request)
     {
         try
         {
-            _logger.LogInformation("GPS login attempt with PIN");
-
+            // check if the request data is correct
             if (!ModelState.IsValid)
             {
-                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-                return BadRequest(ApiResponse<LoginWithGPSResponse>.ErrorResult(errors));
+                var errors = new List<string>();
+                foreach (var modelState in ModelState.Values)
+                {
+                    foreach (var error in modelState.Errors)
+                    {
+                        errors.Add(error.ErrorMessage);
+                    }
+                }
+                return BadRequest(ApiResponse<LoginWithGPSResponse>.ErrorResponse(errors));
             }
 
-            // Get worker by PIN
-            var user = await _userRepo.GetByPinAsync(request.Pin);
+            // 1. find user by his PIN
+            var user = await _users.GetByPinAsync(request.Pin);
+
             if (user == null)
             {
                 _logger.LogWarning("GPS login failed - Invalid PIN");
-                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResult("الرقم السري غير صحيح"));
+                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("الرقم السري غير صحيح"));
             }
 
-            // Check if user account is active
             if (user.Status != Core.Enums.UserStatus.Active)
             {
                 _logger.LogWarning("GPS login failed - User {UserId} is not active", user.UserId);
-                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResult("حساب المستخدم غير نشط"));
+                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("حساب المستخدم غير نشط"));
             }
 
-            // Validate GPS location against assigned zones
-            var userWithZones = await _userRepo.GetUserWithZonesAsync(user.UserId);
-            var assignedZoneIds = userWithZones?.AssignedZones?.Where(uz => uz.IsActive).Select(uz => uz.ZoneId).ToList() ?? new List<int>();
-
-            Core.Entities.Zone? validZone = null;
-            bool isInValidZone = false;
-
-            // Developer mode - skip geofencing if disabled
-            var disableGeofencing = _configuration.GetValue<bool>("DeveloperMode:DisableGeofencing", false);
-            if (disableGeofencing)
+            // 2. check GPS location
+            // check if accuracy is good enough
+            if (request.Accuracy.HasValue && request.Accuracy.Value > Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters)
             {
-                _logger.LogWarning("Developer mode: Geofencing disabled - allowing login from any location");
-                // Get first assigned zone
-                if (assignedZoneIds.Any())
-                {
-                    // Get assigned zones for this user
-                    var assignedZones = await _zoneRepo.GetZonesByIdsAsync(assignedZoneIds);
-                    validZone = assignedZones.FirstOrDefault();
-                }
-                isInValidZone = true;  // Skip validation in dev mode
+                _logger.LogWarning("GPS login rejected - Poor GPS accuracy: {Accuracy}m", request.Accuracy.Value);
+                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse($"دقة GPS منخفضة جداً ({request.Accuracy:F1}م). يرجى المحاولة في مكان أفضل."));
             }
-            else if (assignedZoneIds.Any())
+
+            // check if lat and long are zeros
+            if (request.Latitude == 0 && request.Longitude == 0)
             {
-                // Get assigned zones for this user
-                var assignedZones = (await _zoneRepo.GetZonesByIdsAsync(assignedZoneIds))
-                    .Where(z => z.IsActive)
-                    .ToList();
+                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("إحداثيات GPS غير صالحة. يرجى تفعيل GPS."));
+            }
 
-                // Create point from GPS coordinates
-                var point = NetTopologySuite.Geometries.GeometryFactory.Default
-                    .CreatePoint(new NetTopologySuite.Geometries.Coordinate(request.Longitude, request.Latitude));
+            // validate coordinates are inside Palestine area
+            if (request.Latitude < Core.Constants.GeofencingConstants.MinLatitude ||
+                request.Latitude > Core.Constants.GeofencingConstants.MaxLatitude ||
+                request.Longitude < Core.Constants.GeofencingConstants.MinLongitude ||
+                request.Longitude > Core.Constants.GeofencingConstants.MaxLongitude)
+            {
+                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("الموقع خارج منطقة الخدمة. يرجى التحقق من GPS."));
+            }
 
-                // 30 meter buffer (approximately 0.0003 degrees)
-                const double BufferToleranceDegrees = 0.0003;
+            Zone? matchedZone = null;
+            bool isInsideZone = false;
 
-                foreach (var zone in assignedZones)
+            // check developer mode bypass for testing
+            var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing", false);
+            if (disableGeofencing && _env.IsDevelopment())
+            {
+                _logger.LogWarning("⚠️ SECURITY: Geofencing validation BYPASSED - Development mode only.");
+                var userWithZonesBypass = await _users.GetUserWithZonesAsync(user.UserId);
+                var assignedZoneIdsBypass = userWithZonesBypass?.AssignedZones?.Where(uz => uz.IsActive).Select(uz => uz.ZoneId).ToList() ?? new List<int>();
+
+                if (assignedZoneIdsBypass.Any())
                 {
-                    if (zone.Boundary != null)
-                    {
-                        // Check if worker is inside zone
-                        if (zone.Boundary.Contains(point))
-                        {
-                            validZone = zone;
-                            isInValidZone = true;
-                            break;
-                        }
-
-                        // Check if within buffer zone
-                        if (zone.Boundary.Distance(point) <= BufferToleranceDegrees)
-                        {
-                            validZone = zone;
-                            isInValidZone = true;
-                            _logger.LogInformation("Worker {UserId} validated via Buffer Zone ({Distance} deg)", user.UserId, zone.Boundary.Distance(point));
-                            break;
-                        }
-                    }
+                    matchedZone = await _zones.GetByIdAsync(assignedZoneIdsBypass.First());
+                    isInsideZone = true;
                 }
-
-                // Reject if not in any zone
-                if (validZone == null)
+                else
                 {
-                    _logger.LogWarning("GPS login rejected - Worker {UserId} is outside all assigned zones", user.UserId);
-                    return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResult("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور."));
+                    isInsideZone = true;
                 }
             }
             else
             {
-                // No zones assigned - worker must have at least one zone
-                _logger.LogWarning("GPS login rejected - Worker {UserId} has NO assigned zones", user.UserId);
-                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResult("لا يوجد مناطق عمل مخصصة لهذا المستخدم. يرجى مراجعة المشرف."));
+                // load user zones and check if inside any of them
+                var userWithZones = await _users.GetUserWithZonesAsync(user.UserId);
+                var assignedZoneIds = userWithZones?.AssignedZones?.Where(uz => uz.IsActive).Select(uz => uz.ZoneId).ToList() ?? new List<int>();
+
+                if (!assignedZoneIds.Any())
+                {
+                    return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("لا يوجد مناطق عمل مخصصة لهذا المستخدم."));
+                }
+
+                var assignedZones = (await _zones.GetZonesByIdsAsync(assignedZoneIds)).Where(z => z.IsActive).ToList();
+                var point = NetTopologySuite.Geometries.GeometryFactory.Default.CreatePoint(new NetTopologySuite.Geometries.Coordinate(request.Longitude, request.Latitude));
+
+                foreach (var z in assignedZones)
+                {
+                    if (z.Boundary == null) continue;
+
+                    // check if inside or close to boundary
+                    if (z.Boundary.Contains(point) || z.Boundary.Distance(point) <= Core.Constants.GeofencingConstants.BufferToleranceDegrees)
+                    {
+                        matchedZone = z;
+                        isInsideZone = true;
+                        break;
+                    }
+                }
             }
 
-            // Generate JWT token
-            var (success, token, refreshToken, error) = await _authService.GenerateTokenForUserAsync(user);
+            if (!isInsideZone)
+            {
+                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور."));
+            }
 
+            // 3. create login token
+            var (success, token, refreshToken, tokenError) = await _auth.GenerateTokenForUserAsync(user);
             if (!success)
             {
-                _logger.LogWarning("GPS login failed - Token generation error for user {UserId}: {Error}",
-                    user.UserId, error);
-                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResult(error ?? "فشل تسجيل الدخول"));
+                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse(tokenError ?? "فشل تسجيل الدخول"));
             }
 
-            // Create attendance record for check-in
-            var attendance = new Core.Entities.Attendance
+            // 4. save attendance record in database
+            var attendance = new Attendance
             {
                 UserId = user.UserId,
                 CheckInEventTime = DateTime.UtcNow,
                 CheckInLatitude = request.Latitude,
                 CheckInLongitude = request.Longitude,
-                ZoneId = validZone?.ZoneId,
-                IsValidated = isInValidZone,
-                ValidationMessage = isInValidZone
-                    ? "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة"
-                    : "تم تسجيل الحضور (خارج المناطق المخصصة)",
+                ZoneId = matchedZone?.ZoneId,
+                IsValidated = true,
+                ValidationMessage = "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة",
                 Status = Core.Enums.AttendanceStatus.CheckedIn
             };
 
-            await _attendanceRepo.AddAsync(attendance);
-            await _context.SaveChangesAsync();
+            await _attendance.AddAsync(attendance);
+            await _attendance.SaveChangesAsync();
 
-            _logger.LogInformation("User {UserId} ({FullName}) logged in with GPS and attendance created. Attendance ID: {AttendanceId}",
-                user.UserId, user.FullName, attendance.AttendanceId);
-
-            // Build response
-            var expirationMinutes = int.Parse(_configuration["JwtSettings:ExpirationMinutes"] ?? "1440");
-
-            var response = new LoginWithGPSResponse
+            // 5. prepare final response
+            var expirationMinutes = int.Parse(_config["JwtSettings:ExpirationMinutes"] ?? "1440");
+            var resObj = new LoginWithGPSResponse
             {
                 Success = true,
                 Token = token,
                 RefreshToken = refreshToken,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes),
-                User = new UserDto
-                {
-                    UserId = user.UserId,
-                    Username = user.Username,
-                    FullName = user.FullName,
-                    Email = user.Email,
-                    Role = user.Role.ToString(),
-                    WorkerType = user.WorkerType?.ToString(),
-                    Pin = user.Pin,
-                    EmployeeId = user.Pin ?? user.Username,  // PIN is employeeId for workers
-                    PhoneNumber = user.PhoneNumber,
-                    CreatedAt = user.CreatedAt
-                },
+                User = _mapper.Map<UserDto>(user),
                 Attendance = new AttendanceResponse
                 {
                     AttendanceId = attendance.AttendanceId,
                     UserId = attendance.UserId,
                     UserName = user.FullName,
                     ZoneId = attendance.ZoneId,
-                    ZoneName = validZone?.ZoneName,
+                    ZoneName = matchedZone?.ZoneName,
                     CheckInEventTime = attendance.CheckInEventTime,
                     CheckInLatitude = attendance.CheckInLatitude,
                     CheckInLongitude = attendance.CheckInLongitude,
@@ -278,50 +249,48 @@ public class AuthController : ControllerBase
                 Message = "تم تسجيل الدخول والحضور بنجاح"
             };
 
-            return Ok(ApiResponse<LoginWithGPSResponse>.SuccessResult(response, "GPS login and check-in successful"));
+            return Ok(ApiResponse<LoginWithGPSResponse>.SuccessResponse(resObj, "تم تسجيل الدخول والحضور بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during GPS login");
-            return StatusCode(500, ApiResponse<LoginWithGPSResponse>.ErrorResult("حدث خطأ أثناء تسجيل الدخول"));
+            return StatusCode(500, ApiResponse<LoginWithGPSResponse>.ErrorResponse("حدث خطأ أثناء تسجيل الدخول"));
         }
     }
 
     [HttpPost("register")]
     [Authorize(Roles = "Admin")]
-    [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         try
         {
-            _logger.LogInformation("Registration attempt for username: {Username}", request.Username);
-
             if (!ModelState.IsValid)
             {
                 var errors = ModelState.Values
                     .SelectMany(v => v.Errors)
                     .Select(e => e.ErrorMessage)
                     .ToList();
-                return BadRequest(ApiResponse<UserDto>.ErrorResult(errors));
+                return BadRequest(ApiResponse<UserDto>.ErrorResponse(errors));
             }
 
-            // Handle PIN for workers
+            if (!Utils.InputSanitizer.IsStrongPassword(request.Password))
+            {
+                return BadRequest(ApiResponse<UserDto>.ErrorResponse("كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم"));
+            }
+
             string? workerPin = request.Pin;
             if (request.Role == Core.Enums.UserRole.Worker)
             {
-                // Auto-generate PIN if not provided
                 if (string.IsNullOrEmpty(workerPin))
                 {
-                    workerPin = await GenerateUniquePinAsync();
+                    workerPin = await makeNewPin();
                 }
                 else
                 {
-                    // Check PIN uniqueness if provided
-                    var isPinUnique = await _userRepo.IsPinUniqueAsync(workerPin);
+                    var isPinUnique = await _users.IsPinUniqueAsync(workerPin);
                     if (!isPinUnique)
                     {
-                        return BadRequest(ApiResponse<UserDto>.ErrorResult("PIN already exists. Please use a different PIN."));
+                        return BadRequest(ApiResponse<UserDto>.ErrorResponse("الرقم السري موجود مسبقاً، يرجى استخدام رقم آخر"));
                     }
                 }
             }
@@ -338,42 +307,26 @@ public class AuthController : ControllerBase
                 Pin = request.Role == Core.Enums.UserRole.Worker ? workerPin : null
             };
 
-            var (success, createdUser, error) = await _authService.RegisterAsync(user, request.Password);
+            var (success, createdUser, error) = await _auth.RegisterAsync(user, request.Password);
 
             if (!success)
             {
-                _logger.LogWarning("Registration failed for username: {Username}. Error: {Error}", request.Username, error);
-                return BadRequest(ApiResponse<UserDto>.ErrorResult(error ?? "Registration failed"));
+                return BadRequest(ApiResponse<UserDto>.ErrorResponse(error ?? "فشل التسجيل"));
             }
 
-            var userDto = new UserDto
-            {
-                UserId = createdUser!.UserId,
-                Username = createdUser.Username,
-                FullName = createdUser.FullName,
-                Email = createdUser.Email,
-                Role = createdUser.Role.ToString(),
-                WorkerType = createdUser.WorkerType?.ToString(),
-                Pin = createdUser.Pin, // Show PIN to admin
-                PhoneNumber = createdUser.PhoneNumber,
-                CreatedAt = createdUser.CreatedAt
-            };
+            var userDto = _mapper.Map<UserDto>(createdUser!);
 
-            _logger.LogInformation("User {Username} registered successfully", request.Username);
-
-            return CreatedAtAction(nameof(GetProfile), null, ApiResponse<UserDto>.SuccessResult(userDto, "User registered successfully"));
+            return CreatedAtAction(nameof(GetProfile), null, ApiResponse<UserDto>.SuccessResponse(userDto, "تم تسجيل المستخدم بنجاح"));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during registration for username: {Username}", request.Username);
-            return StatusCode(500, ApiResponse<UserDto>.ErrorResult("An error occurred during registration"));
+            _logger.LogError(ex, "Error during registration");
+            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("حدث خطأ أثناء التسجيل"));
         }
     }
 
     [HttpGet("profile")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResponse<UserDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetProfile()
     {
         try
@@ -381,71 +334,57 @@ public class AuthController : ControllerBase
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
             {
-                return Unauthorized(ApiResponse<UserDto>.ErrorResult("Invalid token"));
+                return Unauthorized(ApiResponse<UserDto>.ErrorResponse("رمز دخول غير صالح"));
             }
 
-            var user = await _userRepo.GetByIdAsync(userId);
+            var user = await _users.GetByIdAsync(userId);
             if (user == null)
             {
-                return NotFound(ApiResponse<UserDto>.ErrorResult("User not found"));
+                return NotFound(ApiResponse<UserDto>.ErrorResponse("المستخدم غير موجود"));
             }
 
-            var userDto = new UserDto
-            {
-                UserId = user.UserId,
-                Username = user.Username,
-                FullName = user.FullName,
-                Email = user.Email,
-                Role = user.Role.ToString(),
-                WorkerType = user.WorkerType?.ToString(),
-                PhoneNumber = user.PhoneNumber,
-                CreatedAt = user.CreatedAt
-            };
+            var userDto = _mapper.Map<UserDto>(user);
 
-            return Ok(ApiResponse<UserDto>.SuccessResult(userDto));
+            return Ok(ApiResponse<UserDto>.SuccessResponse(userDto));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving user profile");
-            return StatusCode(500, ApiResponse<UserDto>.ErrorResult("An error occurred while retrieving profile"));
+            return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("حدث خطأ أثناء جلب الملف الشخصي"));
         }
     }
 
     [HttpPost("refresh")]
-    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Refresh([FromBody] string refreshToken)
     {
         try
         {
-            _logger.LogInformation("Token refresh attempt");
 
-            var (success, newToken, error) = await _authService.RefreshTokenAsync(refreshToken);
+            var (success, newToken, error) = await _auth.RefreshTokenAsync(refreshToken);
 
             if (!success)
             {
-                return BadRequest(ApiResponse<LoginResponse>.ErrorResult(error ?? "Token refresh failed"));
+                return BadRequest(ApiResponse<LoginResponse>.ErrorResponse(error ?? "فشل تحديث الرمز"));
             }
 
             var response = new LoginResponse
             {
                 Success = true,
                 Token = newToken,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(int.Parse(_configuration["JwtSettings:ExpirationMinutes"] ?? "1440"))
+                ExpiresAt = DateTime.UtcNow.AddMinutes(int.Parse(_config["JwtSettings:ExpirationMinutes"] ?? "1440"))
             };
 
-            return Ok(ApiResponse<LoginResponse>.SuccessResult(response, "Token refreshed successfully"));
+            return Ok(ApiResponse<LoginResponse>.SuccessResponse(response, "تم تحديث الرمز بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during token refresh");
-            return StatusCode(500, ApiResponse<LoginResponse>.ErrorResult("An error occurred during token refresh"));
+            return StatusCode(500, ApiResponse<LoginResponse>.ErrorResponse("حدث خطأ أثناء تحديث الرمز"));
         }
     }
 
     [HttpPost("logout")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout()
     {
         try
@@ -453,64 +392,57 @@ public class AuthController : ControllerBase
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (int.TryParse(userIdClaim, out var userId))
             {
-                await _authService.LogoutAsync(userId);
-                _logger.LogInformation("User {UserId} logged out", userId);
+                await _auth.LogoutAsync(userId);
             }
 
-            return Ok(ApiResponse<string>.SuccessResult("Logged out successfully"));
+            return Ok(ApiResponse<string>.SuccessResponse("تم تسجيل الخروج بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during logout");
-            return StatusCode(500, ApiResponse<string>.ErrorResult("An error occurred during logout"));
+            return StatusCode(500, ApiResponse<string>.ErrorResponse("حدث خطأ أثناء تسجيل الخروج"));
         }
     }
 
     [HttpPost("register-fcm-token")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> RegisterFcmToken([FromBody] RegisterFcmTokenRequest request)
     {
         try
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ApiResponse<object>.ErrorResult("Invalid request"));
+                return BadRequest(ApiResponse<object>.ErrorResponse("طلب غير صالح"));
             }
 
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
             {
-                return Unauthorized(ApiResponse<object>.ErrorResult("Invalid user token"));
+                return Unauthorized(ApiResponse<object>.ErrorResponse("رمز مستخدم غير صالح"));
             }
 
-            var user = await _userRepo.GetByIdAsync(userId);
+            var user = await _users.GetByIdAsync(userId);
             if (user == null)
             {
-                return NotFound(ApiResponse<object>.ErrorResult("User not found"));
+                return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
             }
 
             user.FcmToken = request.FcmToken;
-            await _userRepo.UpdateAsync(user);
-            await _context.SaveChangesAsync();
+            await _users.UpdateAsync(user);
+            await _users.SaveChangesAsync();
 
-            _logger.LogInformation("FCM token registered for user {UserId}", userId);
-
-            return Ok(ApiResponse<object?>.SuccessResponse(null, "FCM token registered successfully"));
+            return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تسجيل رمز الإشعارات بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error registering FCM token");
-            return StatusCode(500, ApiResponse<object>.ErrorResult("An error occurred while registering FCM token"));
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("حدث خطأ أثناء تسجيل رمز الإشعارات"));
         }
     }
 
-    // Use Random.Shared (thread-safe) to avoid duplicate PINs
     private static readonly Random _randomGenerator = Random.Shared;
 
-    private async Task<string> GenerateUniquePinAsync()
+    private async Task<string> makeNewPin()
     {
         string pin;
         bool isUnique;
@@ -518,7 +450,7 @@ public class AuthController : ControllerBase
         do
         {
             pin = _randomGenerator.Next(1000, 9999).ToString();
-            isUnique = await _userRepo.IsPinUniqueAsync(pin);
+            isUnique = await _users.IsPinUniqueAsync(pin);
         } while (!isUnique);
 
         return pin;

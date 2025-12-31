@@ -1,7 +1,6 @@
 using System.Text;
 using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.Interfaces.Repositories;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskStatus = Jawlah.Core.Enums.TaskStatus;
@@ -13,16 +12,14 @@ namespace Jawlah.API.Controllers;
 [Authorize(Roles = "Admin,Supervisor")]
 public class ReportsController : ControllerBase
 {
-    private readonly IAttendanceRepository _attendanceRepo;
-    private readonly ITaskRepository _taskRepo;
-    private readonly JawlahDbContext _context;
+    private readonly IAttendanceRepository _attendance;
+    private readonly ITaskRepository _tasks;
     private readonly ILogger<ReportsController> _logger;
 
-    public ReportsController(IAttendanceRepository attendanceRepo, ITaskRepository taskRepo, JawlahDbContext context, ILogger<ReportsController> logger)
+    public ReportsController(IAttendanceRepository attendance, ITaskRepository tasks, ILogger<ReportsController> logger)
     {
-        _attendanceRepo = attendanceRepo;
-        _taskRepo = taskRepo;
-        _context = context;
+        _attendance = attendance;
+        _tasks = tasks;
         _logger = logger;
     }
 
@@ -36,16 +33,29 @@ public class ReportsController : ControllerBase
     {
         try
         {
-            var records = await _attendanceRepo.GetFilteredAttendanceAsync(
+            // 1. get all attendance records from the repo based on the search filters
+            var records = await _attendance.GetFilteredAttendanceAsync(
                 workerId, zoneId, startDate, endDate);
 
+            // 2. if the user wants a CSV file
             if (format.ToLower() == "csv")
             {
-                var csv = GenerateAttendanceCsv(records);
+                var sb = new StringBuilder();
+                // add the header row
+                sb.AppendLine("AttendanceId,UserId,WorkerName,ZoneId,ZoneName,CheckInTime,CheckOutTime,CheckInLat,CheckInLng,CheckOutLat,CheckOutLng,WorkDuration,Status,IsValidated");
+
+                // add each row of data
+                foreach (var a in records)
+                {
+                    sb.AppendLine($"{a.AttendanceId},{a.UserId},{cleanForCsv(a.User?.FullName)},{a.ZoneId},{cleanForCsv(a.Zone?.ZoneName)},{a.CheckInEventTime:yyyy-MM-dd HH:mm:ss},{a.CheckOutEventTime?.ToString("yyyy-MM-dd HH:mm:ss")},{a.CheckInLatitude},{a.CheckInLongitude},{a.CheckOutLatitude},{a.CheckOutLongitude},{a.WorkDuration?.ToString(@"hh\:mm\:ss")},{a.Status},{a.IsValidated}");
+                }
+
+                var csvResult = sb.ToString();
                 var fileName = $"attendance_report_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv";
-                return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
+                return File(Encoding.UTF8.GetBytes(csvResult), "text/csv", fileName);
             }
 
+            // 3. if the user wants JSON (default)
             var response = records.Select(a => new
             {
                 a.AttendanceId,
@@ -64,12 +74,12 @@ public class ReportsController : ControllerBase
                 a.IsValidated
             });
 
-            return Ok(ApiResponse<object>.SuccessResult(response));
+            return Ok(ApiResponse<object>.SuccessResponse(response));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating attendance report");
-            return StatusCode(500, ApiResponse<object>.ErrorResult("Failed to generate report"));
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("فشل إنشاء التقرير"));
         }
     }
 
@@ -84,17 +94,29 @@ public class ReportsController : ControllerBase
     {
         try
         {
-            var tasks = await _taskRepo.GetFilteredTasksAsync(
+            // 1. fetch tasks based on filters
+            var filteredTasks = await _tasks.GetFilteredTasksAsync(
                 workerId, zoneId, startDate, endDate, status);
 
+            // 2. format output based on choice
             if (format.ToLower() == "csv")
             {
-                var csv = GenerateTasksCsv(tasks);
+                var sb = new StringBuilder();
+                // table header
+                sb.AppendLine("TaskId,Title,Description,AssignedToUserId,AssignedToName,AssignedByUserId,AssignedByName,ZoneId,ZoneName,Priority,Status,DueDate,CompletedAt,CreatedAt");
+
+                // table data
+                foreach (var t in filteredTasks)
+                {
+                    sb.AppendLine($"{t.TaskId},{cleanForCsv(t.Title)},{cleanForCsv(t.Description)},{t.AssignedToUserId},{cleanForCsv(t.AssignedToUser?.FullName)},{t.AssignedByUserId},{cleanForCsv(t.AssignedByUser?.FullName)},{t.ZoneId},{cleanForCsv(t.Zone?.ZoneName)},{t.Priority},{t.Status},{t.DueDate:yyyy-MM-dd HH:mm:ss},{t.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss")},{t.CreatedAt:yyyy-MM-dd HH:mm:ss}");
+                }
+
+                var csvResult = sb.ToString();
                 var fileName = $"tasks_report_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv";
-                return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
+                return File(Encoding.UTF8.GetBytes(csvResult), "text/csv", fileName);
             }
 
-            var response = tasks.Select(t => new
+            var response = filteredTasks.Select(t => new
             {
                 t.TaskId,
                 t.Title,
@@ -112,48 +134,17 @@ public class ReportsController : ControllerBase
                 t.CreatedAt
             });
 
-            return Ok(ApiResponse<object>.SuccessResult(response));
+            return Ok(ApiResponse<object>.SuccessResponse(response));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating tasks report");
-            return StatusCode(500, ApiResponse<object>.ErrorResult("Failed to generate report"));
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("Failed to generate report"));
         }
     }
 
-    private static string GenerateAttendanceCsv(IEnumerable<Core.Entities.Attendance> records)
-    {
-        var sb = new StringBuilder();
 
-        // Header
-        sb.AppendLine("AttendanceId,UserId,WorkerName,ZoneId,ZoneName,CheckInTime,CheckOutTime,CheckInLat,CheckInLng,CheckOutLat,CheckOutLng,WorkDuration,Status,IsValidated");
-
-        // Data rows
-        foreach (var a in records)
-        {
-            sb.AppendLine($"{a.AttendanceId},{a.UserId},{EscapeCsv(a.User?.FullName)},{a.ZoneId},{EscapeCsv(a.Zone?.ZoneName)},{a.CheckInEventTime:yyyy-MM-dd HH:mm:ss},{a.CheckOutEventTime?.ToString("yyyy-MM-dd HH:mm:ss")},{a.CheckInLatitude},{a.CheckInLongitude},{a.CheckOutLatitude},{a.CheckOutLongitude},{a.WorkDuration?.ToString(@"hh\:mm\:ss")},{a.Status},{a.IsValidated}");
-        }
-
-        return sb.ToString();
-    }
-
-    private static string GenerateTasksCsv(IEnumerable<Core.Entities.Task> tasks)
-    {
-        var sb = new StringBuilder();
-
-        // Header
-        sb.AppendLine("TaskId,Title,Description,AssignedToUserId,AssignedToName,AssignedByUserId,AssignedByName,ZoneId,ZoneName,Priority,Status,DueDate,CompletedAt,CreatedAt");
-
-        // Data rows
-        foreach (var t in tasks)
-        {
-            sb.AppendLine($"{t.TaskId},{EscapeCsv(t.Title)},{EscapeCsv(t.Description)},{t.AssignedToUserId},{EscapeCsv(t.AssignedToUser?.FullName)},{t.AssignedByUserId},{EscapeCsv(t.AssignedByUser?.FullName)},{t.ZoneId},{EscapeCsv(t.Zone?.ZoneName)},{t.Priority},{t.Status},{t.DueDate:yyyy-MM-dd HH:mm:ss},{t.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss")},{t.CreatedAt:yyyy-MM-dd HH:mm:ss}");
-        }
-
-        return sb.ToString();
-    }
-
-    private static string EscapeCsv(string? value)
+    private static string cleanForCsv(string? value)
     {
         if (string.IsNullOrEmpty(value))
             return "";

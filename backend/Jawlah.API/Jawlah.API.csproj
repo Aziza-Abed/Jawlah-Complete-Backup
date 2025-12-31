@@ -5,19 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>34b9fe55-5b5f-4930-be0f-5b3aac4a0a9a</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Content Remove="wwwroot\uploads\issues\14b7d58b-4820-43e4-ba97-0c59e16b6340.jpg" />
-    <Content Remove="wwwroot\uploads\issues\1d91c745-f5af-47ab-8dd2-db657a7b3f45.jpg" />
-    <Content Remove="wwwroot\uploads\issues\96d980c4-95ad-46a9-8cd1-eeb2aa65e43b.jpg" />
-    <Content Remove="wwwroot\uploads\issues\a28fa4c5-ae1d-4f15-9419-6bdbe357b3fe.jpg" />
-    <Content Remove="wwwroot\uploads\issues\a831e62e-0928-4821-abc3-991a59fe1a27.jpg" />
-    <Content Remove="wwwroot\uploads\issues\b9c4aa28-5527-426f-9dbe-cd8f8693c949.jpg" />
-    <Content Remove="wwwroot\uploads\issues\d9f18b0f-eb71-463a-b870-47664f0a936d.jpg" />
-    <Content Remove="wwwroot\uploads\tasks\76d57fd9-3d9f-4154-9bc8-98747057ca78.jpg" />
-    <Content Remove="wwwroot\uploads\tasks\b369f253-dae8-4536-8695-3e9c0c7ba67b.jpg" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Jawlah.Core\Jawlah.Core.csproj" />
@@ -35,11 +25,12 @@
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-    <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="6.5.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Storage\uploads\issues\" />
     <Folder Include="wwwroot\uploads\issues\" />
     <Folder Include="wwwroot\uploads\tasks\" />
   </ItemGroup>

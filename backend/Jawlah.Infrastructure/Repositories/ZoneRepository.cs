@@ -21,6 +21,7 @@ public class ZoneRepository : Repository<Zone>, IZoneRepository
     public async Task<IEnumerable<Zone>> GetActiveZonesAsync()
     {
         return await _dbSet
+            .AsNoTracking()
             .Where(z => z.IsActive)
             .OrderBy(z => z.ZoneName)
             .ToListAsync();
@@ -32,6 +33,7 @@ public class ZoneRepository : Repository<Zone>, IZoneRepository
         var point = geometryFactory.CreatePoint(new Coordinate(longitude, latitude));
 
         var zones = await _dbSet
+            .AsNoTracking()
             .Where(z => z.IsActive && z.Boundary != null)
             .ToListAsync();
 
@@ -39,9 +41,19 @@ public class ZoneRepository : Repository<Zone>, IZoneRepository
         return zone;
     }
 
+    public async Task<IEnumerable<Zone>> GetUserZonesAsync(int userId)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .Include(z => z.AssignedUsers)
+            .Where(z => z.IsActive && z.AssignedUsers.Any(au => au.UserId == userId))
+            .ToListAsync();
+    }
+
     public async Task<IEnumerable<Zone>> GetZonesWithUsersAsync()
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(z => z.AssignedUsers)
                 .ThenInclude(uz => uz.User)
             .Where(z => z.IsActive)
@@ -56,6 +68,7 @@ public class ZoneRepository : Repository<Zone>, IZoneRepository
             return Enumerable.Empty<Zone>();
 
         return await _dbSet
+            .AsNoTracking()
             .Where(z => zoneIdsList.Contains(z.ZoneId))
             .ToListAsync();
     }

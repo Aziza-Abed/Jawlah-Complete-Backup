@@ -32,6 +32,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(20);
 
+        builder.Property(e => e.FcmToken)
+            .HasMaxLength(255);
+
         builder.Property(e => e.Department)
             .HasMaxLength(100);
 

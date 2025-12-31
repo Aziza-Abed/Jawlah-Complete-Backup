@@ -1,35 +1,40 @@
 ﻿using System.Security.Claims;
+using AutoMapper;
 using Jawlah.API.Models;
+using Jawlah.API.Utils;
 using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.DTOs.Issues;
 using Jawlah.Core.Entities;
 using Jawlah.Core.Enums;
 using Jawlah.Core.Interfaces.Repositories;
 using Jawlah.Core.Interfaces.Services;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Jawlah.API.Controllers;
 
 [Route("api/[controller]")]
 public class IssuesController : BaseApiController
 {
-    private readonly IIssueRepository _issueRepo;
-    private readonly JawlahDbContext _context;
+    private readonly IIssueRepository _issues;
+    private readonly IPhotoRepository _photos;
     private readonly ILogger<IssuesController> _logger;
-    private readonly IFileStorageService _fileStorageService;
+    private readonly IFileStorageService _files;
+    private readonly IMapper _mapper;
 
     public IssuesController(
-        IIssueRepository issueRepo,
-        JawlahDbContext context,
+        IIssueRepository issues,
+        IPhotoRepository photos,
         ILogger<IssuesController> logger,
-        IFileStorageService fileStorageService)
+        IFileStorageService files,
+        IMapper mapper)
     {
-        _issueRepo = issueRepo;
-        _context = context;
+        _issues = issues;
+        _photos = photos;
         _logger = logger;
-        _fileStorageService = fileStorageService;
+        _files = files;
+        _mapper = mapper;
     }
 
     [HttpPost("report")]
@@ -58,13 +63,11 @@ public class IssuesController : BaseApiController
             SyncVersion = 1
         };
 
-        await _issueRepo.AddAsync(issue);
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("Issue {IssueId} reported by user {UserId}", issue.IssueId, userId);
+        await _issues.AddAsync(issue);
+        await _issues.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetIssueById), new { id = issue.IssueId },
-            ApiResponse<IssueResponse>.SuccessResponse(MapToIssueResponse(issue)));
+            ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue)));
     }
 
     [HttpPost("report-with-photo")]
@@ -75,113 +78,81 @@ public class IssuesController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized();
 
-        //
-        _logger.LogInformation("Received issue report - Type: '{Type}', Description: '{Description}', Latitude: {Lat}, Longitude: {Lng}",
-            request.Type ?? "NULL", 
-            request.Description ?? "NULL",
-            request.Latitude,
-            request.Longitude);
-
-        // Upload photos if provided (support both old single photo and new 3-photo system)
+        // support up to 3 photos per issue
         var photoUrls = new List<string>();
 
-        // Check for new 3-photo system first
-        var photo1 = request.Photo1 ?? request.Photo;  // Fallback to legacy Photo field
+        var photo1 = request.Photo1 ?? request.Photo;
         if (photo1 != null)
         {
-            if (!_fileStorageService.ValidateImage(photo1))
-                return BadRequest(ApiResponse<object>.ErrorResponse("Invalid image file for photo 1"));
-            photoUrls.Add(await _fileStorageService.UploadImageAsync(photo1, "issues"));
+            if (!_files.ValidateImage(photo1))
+                return BadRequest(ApiResponse<object>.ErrorResponse("ملف الصورة الأولى غير صالح"));
+            photoUrls.Add(await _files.UploadImageAsync(photo1, "issues"));
         }
 
         if (request.Photo2 != null)
         {
-            if (!_fileStorageService.ValidateImage(request.Photo2))
-                return BadRequest(ApiResponse<object>.ErrorResponse("Invalid image file for photo 2"));
-            photoUrls.Add(await _fileStorageService.UploadImageAsync(request.Photo2, "issues"));
+            if (!_files.ValidateImage(request.Photo2))
+                return BadRequest(ApiResponse<object>.ErrorResponse("ملف الصورة الثانية غير صالح"));
+            photoUrls.Add(await _files.UploadImageAsync(request.Photo2, "issues"));
         }
 
         if (request.Photo3 != null)
         {
-            if (!_fileStorageService.ValidateImage(request.Photo3))
-                return BadRequest(ApiResponse<object>.ErrorResponse("Invalid image file for photo 3"));
-            photoUrls.Add(await _fileStorageService.UploadImageAsync(request.Photo3, "issues"));
+            if (!_files.ValidateImage(request.Photo3))
+                return BadRequest(ApiResponse<object>.ErrorResponse("ملف الصورة الثالثة غير صالح"));
+            photoUrls.Add(await _files.UploadImageAsync(request.Photo3, "issues"));
         }
 
-        // Combine photo URLs with semicolon separator for multiple photos
         string? photoUrl = photoUrls.Count > 0 ? string.Join(";", photoUrls) : null;
 
-        //
         if (string.IsNullOrWhiteSpace(request.Type))
         {
-            // Cleanup uploaded photos if validation fails
-            foreach (var url in photoUrls)
-            {
-                try { await _fileStorageService.DeleteImageAsync(url); } catch { }
-            }
-            _logger.LogWarning("Issue type is null or empty");
-            return BadRequest(ApiResponse<object>.ErrorResponse("Issue type is required"));
+            await _files.DeleteImagesAsync(photoUrls);
+            return BadRequest(ApiResponse<object>.ErrorResponse("نوع المشكلة مطلوب"));
         }
 
-        // Try parsing with ignoreCase=true for case-insensitive matching
         var typeString = request.Type.Trim();
         if (!Enum.TryParse<IssueType>(typeString, ignoreCase: true, out var issueType))
         {
-            // Cleanup uploaded photos if validation fails
-            foreach (var url in photoUrls)
-            {
-                try { await _fileStorageService.DeleteImageAsync(url); } catch { }
-            }
-            _logger.LogWarning("Invalid issue type received: {Type}. Valid types are: {ValidTypes}", 
-                typeString, string.Join(", ", Enum.GetNames<IssueType>()));
-            return BadRequest(ApiResponse<object>.ErrorResponse(
-                $"Invalid issue type: '{typeString}'. Valid types are: {string.Join(", ", Enum.GetNames<IssueType>())}"));
+            await _files.DeleteImagesAsync(photoUrls);
+            return BadRequest(ApiResponse<object>.ErrorResponse("نوع المشكلة غير صالح"));
         }
 
-        // Default severity to Moderate if not provided
         IssueSeverity issueSeverity = IssueSeverity.Moderate;
         if (!string.IsNullOrEmpty(request.Severity))
         {
             var severityString = request.Severity.Trim();
-            //
             if (!Enum.TryParse<IssueSeverity>(severityString, ignoreCase: true, out issueSeverity))
             {
-                // Cleanup uploaded photos if validation fails
-                foreach (var url in photoUrls)
-                {
-                    try { await _fileStorageService.DeleteImageAsync(url); } catch { }
-                }
-                _logger.LogWarning("Invalid severity received: {Severity}. Valid severities are: {ValidSeverities}",
-                    severityString, string.Join(", ", Enum.GetNames<IssueSeverity>()));
-                return BadRequest(ApiResponse<object>.ErrorResponse(
-                    $"Invalid severity: '{severityString}'. Valid severities are: {string.Join(", ", Enum.GetNames<IssueSeverity>())}"));
+                await _files.DeleteImagesAsync(photoUrls);
+                return BadRequest(ApiResponse<object>.ErrorResponse("مستوى الخطورة غير صالح"));
             }
         }
 
-        // Generate title from type and date if not provided
-        var title = request.Title;
+        var title = InputSanitizer.SanitizeString(request.Title, 200);
         if (string.IsNullOrWhiteSpace(title))
         {
             title = $"{issueType} - {DateTime.UtcNow:yyyy-MM-dd HH:mm}";
         }
 
-        //
+        var sanitizedDescription = InputSanitizer.SanitizeString(request.Description, 2000);
+        var sanitizedLocation = InputSanitizer.SanitizeString(request.LocationDescription, 500);
+
         Issue issue;
-        
-        //
+
         try
         {
             issue = new Issue
             {
                 Title = title,
-                Description = request.Description ?? string.Empty,  // Handle null description
+                Description = sanitizedDescription,
                 Type = issueType,
                 Severity = issueSeverity,
                 ReportedByUserId = userId.Value,
                 Latitude = request.Latitude ?? 0.0,
                 Longitude = request.Longitude ?? 0.0,
-                LocationDescription = request.LocationDescription,
-                PhotoUrl = photoUrl,
+                LocationDescription = sanitizedLocation,
+                PhotoUrl = photoUrl, // keep for backward compatibility
                 Status = IssueStatus.Reported,
                 ReportedAt = DateTime.UtcNow,
                 EventTime = DateTime.UtcNow,
@@ -190,42 +161,43 @@ public class IssuesController : BaseApiController
                 SyncVersion = 1
             };
 
-            await _issueRepo.AddAsync(issue);
-            await _context.SaveChangesAsync();
+            await _issues.AddAsync(issue);
+            await _issues.SaveChangesAsync();
+
+            for (int i = 0; i < photoUrls.Count; i++)
+            {
+                var photo = new Photo
+                {
+                    PhotoUrl = photoUrls[i],
+                    EntityType = "Issue",
+                    EntityId = issue.IssueId,
+                    OrderIndex = i,
+                    UploadedAt = DateTime.UtcNow,
+                    UploadedByUserId = userId.Value,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _photos.AddAsync(photo);
+            }
+            await _issues.SaveChangesAsync();
         }
         catch
         {
-            // Cleanup uploaded files if database save failed
-            foreach (var url in photoUrls)
-            {
-                try
-                {
-                    await _fileStorageService.DeleteImageAsync(url);
-                    _logger.LogWarning("Cleaned up orphaned photo file: {PhotoUrl}", url);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to cleanup orphaned photo: {PhotoUrl}", url);
-                }
-            }
-            throw; // Re-throw original exception
+            await _files.DeleteImagesAsync(photoUrls);
+            throw;
         }
 
-        _logger.LogInformation("Issue {IssueId} reported by user {UserId} with photo {PhotoUrl}",
-            issue.IssueId, userId, photoUrl);
-
         return CreatedAtAction(nameof(GetIssueById), new { id = issue.IssueId },
-            ApiResponse<IssueResponse>.SuccessResponse(MapToIssueResponse(issue)));
+            ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue)));
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetIssueById(int id)
     {
-        var issue = await _issueRepo.GetByIdAsync(id);
+        var issue = await _issues.GetByIdAsync(id);
         if (issue == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("Issue not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("المشكلة غير موجودة"));
 
-        return Ok(ApiResponse<IssueResponse>.SuccessResponse(MapToIssueResponse(issue)));
+        return Ok(ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue)));
     }
 
     [HttpGet]
@@ -238,11 +210,11 @@ public class IssuesController : BaseApiController
 
         if (userRole == "Worker")
         {
-            issues = await _issueRepo.GetUserIssuesAsync(userId!.Value);
+            issues = await _issues.GetUserIssuesAsync(userId!.Value);
         }
         else
         {
-            issues = await _issueRepo.GetAllAsync();
+            issues = await _issues.GetAllAsync();
         }
 
         if (status.HasValue)
@@ -251,25 +223,25 @@ public class IssuesController : BaseApiController
         }
 
         return Ok(ApiResponse<IEnumerable<IssueResponse>>.SuccessResponse(
-            issues.Select(i => MapToIssueResponse(i))));
+            issues.Select(i => _mapper.Map<IssueResponse>(i))));
     }
 
     [HttpGet("critical")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetCriticalIssues()
     {
-        var issues = await _issueRepo.GetCriticalIssuesAsync();
+        var issues = await _issues.GetCriticalIssuesAsync();
         return Ok(ApiResponse<IEnumerable<IssueResponse>>.SuccessResponse(
-            issues.Select(i => MapToIssueResponse(i))));
+            issues.Select(i => _mapper.Map<IssueResponse>(i))));
     }
 
     [HttpPut("{id}/status")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> UpdateIssueStatus(int id, [FromBody] UpdateIssueStatusRequest request)
     {
-        var issue = await _issueRepo.GetByIdAsync(id);
+        var issue = await _issues.GetByIdAsync(id);
         if (issue == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("Issue not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("المشكلة غير موجودة"));
 
         var userId = GetCurrentUserId();
 
@@ -284,44 +256,28 @@ public class IssuesController : BaseApiController
             issue.ResolutionNotes = request.ResolutionNotes;
         }
 
-        await _issueRepo.UpdateAsync(issue);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _issues.UpdateAsync(issue);
+            await _issues.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            _logger.LogWarning("Concurrency conflict when updating issue {IssueId}", id);
+            return Conflict(ApiResponse<object>.ErrorResponse(
+                "تم تعديل المشكلة من قبل مستخدم آخر. يرجى التحديث والمحاولة مرة أخرى"));
+        }
 
-        _logger.LogInformation("Issue {IssueId} status updated to {Status} by user {UserId}",
-            id, request.Status, userId);
-
-        return Ok(ApiResponse<IssueResponse>.SuccessResponse(MapToIssueResponse(issue)));
+        return Ok(ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue)));
     }
 
     [HttpGet("unresolved-count")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetUnresolvedCount()
     {
-        var issues = await _issueRepo.GetAllAsync();
+        var issues = await _issues.GetAllAsync();
         var unresolvedCount = issues.Count(i => i.Status != IssueStatus.Resolved);
 
         return Ok(ApiResponse<int>.SuccessResponse(unresolvedCount));
-    }
-
-    private IssueResponse MapToIssueResponse(Issue issue)
-    {
-        return new IssueResponse
-        {
-            IssueId = issue.IssueId,
-            Title = issue.Title,
-            Description = issue.Description,
-            Type = issue.Type,
-            Severity = issue.Severity,
-            Status = issue.Status,
-            ReportedByUserId = issue.ReportedByUserId,
-            ZoneId = issue.ZoneId,
-            Latitude = issue.Latitude,
-            Longitude = issue.Longitude,
-            LocationDescription = issue.LocationDescription,
-            PhotoUrl = issue.PhotoUrl,
-            ReportedAt = issue.ReportedAt,
-            ResolvedAt = issue.ResolvedAt,
-            ResolutionNotes = issue.ResolutionNotes
-        };
     }
 }

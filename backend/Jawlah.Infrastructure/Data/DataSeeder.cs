@@ -1,6 +1,7 @@
 using Jawlah.Core.Entities;
 using Jawlah.Core.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using NetTopologySuite.Geometries;
 using Task = System.Threading.Tasks.Task;
 
@@ -10,22 +11,27 @@ public class DataSeeder
 {
     private readonly JawlahDbContext _context;
     private readonly GeometryFactory _geometryFactory;
+    private readonly IConfiguration _configuration;
 
-    public DataSeeder(JawlahDbContext context)
+    public DataSeeder(JawlahDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
         _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
     }
 
     public async Task SeedAsync()
     {
+        // 1. make sure the database is there
         await _context.Database.EnsureCreatedAsync();
 
+        // 2. add users if none exist
         if (!await _context.Users.AnyAsync())
         {
             await SeedUsersAsync();
         }
 
+        // 3. add zones if none exist
         if (!await _context.Zones.AnyAsync())
         {
             await SeedZonesAsync();
@@ -33,13 +39,13 @@ public class DataSeeder
 
         await _context.SaveChangesAsync();
 
-        // Seed user-zone assignments after users and zones are created
+        // 4. assign workers to zones
         if (!await _context.UserZones.AnyAsync())
         {
             await SeedUserZonesAsync();
         }
 
-        // Seed sample tasks
+        // 5. add some sample tasks
         if (!await _context.Tasks.AnyAsync())
         {
             await SeedTasksAsync();
@@ -53,7 +59,7 @@ public class DataSeeder
         var adminUser = new User
         {
             Username = "admin",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 12),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(_configuration["Seeding:AdminPassword"] ?? "Admin@123", workFactor: 12),
             Email = "admin@jawlah.com",
             PhoneNumber = "+970591234567",
             FullName = "System Administrator",
@@ -68,7 +74,7 @@ public class DataSeeder
         var supervisorUser = new User
         {
             Username = "supervisor",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Super@123", workFactor: 12),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(_configuration["Seeding:SupervisorPassword"] ?? "Super@123", workFactor: 12),
             Email = "supervisor@jawlah.com",
             PhoneNumber = "+970592345678",
             FullName = "Field Supervisor",
@@ -83,8 +89,8 @@ public class DataSeeder
         var worker1 = new User
         {
             Username = "worker1",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Worker@123", workFactor: 12),
-            Pin = "1234",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(_configuration["Seeding:WorkerPassword"] ?? "Worker@123", workFactor: 12),
+            Pin = _configuration["Seeding:Worker1Pin"] ?? "1234",
             Email = "worker1@jawlah.com",
             PhoneNumber = "+970593456789",
             FullName = "أحمد حسن",
@@ -99,8 +105,8 @@ public class DataSeeder
         var worker2 = new User
         {
             Username = "worker2",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Worker@123", workFactor: 12),
-            Pin = "5678",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(_configuration["Seeding:WorkerPassword"] ?? "Worker@123", workFactor: 12),
+            Pin = _configuration["Seeding:Worker2Pin"] ?? "5678",
             Email = "worker2@jawlah.com",
             PhoneNumber = "+970594567890",
             FullName = "محمد علي",
@@ -115,8 +121,8 @@ public class DataSeeder
         var worker3 = new User
         {
             Username = "worker3",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Worker@123", workFactor: 12),
-            Pin = "9012",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(_configuration["Seeding:WorkerPassword"] ?? "Worker@123", workFactor: 12),
+            Pin = _configuration["Seeding:Worker3Pin"] ?? "9012",
             Email = "worker3@jawlah.com",
             PhoneNumber = "+970595678901",
             FullName = "خالد محمود",
@@ -133,8 +139,8 @@ public class DataSeeder
 
     private async Task SeedZonesAsync()
     {
-        // Create polygon boundaries for GPS validation
-        // Central zone - area around Al-Bireh center
+        // create polygon boundaries for GPS validation
+        // central zone - area around Al-Bireh center
         var centralCoords = new Coordinate[]
         {
             new Coordinate(35.1984, 31.8988),
@@ -162,7 +168,7 @@ public class DataSeeder
             CreatedAt = DateTime.UtcNow
         };
 
-        // Northern zone
+        // northern zone
         var northernCoords = new Coordinate[]
         {
             new Coordinate(35.1950, 31.9100),
@@ -190,7 +196,7 @@ public class DataSeeder
             CreatedAt = DateTime.UtcNow
         };
 
-        // Southern zone
+        // southern zone
         var southernCoords = new Coordinate[]
         {
             new Coordinate(35.2000, 31.8870),
@@ -230,7 +236,7 @@ public class DataSeeder
 
         var userZones = new List<UserZone>();
 
-        // Assign worker1 to zone 1
+        // assign worker1 to zone 1
         var worker1 = workers.FirstOrDefault(w => w.Pin == "1234");
         var zone1 = zones.FirstOrDefault(z => z.ZoneCode == "ZONE-001");
         if (worker1 != null && zone1 != null)
@@ -244,7 +250,7 @@ public class DataSeeder
             });
         }
 
-        // Assign worker2 to zone 2
+        // assign worker2 to zone 2
         var worker2 = workers.FirstOrDefault(w => w.Pin == "5678");
         var zone2 = zones.FirstOrDefault(z => z.ZoneCode == "ZONE-002");
         if (worker2 != null && zone2 != null)
@@ -258,7 +264,7 @@ public class DataSeeder
             });
         }
 
-        // Assign worker3 to zone 3
+        // assign worker3 to zone 3
         var worker3 = workers.FirstOrDefault(w => w.Pin == "9012");
         var zone3 = zones.FirstOrDefault(z => z.ZoneCode == "ZONE-003");
         if (worker3 != null && zone3 != null)

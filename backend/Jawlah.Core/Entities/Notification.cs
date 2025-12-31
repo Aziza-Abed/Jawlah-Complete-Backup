@@ -14,7 +14,6 @@ public class Notification
     public DateTime CreatedAt { get; set; }
     public DateTime? SentAt { get; set; }
     public DateTime? ReadAt { get; set; }
-    public string? FcmToken { get; set; }
     public string? FcmMessageId { get; set; }
     public string? PayloadJson { get; set; }
     public User User { get; set; } = null!;

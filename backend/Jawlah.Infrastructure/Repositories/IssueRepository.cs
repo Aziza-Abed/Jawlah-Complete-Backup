@@ -12,11 +12,24 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
     {
     }
 
+    public override async Task<Issue?> GetByIdAsync(int id)
+    {
+        return await _dbSet
+            .Include(i => i.ReportedByUser)
+            .Include(i => i.Zone)
+            .Include(i => i.ResolvedByUser)
+            .Include(i => i.Photos)
+            .FirstOrDefaultAsync(i => i.IssueId == id);
+    }
+
     public async Task<IEnumerable<Issue>> GetUserIssuesAsync(int userId)
     {
         return await _dbSet
+            .AsNoTracking()
+            .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
             .Include(i => i.ResolvedByUser)
+            .Include(i => i.Photos)
             .Where(i => i.ReportedByUserId == userId)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
@@ -25,8 +38,10 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
     public async Task<IEnumerable<Issue>> GetIssuesByStatusAsync(IssueStatus status)
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
+            .Include(i => i.Photos)
             .Where(i => i.Status == status)
             .OrderByDescending(i => i.Severity)
             .ThenByDescending(i => i.ReportedAt)
@@ -36,8 +51,10 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
     public async Task<IEnumerable<Issue>> GetIssuesByTypeAsync(IssueType type)
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
+            .Include(i => i.Photos)
             .Where(i => i.Type == type)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
@@ -46,8 +63,10 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
     public async Task<IEnumerable<Issue>> GetCriticalIssuesAsync()
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
+            .Include(i => i.Photos)
             .Where(i => i.Severity == IssueSeverity.Critical &&
                        i.Status != IssueStatus.Resolved &&
                        i.Status != IssueStatus.Dismissed)

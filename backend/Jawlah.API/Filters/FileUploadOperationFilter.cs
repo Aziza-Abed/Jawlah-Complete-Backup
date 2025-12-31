@@ -3,14 +3,12 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Jawlah.API.Filters;
 
-/// <summary>
-/// Swagger operation filter to properly handle IFormFile parameters in API documentation
-/// </summary>
+// swagger operation filter to properly handle IFormFile parameters in API documentation
 public class FileUploadOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        // Find all [FromForm] parameters
+        // find all [FromForm] parameters
         var formParameters = context.ApiDescription.ParameterDescriptions
             .Where(p => p.Source.Id == "Form")
             .ToList();
@@ -18,15 +16,16 @@ public class FileUploadOperationFilter : IOperationFilter
         if (!formParameters.Any())
             return;
 
-        // Check if any parameter is IFormFile (including nullable)
+        // check if any parameter is IFormFile (including nullable)
         var hasFileParameter = formParameters.Any(p =>
             p.Type == typeof(IFormFile) ||
             Nullable.GetUnderlyingType(p.Type) == typeof(IFormFile));
 
+        // if there's no file, we don't need to do anything special
         if (!hasFileParameter)
             return;
 
-        // Build the multipart/form-data schema
+        // build the multipart/form-data schema
         var properties = new Dictionary<string, OpenApiSchema>();
         foreach (var param in formParameters)
         {
@@ -52,7 +51,7 @@ public class FileUploadOperationFilter : IOperationFilter
             }
         }
 
-        // Replace operation parameters with request body
+        // replace operation parameters with request body
         operation.Parameters.Clear();
         operation.RequestBody = new OpenApiRequestBody
         {
@@ -72,7 +71,7 @@ public class FileUploadOperationFilter : IOperationFilter
 
     private string GetSchemaType(Type type)
     {
-        // Handle nullable types
+        // handle nullable types
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
         {
             type = Nullable.GetUnderlyingType(type)!;

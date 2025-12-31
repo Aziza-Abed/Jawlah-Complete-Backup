@@ -15,6 +15,12 @@ public class TaskResponse
     public string? ZoneName { get; set; }
     public TaskPriority Priority { get; set; }
     public Enums.TaskStatus Status { get; set; }
+
+    // enhanced task fields
+    public TaskType? TaskType { get; set; }
+    public bool RequiresPhotoProof { get; set; }
+    public int? EstimatedDurationMinutes { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime? DueDate { get; set; }
     public DateTime? StartedAt { get; set; }
@@ -22,6 +28,7 @@ public class TaskResponse
     public string? LocationDescription { get; set; }
     public string? CompletionNotes { get; set; }
     public string? PhotoUrl { get; set; }
+    public List<string> Photos { get; set; } = new();
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
 }

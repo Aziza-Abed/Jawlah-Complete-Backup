@@ -5,7 +5,6 @@ using Jawlah.Core.Entities;
 using Jawlah.Core.Enums;
 using Jawlah.Core.Interfaces.Repositories;
 using Jawlah.Core.Interfaces.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Task = System.Threading.Tasks.Task;
@@ -15,35 +14,42 @@ namespace Jawlah.Infrastructure.Services;
 public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IConfiguration _configuration;
-    private readonly Infrastructure.Data.JawlahDbContext _dbContext;
 
-    public AuthService(IUserRepository userRepository, IConfiguration configuration, Infrastructure.Data.JawlahDbContext dbContext)
+    public AuthService(
+        IUserRepository userRepository,
+        IRefreshTokenRepository refreshTokenRepository,
+        IConfiguration configuration)
     {
         _userRepository = userRepository;
+        _refreshTokenRepository = refreshTokenRepository;
         _configuration = configuration;
-        _dbContext = dbContext;
     }
 
     public async Task<(bool Success, string? Token, string? RefreshToken, string? Error)> LoginAsync(string username, string password)
     {
+        // 1. find the user by username
         var user = await _userRepository.GetByUsernameAsync(username);
 
         if (user == null)
         {
-            return (false, null, null, "Invalid username or password");
+            return (false, null, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
+        // 2. check if the user is active
         if (user.Status != UserStatus.Active)
         {
-            return (false, null, null, "User account is not active");
+            return (false, null, null, "حساب المستخدم غير نشط");
         }
 
+        // 3. verify the password
         if (!VerifyPassword(password, user.PasswordHash))
         {
-            return (false, null, null, "Invalid username or password");
+            return (false, null, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
+        // 4. update login time and generate tokens
         user.LastLoginAt = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user);
 
@@ -58,7 +64,7 @@ public class AuthService : IAuthService
         var existingUser = await _userRepository.GetByUsernameAsync(user.Username);
         if (existingUser != null)
         {
-            return (false, null, "Username already exists");
+            return (false, null, "اسم المستخدم موجود مسبقاً");
         }
 
         if (!string.IsNullOrEmpty(user.Email))
@@ -66,7 +72,7 @@ public class AuthService : IAuthService
             var existingEmail = await _userRepository.GetByEmailAsync(user.Email);
             if (existingEmail != null)
             {
-                return (false, null, "Email already exists");
+                return (false, null, "البريد الإلكتروني موجود مسبقاً");
             }
         }
 
@@ -75,7 +81,7 @@ public class AuthService : IAuthService
         user.Status = UserStatus.Active;
 
         await _userRepository.AddAsync(user);
-        await _dbContext.SaveChangesAsync();
+        await _userRepository.SaveChangesAsync();
 
         return (true, user, null);
     }
@@ -109,48 +115,39 @@ public class AuthService : IAuthService
 
     public async Task<(bool Success, string? Token, string? Error)> RefreshTokenAsync(string refreshToken)
     {
-        var storedToken = await _dbContext.RefreshTokens
-            .Include(rt => rt.User)
-            .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
+        var storedToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
 
         if (storedToken == null)
         {
-            return (false, null, "Invalid refresh token");
+            return (false, null, "رمز التحديث غير صالح");
         }
 
         if (storedToken.IsRevoked)
         {
-            // Token has been revoked, possibly compromised - revoke all tokens for user
-            await RevokeAllUserTokensAsync(storedToken.UserId, "Attempted reuse of revoked token");
-            return (false, null, "Token has been revoked");
+            return (false, null, "تم إلغاء الرمز");
         }
 
         if (storedToken.IsExpired)
         {
-            return (false, null, "Refresh token has expired");
+            return (false, null, "انتهت صلاحية رمز التحديث");
         }
 
         if (storedToken.User.Status != UserStatus.Active)
         {
-            return (false, null, "User account is not active");
+            return (false, null, "حساب المستخدم غير نشط");
         }
 
-        // Revoke old token
         storedToken.RevokedAt = DateTime.UtcNow;
 
-        // Create new tokens
         var newJwtToken = GenerateJwtToken(storedToken.User);
         var newRefreshToken = await CreateRefreshTokenAsync(storedToken.UserId);
 
-        // Link old token to new one
-        storedToken.ReplacedByToken = newRefreshToken.Token;
-
-        await _dbContext.SaveChangesAsync();
+        await _userRepository.SaveChangesAsync();
 
         return (true, newJwtToken, null);
     }
 
-    private async Task<RefreshToken> CreateRefreshTokenAsync(int userId, string? deviceInfo = null, string? ipAddress = null)
+    private async Task<RefreshToken> CreateRefreshTokenAsync(int userId)
     {
         var refreshTokenDays = int.Parse(_configuration["JwtSettings:RefreshTokenExpirationDays"] ?? "7");
 
@@ -159,53 +156,43 @@ public class AuthService : IAuthService
             Token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
             UserId = userId,
             ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays),
-            CreatedAt = DateTime.UtcNow,
-            DeviceInfo = deviceInfo,
-            IpAddress = ipAddress
+            CreatedAt = DateTime.UtcNow
         };
 
-        _dbContext.RefreshTokens.Add(refreshToken);
-        await _dbContext.SaveChangesAsync();
+        await _refreshTokenRepository.AddAsync(refreshToken);
+        await _refreshTokenRepository.SaveChangesAsync();
 
         return refreshToken;
     }
 
-    private async Task RevokeAllUserTokensAsync(int userId, string reason)
+    private async Task RevokeAllUserTokensAsync(int userId)
     {
-        var tokens = await _dbContext.RefreshTokens
-            .Where(rt => rt.UserId == userId && rt.RevokedAt == null)
-            .ToListAsync();
-
-        foreach (var token in tokens)
-        {
-            token.RevokedAt = DateTime.UtcNow;
-        }
-
-        await _dbContext.SaveChangesAsync();
+        await _refreshTokenRepository.RevokeAllUserTokensAsync(userId);
+        await _refreshTokenRepository.SaveChangesAsync();
     }
 
     public async Task LogoutAsync(int userId)
     {
-        await RevokeAllUserTokensAsync(userId, "User logout");
+        await RevokeAllUserTokensAsync(userId);
     }
 
     public async Task<(bool Success, string? Token, string? RefreshToken, string? Error)> GenerateTokenForUserAsync(User user)
     {
         if (user == null)
         {
-            return (false, null, null, "User cannot be null");
+            return (false, null, null, "المستخدم غير موجود");
         }
 
         if (user.Status != UserStatus.Active)
         {
-            return (false, null, null, "User account is not active");
+            return (false, null, null, "حساب المستخدم غير نشط");
         }
 
-        // Update last login time
+        // update last login time
         user.LastLoginAt = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user);
 
-        // Generate tokens
+        // generate tokens
         var token = GenerateJwtToken(user);
         var refreshToken = await CreateRefreshTokenAsync(user.UserId);
 
