@@ -293,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // this method handles the login logic
   Future<void> _login() async {
-    // 1. validate the form
+    // validate the form
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _isLoading = true);
@@ -302,13 +302,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final employeeId = _employeeIdController.text.trim();
       final authProvider = context.read<AuthManager>();
 
-      // 2. call the login method in the provider
+      // call the login method in the provider
       final success = await authProvider.doLogin(employeeId);
 
       if (!mounted) return;
 
       if (success) {
-        // 3. if successful, save the employee id if remember me is checked
+        // if successful, save the employee id if remember me is checked
         if (_rememberMe) {
           await authProvider.saveEmployeeId(employeeId);
           await authProvider.setRememberMe(true);
@@ -319,12 +319,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
         _showSuccessMessage('تم تسجيل الدخول بنجاح');
 
-        // 4. go to the home screen
+        // go to the home screen
         if (mounted) {
           Navigator.of(context).pushReplacementNamed(Routes.home);
         }
       } else {
-        // 5. if failed, show the error message from the provider
+        // if failed, show the error message from the provider
         _showErrorMessage(authProvider.errorMessage ?? 'فشل تسجيل الدخول');
       }
     } catch (e) {

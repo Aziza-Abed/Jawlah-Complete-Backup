@@ -22,7 +22,7 @@ public class HealthController : ControllerBase
     {
         try
         {
-            // 1. check database connection (simple SELECT 1 check)
+            // check database connection (simple SELECT 1 check)
             var canConnect = await _db.Database.CanConnectAsync();
 
             if (!canConnect)
@@ -35,7 +35,7 @@ public class HealthController : ControllerBase
                 });
             }
 
-            // 2. count important things to show the system is alive
+            // count important things to show the system is alive
             // Note: We use sequential calls because DbContext is not thread-safe
             var userCount = await _db.Users.CountAsync();
             var taskCount = await _db.Tasks.CountAsync();

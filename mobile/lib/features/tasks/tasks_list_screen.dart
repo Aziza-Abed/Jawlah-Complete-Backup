@@ -22,10 +22,10 @@ class _TasksListScreenState extends State<TasksListScreen>
   @override
   void initState() {
     super.initState();
-    // 1. set up the tabs (we have 4 filters)
+    // set up the tabs (we have 4 filters)
     _tabController = TabController(length: 4, vsync: this);
 
-    // 2. load the tasks when the screen opens
+    // load the tasks when the screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskManager>().loadTasks();
     });

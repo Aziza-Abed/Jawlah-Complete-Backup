@@ -35,7 +35,7 @@ class AppHeader extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 1. Logo and Title on the RIGHT (First in RTL)
+            // Logo and Title on the RIGHT (First in RTL)
             Expanded(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -66,10 +66,10 @@ class AppHeader extends StatelessWidget {
               ),
             ),
 
-            // 2. Actions (If any, they go to the right of the back button)
+            // Actions (If any, they go to the right of the back button)
             if (actions != null) ...actions!,
 
-            // 3. Back button on the FAR LEFT (Last in RTL)
+            // Back button on the FAR LEFT (Last in RTL)
             if (showBackButton)
               IconButton(
                 icon: const Icon(

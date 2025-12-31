@@ -385,7 +385,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
 
   // method to send task completion
   Future<void> _submitEvidence() async {
-    // 1. check if notes are valid (they are optional now)
+    // check if notes are valid (they are optional now)
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -393,7 +393,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
     final task = context.read<TaskManager>().currentTask;
     if (task == null) return;
 
-    // 2. check if the task requires a photo and if the user added one
+    // check if the task requires a photo and if the user added one
     if (task.requiresPhotoProof && _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -409,7 +409,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // 3. call the manager to finish the task
+    // call the manager to finish the task
     final success = await context.read<TaskManager>().finishTask(
           task.taskId,
           notes: _notesController.text.trim(),
@@ -419,7 +419,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
     setState(() => _isSubmitting = false);
 
     if (success && mounted) {
-      // 4. if success, show message and go back
+      // if success, show message and go back
       final isOnline = context.read<SyncManager>().isOnline;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -435,7 +435,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
       Navigator.of(context).pop();
       Navigator.of(context).pop();
     } else if (mounted) {
-      // 5. if failed, show what happened
+      // if failed, show what happened
       final provider = context.read<TaskManager>();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

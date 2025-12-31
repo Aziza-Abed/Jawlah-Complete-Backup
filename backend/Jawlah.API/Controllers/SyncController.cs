@@ -35,13 +35,13 @@ public class SyncController : BaseApiController
     [HttpPost("attendance/batch")]
     public async Task<IActionResult> SyncAttendanceBatch([FromBody] BatchSyncRequest<AttendanceSyncDto> request)
     {
-        // 1. check current user
+        // check current user
         var userId = GetCurrentUserId();
         if (!userId.HasValue) return Unauthorized();
 
         var results = new List<SyncResult>();
 
-        // 2. process each attendance item from the mobile app
+        // process each attendance item from the mobile app
         foreach (var item in request.Items)
         {
             try
@@ -100,13 +100,13 @@ public class SyncController : BaseApiController
     [HttpPost("tasks/batch")]
     public async Task<IActionResult> SyncTasksBatch([FromBody] BatchSyncRequest<TaskSyncDto> request)
     {
-        // 1. check current user
+        // check current user
         var userId = GetCurrentUserId();
         if (!userId.HasValue) return Unauthorized();
 
         var results = new List<SyncResult>();
 
-        // 2. process each task update from the mobile app
+        // process each task update from the mobile app
         foreach (var item in request.Items)
         {
             try

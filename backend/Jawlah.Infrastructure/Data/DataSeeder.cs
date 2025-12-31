@@ -22,16 +22,16 @@ public class DataSeeder
 
     public async Task SeedAsync()
     {
-        // 1. make sure the database is there
+        // make sure the database is there
         await _context.Database.EnsureCreatedAsync();
 
-        // 2. add users if none exist
+        // add users if none exist
         if (!await _context.Users.AnyAsync())
         {
             await SeedUsersAsync();
         }
 
-        // 3. add zones if none exist
+        // add zones if none exist
         if (!await _context.Zones.AnyAsync())
         {
             await SeedZonesAsync();
@@ -39,13 +39,13 @@ public class DataSeeder
 
         await _context.SaveChangesAsync();
 
-        // 4. assign workers to zones
+        // assign workers to zones
         if (!await _context.UserZones.AnyAsync())
         {
             await SeedUserZonesAsync();
         }
 
-        // 5. add some sample tasks
+        // add some sample tasks
         if (!await _context.Tasks.AnyAsync())
         {
             await SeedTasksAsync();

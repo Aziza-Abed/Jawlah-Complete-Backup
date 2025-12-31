@@ -26,7 +26,7 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// 1. add controllers and json settings
+// add controllers and json settings
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -75,7 +75,7 @@ builder.Services.AddSwaggerGen(options =>
     options.OperationFilter<FileUploadOperationFilter>();
 });
 
-// 2. setup the database connection
+// setup the database connection
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
@@ -96,7 +96,7 @@ builder.Services.AddDbContext<JawlahDbContext>(options =>
         }
     ));
 
-// 3. setup authentication using JWT tokens
+// setup authentication using JWT tokens
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"]
     ?? throw new InvalidOperationException("JWT SecretKey not configured");
@@ -159,7 +159,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 4. register all repositories and services (Dependency Injection)
+// register all repositories and services (Dependency Injection)
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 builder.Services.AddHttpContextAccessor();

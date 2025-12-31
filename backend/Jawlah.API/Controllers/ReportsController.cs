@@ -33,11 +33,11 @@ public class ReportsController : ControllerBase
     {
         try
         {
-            // 1. get all attendance records from the repo based on the search filters
+            // get all attendance records from the repo based on the search filters
             var records = await _attendance.GetFilteredAttendanceAsync(
                 workerId, zoneId, startDate, endDate);
 
-            // 2. if the user wants a CSV file
+            // if the user wants a CSV file
             if (format.ToLower() == "csv")
             {
                 var sb = new StringBuilder();
@@ -55,7 +55,7 @@ public class ReportsController : ControllerBase
                 return File(Encoding.UTF8.GetBytes(csvResult), "text/csv", fileName);
             }
 
-            // 3. if the user wants JSON (default)
+            // if the user wants JSON (default)
             var response = records.Select(a => new
             {
                 a.AttendanceId,
@@ -94,11 +94,11 @@ public class ReportsController : ControllerBase
     {
         try
         {
-            // 1. fetch tasks based on filters
+            // fetch tasks based on filters
             var filteredTasks = await _tasks.GetFilteredTasksAsync(
                 workerId, zoneId, startDate, endDate, status);
 
-            // 2. format output based on choice
+            // format output based on choice
             if (format.ToLower() == "csv")
             {
                 var sb = new StringBuilder();

@@ -19,20 +19,20 @@ class TasksService {
     int? page,
     int? pageSize,
   }) async {
-    // 1. prepare the filters
+    // prepare the filters
     final queryParams = <String, dynamic>{};
     if (status != null) queryParams['status'] = status;
     if (priority != null) queryParams['priority'] = priority;
     if (page != null) queryParams['page'] = page;
     if (pageSize != null) queryParams['pageSize'] = pageSize;
 
-    // 2. call the api
+    // call the api
     final response = await _apiService.get(
       ApiConfig.myTasks,
       queryParameters: queryParams.isNotEmpty ? queryParams : null,
     );
 
-    // 3. check if the response is ok and return the tasks
+    // check if the response is ok and return the tasks
     final responseData = response.data;
     if (responseData['success'] != true) {
       throw ServerException(

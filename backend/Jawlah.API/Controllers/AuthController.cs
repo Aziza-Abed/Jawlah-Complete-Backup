@@ -107,7 +107,7 @@ public class AuthController : BaseApiController
                 return BadRequest(ApiResponse<LoginWithGPSResponse>.ErrorResponse(errors));
             }
 
-            // 1. find user by his PIN
+            // find user by his PIN
             var user = await _users.GetByPinAsync(request.Pin);
 
             if (user == null)
@@ -122,7 +122,7 @@ public class AuthController : BaseApiController
                 return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("حساب المستخدم غير نشط"));
             }
 
-            // 2. check GPS location
+            // check GPS location
             // check if accuracy is good enough
             if (request.Accuracy.HasValue && request.Accuracy.Value > Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters)
             {
@@ -199,14 +199,14 @@ public class AuthController : BaseApiController
                 return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور."));
             }
 
-            // 3. create login token
+            // create login token
             var (success, token, refreshToken, tokenError) = await _auth.GenerateTokenForUserAsync(user);
             if (!success)
             {
                 return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse(tokenError ?? "فشل تسجيل الدخول"));
             }
 
-            // 4. save attendance record in database
+            // save attendance record in database
             var attendance = new Attendance
             {
                 UserId = user.UserId,
@@ -222,7 +222,7 @@ public class AuthController : BaseApiController
             await _attendance.AddAsync(attendance);
             await _attendance.SaveChangesAsync();
 
-            // 5. prepare final response
+            // prepare final response
             var expirationMinutes = int.Parse(_config["JwtSettings:ExpirationMinutes"] ?? "1440");
             var resObj = new LoginWithGPSResponse
             {

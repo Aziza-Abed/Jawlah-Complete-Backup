@@ -40,22 +40,22 @@ class FirebaseMessagingService {
       debugPrint('Initializing Firebase Messaging...');
     }
 
-    // 1. ask for permission to show notifications
+    // request permission
     final settings = await _requestPermission();
     if (settings.authorizationStatus != AuthorizationStatus.authorized) {
       return;
     }
 
-    // 2. prepare local notifications for android/ios
+    // init local notifications
     await _initializeLocalNotifications();
 
-    // 3. get the unique FCM token for this phone
+    // get fcm token
     await _getFcmToken();
 
-    // 4. setup listeners for when a message arrives
+    // setup listeners
     _setupMessageHandlers();
 
-    // 5. handle messages when app is in the background
+    // background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
 

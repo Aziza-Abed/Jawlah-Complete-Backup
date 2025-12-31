@@ -9,10 +9,10 @@ class NotificationsService {
   // get all user notifications from the server
   Future<List<NotificationModel>> getMyNotifications() async {
     try {
-      // 1. call the api
+      // call the api
       final response = await _apiService.get(ApiConfig.notifications);
       if (response.data['success'] == true) {
-        // 2. convert the list from json to models
+        // convert the list from json to models
         final List<dynamic> data = response.data['data'] as List<dynamic>;
         return data.map((json) => NotificationModel.fromJson(json)).toList();
       }

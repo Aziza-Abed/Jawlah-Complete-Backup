@@ -31,7 +31,7 @@ public class TrackingController : ControllerBase
     [HttpPost("location")]
     public async Task<IActionResult> UpdateLocation([FromBody] LocationUpdateDto dto)
     {
-        // 1. get current user ID
+        // get current user ID
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId))
         {
@@ -40,7 +40,7 @@ public class TrackingController : ControllerBase
 
         try
         {
-            // 2. save the location to the history table
+            // save the location to the history table
             var history = new LocationHistory
             {
                 UserId = userId,
@@ -56,7 +56,7 @@ public class TrackingController : ControllerBase
             await _history.AddAsync(history);
             await _history.SaveChangesAsync();
 
-            // 3. tell the supervisor about the new location live
+            // tell the supervisor about the new location live
             var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
             await _hub.Clients.Group("Supervisors").ReceiveLocationUpdate(
                 userId,

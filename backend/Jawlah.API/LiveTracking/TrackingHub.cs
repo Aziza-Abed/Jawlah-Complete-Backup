@@ -59,7 +59,7 @@ public class TrackingHub : Hub<ITrackingClient>
     // called when a client connects to the hub
     public override async Task OnConnectedAsync()
     {
-        // 1. get the user info from the connection
+        // get the user info from the connection
         var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         int? userId = int.TryParse(userIdStr, out var u) ? u : null;
         
@@ -68,7 +68,7 @@ public class TrackingHub : Hub<ITrackingClient>
 
         if (userId.HasValue)
         {
-            // 2. create a connection object and save it in our list
+            // create a connection object and save it in our list
             var connection = new UserConnection
             {
                 UserId = userId.Value,
@@ -81,7 +81,7 @@ public class TrackingHub : Hub<ITrackingClient>
 
             _connections.TryAdd(Context.ConnectionId, connection);
 
-            // 3. put the user in groups based on their role
+            // put the user in groups based on their role
             if (role == "Admin" || role == "Supervisor")
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, "Supervisors");
@@ -91,7 +91,7 @@ public class TrackingHub : Hub<ITrackingClient>
                 await Groups.AddToGroupAsync(Context.ConnectionId, "Workers");
             }
 
-            // 4. if it's a worker, tell supervisors they are online
+            // if it's a worker, tell supervisors they are online
             if (role == "Worker")
             {
                 await Clients.Group("Supervisors").ReceiveUserStatus(
@@ -100,7 +100,7 @@ public class TrackingHub : Hub<ITrackingClient>
                     "online");
             }
 
-            // 5. update the connection stats for everyone
+            // update the connection stats for everyone
             await BroadcastConnectionStats();
 
             _logger.LogInformation("User connected: " + userName);
@@ -112,10 +112,10 @@ public class TrackingHub : Hub<ITrackingClient>
     // called when a client disconnects from the hub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        // 1. remove the user from our connection list
+        // remove the user from our connection list
         if (_connections.TryRemove(Context.ConnectionId, out var connection))
         {
-            // 2. tell supervisors that this person went offline
+            // tell supervisors that this person went offline
             if (connection.Role == "Worker")
             {
                 await Clients.Group("Supervisors").ReceiveUserStatus(
@@ -124,7 +124,7 @@ public class TrackingHub : Hub<ITrackingClient>
                     "offline");
             }
 
-            // 3. update connection stats for everyone
+            // update connection stats for everyone
             await BroadcastConnectionStats();
 
             _logger.LogInformation("User disconnected: " + connection.UserName);
@@ -140,7 +140,7 @@ public class TrackingHub : Hub<ITrackingClient>
     // worker sends real-time location update
     public async Task SendLocationUpdate(double latitude, double longitude)
     {
-        // 1. get the user info
+        // get the user info
         var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         int? userId = int.TryParse(userIdStr, out var u) ? u : null;
         var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
@@ -151,7 +151,7 @@ public class TrackingHub : Hub<ITrackingClient>
             return;
         }
 
-        // 2. update the connection info in our memory
+        // update the connection info in our memory
         if (_connections.TryGetValue(Context.ConnectionId, out var connection))
         {
             connection.LastLatitude = latitude;
@@ -159,7 +159,7 @@ public class TrackingHub : Hub<ITrackingClient>
             connection.LastActivity = DateTime.UtcNow;
         }
 
-        // 3. send the new location to all supervisors so they can see it on the map
+        // send the new location to all supervisors so they can see it on the map
         await Clients.Group("Supervisors").ReceiveLocationUpdate(
             userId.Value,
             userName ?? "Unknown",
@@ -173,7 +173,7 @@ public class TrackingHub : Hub<ITrackingClient>
     // worker sends batch location updates (for offline sync)
     public async Task SendLocationBatch(List<LocationUpdate> locations)
     {
-        // 1. get user info
+        // get user info
         var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         int? userId = int.TryParse(userIdStr, out var u) ? u : null;
         var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
@@ -185,7 +185,7 @@ public class TrackingHub : Hub<ITrackingClient>
 
         _logger.LogInformation("Received batch location updates from: " + userName);
 
-        // 2. broadcast each location to supervisors
+        // broadcast each location to supervisors
         foreach (var location in locations.OrderBy(l => l.Timestamp))
         {
             await Clients.Group("Supervisors").ReceiveLocationUpdate(
@@ -204,7 +204,7 @@ public class TrackingHub : Hub<ITrackingClient>
     // worker notifies supervisors of an activity (task started, completed, etc.)
     public async Task NotifyActivity(string activityType, string description)
     {
-        // 1. get user info
+        // get user info
         var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         int? userId = int.TryParse(userIdStr, out var u) ? u : null;
         var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
@@ -214,7 +214,7 @@ public class TrackingHub : Hub<ITrackingClient>
             return;
         }
 
-        // 2. tell supervisors about the activity
+        // tell supervisors about the activity
         await Clients.Group("Supervisors").ReceiveActivity(
             userId.Value,
             userName ?? "Unknown",
@@ -227,7 +227,7 @@ public class TrackingHub : Hub<ITrackingClient>
     // worker notifies when entering/exiting a zone
     public async Task NotifyZoneEvent(int zoneId, string zoneName, string eventType)
     {
-        // 1. get user info
+        // get user info
         var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         int? userId = int.TryParse(userIdStr, out var u) ? u : null;
         var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
@@ -237,7 +237,7 @@ public class TrackingHub : Hub<ITrackingClient>
             return;
         }
 
-        // 2. broadcast to supervisors
+        // broadcast to supervisors
         await Clients.Group("Supervisors").ReceiveZoneEvent(
             userId.Value,
             userName ?? "Unknown",
@@ -245,7 +245,7 @@ public class TrackingHub : Hub<ITrackingClient>
             zoneName,
             eventType);
 
-        // 3. also broadcast to other workers in the same zone (for coordination)
+        // also broadcast to other workers in the same zone (for coordination)
         await Clients.Group($"Zone_{zoneId}").ReceiveZoneEvent(
             userId.Value,
             userName ?? "Unknown",

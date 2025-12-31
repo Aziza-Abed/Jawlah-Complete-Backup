@@ -88,7 +88,7 @@ class BackgroundServiceUtils {
 
     await trackingService.connect();
 
-    // 5. check and request location permissions
+    // check and request location permissions
     bool hasPermission = await _checkLocationPermission();
     if (!hasPermission) {
       debugPrint('Location permission denied, stopping background service');
@@ -96,7 +96,7 @@ class BackgroundServiceUtils {
       return;
     }
 
-    // 6. start the location update loop
+    // start location update loop
     Position? previousPosition;
     Duration currentInterval = LocationService.movingFastInterval;
 
@@ -109,7 +109,7 @@ class BackgroundServiceUtils {
         }
 
         try {
-          // 7. check if the user turned off location or permission
+          // check location service status
           LocationPermission permission = await Geolocator.checkPermission();
           if (permission == LocationPermission.denied ||
               permission == LocationPermission.deniedForever) {
@@ -135,13 +135,13 @@ class BackgroundServiceUtils {
             return;
           }
 
-          // 8. get the current position
+          // get current position
           Position position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationService.defaultAccuracy,
             timeLimit: const Duration(seconds: 15),
           );
 
-          // 9. figure out how long to wait for the next update
+          // calculate next interval
           if (previousPosition != null) {
             currentInterval = LocationService.getOptimalPollingInterval(
               position,
@@ -151,7 +151,7 @@ class BackgroundServiceUtils {
 
           previousPosition = position;
 
-          // 10. send the location to the server
+          // send location to server
           await trackingService.sendLocation(
             position.latitude,
             position.longitude,

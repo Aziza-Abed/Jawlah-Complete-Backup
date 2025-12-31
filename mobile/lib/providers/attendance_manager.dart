@@ -97,7 +97,7 @@ class AttendanceManager extends BaseController {
   // perform check-in (online or offline)
   Future<bool> doCheckIn() async {
     return await executeVoidWithErrorHandling(() async {
-      // 1. try to check in online if we have internet
+      // try to check in online if we have internet
       if (_syncManager?.isOnline ?? false) {
         try {
           final result = await _attendanceService.checkIn();
@@ -115,7 +115,7 @@ class AttendanceManager extends BaseController {
         }
       }
 
-      // 2. if offline or online fails, save it locally on the phone
+      // if offline or online fails, save it locally on the phone
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id');
 
@@ -123,7 +123,7 @@ class AttendanceManager extends BaseController {
         throw Exception('يجب تسجيل الدخول أولاً');
       }
 
-      // 3. get the GPS location
+      // get the GPS location
       final position = await LocationService.getCurrentLocation();
       if (position == null) {
         throw Exception('يجب تفعيل تحديد الموقع (GPS)');
@@ -137,7 +137,7 @@ class AttendanceManager extends BaseController {
         createdAt: DateTime.now(),
       );
 
-      // 4. save to the local database and tell sync manager to send it later
+      // save to the local database and tell sync manager to send it later
       await _localRepo.addAttendance(localAttendance);
       await _syncManager?.newDataAdded();
 
@@ -297,11 +297,11 @@ class AttendanceManager extends BaseController {
   Future<void> _cacheTodayRecord(
       AttendanceModel serverRecord, int userId) async {
     try {
-      // 1. check if we already have a local record for today
+      // check if we already have a local record for today
       var localRecord = await _localRepo.getTodayAttendance(userId);
 
       if (localRecord != null) {
-        // 2. update existing record
+        // update existing record
         localRecord.serverId = serverRecord.attendanceId;
         localRecord.checkInTime = serverRecord.checkInTime;
         localRecord.checkOutTime = serverRecord.checkOutTime;
@@ -316,7 +316,7 @@ class AttendanceManager extends BaseController {
 
         await localRecord.save();
       } else {
-        // 3. create new record if none exists
+        // create new record if none exists
         final newRecord = AttendanceLocal(
           userId: userId,
           serverId: serverRecord.attendanceId,

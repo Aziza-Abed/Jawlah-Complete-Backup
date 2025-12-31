@@ -36,7 +36,7 @@ class IssueManager extends BaseController {
     File? photo2,
     File? photo3,
   }) async {
-    // 1. Get GPS location first, very safely
+    // Get GPS location first
     double lat = 0.0;
     double lng = 0.0;
     try {
@@ -52,7 +52,7 @@ class IssueManager extends BaseController {
       }
     }
 
-    // 2. try to send it to the server immediately
+    // attempt to send to server
     final success = await executeVoidWithErrorHandling(() async {
       final issue = await _issuesService.reportIssue(
         description: description,
@@ -69,7 +69,7 @@ class IssueManager extends BaseController {
 
     if (success) return true;
 
-    // 3. if online failed, save it locally on the phone
+    // if online failed, save it locally
     try {
       final user = await StorageHelper.takeUser();
       if (user == null) {
@@ -77,7 +77,7 @@ class IssueManager extends BaseController {
         return false;
       }
 
-      // 4. save the photos to the phone's memory so they don't get deleted
+      // save photos permanently
       List<String> permanentPaths = [];
       try {
         final appDir = await getApplicationDocumentsDirectory();
@@ -103,7 +103,7 @@ class IssueManager extends BaseController {
         permanentPaths = [photo1.path];
       }
 
-      // 5. save to the local database
+      // save to local database
       final issueLocal = IssueLocal(
         title: '$type - بلاغ جديد',
         description: description,
@@ -122,7 +122,7 @@ class IssueManager extends BaseController {
       await _issueLocalRepo.addIssue(issueLocal);
       await _syncManager?.newDataAdded();
 
-      // 6. insert a temporary item in the list so the worker sees it
+      // insert temporary item in list
       final tempIssue = IssueModel(
         issueId: -1 * DateTime.now().millisecondsSinceEpoch,
         title: issueLocal.title,

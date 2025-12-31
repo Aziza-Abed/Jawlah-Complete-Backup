@@ -15,13 +15,13 @@ class AuthService {
     required String employeeId,
   }) async {
     try {
-      // 1. get the current position of the worker
+      // get the current position of the worker
       final position = await LocationService.getCurrentLocation();
       if (position == null) {
         throw ValidationException('فشل الحصول على موقع GPS.');
       }
 
-      // 2. send the data to the server
+      // send the data to the server
       final response = await _apiService.post(
         ApiConfig.loginWithGPS,
         data: {
@@ -31,7 +31,7 @@ class AuthService {
         },
       );
 
-      // 3. check if the response is ok
+      // check if the response is ok
       if (response.statusCode != 200) {
         throw ServerException(
           'حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.',
@@ -41,14 +41,14 @@ class AuthService {
 
       final responseData = response.data;
 
-      // 4. check if the login was successful
+      // check if the login was successful
       if (responseData['success'] != true) {
         throw ValidationException(
           responseData['message'] ?? 'الرقم السري غير صحيح.',
         );
       }
 
-      // 5. extract the data and return it
+      // extract the data and return it
       final data = responseData['data'];
 
       if (data == null || data['user'] == null || data['token'] == null) {

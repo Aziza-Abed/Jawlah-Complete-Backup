@@ -73,13 +73,13 @@ class LocationService {
     LocationAccuracy accuracy = defaultAccuracy,
   }) async {
     try {
-      // 1. check if GPS is turned on in the phone settings
+      // check if GPS is turned on in the phone settings
       final serviceEnabled = await isLocationServiceEnabled();
       if (!serviceEnabled) {
         throw ValidationException('فشل الحصول على موقع GPS.');
       }
 
-      // 2. check if the app has permission to use location
+      // check if the app has permission to use location
       bool hasPermission = await checkPermissions();
       if (!hasPermission) {
         hasPermission = await requestPermissions();
@@ -88,7 +88,7 @@ class LocationService {
         }
       }
 
-      // 3. get the actual location from the phone
+      // get the actual location from the phone
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: accuracy,
         timeLimit: const Duration(seconds: 30),

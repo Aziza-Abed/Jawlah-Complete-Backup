@@ -15,12 +15,12 @@ class TaskLocalRepository {
   Future<void> saveTask(TaskLocal task) async {
     final box = await _openBox();
 
-    // 1. check if the task is already saved
+    // check if the task is already saved
     final existingIndex =
         box.values.toList().indexWhere((t) => t.taskId == task.taskId);
 
     if (existingIndex >= 0) {
-      // 2. update the existing task details
+      // update the existing task details
       final existing = box.getAt(existingIndex)!;
       existing.status = task.status;
       existing.completionNotes = task.completionNotes;
@@ -30,7 +30,7 @@ class TaskLocalRepository {
       existing.isSynced = task.isSynced;
       await existing.save();
     } else {
-      // 3. if it's new, give it a unique client id and save it
+      // if it's new, give it a unique client id and save it
       if (!task.isSynced && task.clientId == null) {
         task.clientId = _uuid.v4();
       }

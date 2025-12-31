@@ -58,14 +58,14 @@ public class GisService : IGisService
 
     public async Task<Zone?> ValidateLocationAsync(double latitude, double longitude, int? userId = null, double? accuracy = null)
     {
-        // 1. check if the coordinates are valid
+        // check if the coordinates are valid
         if (latitude < -90 || latitude > 90)
             throw new ArgumentException("Latitude must be between -90 and 90", nameof(latitude));
 
         if (longitude < -180 || longitude > 180)
             throw new ArgumentException("Longitude must be between -180 and 180", nameof(longitude));
 
-        // 2. check if the GPS accuracy is good
+        // check if the GPS accuracy is good
         if (accuracy.HasValue && accuracy.Value > Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters)
         {
             _logger.LogWarning(
@@ -82,7 +82,7 @@ public class GisService : IGisService
             throw new ArgumentException("Invalid GPS coordinates received (0, 0). Please ensure GPS is enabled.");
         }
 
-        // 3. check if the location is inside Palestine
+        // check if the location is inside Palestine
         if (latitude < Core.Constants.GeofencingConstants.MinLatitude ||
             latitude > Core.Constants.GeofencingConstants.MaxLatitude ||
             longitude < Core.Constants.GeofencingConstants.MinLongitude ||
@@ -94,7 +94,7 @@ public class GisService : IGisService
             throw new ArgumentException("Coordinates outside operational area (Palestine region).");
         }
 
-        // 4. check if the location is inside the assigned zones
+        // check if the location is inside the assigned zones
         if (userId.HasValue)
         {
             var userZones = await _zoneRepository.GetUserZonesAsync(userId.Value);
@@ -138,7 +138,7 @@ public class GisService : IGisService
 
     public async Task ImportShapefileAsync(string filePath)
     {
-        // 1. check if the file exists and prepare the path
+        // check if the file exists and prepare the path
         var basePath = filePath.EndsWith(".shp", StringComparison.OrdinalIgnoreCase)
             ? filePath[..^4]
             : filePath;
