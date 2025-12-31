@@ -4,10 +4,8 @@
 
 namespace Jawlah.Infrastructure.Data.Migrations
 {
-    /// <inheritdoc />
     public partial class AddPerformanceIndices : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateIndex(
@@ -61,7 +59,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                 column: "UserId");
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(

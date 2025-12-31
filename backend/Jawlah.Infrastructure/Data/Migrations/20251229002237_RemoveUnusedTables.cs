@@ -5,10 +5,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Jawlah.Infrastructure.Data.Migrations
 {
-    /// <inheritdoc />
     public partial class RemoveUnusedTables : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
@@ -21,7 +19,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                 name: "SyncLogs");
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(

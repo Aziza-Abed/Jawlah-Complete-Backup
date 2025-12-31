@@ -5,10 +5,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Jawlah.Infrastructure.Data.Migrations
 {
-    /// <inheritdoc />
     public partial class AddRowVersionConcurrency : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<byte[]>(
@@ -97,7 +95,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                 column: "UploadedByUserId");
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(

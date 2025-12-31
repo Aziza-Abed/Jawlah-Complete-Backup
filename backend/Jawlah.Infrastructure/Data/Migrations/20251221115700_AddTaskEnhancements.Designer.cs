@@ -16,7 +16,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
     [Migration("20251221115700_AddTaskEnhancements")]
     partial class AddTaskEnhancements
     {
-        /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618

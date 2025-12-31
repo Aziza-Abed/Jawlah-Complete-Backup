@@ -4,10 +4,8 @@
 
 namespace Jawlah.Infrastructure.Data.Migrations
 {
-    /// <inheritdoc />
     public partial class AddTaskEnhancements : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<int>(
@@ -30,7 +28,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                 nullable: true);
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(

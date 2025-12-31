@@ -16,7 +16,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
     [Migration("20251226193332_AddPhotosTables")]
     partial class AddPhotosTables
     {
-        /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618

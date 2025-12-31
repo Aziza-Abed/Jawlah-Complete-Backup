@@ -5,10 +5,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Jawlah.Infrastructure.Data.Migrations
 {
-    /// <inheritdoc />
     public partial class AddPhotosTables : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
@@ -120,7 +118,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
             // They will be removed in a future migration after verification
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
