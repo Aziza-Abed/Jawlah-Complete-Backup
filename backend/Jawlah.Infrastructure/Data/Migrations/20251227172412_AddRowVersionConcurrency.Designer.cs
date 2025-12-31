@@ -16,7 +16,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
     [Migration("20251227172412_AddRowVersionConcurrency")]
     partial class AddRowVersionConcurrency
     {
-        /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618

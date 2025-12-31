@@ -16,7 +16,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
     [Migration("20251229002237_RemoveUnusedTables")]
     partial class RemoveUnusedTables
     {
-        /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618

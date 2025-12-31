@@ -4,10 +4,8 @@
 
 namespace Jawlah.Infrastructure.Data.Migrations
 {
-    /// <inheritdoc />
     public partial class AddUniquePinConstraint : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // add unique constraint on PIN column (null values allowed, but non-null must be unique)
@@ -19,7 +17,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                 filter: "[Pin] IS NOT NULL");
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
