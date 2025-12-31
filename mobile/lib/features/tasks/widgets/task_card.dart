@@ -61,7 +61,7 @@ class TaskCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // 1. Main Content (Right side in RTL)
+            // Main Content (Right side in RTL)
             Expanded(
               child: Column(
                 crossAxisAlignment:
@@ -188,7 +188,7 @@ class TaskCard extends StatelessWidget {
 
             const SizedBox(width: 12),
 
-            // 2. Left Chevron (Points Left in RTL to indicate "Forward" to details)
+            // Left Chevron (Points Left in RTL to indicate "Forward" to details)
             const Icon(
               Icons.arrow_forward_ios,
               size: 20,

@@ -15,10 +15,10 @@ class AttendanceLocalRepository {
   // add new attendance record to the phone when offline
   Future<String> addAttendance(AttendanceLocal attendance) async {
     final box = await _openBox();
-    // 1. generate a unique id for the record
+    // generate a unique id for the record
     attendance.clientId = _uuid.v4();
     attendance.createdAt = DateTime.now();
-    // 2. save it to the local box
+    // save it to the local box
     await box.add(attendance);
     return attendance.clientId!;
   }

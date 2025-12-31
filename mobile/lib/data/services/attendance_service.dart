@@ -13,13 +13,13 @@ class AttendanceService {
   // create today's attendance check-in with current GPS
   Future<AttendanceModel> checkIn() async {
     try {
-      // 1. get the current location coordinates
+      // get the current location coordinates
       final position = await LocationService.getCurrentLocation();
       if (position == null) {
         throw ValidationException('فشل الحصول على موقع GPS.');
       }
 
-      // 2. send the check-in request to the server
+      // send the check-in request to the server
       final response = await _apiService.post(
         ApiConfig.checkIn,
         data: {
@@ -34,7 +34,7 @@ class AttendanceService {
           responseData['message'] ?? 'فشل تسجيل الحضور',
         );
       }
-      // 3. return the attendance data
+      // return the attendance data
       return AttendanceModel.fromJson(responseData['data']);
     } catch (e) {
       if (e is AppException) rethrow;

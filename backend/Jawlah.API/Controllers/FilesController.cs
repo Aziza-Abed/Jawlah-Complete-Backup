@@ -37,7 +37,7 @@ public class FilesController : ControllerBase
     {
         try
         {
-            // 1. check if the folder name and file name are correct
+            // check if the folder name and file name are correct
             if (string.IsNullOrWhiteSpace(folder) || !System.Text.RegularExpressions.Regex.IsMatch(folder, "^[a-zA-Z0-9_-]+$") ||
                 string.IsNullOrWhiteSpace(filename) || filename.Contains("..") || filename.Contains("/") || filename.Contains("\\") || 
                 !System.Text.RegularExpressions.Regex.IsMatch(filename, "^[a-zA-Z0-9_.-]+$"))
@@ -49,7 +49,7 @@ public class FilesController : ControllerBase
             var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            // 2. if the user is a worker, they should only see their own photos
+            // if the user is a worker, they should only see their own photos
             if (userRole != "Admin" && userRole != "Supervisor")
             {
                 if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
@@ -93,7 +93,7 @@ public class FilesController : ControllerBase
                 }
             }
 
-            // 3. check the file extension
+            // check the file extension
             var extension = Path.GetExtension(filename).ToLowerInvariant();
             if (!AllowedExtensions.Contains(extension))
             {
@@ -101,7 +101,7 @@ public class FilesController : ControllerBase
                 return BadRequest(new { error = "نوع الملف غير مسموح" });
             }
 
-            // 4. get the full path of the file on the server
+            // get the full path of the file on the server
             var filePath = Path.Combine(
                 _env.ContentRootPath,
                 SecureStorageFolder,
@@ -126,7 +126,7 @@ public class FilesController : ControllerBase
                 return NotFound(new { error = "الملف غير موجود" });
             }
 
-            // 5. detect content type to return the file correctly
+            // detect content type to return the file correctly
             var contentType = extension switch
             {
                 ".jpg" or ".jpeg" => "image/jpeg",

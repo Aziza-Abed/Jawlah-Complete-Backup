@@ -31,7 +31,7 @@ class AuthManager extends BaseController {
   // load saved user session when the app starts
   Future<void> _loadSavedSession() async {
     try {
-      // 1. check if we have a token and user id saved
+      // check for saved token and user id
       final token = await _storageService.getToken();
       final userId = await _storageService.getUserId();
 
@@ -39,7 +39,7 @@ class AuthManager extends BaseController {
         jwtToken = token;
         ApiService().updateToken(token);
 
-        // 2. try to get the user profile from the server
+        // get user profile from server
         try {
           final user = await _authService.getProfile();
           currentUser = user;
@@ -53,7 +53,7 @@ class AuthManager extends BaseController {
 
         notifyListeners();
 
-        // 3. start the background tracking if logged in
+        // start background tracking if logged in
         if (jwtToken != null) {
           BackgroundServiceUtils.startService();
           await _registerFcmToken();
@@ -71,13 +71,13 @@ class AuthManager extends BaseController {
   // login method
   Future<bool> doLogin(String pin) async {
     final result = await executeWithErrorHandling(() async {
-      // 1. call the login service
+      // attempt login
       final loginResult = await _authService.loginWithGPS(employeeId: pin);
 
       currentUser = loginResult.user;
       jwtToken = loginResult.token;
 
-      // 2. save everything to the phone storage
+      // save session data
       await _storageService.saveToken(loginResult.token);
       await _storageService.saveUserId(loginResult.user.userId);
       if (loginResult.refreshToken != null &&
@@ -89,12 +89,12 @@ class AuthManager extends BaseController {
       await _storageService
           .saveUserProfile(jsonEncode(loginResult.user.toJson()));
 
-      // 3. update the api client with the new token
+      // update api client
       ApiService().updateToken(loginResult.token);
 
       notifyListeners();
 
-      // 4. start background tracking
+      // start tracking
       BackgroundServiceUtils.startService();
 
       try {
@@ -107,7 +107,7 @@ class AuthManager extends BaseController {
     });
 
     if (result == null) {
-      // 5. if online login fails (maybe no internet), try offline login
+      // login failed (maybe offline), try offline login
       return await _attemptOfflineLogin(pin);
     }
 

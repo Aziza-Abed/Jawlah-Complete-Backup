@@ -29,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    // 1. when the screen starts, prepare the managers and load data
+    // when the screen starts, prepare the managers and load data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final syncManager = context.read<SyncManager>();
       context.read<AttendanceManager>().setSyncManager(syncManager);
@@ -39,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<NoticeManager>().loadNotices();
     });
 
-    // 2. refresh the work duration timer every minute
+    // refresh the work duration timer every minute
     _workDurationTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (mounted) {
         setState(() {});

@@ -36,20 +36,20 @@ public class FileStorageService : IFileStorageService
     {
         try
         {
-            // 1. check if the file is a valid image
+            // check if the file is a valid image
             if (!ValidateImage(file))
             {
                 throw new InvalidOperationException("Invalid image file");
             }
 
-            // 2. sanitize the folder name
+            // sanitize the folder name
             var safeFolder = SanitizeFolder(folder);
 
-            // 3. create the directory if it doesn't exist
+            // create the directory if it doesn't exist
             var storageBasePath = Path.Combine(_environment.ContentRootPath, SecureStorageFolder, "uploads", safeFolder);
             Directory.CreateDirectory(storageBasePath);
 
-            // 4. give the file a unique name and save it
+            // give the file a unique name and save it
             var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
             var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
             var filePath = Path.Combine(storageBasePath, uniqueFileName);
@@ -59,7 +59,7 @@ public class FileStorageService : IFileStorageService
                 await file.CopyToAsync(stream);
             }
 
-            // 5. return the full URL of the uploaded image
+            // return the full URL of the uploaded image
             var baseUrl = GetBaseUrl();
             var fileUrl = $"{baseUrl}/api/files/{safeFolder}/{uniqueFileName}";
 

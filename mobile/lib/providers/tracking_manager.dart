@@ -23,7 +23,7 @@ class TrackingManager extends BaseController {
     }
 
     await executeVoidWithErrorHandling(() async {
-      // 1. get the token for authentication
+      // get the token for authentication
       final token = await SecureStorageHelper.getToken();
 
       if (token == null || token.isEmpty) {
@@ -32,7 +32,7 @@ class TrackingManager extends BaseController {
 
       final hubUrl = ApiConfig.getHubUrl('/hubs/tracking');
 
-      // 2. build the connection
+      // build the connection
       connection = HubConnectionBuilder()
           .withUrl(
             hubUrl,
@@ -43,7 +43,7 @@ class TrackingManager extends BaseController {
           .withAutomaticReconnect()
           .build();
 
-      // 3. setup listeners for updates
+      // setup listeners for updates
       connection?.on('ReceiveLocationUpdate', onGetLocation);
       connection?.on('ReceiveUserStatus', onGetStatus);
 
@@ -58,7 +58,7 @@ class TrackingManager extends BaseController {
         notifyListeners();
       });
 
-      // 4. start the connection
+      // start the connection
       await connection?.start();
       _isConnected = true;
       await _joinSupervisorsGroup();

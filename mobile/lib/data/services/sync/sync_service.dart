@@ -35,17 +35,17 @@ class SyncService {
     final result = SyncResult();
 
     try {
-      // 1. sync attendance
+      // sync attendance first
       final attendanceResult = await _syncAttendances();
       result.attendancesSynced = attendanceResult.success;
       result.attendancesFailed = attendanceResult.failed;
 
-      // 2. sync tasks
+      // then sync tasks
       final taskResult = await _syncTasks();
       result.tasksSynced = taskResult.success;
       result.tasksFailed = taskResult.failed;
 
-      // 3. sync reported issues
+      // finally sync issues
       final issueResult = await _syncIssues();
       result.issuesSynced = issueResult.success;
       result.issuesFailed = issueResult.failed;
@@ -280,7 +280,7 @@ class SyncService {
   // download latest data from server
   Future<void> syncFromServer() async {
     try {
-      // 1. get the time of the last sync
+      // get last sync time
       final lastSyncTime = await _getLastSyncTime();
 
       final response = await _dio.get(
@@ -293,7 +293,7 @@ class SyncService {
       if (response.statusCode == 200) {
         final data = response.data['data'];
 
-        // 2. update tasks from server
+        // update tasks
         final tasks = data['tasks'] as List;
         for (var taskJson in tasks) {
           final existingTask =
@@ -330,7 +330,7 @@ class SyncService {
           await _taskLocalRepo.updateFromServer(task);
         }
 
-        // 3. update issues from server
+        // update issues
         final issues = data['issues'] as List;
         for (var issueJson in issues) {
           final existingIssue =
@@ -359,7 +359,7 @@ class SyncService {
           await _issueLocalRepo.updateFromServer(issue);
         }
 
-        // 4. save current time as the last sync time
+        // save new sync time
         await _saveLastSyncTime(DateTime.now());
       }
     } catch (e) {

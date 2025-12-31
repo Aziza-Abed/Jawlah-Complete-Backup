@@ -30,13 +30,13 @@ import 'providers/sync_manager.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
-  // 1. make sure flutter is ready
+  // ensure bindings are ready
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 3. start the background services and database
+  // init services and db
   await _initializeServices();
 
-  // 4. set the status bar style
+  // helper to set status bar style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -45,29 +45,29 @@ void main() async {
     ),
   );
 
-  // 5. lock the phone to vertical mode
+  // lock orientation to portrait
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // 6. run the app
+  // start app
   runApp(const JawlahApp());
 }
 
 Future<void> _initializeServices() async {
   try {
-    // 1. start the small local storage
+    // init secure storage
     await StorageHelper.startStorage();
 
-    // 2. start Hive for offline mode
+    // init hive
     await HiveInit.initialize();
 
-    // 3. set up our API client
+    // setup api
     ApiService().setUpApi();
     await ApiService().loadToken();
 
-    // 4. initialize Firebase with the generated options
+    // init firebase
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,

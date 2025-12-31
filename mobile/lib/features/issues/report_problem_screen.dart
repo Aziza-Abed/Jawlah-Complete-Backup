@@ -393,12 +393,12 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   }
 
   Future<void> _submitReport() async {
-    // 1. check if the form fields are valid
+    // check if the form fields are valid
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // 2. make sure at least one photo is picked
+    // make sure at least one photo is picked
     if (_photo1 == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -456,7 +456,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   Future<void> _executeSubmit() async {
     setState(() => _isSubmitting = true);
 
-    // 3. call the manager to send the report
+    // call the manager to send the report
     final success = await context.read<IssueManager>().sendIssueReport(
           description: _descriptionController.text.trim(),
           type: _selectedProblemType,
@@ -470,7 +470,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     if (!mounted) return;
 
     if (success) {
-      // 4. if success, show a message
+      // if success, show a message
       final isOnline = context.read<SyncManager>().isOnline;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -487,7 +487,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       // Reset form instead of popping to avoid black screen
       _resetForm();
     } else {
-      // 5. if failed, show what went wrong
+      // if failed, show what went wrong
       final provider = context.read<IssueManager>();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

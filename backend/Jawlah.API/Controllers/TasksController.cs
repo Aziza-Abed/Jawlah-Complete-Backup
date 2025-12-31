@@ -346,20 +346,20 @@ public class TasksController : BaseApiController
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> ApproveTask(int id, [FromBody] ApproveTaskRequest? request)
     {
-        // 1. find the task
+        // find the task
         var task = await _tasks.GetByIdAsync(id);
         if (task == null)
         {
             return NotFound(ApiResponse<object>.ErrorResponse("Task not found"));
         }
 
-        // 2. only completed tasks can be approved
+        // can only approve completed tasks
         if (task.Status != TaskStatus.Completed)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("يمكن الموافقة على المهام المكتملة فقط"));
         }
 
-        // 3. update status and add supervisor notes if they exist
+        // update status and add notes
         task.Status = TaskStatus.Approved;
         if (request?.Comments != null)
         {
@@ -380,20 +380,20 @@ public class TasksController : BaseApiController
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> RejectTask(int id, [FromBody] RejectTaskRequest request)
     {
-        // 1. find the task
+        // find the task
         var task = await _tasks.GetByIdAsync(id);
         if (task == null)
         {
             return NotFound(ApiResponse<object>.ErrorResponse("Task not found"));
         }
 
-        // 2. only completed tasks can be rejected
+        // check status
         if (task.Status != TaskStatus.Completed)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("يمكن رفض المهام المكتملة فقط"));
         }
 
-        // 3. update status and add the reason why it was rejected
+        // update status with reason
         task.Status = TaskStatus.Rejected;
         if (request.Reason != null)
         {

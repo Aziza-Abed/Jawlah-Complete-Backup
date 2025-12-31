@@ -28,7 +28,7 @@ class IssuesService {
       double lat;
       double lng;
 
-      // 1. decide which location to use (given or current)
+      // decide which location to use (given or current)
       if (latitude != null && longitude != null) {
         lat = latitude;
         lng = longitude;
@@ -41,7 +41,7 @@ class IssuesService {
         lng = position.longitude;
       }
 
-      // 2. prepare the data in a form (FormData)
+      // prepare the data in a form (FormData)
       final formData = FormData();
 
       // log the issue type for debugging

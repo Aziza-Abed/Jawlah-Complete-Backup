@@ -31,16 +31,16 @@ public class UsersController : BaseApiController
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetAllUsers([FromQuery] UserStatus? status = null)
     {
-        // 1. get all users from the database
+        // get all users from the database
         var users = await _users.GetAllAsync();
 
-        // 2. filter by status if the supervisor wants only active or inactive users
+        // filter by status if the supervisor wants only active or inactive users
         if (status.HasValue)
         {
             users = users.Where(u => u.Status == status.Value);
         }
 
-        // 3. return the list
+        // return the list
         return Ok(ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(
             users.Select(u => _mapper.Map<UserResponse>(u))));
     }
@@ -69,7 +69,7 @@ public class UsersController : BaseApiController
     [HttpPut("profile")]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
     {
-        // 1. find the current user
+        // find the current user
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
             return Unauthorized();
@@ -78,12 +78,12 @@ public class UsersController : BaseApiController
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
-        // 2. update the fields with new values
+        // update the fields with new values
         user.Email = request.Email;
         user.PhoneNumber = request.PhoneNumber;
         user.FullName = request.FullName;
 
-        // 3. save changes
+        // save changes
         await _users.UpdateAsync(user);
         await _users.SaveChangesAsync();
 

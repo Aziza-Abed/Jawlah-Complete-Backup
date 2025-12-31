@@ -68,13 +68,13 @@ class TaskManager extends BaseController {
 
     final isOnline = _syncManager?.isOnline ?? true;
 
-    // 1. if we are offline, just get tasks from the device
+    // if we are offline, just get tasks from the device
     if (!isOnline) {
       await getDataFromDevice(status, priority);
       return;
     }
 
-    // 2. if online, fetch them from the server
+    // if online, fetch them from the server
     try {
       final tasks = await _tasksService.getMyTasks(
         status: status,
@@ -86,7 +86,7 @@ class TaskManager extends BaseController {
       myTasks = tasks;
       _hasMoreData = tasks.length >= _pageSize;
 
-      // 3. save them to local storage for later use when offline
+      // save them to local storage for later use when offline
       _saveTasksToLocal(tasks).catchError((e) {
         if (kDebugMode) debugPrint('failed to save tasks locally: $e');
       });
@@ -95,7 +95,7 @@ class TaskManager extends BaseController {
       setError(null);
       notifyListeners();
     } catch (e) {
-      // 4. if fetching fails (like network error), fallback to device data
+      // if fetching fails (like network error), fallback to device data
       await getDataFromDevice(status, priority);
     }
   }

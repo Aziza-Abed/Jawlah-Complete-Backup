@@ -34,19 +34,19 @@ public class AttendanceController : BaseApiController
     {
         try
         {
-            // 1. check if the user is logged in
+            // check if the user is logged in
             var userId = GetCurrentUserId();
             if (userId == null)
                 return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("رمز غير صالح"));
 
-            // 2. check if the user already has an active attendance session
+            // check if the user already has an active attendance session
             var hasActive = await _attendance.HasActiveAttendanceAsync(userId.Value);
             if (hasActive)
             {
                 return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لديك تسجيل حضور نشط بالفعل"));
             }
 
-            // 3. validate the user location using GIS service
+            // validate the user location using GIS service
             var zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude, userId.Value);
 
             if (zone == null)
@@ -54,7 +54,7 @@ public class AttendanceController : BaseApiController
                 return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور"));
             }
 
-            // 4. if location is valid, create a new record
+            // if location is valid, create a new record
             var attendance = new Attendance
             {
                 UserId = userId.Value,
@@ -73,7 +73,7 @@ public class AttendanceController : BaseApiController
             await _attendance.AddAsync(attendance);
             await _attendance.SaveChangesAsync();
 
-            // 5. return the saved record
+            // return the saved record
             var response = _mapper.Map<AttendanceResponse>(attendance);
 
             return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم تسجيل الحضور بنجاح"));

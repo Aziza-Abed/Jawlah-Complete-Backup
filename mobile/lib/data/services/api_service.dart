@@ -17,7 +17,7 @@ class ApiService {
   Dio get dio => dioClient;
 
   void setUpApi() {
-    // 1. set up the dio client with our base url and timeout
+    // set up the dio client with our base url and timeout
     dioClient = Dio(
       BaseOptions(
         baseUrl: ApiConfig.baseUrl,
@@ -31,10 +31,10 @@ class ApiService {
       ),
     );
 
-    // 2. add the interceptor to send the token with every request
+    // add the interceptor to send the token with every request
     dioClient.interceptors.add(makeAuthHelper());
 
-    // 3. enable logging if we are in debug mode
+    // enable logging if we are in debug mode
     if (ApiConfig.enableLogging) {
       dioClient.interceptors.add(LogInterceptor(
         requestBody: true,

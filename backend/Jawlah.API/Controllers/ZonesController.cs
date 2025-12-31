@@ -30,17 +30,17 @@ public class ZonesController : BaseApiController
     [HttpGet("my")]
     public async Task<IActionResult> GetMyZones()
     {
-        // 1. get the current user ID
+        // get the current user ID
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
             return Unauthorized();
 
-        // 2. find the user and his assigned zones
+        // find the user and his assigned zones
         var user = await _users.GetUserWithZonesAsync(userId.Value);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("User not found"));
 
-        // 3. extract the zone list for the worker
+        // extract the zone list for the worker
         var zones = user.AssignedZones.Select(uz => uz.Zone).Where(z => z.IsActive).ToList();
 
         return Ok(ApiResponse<IEnumerable<ZoneResponse>>.SuccessResponse(

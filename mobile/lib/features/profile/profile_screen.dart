@@ -23,7 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // 1. load tasks to show stats in profile
+    // load tasks to show stats in profile
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskManager>().loadTasks();
     });

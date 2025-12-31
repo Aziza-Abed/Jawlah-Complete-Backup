@@ -15,10 +15,10 @@ class IssueLocalRepository {
   // save a new issue report on the phone when offline
   Future<String> addIssue(IssueLocal issue) async {
     final box = await _openBox();
-    // 1. generate a unique id
+    // generate a unique id
     issue.clientId = _uuid.v4();
     issue.createdAt = DateTime.now();
-    // 2. add to the local database
+    // add to the local database
     await box.add(issue);
     return issue.clientId!;
   }

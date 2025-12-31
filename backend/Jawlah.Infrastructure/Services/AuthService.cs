@@ -29,7 +29,7 @@ public class AuthService : IAuthService
 
     public async Task<(bool Success, string? Token, string? RefreshToken, string? Error)> LoginAsync(string username, string password)
     {
-        // 1. find the user by username
+        // find the user by username
         var user = await _userRepository.GetByUsernameAsync(username);
 
         if (user == null)
@@ -37,19 +37,19 @@ public class AuthService : IAuthService
             return (false, null, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
-        // 2. check if the user is active
+        // check if the user is active
         if (user.Status != UserStatus.Active)
         {
             return (false, null, null, "حساب المستخدم غير نشط");
         }
 
-        // 3. verify the password
+        // verify the password
         if (!VerifyPassword(password, user.PasswordHash))
         {
             return (false, null, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
-        // 4. update login time and generate tokens
+        // update login time and generate tokens
         user.LastLoginAt = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user);
 

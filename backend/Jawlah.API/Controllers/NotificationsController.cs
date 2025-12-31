@@ -23,15 +23,15 @@ public class NotificationsController : BaseApiController
     [HttpGet]
     public async Task<IActionResult> GetMyNotifications()
     {
-        // 1. get the current user ID
+        // get the current user ID
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
             return Unauthorized();
 
-        // 2. load all notifications for this user
+        // load all notifications for this user
         var notifications = await _notices.GetUserNotificationsAsync(userId.Value);
 
-        // 3. return them as a list
+        // return them as a list
         return Ok(ApiResponse<IEnumerable<NotificationResponse>>.SuccessResponse(
             notifications.Select(n => _mapper.Map<NotificationResponse>(n))));
     }

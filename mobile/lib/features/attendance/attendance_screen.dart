@@ -19,7 +19,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   void initState() {
     super.initState();
-    // 1. load the attendance for today when screen starts
+    // load the attendance for today when screen starts
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AttendanceManager>().loadTodayRecord();
     });

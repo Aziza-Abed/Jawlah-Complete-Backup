@@ -72,7 +72,7 @@ class SyncManager extends BaseController {
       return lastResult ?? SyncResult();
     }
 
-    // 1. check if we have internet before starting
+    // check internet connection
     if (!_isOnline) {
       final result = SyncResult();
       result.success = false;
@@ -84,14 +84,14 @@ class SyncManager extends BaseController {
     notifyListeners();
 
     try {
-      // 2. send all saved data on the phone to the server
+      // upload local data
       final uploadResult = await _syncService.syncToServer();
       lastResult = uploadResult;
 
-      // 3. fetch new data from the server
+      // get latest updates
       await _syncService.syncFromServer();
 
-      // 4. update the count of waiting items
+      // update waiting count
       await _refreshWaitingCount();
 
       return uploadResult;
