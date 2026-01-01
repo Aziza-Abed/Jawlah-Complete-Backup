@@ -100,6 +100,7 @@ class TaskManager extends BaseController {
     }
   }
 
+  // when offline, load tasks from phone storage
   Future<void> getDataFromDevice(String? status, String? priority) async {
     try {
       myTasks = await _loadLocalTasks(status: status, priority: priority);
@@ -107,10 +108,11 @@ class TaskManager extends BaseController {
       if (myTasks.isEmpty) {
         setError('لا توجد مهام محفوظة. الرجاء الاتصال بالإنترنت.');
       } else {
-        // use strings without placeholders for simplicity or handle them
+        // show message that we're offline
         setError('وضع عدم الاتصال - عرض ${myTasks.length} مهمة محفوظة');
       }
     } catch (e) {
+      print('error loading from device: $e');
       setError('خطأ في قاعدة البيانات المحلية');
       myTasks = [];
     }
@@ -119,7 +121,7 @@ class TaskManager extends BaseController {
     notifyListeners();
   }
 
-  // load tasks from hive
+  // get tasks from hive database
   Future<List<TaskModel>> _loadLocalTasks({
     String? status,
     String? priority,
@@ -129,7 +131,7 @@ class TaskManager extends BaseController {
     return _applyFilters(tasks, status, priority);
   }
 
-  // save tasks to local db
+  // save tasks to phone for offline use
   Future<void> _saveTasksToLocal(List<TaskModel> tasks) async {
     for (var task in tasks) {
       await _taskLocalRepo.saveFromServer(task.toLocal());
@@ -170,6 +172,7 @@ class TaskManager extends BaseController {
     return sorted;
   }
 
+  // load more tasks when user scrolls down
   Future<void> loadMoreTasks() async {
     if (_isLoadingMore || !_hasMoreData) return;
 
@@ -177,26 +180,31 @@ class TaskManager extends BaseController {
     notifyListeners();
 
     try {
+      _currentPage++;
       final moreTasks = await _tasksService.getMyTasks(
         status: filterStatus,
         priority: filterPriority,
-        page: _currentPage + 1,
+        page: _currentPage,
         pageSize: _pageSize,
       );
 
-      if (moreTasks.isNotEmpty) {
-        _currentPage++;
-        myTasks.addAll(moreTasks);
-        _hasMoreData = moreTasks.length >= _pageSize;
-      } else {
+      if (moreTasks.isEmpty || moreTasks.length < _pageSize) {
         _hasMoreData = false;
       }
+
+      myTasks.addAll(moreTasks);
+
+      // save new tasks to local storage
+      _saveTasksToLocal(moreTasks).catchError((e) {
+        if (kDebugMode) debugPrint('failed to save tasks: $e');
+      });
     } catch (e) {
-      _hasMoreData = false;
-    } finally {
-      _isLoadingMore = false;
-      notifyListeners();
+      if (kDebugMode) debugPrint('error loading more tasks: $e');
+      _currentPage--; // go back if failed
     }
+
+    _isLoadingMore = false;
+    notifyListeners();
   }
 
   Future<void> getTaskDetails(int taskId) async {

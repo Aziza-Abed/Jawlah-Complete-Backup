@@ -46,42 +46,36 @@ class ApiService {
     }
   }
 
+  // add token to requests
   InterceptorsWrapper makeAuthHelper() {
     return InterceptorsWrapper(
       onRequest: (options, handler) async {
+        // add the token if we have one
         if (_token != null && _token!.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $_token';
         }
-
         return handler.next(options);
       },
       onError: (error, handler) async {
+        // if we get 401, try to refresh the token
         if (error.response?.statusCode == 401) {
-          final refreshed = await renewToken();
+          // try refreshing token
+          bool refreshed = await renewToken();
           if (refreshed) {
-            try {
-              error.requestOptions.headers['Authorization'] = 'Bearer $_token';
-              final retryResponse = await dioClient.fetch(error.requestOptions);
-              return handler.resolve(retryResponse);
-            } catch (retryError) {
-              // ignore retry error if token refresh fails
-            }
+            // token refreshed, just return the error and let user retry manually
+            // TODO: maybe auto-retry the request here?
+          } else {
+            // refresh failed, logout user
+            await cleanAuthData();
           }
-
-          await cleanAuthData();
         }
-
         return handler.next(error);
       },
     );
   }
 
-  bool _isRefreshing = false;
-
+  // refresh the token when it expires
   Future<bool> renewToken() async {
-    if (_isRefreshing) return false;
-
-    _isRefreshing = true;
     try {
       final refreshToken = await StorageHelper.getRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
@@ -106,9 +100,8 @@ class ApiService {
       }
       return false;
     } catch (e) {
+      print('error refreshing token: $e');
       return false;
-    } finally {
-      _isRefreshing = false;
     }
   }
 

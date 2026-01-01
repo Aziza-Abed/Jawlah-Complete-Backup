@@ -62,10 +62,9 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
         builder.Property(e => e.SyncVersion)
             .IsRequired();
 
-        // Optimistic concurrency control
+        // for handling concurrent updates
         builder.Property(e => e.RowVersion)
-            .IsRowVersion()
-            .IsConcurrencyToken();
+            .IsRowVersion();
 
         builder.HasIndex(e => new { e.ReportedByUserId, e.Status })
             .HasDatabaseName("IX_Issue_Reporter_Status");
