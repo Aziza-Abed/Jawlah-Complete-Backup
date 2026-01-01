@@ -53,10 +53,9 @@ public class TaskConfiguration : IEntityTypeConfiguration<Core.Entities.Task>
         builder.Property(e => e.SyncVersion)
             .IsRequired();
 
-        // Optimistic concurrency control
+        // for handling concurrent updates
         builder.Property(e => e.RowVersion)
-            .IsRowVersion()
-            .IsConcurrencyToken();
+            .IsRowVersion();
 
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status })
             .HasDatabaseName("IX_Task_AssignedUser_Status");
