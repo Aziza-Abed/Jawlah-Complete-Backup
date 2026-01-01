@@ -2,21 +2,24 @@ using Jawlah.Core.Entities;
 using Jawlah.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Jawlah.Core.Interfaces.Services;
 using NetTopologySuite.Geometries;
 using Task = System.Threading.Tasks.Task;
 
 namespace Jawlah.Infrastructure.Data;
 
-public class DataSeeder
+public class DatabaseInitializer
 {
     private readonly JawlahDbContext _context;
     private readonly GeometryFactory _geometryFactory;
     private readonly IConfiguration _configuration;
+    private readonly IGisService _gisService;
 
-    public DataSeeder(JawlahDbContext context, IConfiguration configuration)
+    public DatabaseInitializer(JawlahDbContext context, IConfiguration configuration, IGisService gisService)
     {
         _context = context;
         _configuration = configuration;
+        _gisService = gisService;
         _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
     }
 
@@ -139,7 +142,37 @@ public class DataSeeder
 
     private async Task SeedZonesAsync()
     {
-        // create polygon boundaries for GPS validation
+        // try to find the GIS folder in the current directory or the parent (solution root)
+        var currentDir = Directory.GetCurrentDirectory();
+        var gisPath = Path.Combine(currentDir, "GIS", "Blocks_WGS84.shp");
+        
+        if (!File.Exists(gisPath))
+        {
+            // try parent directory (common when running from within Jawlah.API)
+            var parentGisPath = Path.Combine(Directory.GetParent(currentDir)?.FullName ?? "", "GIS", "Blocks_WGS84.shp");
+            if (File.Exists(parentGisPath)) gisPath = parentGisPath;
+            else 
+            {
+                // try one more level up (repo root)
+                var rootGisPath = Path.Combine(Directory.GetParent(currentDir)?.Parent?.FullName ?? "", "GIS", "Blocks_WGS84.shp");
+                if (File.Exists(rootGisPath)) gisPath = rootGisPath;
+            }
+        }
+
+        if (File.Exists(gisPath))
+        {
+            try 
+            {
+                await _gisService.ImportShapefileAsync(gisPath);
+                return; // successfully imported real data
+            }
+            catch
+            {
+                // if real import fails, fall back to sample data
+            }
+        }
+
+        // create polygon boundaries for GPS validation (fallback sample data)
         // central zone - area around Al-Bireh center
         var centralCoords = new Coordinate[]
         {
@@ -236,9 +269,10 @@ public class DataSeeder
 
         var userZones = new List<UserZone>();
 
-        // assign worker1 to zone 1
-        var worker1 = workers.FirstOrDefault(w => w.Pin == "1234");
-        var zone1 = zones.FirstOrDefault(z => z.ZoneCode == "ZONE-001");
+        // assign workers to zones
+        var worker1 = workers[0];
+        var zone1 = zones.Count > 0 ? zones[0] : null;
+
         if (worker1 != null && zone1 != null)
         {
             userZones.Add(new UserZone
@@ -251,8 +285,8 @@ public class DataSeeder
         }
 
         // assign worker2 to zone 2
-        var worker2 = workers.FirstOrDefault(w => w.Pin == "5678");
-        var zone2 = zones.FirstOrDefault(z => z.ZoneCode == "ZONE-002");
+        var worker2 = workers.Count > 1 ? workers[1] : null;
+        var zone2 = zones.Count > 1 ? zones[1] : null;
         if (worker2 != null && zone2 != null)
         {
             userZones.Add(new UserZone
@@ -265,8 +299,8 @@ public class DataSeeder
         }
 
         // assign worker3 to zone 3
-        var worker3 = workers.FirstOrDefault(w => w.Pin == "9012");
-        var zone3 = zones.FirstOrDefault(z => z.ZoneCode == "ZONE-003");
+        var worker3 = workers.Count > 2 ? workers[2] : null;
+        var zone3 = zones.Count > 2 ? zones[2] : null;
         if (worker3 != null && zone3 != null)
         {
             userZones.Add(new UserZone
@@ -289,10 +323,8 @@ public class DataSeeder
 
         if (!workers.Any() || !zones.Any() || supervisor == null) return;
 
-        var worker1 = workers.FirstOrDefault(w => w.Pin == "1234");
-        var zone1 = zones.FirstOrDefault(z => z.ZoneCode == "ZONE-001");
-
-        if (worker1 == null || zone1 == null) return;
+        var worker1 = workers[0];
+        var zone1 = zones[0];
 
         var tasks = new List<Core.Entities.Task>
         {

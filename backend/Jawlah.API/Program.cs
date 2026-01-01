@@ -179,7 +179,7 @@ builder.Services.AddScoped<IGisService, GisService>();
 
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 
-builder.Services.AddScoped<DataSeeder>();
+builder.Services.AddScoped<DatabaseInitializer>();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -207,7 +207,7 @@ using (var scope = app.Services.CreateScope())
 {
     if (app.Environment.IsDevelopment())
     {
-        var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
+        var seeder = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
         await seeder.SeedAsync();
     }
 }
