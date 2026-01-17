@@ -27,10 +27,10 @@ export default function Sidebar({ role = "supervisor" }: { role?: UserRole }) {
   const items = role === "manager" ? managerItems : supervisorItems;
 
   return (
-    <aside className="h-full shrink-0 w-52 sm:w-56 md:w-[250px] flex flex-col bg-[#7895B2]">
+    <aside className="h-full flex flex-col bg-[#7895B2] w-52 sm:w-56 md:w-[250px]">
       <div className="h-24" />
 
-      {/* Added pb to keep last item away from bottom */}
+      {/* Pages */}
       <nav className="px-2.5 pt-14 pb-10 flex flex-col gap-10">
         {items.map((it) => (
           <SideItem key={it.to} to={it.to} end={it.end}>
@@ -40,6 +40,28 @@ export default function Sidebar({ role = "supervisor" }: { role?: UserRole }) {
       </nav>
 
       <div className="flex-1" />
+
+      {/* Mobile-only: Profile + Settings inside Drawer */}
+      <div className="md:hidden px-2.5 pb-6">
+        <div className="h-[1px] bg-white/25 mb-4" />
+
+        <div className="flex flex-col gap-3">
+          <SideItem to="/profile">الصفحة الشخصية</SideItem>
+          <SideItem to="/settings">الإعدادات</SideItem>
+
+          {/* اختياري (لو بدك زر تسجيل خروج بعدين)
+          <button
+            type="button"
+            className="w-full py-4 text-right px-3 text-[#F3F1ED] font-sans font-semibold text-[18px] rounded-lg hover:bg-white/10 transition"
+            onClick={() => {
+              // TODO: logout
+            }}
+          >
+            تسجيل خروج
+          </button>
+          */}
+        </div>
+      </div>
     </aside>
   );
 }
@@ -65,7 +87,6 @@ function SideItem({
           "py-4",
           isActive
             ? [
-                // Active: card attached to the content side (left in RTL layout)
                 "bg-[#F3F1ED] text-[#2F2F2F]",
                 "rounded-tr-[10px] rounded-br-[10px]",
                 "px-4 text-center",
