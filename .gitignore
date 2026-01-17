@@ -21,3 +21,4 @@ logs/
 .env.local
 .env.*.local
 backend/Jawlah.API/jawlah-2945f-firebase-adminsdk-fbsvc-6fb8c52dfa.json
+.claude/
