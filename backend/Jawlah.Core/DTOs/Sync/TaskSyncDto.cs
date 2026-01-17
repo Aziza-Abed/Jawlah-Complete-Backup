@@ -19,7 +19,7 @@ public class TaskSyncDto
     public string? PhotoUrl { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Description { get; set; }
-    public string? Priority { get; set; }
+    public Enums.TaskPriority? Priority { get; set; }
     public DateTime? DueDate { get; set; }
     public int? ZoneId { get; set; }
 

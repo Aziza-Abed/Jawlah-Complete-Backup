@@ -8,6 +8,14 @@ class UserModel {
   final String? email;
   final DateTime createdAt;
 
+  // Privacy consent tracking
+  final bool hasConsented;
+  final DateTime? privacyConsentedAt;
+  final int consentVersion;
+
+  // Current required consent version - must match backend
+  static const int requiredConsentVersion = 1;
+
   UserModel({
     required this.userId,
     required this.employeeId,
@@ -17,7 +25,13 @@ class UserModel {
     this.workerType,
     this.email,
     required this.createdAt,
+    this.hasConsented = false,
+    this.privacyConsentedAt,
+    this.consentVersion = 0,
   });
+
+  // Helper to check if user needs to consent
+  bool get needsConsent => consentVersion < requiredConsentVersion;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -36,6 +50,12 @@ class UserModel {
       createdAt: json['createdAt'] != null
           ? DateTime.parse('${json['createdAt'] as String}Z')
           : DateTime.now().toUtc(),
+      // Privacy consent fields
+      hasConsented: json['hasConsented'] as bool? ?? false,
+      privacyConsentedAt: json['privacyConsentedAt'] != null
+          ? DateTime.tryParse('${json['privacyConsentedAt']}Z')
+          : null,
+      consentVersion: json['consentVersion'] as int? ?? 0,
     );
   }
 
@@ -49,6 +69,9 @@ class UserModel {
       'workerType': workerType,
       'email': email,
       'createdAt': createdAt.toIso8601String(),
+      'hasConsented': hasConsented,
+      'privacyConsentedAt': privacyConsentedAt?.toIso8601String(),
+      'consentVersion': consentVersion,
     };
   }
 
@@ -61,6 +84,9 @@ class UserModel {
     String? workerType,
     String? email,
     DateTime? createdAt,
+    bool? hasConsented,
+    DateTime? privacyConsentedAt,
+    int? consentVersion,
   }) {
     return UserModel(
       userId: userId ?? this.userId,
@@ -71,6 +97,9 @@ class UserModel {
       workerType: workerType ?? this.workerType,
       email: email ?? this.email,
       createdAt: createdAt ?? this.createdAt,
+      hasConsented: hasConsented ?? this.hasConsented,
+      privacyConsentedAt: privacyConsentedAt ?? this.privacyConsentedAt,
+      consentVersion: consentVersion ?? this.consentVersion,
     );
   }
 
@@ -94,19 +123,22 @@ class UserModel {
   }
 
   String get workerTypeArabic {
-    if (workerType == null) return '';
+    if (workerType == null || workerType!.isEmpty) return '';
 
+    // Handle both enum names and numeric values
     switch (workerType!.toLowerCase()) {
       case 'sanitation':
+      case '0':
         return 'عامل نظافة';
       case 'inspector':
+      case '1':
         return 'مفتش';
-      case 'electrician':
-        return 'كهربائي';
-      case 'plumber':
-        return 'سباك';
+      case 'emergency':
+      case '2':
+        return 'طوارئ';
       case 'maintenance':
-        return 'صيانة';
+      case '3':
+        return 'عامل صيانة';
       default:
         return workerType!;
     }

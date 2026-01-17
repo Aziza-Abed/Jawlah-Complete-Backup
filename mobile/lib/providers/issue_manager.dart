@@ -13,30 +13,33 @@ import '../core/utils/storage_helper.dart';
 import 'sync_manager.dart';
 import 'base_controller.dart';
 
-// class to manage reporting problems in the field
+// class for reporting problems in the feild
 class IssueManager extends BaseController {
   final IssuesService _issuesService = IssuesService();
   final IssueLocalRepository _issueLocalRepo = IssueLocalRepository();
   SyncManager? _syncManager;
 
-  List<IssueModel> myIssues = []; // list to hold all issues
-  IssueModel? currentIssue; // the issue user is currently viewing
+  List<IssueModel> myIssues = []; // all issues go here
+  IssueModel? currentIssue; // issue user is looking at
   String? filterStatus;
 
-  // set sync manager
+  // set the sync manager
   void setSyncManager(SyncManager manager) {
     _syncManager = manager;
   }
 
-  // report new issue (online with offline fallback)
+  // send new issue report to server or save localy if offline
   Future<bool> sendIssueReport({
+    required String title,
     required String description,
     required String type,
+    required String severity,
+    String? locationDescription,
     required File photo1,
     File? photo2,
     File? photo3,
   }) async {
-    // Get GPS location first
+    // get gps location first
     double lat = 0.0;
     double lng = 0.0;
     try {
@@ -52,11 +55,14 @@ class IssueManager extends BaseController {
       }
     }
 
-    // attempt to send to server
+    // try to send to server
     final success = await executeVoidWithErrorHandling(() async {
       final issue = await _issuesService.reportIssue(
+        title: title,
         description: description,
         type: type,
+        severity: severity,
+        locationDescription: locationDescription,
         photo1: photo1,
         photo2: photo2,
         photo3: photo3,
@@ -69,7 +75,7 @@ class IssueManager extends BaseController {
 
     if (success) return true;
 
-    // if online failed, save it locally
+    // if online failed save it localy on phone
     try {
       final user = await StorageHelper.takeUser();
       if (user == null) {
@@ -77,7 +83,7 @@ class IssueManager extends BaseController {
         return false;
       }
 
-      // save photos permanently
+      // save photos to permanent location
       List<String> permanentPaths = [];
       try {
         final appDir = await getApplicationDocumentsDirectory();
@@ -92,27 +98,36 @@ class IssueManager extends BaseController {
         await photo1.copy(permanentPath1);
         permanentPaths.add(permanentPath1);
 
-        // copy extras if any
+        // copy extra photos if there
         if (photo2 != null) {
           final fileName2 = '${const Uuid().v4()}.jpg';
           final permanentPath2 = p.join(photoDir.path, fileName2);
           await photo2.copy(permanentPath2);
           permanentPaths.add(permanentPath2);
         }
+        if (photo3 != null) {
+          final fileName3 = '${const Uuid().v4()}.jpg';
+          final permanentPath3 = p.join(photoDir.path, fileName3);
+          await photo3.copy(permanentPath3);
+          permanentPaths.add(permanentPath3);
+        }
       } catch (e) {
-        permanentPaths = [photo1.path];
+        // fallback: use original path (may fail on sync if temp file deleted)
+        if (permanentPaths.isEmpty) {
+          permanentPaths = [photo1.path];
+        }
       }
 
-      // save to local database
+      // save to local db
       final issueLocal = IssueLocal(
-        title: '$type - بلاغ جديد',
+        title: title,
         description: description,
         type: type,
-        severity: 'Medium',
+        severity: severity,
         reportedByUserId: user.userId,
         latitude: lat,
         longitude: lng,
-        locationDescription: 'محفوظ محلياً',
+        locationDescription: locationDescription ?? '',
         photoUrl: permanentPaths.join(';'),
         reportedAt: DateTime.now(),
         createdAt: DateTime.now(),
@@ -122,7 +137,7 @@ class IssueManager extends BaseController {
       await _issueLocalRepo.addIssue(issueLocal);
       await _syncManager?.newDataAdded();
 
-      // insert temporary item in list
+      // add temp item to list so user can see it
       final tempIssue = IssueModel(
         issueId: -1 * DateTime.now().millisecondsSinceEpoch,
         title: issueLocal.title,
@@ -165,7 +180,7 @@ class IssueManager extends BaseController {
     }
   }
 
-  // get single issue details
+  // get single issue by id
   Future<void> getIssueDetails(int issueId) async {
     final issue = await executeWithErrorHandling(
       () => _issuesService.getIssueById(issueId),
@@ -194,7 +209,7 @@ class IssueManager extends BaseController {
     await loadIssues(status: filterStatus, forceRefresh: true);
   }
 
-  // reset on logout
+  // reset everything when user logs out
   void reset() {
     myIssues = [];
     currentIssue = null;

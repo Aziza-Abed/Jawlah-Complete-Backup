@@ -5,11 +5,12 @@ import '../../core/theme/app_colors.dart';
 
 import '../../core/utils/photo_picker_helper.dart';
 import '../../presentation/widgets/base_screen.dart';
+import '../../presentation/widgets/offline_banner.dart';
 import '../../providers/auth_manager.dart';
 import '../../providers/task_manager.dart';
 import '../../data/models/user_model.dart';
 
-// worker profile screen with stats and personal info
+// profile screen shows worker info and stats
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -23,7 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // load tasks to show stats in profile
+    // get tasks for showing stats
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskManager>().loadTasks();
     });
@@ -38,19 +39,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return BaseScreen(
       title: 'الملف الشخصي',
       showBackButton: true,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-        child: Column(
-          children: [
-            _buildAvatarCard(authProvider.userName, user?.workerTypeArabic),
-            const SizedBox(height: 20),
-            _buildPersonalInfoCard(user),
-            const SizedBox(height: 16),
-            _buildStatisticsCard(tasksProvider),
-            const SizedBox(height: 16),
-            _buildWorkInfoCard(user),
-          ],
-        ),
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+              child: Column(
+                children: [
+                  _buildAvatarCard(authProvider.userName, user?.workerTypeArabic),
+                  const SizedBox(height: 20),
+                  _buildPersonalInfoCard(user),
+                  const SizedBox(height: 16),
+                  _buildStatisticsCard(tasksProvider),
+                  const SizedBox(height: 16),
+                  _buildWorkInfoCard(user),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -151,26 +159,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // profile pic can be smaller, doesnt need full 1024x1024
   Future<void> _pickProfileImage() async {
     final image = await PhotoPickerHelper.pickImageWithChoice(
       context,
       maxWidth: 512,
       maxHeight: 512,
-      imageQuality: 85,
+      imageQuality: 70,
     );
 
     if (image != null) {
       setState(() => _profileImage = image);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم تحديث الصورة الشخصية بنجاح',
-                style: const TextStyle(fontFamily: 'Cairo')),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
     }
   }
 
@@ -236,6 +235,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildStatisticsCard(TaskManager tasksProvider) {
+    final actionableTotal = tasksProvider.actionableCount;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -264,7 +265,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   tasksProvider.inProgressCount.toString(), AppColors.warning),
               _buildStatItem('مكتمل', tasksProvider.completedCount.toString(),
                   AppColors.success),
-              _buildStatItem('الكل', tasksProvider.totalTasks.toString(),
+              _buildStatItem('الكل', actionableTotal.toString(),
                   AppColors.primary),
             ],
           ),
@@ -323,8 +324,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(height: 24),
           _buildInfoRow(
               Icons.work_outline, 'الدور', user?.roleArabic ?? 'عامل ميداني'),
-          const Divider(height: 24),
-          _buildInfoRow(Icons.schedule, 'ساعات العمل', '08:00 - 16:00'),
         ],
       ),
     );

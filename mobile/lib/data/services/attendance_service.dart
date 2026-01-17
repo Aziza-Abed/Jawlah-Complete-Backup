@@ -10,7 +10,7 @@ import 'location_service.dart';
 class AttendanceService {
   final ApiService _apiService = ApiService();
 
-  // create today's attendance check-in with current GPS
+  // create today's attendance check in with current GPS
   Future<AttendanceModel> checkIn() async {
     try {
       // get the current location coordinates
@@ -19,7 +19,7 @@ class AttendanceService {
         throw ValidationException('فشل الحصول على موقع GPS.');
       }
 
-      // send the check-in request to the server
+      // send the check in request to the server
       final response = await _apiService.post(
         ApiConfig.checkIn,
         data: {
@@ -101,7 +101,7 @@ class AttendanceService {
     }
   }
 
-  // get attendance history for current user (optional range and pagination)
+  // get attendance history for current user optional range and pagination
   Future<List<AttendanceModel>> getMyAttendance({
     DateTime? fromDate,
     DateTime? toDate,

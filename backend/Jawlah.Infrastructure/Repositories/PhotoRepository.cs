@@ -23,7 +23,17 @@ public class PhotoRepository : Repository<Photo>, IPhotoRepository
 
     public async Task DeletePhotosByEntityAsync(string entityType, int entityId)
     {
-        var photos = await GetPhotosByEntityAsync(entityType, entityId);
+        var photos = await _dbSet
+            .Where(p => p.EntityType == entityType && p.EntityId == entityId)
+            .ToListAsync();
         _dbSet.RemoveRange(photos);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<Photo?> GetByFilenameAsync(string filename)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.PhotoUrl != null && p.PhotoUrl.Contains(filename));
     }
 }

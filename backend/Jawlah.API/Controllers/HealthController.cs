@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Jawlah.Infrastructure.Data;
 
 namespace Jawlah.API.Controllers;
 
+// this controller check if api and database are working
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class HealthController : ControllerBase
 {
     private readonly JawlahDbContext _db;
@@ -17,12 +20,13 @@ public class HealthController : ControllerBase
         _logger = logger;
     }
 
+    // main health check endpoint
     [HttpGet]
     public async Task<IActionResult> Get()
     {
         try
         {
-            // check database connection (simple SELECT 1 check)
+            // check if we can connect to database
             var canConnect = await _db.Database.CanConnectAsync();
 
             if (!canConnect)
@@ -35,8 +39,7 @@ public class HealthController : ControllerBase
                 });
             }
 
-            // count important things to show the system is alive
-            // Note: We use sequential calls because DbContext is not thread-safe
+            // count some records to show system is working
             var userCount = await _db.Users.CountAsync();
             var taskCount = await _db.Tasks.CountAsync();
             var zoneCount = await _db.Zones.CountAsync();
@@ -69,7 +72,9 @@ public class HealthController : ControllerBase
         }
     }
 
+    // simple ping endpoint - public for load balancer health checks
     [HttpGet("ping")]
+    [AllowAnonymous]
     public IActionResult Ping()
     {
         return Ok(new

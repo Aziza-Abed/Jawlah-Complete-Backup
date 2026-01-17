@@ -1,4 +1,5 @@
 import '../../core/utils/storage_helper.dart';
+import '../../core/utils/secure_storage_helper.dart';
 
 // this service is for saving and reading data from the phone's memory
 class StorageService {
@@ -23,7 +24,7 @@ class StorageService {
   Future<String?> getRefreshToken() => StorageHelper.getRefreshToken();
   Future<bool> removeRefreshToken() => StorageHelper.removeRefreshToken();
 
-  // user ID methods (save/get userId as int)
+  // user ID methods save and get userId as int
   Future<bool> saveUserId(int userId) =>
       StorageHelper.saveInt('user_id', userId);
   Future<int?> getUserId() => StorageHelper.getInt('user_id');
@@ -33,19 +34,21 @@ class StorageService {
       StorageHelper.saveRememberMe(value);
   Future<bool> getRememberMe() => StorageHelper.getRememberMe();
 
-  // employee ID methods (for Remember Me)
+  // employee ID methods for Remember Me
   Future<bool> saveEmployeeId(String employeeId) =>
       StorageHelper.saveEmployeeId(employeeId);
   Future<String?> getEmployeeId() => StorageHelper.getEmployeeId();
   Future<bool> removeEmployeeId() => StorageHelper.removeEmployeeId();
 
-  // offline login methods
+  // offline login methods - now using secure storage
   Future<bool> saveHashedPin(String hashedPin) =>
-      StorageHelper.saveString('hashed_pin', hashedPin);
-  Future<String?> getHashedPin() => StorageHelper.getString('hashed_pin');
+      SecureStorageHelper.saveHashedPin(hashedPin);
+  Future<String?> getHashedPin() => SecureStorageHelper.getHashedPin();
+
+  // user profile - now using secure storage
   Future<bool> saveUserProfile(String userJson) =>
-      StorageHelper.saveString('user_profile', userJson);
-  Future<String?> getUserProfile() => StorageHelper.getString('user_profile');
+      SecureStorageHelper.saveUserProfile(userJson);
+  Future<String?> getUserProfile() => SecureStorageHelper.getUserProfile();
 
   // clear all data
   Future<bool> clearAll() => StorageHelper.wipeData();

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Jawlah.API.Controllers;
 
+// this controller handle user notifications
 [Route("api/[controller]")]
 public class NotificationsController : BaseApiController
 {
@@ -20,22 +21,24 @@ public class NotificationsController : BaseApiController
         _mapper = mapper;
     }
 
+    // get all notifications for current user
     [HttpGet]
     public async Task<IActionResult> GetMyNotifications()
     {
-        // get the current user ID
+        // get user id from token
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
             return Unauthorized();
 
-        // load all notifications for this user
+        // get all notifications
         var notifications = await _notices.GetUserNotificationsAsync(userId.Value);
 
-        // return them as a list
+        // return as list
         return Ok(ApiResponse<IEnumerable<NotificationResponse>>.SuccessResponse(
             notifications.Select(n => _mapper.Map<NotificationResponse>(n))));
     }
 
+    // get only unread notifications
     [HttpGet("unread")]
     public async Task<IActionResult> GetUnreadNotifications()
     {
@@ -49,6 +52,7 @@ public class NotificationsController : BaseApiController
             notifications.Select(n => _mapper.Map<NotificationResponse>(n))));
     }
 
+    // get count of unread notifications
     [HttpGet("unread-count")]
     public async Task<IActionResult> GetUnreadCount()
     {
@@ -61,6 +65,7 @@ public class NotificationsController : BaseApiController
         return Ok(ApiResponse<int>.SuccessResponse(count));
     }
 
+    // mark single notification as read
     [HttpPut("{id}/mark-read")]
     public async Task<IActionResult> MarkAsRead(int id)
     {
@@ -72,18 +77,17 @@ public class NotificationsController : BaseApiController
         if (notification == null)
             return NotFound(ApiResponse<object>.ErrorResponse("الإشعار غير موجود"));
 
+        // check if notification belong to user
         if (notification.UserId != userId.Value)
             return Forbid();
 
-        notification.IsRead = true;
-        notification.ReadAt = DateTime.UtcNow;
-
-        await _notices.UpdateAsync(notification);
+        await _notices.MarkAsReadAsync(id);
         await _notices.SaveChangesAsync();
 
         return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تحديد الإشعار كمقروء"));
     }
 
+    // mark all notifications as read
     [HttpPut("mark-all-read")]
     public async Task<IActionResult> MarkAllAsRead()
     {
@@ -97,6 +101,7 @@ public class NotificationsController : BaseApiController
         return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تحديد جميع الإشعارات كمقروءة"));
     }
 
+    // delete single notification
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteNotification(int id)
     {
@@ -108,6 +113,7 @@ public class NotificationsController : BaseApiController
         if (notification == null)
             return NotFound(ApiResponse<object>.ErrorResponse("الإشعار غير موجود"));
 
+        // check if notification belong to user
         if (notification.UserId != userId.Value)
             return Forbid();
 

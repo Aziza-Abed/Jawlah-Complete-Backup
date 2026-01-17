@@ -73,4 +73,15 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
     }
+
+    public async Task<IEnumerable<Issue>> GetIssuesModifiedAfterAsync(int userId, DateTime lastSyncTime)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .Include(i => i.ReportedByUser)
+            .Include(i => i.Zone)
+            .Include(i => i.Photos)
+            .Where(i => i.ReportedByUserId == userId && i.SyncTime > lastSyncTime)
+            .ToListAsync();
+    }
 }

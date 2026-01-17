@@ -6,19 +6,22 @@ import '../data/models/local/attendance_local.dart';
 import '../data/services/attendance_service.dart';
 import '../data/services/location_service.dart';
 import '../data/repositories/local/attendance_local_repository.dart';
+import '../core/utils/background_service_utils.dart';
 import 'sync_manager.dart';
+import 'auth_manager.dart';
 import 'base_controller.dart';
 
-// manager for worker check-in and check-out
+// manager for check in and check out
 class AttendanceManager extends BaseController {
   final AttendanceService _attendanceService = AttendanceService();
   final AttendanceLocalRepository _localRepo = AttendanceLocalRepository();
   SyncManager? _syncManager;
+  AuthManager? _authManager;
 
   AttendanceModel? todayRecord;
   List<AttendanceModel> myHistory = [];
 
-  // pagination for history
+  // pagination stuff
   int historyPage = 1;
   final int _pageSize = 20;
   bool canLoadMore = true;
@@ -29,12 +32,17 @@ class AttendanceManager extends BaseController {
   bool get hasNotCheckedInToday => todayRecord == null;
   String? get currentWorkDuration => todayRecord?.workDurationFormatted;
 
-  // link sync manager
+  // set sync manager
   void setSyncManager(SyncManager manager) {
     _syncManager = manager;
   }
 
-  // load today attendance record from server or local storage
+  // set auth manager (for updating check-in status)
+  void setAuthManager(AuthManager manager) {
+    _authManager = manager;
+  }
+
+  // load today attendace from server or local
   Future<void> loadTodayRecord() async {
     final isOnline = _syncManager?.isOnline ?? true;
 
@@ -46,7 +54,7 @@ class AttendanceManager extends BaseController {
       if (attendance != null) {
         todayRecord = attendance;
 
-        // cache data locally for offline usage
+        // save to local for offline use
         final prefs = await SharedPreferences.getInstance();
         final userId = prefs.getInt('user_id');
         if (userId != null) {
@@ -58,7 +66,7 @@ class AttendanceManager extends BaseController {
       }
     }
 
-    // fallback or offline: check local repo
+    // fallback to local if offline
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id');
@@ -78,10 +86,9 @@ class AttendanceManager extends BaseController {
             notes: local.validationMessage,
             createdAt: local.createdAt,
           );
-          clearError(); // Clear "No internet" error if we have local data
+          clearError();
         } else {
-          // If no local data and offline, we don't want to show an error screen
-          // We just want to allow the user to check-in offline
+          // no local data and offline let user check in offline
           if (!isOnline) {
             clearError();
           }
@@ -94,28 +101,35 @@ class AttendanceManager extends BaseController {
     notifyListeners();
   }
 
-  // perform check-in (online or offline)
+  // do check in online or offline
   Future<bool> doCheckIn() async {
-    return await executeVoidWithErrorHandling(() async {
-      // try to check in online if we have internet
+    final success = await executeVoidWithErrorHandling(() async {
+      // try online check in first
       if (_syncManager?.isOnline ?? false) {
         try {
           final result = await _attendanceService.checkIn();
           todayRecord = result;
 
-          // cache it
+          // cache it localy
           final prefs = await SharedPreferences.getInstance();
           final userId = prefs.getInt('user_id');
           if (userId != null) {
             await _cacheTodayRecord(result, userId);
           }
+
+          // start background tracking after successful check-in
+          BackgroundServiceUtils.startService();
+
+          // update auth manager check-in status
+          _authManager?.updateCheckInStatus(true, attendanceId: result.attendanceId);
+
           return;
         } catch (e) {
           if (kDebugMode) debugPrint('Online check-in failed: $e');
         }
       }
 
-      // if offline or online fails, save it locally on the phone
+      // if offline save localy
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id');
 
@@ -123,7 +137,7 @@ class AttendanceManager extends BaseController {
         throw Exception('يجب تسجيل الدخول أولاً');
       }
 
-      // get the GPS location
+      // get gps location
       final position = await LocationService.getCurrentLocation();
       if (position == null) {
         throw Exception('يجب تفعيل تحديد الموقع (GPS)');
@@ -137,7 +151,7 @@ class AttendanceManager extends BaseController {
         createdAt: DateTime.now(),
       );
 
-      // save to the local database and tell sync manager to send it later
+      // save to local db and tell sync manager
       await _localRepo.addAttendance(localAttendance);
       await _syncManager?.newDataAdded();
 
@@ -151,13 +165,21 @@ class AttendanceManager extends BaseController {
         createdAt: DateTime.now(),
       );
 
+      // start background tracking after check-in (even offline)
+      BackgroundServiceUtils.startService();
+
+      // update auth manager check-in status
+      _authManager?.updateCheckInStatus(true);
+
       notifyListeners();
     });
+
+    return success;
   }
 
-  // perform check-out (online or offline)
+  // do check out online or offline
   Future<bool> doCheckOut() async {
-    return await executeVoidWithErrorHandling(() async {
+    final success = await executeVoidWithErrorHandling(() async {
       // try online first
       if (_syncManager?.isOnline ?? false) {
         try {
@@ -170,19 +192,30 @@ class AttendanceManager extends BaseController {
           if (userId != null) {
             await _cacheTodayRecord(result, userId);
           }
+
+          // stop background tracking after check-out
+          await BackgroundServiceUtils.stopService();
+
+          // update auth manager check-in status
+          _authManager?.updateCheckInStatus(false);
+
           return;
         } catch (e) {
           if (kDebugMode) debugPrint('Online check-out failed: $e');
         }
       }
 
-      // save on device
+      // save on phone
       final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getInt('user_id') ?? 0;
+      final userId = prefs.getInt('user_id');
+
+      if (userId == null || userId == 0) {
+        throw Exception('يجب تسجيل الدخول أولاً');
+      }
 
       final position = await LocationService.getCurrentLocation();
       if (position == null) {
-        throw Exception('gps location required');
+        throw Exception('يجب تفعيل تحديد الموقع (GPS)');
       }
 
       try {
@@ -202,7 +235,7 @@ class AttendanceManager extends BaseController {
         throw Exception('يجب تسجيل الحضور أولاً');
       }
 
-      // update ui status
+      // update ui
       if (todayRecord != null) {
         todayRecord = AttendanceModel(
           attendanceId: todayRecord!.attendanceId,
@@ -218,11 +251,19 @@ class AttendanceManager extends BaseController {
         );
       }
 
+      // stop background tracking after check-out (even offline)
+      await BackgroundServiceUtils.stopService();
+
+      // update auth manager check-in status
+      _authManager?.updateCheckInStatus(false);
+
       notifyListeners();
     });
+
+    return success;
   }
 
-  // load attendance history list
+  // load attendace history
   Future<void> loadHistory({
     DateTime? fromDate,
     DateTime? toDate,
@@ -246,7 +287,7 @@ class AttendanceManager extends BaseController {
     }
   }
 
-  // load more rows for history
+  // load more history rows
   Future<void> loadExtraHistory({
     DateTime? fromDate,
     DateTime? toDate,
@@ -279,7 +320,7 @@ class AttendanceManager extends BaseController {
     }
   }
 
-  // refresh today status
+  // refresh today data
   Future<void> refreshTodayData() async {
     await loadTodayRecord();
   }
@@ -293,15 +334,15 @@ class AttendanceManager extends BaseController {
     notifyListeners();
   }
 
-  // helper to save server record to local storage
+  // helper to save server record to local
   Future<void> _cacheTodayRecord(
       AttendanceModel serverRecord, int userId) async {
     try {
-      // check if we already have a local record for today
+      // check if we alredy have local record
       var localRecord = await _localRepo.getTodayAttendance(userId);
 
       if (localRecord != null) {
-        // update existing record
+        // update existing
         localRecord.serverId = serverRecord.attendanceId;
         localRecord.checkInTime = serverRecord.checkInTime;
         localRecord.checkOutTime = serverRecord.checkOutTime;
@@ -311,12 +352,12 @@ class AttendanceManager extends BaseController {
         localRecord.checkOutLongitude = serverRecord.checkOutLongitude;
         localRecord.isValidated = serverRecord.isValid;
         localRecord.validationMessage = serverRecord.notes;
-        localRecord.isSynced = true; // it came from server, so it's synced
+        localRecord.isSynced = true;
         localRecord.syncedAt = DateTime.now();
 
         await localRecord.save();
       } else {
-        // create new record if none exists
+        // create new record
         final newRecord = AttendanceLocal(
           userId: userId,
           serverId: serverRecord.attendanceId,

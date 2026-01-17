@@ -4,13 +4,13 @@ import 'package:flutter/foundation.dart';
 import '../data/services/sync/sync_service.dart';
 import 'base_controller.dart';
 
-// manager to handle internet connection and syncing data
+// this manager checks internet and syncs data to server
 class SyncManager extends BaseController {
   final Connectivity _connectivity = Connectivity();
   final SyncService _syncService;
 
   bool _isOnline = true;
-  int waitingItems = 0; // count of items waiting to be sent to server
+  int waitingItems = 0; // how many items need to be synced
   bool isSyncingNow = false;
   SyncResult? lastResult;
   StreamSubscription<List<ConnectivityResult>>? _subscription;
@@ -22,7 +22,7 @@ class SyncManager extends BaseController {
 
   bool get isOnline => _isOnline;
 
-  // check connection at start
+  // check if we have internet when app starts
   Future<void> _initConnectivity() async {
     try {
       final results = await _connectivity.checkConnectivity();
@@ -33,13 +33,13 @@ class SyncManager extends BaseController {
     }
   }
 
-  // watch for connection changes
+  // listen for connection changes
   void _monitorConnectivity() {
     _subscription = _connectivity.onConnectivityChanged.listen(
       (List<ConnectivityResult> results) async {
         _updateConnectionStatus(results);
 
-        // sync automatically when internet is back
+        // if we get internet back try to sync automaticly
         if (_isOnline && waitingItems > 0 && !isSyncingNow) {
           await startSync();
         }
@@ -47,7 +47,7 @@ class SyncManager extends BaseController {
     );
   }
 
-  // update the online/offline status
+  // update online or offline status
   void _updateConnectionStatus(List<ConnectivityResult> results) {
     final wasOnline = _isOnline;
     _isOnline = results.any((result) =>
@@ -60,19 +60,19 @@ class SyncManager extends BaseController {
     }
   }
 
-  // count how many items need syncing
+  // count items that need syncing
   Future<void> _refreshWaitingCount() async {
     waitingItems = await _syncService.getPendingSyncCount();
     notifyListeners();
   }
 
-  // start the sync process
+  // start syncing data to server
   Future<SyncResult> startSync() async {
     if (isSyncingNow) {
       return lastResult ?? SyncResult();
     }
 
-    // check internet connection
+    // check if we have internet first
     if (!_isOnline) {
       final result = SyncResult();
       result.success = false;
@@ -84,14 +84,14 @@ class SyncManager extends BaseController {
     notifyListeners();
 
     try {
-      // upload local data
+      // send local data to server
       final uploadResult = await _syncService.syncToServer();
       lastResult = uploadResult;
 
-      // get latest updates
+      // get new data from server
       await _syncService.syncFromServer();
 
-      // update waiting count
+      // update count
       await _refreshWaitingCount();
 
       return uploadResult;
@@ -107,11 +107,11 @@ class SyncManager extends BaseController {
     }
   }
 
-  // call this when user adds new data while offline
+  // call this when user saves new data while offline
   Future<void> newDataAdded() async {
     await _refreshWaitingCount();
 
-    // try to sync if online
+    // try sync if online
     if (_isOnline && !isSyncingNow) {
       startSync();
     }

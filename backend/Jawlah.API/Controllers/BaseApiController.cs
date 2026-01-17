@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,20 +8,16 @@ namespace Jawlah.API.Controllers;
 [Authorize]
 public abstract class BaseApiController : ControllerBase
 {
-    // help us get the ID of the person using the app now
+    // get the ID of the current user
     protected int? GetCurrentUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return userIdClaim != null ? int.Parse(userIdClaim.Value) : null;
+        return userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId) ? userId : null;
     }
 
+    // get the role of the current user
     protected string? GetCurrentUserRole()
     {
         return User.FindFirst(ClaimTypes.Role)?.Value;
-    }
-
-    protected string? GetCurrentUsername()
-    {
-        return User.Identity?.Name;
     }
 }

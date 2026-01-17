@@ -12,23 +12,24 @@ import '../../core/config/api_config.dart';
 class IssuesService {
   final ApiService _apiService = ApiService();
 
-  // report a new issue with description, type and 3 photos (1 mandatory, 2 optional)
+  // report a new issue with description type and 3 photos 1 mandatory 2 optional
   Future<IssueModel> reportIssue({
+    required String title,
     required String description,
     required String type,
+    required String severity,
+    String? locationDescription,
     required File photo1,
     File? photo2,
     File? photo3,
-    String? severity,
     double? latitude,
     double? longitude,
-    String? locationDescription,
   }) async {
     try {
       double lat;
       double lng;
 
-      // decide which location to use (given or current)
+      // decide which location to use given or current
       if (latitude != null && longitude != null) {
         lat = latitude;
         lng = longitude;
@@ -41,31 +42,28 @@ class IssuesService {
         lng = position.longitude;
       }
 
-      // prepare the data in a form (FormData)
+      // prepare the data in a form FormData
       final formData = FormData();
 
-      // log the issue type for debugging
+      // log the issue type for debuging
       if (kDebugMode) {
         debugPrint('Reporting issue with type: "$type"');
       }
 
       formData.fields.addAll([
+        MapEntry('title', title),
         MapEntry('description', description),
-        MapEntry('type', type.trim()), // Remove extra spaces
+        MapEntry('type', type.trim()),
+        MapEntry('severity', severity),
         MapEntry('latitude', lat.toString()),
         MapEntry('longitude', lng.toString()),
       ]);
 
-      if (severity != null) {
-        formData.fields.add(MapEntry('severity', severity));
+      if (locationDescription != null && locationDescription.isNotEmpty) {
+        formData.fields.add(MapEntry('locationDescription', locationDescription));
       }
 
-      if (locationDescription != null) {
-        formData.fields
-            .add(MapEntry('locationDescription', locationDescription));
-      }
-
-      // add photo1 (mandatory)
+      // add photo1 mandatory
       if (!await photo1.exists()) {
         throw ValidationException('البيانات المدخلة غير صحيحة.');
       }
@@ -83,7 +81,7 @@ class IssuesService {
         ),
       );
 
-      // add photo2 (optional)
+      // add photo2 optional
       if (photo2 != null) {
         if (await photo2.exists()) {
           final fileSize2 = await photo2.length();
@@ -101,7 +99,7 @@ class IssuesService {
         }
       }
 
-      // add photo3 (optional)
+      // add photo3 optional
       if (photo3 != null) {
         if (await photo3.exists()) {
           final fileSize3 = await photo3.length();
@@ -140,7 +138,7 @@ class IssuesService {
     }
   }
 
-  // get issues reported by current user (optional status filter)
+  // get issues reported by current user optional status filter
   Future<List<IssueModel>> getMyIssues({String? status}) async {
     try {
       final queryParams = <String, dynamic>{};

@@ -9,7 +9,7 @@ class TaskCard extends StatelessWidget {
 
   const TaskCard({super.key, required this.task});
 
-  // Helper to get priority color style (bg, text/icon)
+  // get colors for priority badge
   Map<String, Color> _getPriorityStyle() {
     switch (task.priority.toLowerCase()) {
       case 'high':
@@ -61,7 +61,7 @@ class TaskCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Main Content (Right side in RTL)
+            // main content
             Expanded(
               child: Column(
                 crossAxisAlignment:
@@ -83,12 +83,12 @@ class TaskCard extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Badges Row (Priority & Status)
+                  // priority and status badges
                   Row(
                     mainAxisAlignment:
                         MainAxisAlignment.start, // Align to Right in RTL
                     children: [
-                      // Priority Badge
+                      // priority badge
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
@@ -117,7 +117,7 @@ class TaskCard extends StatelessWidget {
 
                       const SizedBox(width: 8),
 
-                      // Status Badge
+                      // status badge
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
@@ -140,7 +140,7 @@ class TaskCard extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // Location Row
+                  // location row (show zoneName or location)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -149,7 +149,7 @@ class TaskCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          task.location ?? 'المنطقة الرياضية',
+                          task.zoneName ?? task.location ?? 'غير محدد',
                           style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF6C757D),
@@ -165,7 +165,7 @@ class TaskCard extends StatelessWidget {
 
                   const SizedBox(height: 8),
 
-                  // Date Row
+                  // date row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -188,7 +188,7 @@ class TaskCard extends StatelessWidget {
 
             const SizedBox(width: 12),
 
-            // Left Chevron (Points Left in RTL to indicate "Forward" to details)
+            // arrow to go to details
             const Icon(
               Icons.arrow_forward_ios,
               size: 20,

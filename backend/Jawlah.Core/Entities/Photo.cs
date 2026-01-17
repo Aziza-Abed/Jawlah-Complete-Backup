@@ -1,3 +1,5 @@
+using TaskEntity = Jawlah.Core.Entities.Task;
+
 namespace Jawlah.Core.Entities;
 
 public class Photo
@@ -10,6 +12,10 @@ public class Photo
     public string EntityType { get; set; } = string.Empty; // "Issue" or "Task"
     public int EntityId { get; set; } // IssueId or TaskId
 
+    // Explicit foreign keys (match database schema)
+    public int? TaskId { get; set; }
+    public int? IssueId { get; set; }
+
     public int OrderIndex { get; set; } // For ordering photos (0, 1, 2...)
 
     public long? FileSizeBytes { get; set; }
@@ -21,4 +27,6 @@ public class Photo
 
     // navigation properties
     public User? UploadedByUser { get; set; }
+    public TaskEntity? Task { get; set; }
+    public Issue? Issue { get; set; }
 }

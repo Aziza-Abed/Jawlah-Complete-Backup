@@ -4,12 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/offline_banner.dart';
+import '../../presentation/widgets/not_checked_in_banner.dart';
 import '../../presentation/widgets/fade_in_animation.dart';
 import '../../providers/attendance_manager.dart';
+import '../../providers/auth_manager.dart';
 import '../../providers/task_manager.dart';
 import '../../providers/sync_manager.dart';
 import '../../providers/notice_manager.dart';
 import '../../core/routing/app_router.dart';
+import '../../data/services/battery_service.dart';
 import 'widgets/greeting_card.dart';
 import 'widgets/sync_status_card.dart';
 import 'widgets/attendance_card.dart';
@@ -29,17 +32,24 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    // when the screen starts, prepare the managers and load data
+    // load all data when screen starts
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final syncManager = context.read<SyncManager>();
-      context.read<AttendanceManager>().setSyncManager(syncManager);
+      final authManager = context.read<AuthManager>();
+      final attendanceManager = context.read<AttendanceManager>();
 
-      context.read<AttendanceManager>().loadTodayRecord();
+      attendanceManager.setSyncManager(syncManager);
+      attendanceManager.setAuthManager(authManager);
+
+      attendanceManager.loadTodayRecord();
       context.read<TaskManager>().loadTasks();
       context.read<NoticeManager>().loadNotices();
     });
 
-    // refresh the work duration timer every minute
+    // start battery monitoring for low battery alerts
+    BatteryService().startMonitoring();
+
+    // update work time every minute
     _workDurationTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (mounted) {
         setState(() {});
@@ -50,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _workDurationTimer?.cancel();
+    BatteryService().stopMonitoring();
     super.dispose();
   }
 
@@ -128,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           const OfflineBanner(),
+          const NotCheckedInBanner(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _handleRefresh,

@@ -8,8 +8,24 @@ public class UserDto
     public string? Email { get; set; }
     public string Role { get; set; } = string.Empty;
     public string? WorkerType { get; set; }
-    public string? Pin { get; set; } // 4-digit PIN for workers
-    public string EmployeeId { get; set; } = string.Empty; // Employee ID (same as PIN for workers) - REQUIRED
+    public string EmployeeId { get; set; } = string.Empty; // Employee ID - REQUIRED
     public string PhoneNumber { get; set; } = string.Empty; // REQUIRED - Mobile expects this
     public DateTime CreatedAt { get; set; }
+
+    // Municipality information
+    public int MunicipalityId { get; set; }
+    public string MunicipalityCode { get; set; } = string.Empty;
+    public string MunicipalityName { get; set; } = string.Empty;
+    public string? MunicipalityNameEnglish { get; set; }
+
+    // Privacy consent tracking
+    public bool HasConsented { get; set; } = false;
+    public DateTime? PrivacyConsentedAt { get; set; }
+    public int ConsentVersion { get; set; } = 0;
+
+    // Current required consent version - increment this when privacy policy changes
+    public const int RequiredConsentVersion = 1;
+
+    // Helper to check if user needs to consent
+    public bool NeedsConsent => ConsentVersion < RequiredConsentVersion;
 }

@@ -5,6 +5,11 @@ namespace Jawlah.Core.Entities;
 public class Zone
 {
     public int ZoneId { get; set; }
+
+    // Municipality that this zone belongs to
+    public int MunicipalityId { get; set; }
+    public Municipality Municipality { get; set; } = null!;
+
     public string ZoneName { get; set; } = string.Empty;
     public string ZoneCode { get; set; } = string.Empty;
     public string? Description { get; set; }

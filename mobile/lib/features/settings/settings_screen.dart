@@ -4,10 +4,18 @@ import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../providers/auth_manager.dart';
+import '../../providers/task_manager.dart';
+import '../../data/services/attendance_service.dart';
+import '../../data/models/attendance_model.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final authManager = context.read<AuthManager>();
@@ -78,9 +86,187 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            _buildLogoutButton(context),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLogoutButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => _showLogoutDialog(context),
+        borderRadius: BorderRadius.circular(16),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 24, color: AppColors.error),
+              SizedBox(width: 16),
+              Text(
+                'تسجيل الخروج',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.error,
+                  fontFamily: 'Cairo',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) async {
+    // Fetch today's work summary
+    final taskManager = context.read<TaskManager>();
+    AttendanceModel? todayAttendance;
+
+    try {
+      final attendanceService = AttendanceService();
+      todayAttendance = await attendanceService.getTodayAttendance();
+    } catch (e) {
+      // Ignore errors - we'll show summary without attendance info
+    }
+
+    if (!context.mounted) return;
+
+    // Calculate work stats
+    final completedToday = taskManager.myTasks.where((t) =>
+        t.isCompleted &&
+        t.completedAt != null &&
+        t.completedAt!.day == DateTime.now().day &&
+        t.completedAt!.month == DateTime.now().month &&
+        t.completedAt!.year == DateTime.now().year
+    ).length;
+
+    String workDuration = 'غير محدد';
+    String checkInTime = 'غير محدد';
+    String checkOutTime = 'غير محدد';
+    String lateInfo = '';
+
+    if (todayAttendance != null) {
+      final checkIn = todayAttendance.checkInTime;
+      checkInTime = '${checkIn.hour.toString().padLeft(2, '0')}:${checkIn.minute.toString().padLeft(2, '0')}';
+
+      if (todayAttendance.checkOutTime != null) {
+        final checkOut = todayAttendance.checkOutTime!;
+        checkOutTime = '${checkOut.hour.toString().padLeft(2, '0')}:${checkOut.minute.toString().padLeft(2, '0')}';
+        final duration = checkOut.difference(checkIn);
+        final hours = duration.inHours;
+        final minutes = duration.inMinutes % 60;
+        workDuration = '$hours ساعة و $minutes دقيقة';
+      } else {
+        final now = DateTime.now();
+        final duration = now.difference(checkIn);
+        final hours = duration.inHours;
+        final minutes = duration.inMinutes % 60;
+        workDuration = '$hours ساعة و $minutes دقيقة (جاري)';
+      }
+
+      if (todayAttendance.lateMinutes > 0) {
+        lateInfo = 'التأخير: ${todayAttendance.lateMinutes} دقيقة';
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.summarize, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('ملخص العمل اليوم', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSummaryRow(Icons.login, 'وقت الدخول', checkInTime),
+            const SizedBox(height: 8),
+            _buildSummaryRow(Icons.logout, 'وقت الخروج', checkOutTime),
+            const SizedBox(height: 8),
+            _buildSummaryRow(Icons.timer, 'مدة العمل', workDuration),
+            const SizedBox(height: 8),
+            _buildSummaryRow(Icons.task_alt, 'المهام المكتملة', '$completedToday مهمة'),
+            if (lateInfo.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildSummaryRow(Icons.warning_amber, 'ملاحظة', lateInfo, color: AppColors.warning),
+            ],
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: AppColors.info),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'سيتم تسجيل الانصراف تلقائياً عند الخروج',
+                      style: TextStyle(fontFamily: 'Cairo', fontSize: 12, color: AppColors.info),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthManager>().doLogout();
+              Navigator.of(context).pushNamedAndRemoveUntil(Routes.login, (route) => false);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('تسجيل الخروج', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(IconData icon, String label, String value, {Color? color}) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color ?? AppColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(fontFamily: 'Cairo', color: color ?? AppColors.textPrimary),
+          ),
+        ),
+      ],
     );
   }
 

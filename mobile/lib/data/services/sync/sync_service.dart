@@ -2,9 +2,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 import '../../../core/errors/app_exception.dart';
-
+import '../device_service.dart';
 import '../../models/local/task_local.dart';
 import '../../models/local/issue_local.dart';
 import '../../repositories/local/attendance_local_repository.dart';
@@ -12,6 +11,20 @@ import '../../repositories/local/task_local_repository.dart';
 import '../../repositories/local/issue_local_repository.dart';
 import '../tasks_service.dart';
 import '../issues_service.dart';
+
+// safe datetime parser that handles malformed dates gracefuly
+DateTime? _safeParseDateTimeUtc(dynamic value) {
+  if (value == null) return null;
+  try {
+    final str = value.toString();
+    if (str.isEmpty) return null;
+    final utcStr = str.endsWith('Z') ? str : '${str}Z';
+    return DateTime.parse(utcStr);
+  } catch (e) {
+    if (kDebugMode) debugPrint('Sync: Failed to parse DateTime: $value - $e');
+    return null;
+  }
+}
 
 class SyncService {
   final Dio _dio;
@@ -30,7 +43,7 @@ class SyncService {
     this._issuesService,
   );
 
-  // this method sends all local data (attendance, tasks, issues) to the server
+  // this method sends all local data attendance tasks issues to the server
   Future<SyncResult> syncToServer() async {
     final result = SyncResult();
 
@@ -45,7 +58,7 @@ class SyncService {
       result.tasksSynced = taskResult.success;
       result.tasksFailed = taskResult.failed;
 
-      // finally sync issues
+      // finaly sync issues
       final issueResult = await _syncIssues();
       result.issuesSynced = issueResult.success;
       result.issuesFailed = issueResult.failed;
@@ -74,7 +87,7 @@ class SyncService {
   }) async {
     AppException? lastError;
 
-    // retry loop - try request up to maxRetries times
+    // retry loop try request up to maxRetries times
     for (int attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await request();
@@ -122,7 +135,7 @@ class SyncService {
 
       if (response.statusCode == 200) {
         final data = response.data['data'];
-        final results = data['results'] as List;
+        final results = data?['results'] as List? ?? [];
 
         for (var syncResult in results) {
           if (syncResult['success']) {
@@ -155,7 +168,8 @@ class SyncService {
       final batchItems = <TaskLocal>[];
 
       for (var task in unsynced) {
-        if (task.status == 'Completed' &&
+        // use case insensitive comparison for status
+        if (task.status.toLowerCase() == 'completed' &&
             task.photoUrl != null &&
             task.photoUrl!.isNotEmpty &&
             !task.photoUrl!.startsWith('http')) {
@@ -200,7 +214,7 @@ class SyncService {
 
         if (response.statusCode == 200) {
           final data = response.data['data'];
-          final results = data['results'] as List;
+          final results = data?['results'] as List? ?? [];
 
           for (var syncResult in results) {
             if (syncResult['success']) {
@@ -253,18 +267,21 @@ class SyncService {
           }
 
           final newIssue = await _issuesService.reportIssue(
+            title: issue.title,
             description: issue.description,
             type: issue.type,
+            severity: issue.severity,
+            locationDescription: issue.locationDescription,
             photo1: p1,
             photo2: p2,
             photo3: p3,
-            severity: issue.severity,
             latitude: issue.latitude,
             longitude: issue.longitude,
-            locationDescription: issue.locationDescription,
           );
 
-          await _issueLocalRepo.markAsSynced(issue.clientId!, newIssue.issueId);
+          if (issue.clientId != null) {
+            await _issueLocalRepo.markAsSynced(issue.clientId!, newIssue.issueId);
+          }
           result.success++;
         } catch (e) {
           result.failed++;
@@ -292,9 +309,10 @@ class SyncService {
 
       if (response.statusCode == 200) {
         final data = response.data['data'];
+        if (data == null) return;
 
-        // update tasks
-        final tasks = data['tasks'] as List;
+        // update tasks from server
+        final tasks = data['tasks'] as List? ?? [];
         for (var taskJson in tasks) {
           final existingTask =
               await _taskLocalRepo.getTaskById(taskJson['taskId']);
@@ -310,18 +328,14 @@ class SyncService {
             status: taskJson['status'],
             completionNotes: taskJson['completionNotes'],
             photoUrl: taskJson['photoUrl'],
-            completedAt: taskJson['completedAt'] != null
-                ? DateTime.parse(taskJson['completedAt'])
-                : null,
+            completedAt: _safeParseDateTimeUtc(taskJson['completedAt']),
             syncVersion: taskJson['syncVersion'],
             isSynced: true,
             updatedAt: DateTime.now(),
             syncedAt: DateTime.now(),
             description: taskJson['description'],
             priority: taskJson['priority'] ?? 'Medium',
-            dueDate: taskJson['dueDate'] != null
-                ? DateTime.parse(taskJson['dueDate'])
-                : null,
+            dueDate: _safeParseDateTimeUtc(taskJson['dueDate']),
             zoneId: taskJson['zoneId'],
             latitude: (taskJson['latitude'] as num?)?.toDouble(),
             longitude: (taskJson['longitude'] as num?)?.toDouble(),
@@ -330,8 +344,8 @@ class SyncService {
           await _taskLocalRepo.updateFromServer(task);
         }
 
-        // update issues
-        final issues = data['issues'] as List;
+        // update issues from server
+        final issues = data['issues'] as List? ?? [];
         for (var issueJson in issues) {
           final existingIssue =
               await _issueLocalRepo.getIssueByServerId(issueJson['issueId']);
@@ -351,7 +365,7 @@ class SyncService {
             longitude: (issueJson['longitude'] as num?)?.toDouble() ?? 0.0,
             locationDescription: issueJson['locationDescription'],
             photoUrl: issueJson['photoUrl'],
-            reportedAt: DateTime.parse(issueJson['reportedAt']),
+            reportedAt: _safeParseDateTimeUtc(issueJson['reportedAt']) ?? DateTime.now(),
             isSynced: true,
             createdAt: DateTime.now(),
             syncedAt: DateTime.now(),
@@ -369,16 +383,9 @@ class SyncService {
     }
   }
 
+  // use secure DeviceService for device ID (consistent with login)
   Future<String> _getDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
-    var deviceId = prefs.getString('device_id');
-
-    if (deviceId == null) {
-      const uuid = Uuid();
-      deviceId = uuid.v4();
-      await prefs.setString('device_id', deviceId);
-    }
-    return deviceId;
+    return await DeviceService.getDeviceId();
   }
 
   Future<DateTime?> _getLastSyncTime() async {

@@ -1,9 +1,10 @@
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.RateLimiting;
 using Jawlah.API.Filters;
 using Jawlah.API.LiveTracking;
+using Jawlah.API.Middleware;
 using Jawlah.Core.Interfaces.Repositories;
 using Jawlah.Core.Interfaces.Services;
 using Jawlah.Infrastructure.Data;
@@ -32,6 +33,8 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        // Allow Arabic/Unicode characters to be output without escaping
+        options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
     });
 
 builder.Services.AddSignalR();
@@ -173,27 +176,14 @@ builder.Services.AddScoped<IZoneRepository, ZoneRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<ILocationHistoryRepository, LocationHistoryRepository>();
 builder.Services.AddScoped<IPhotoRepository, PhotoRepository>();
+builder.Services.AddScoped<IMunicipalityRepository, MunicipalityRepository>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IGisService, GisService>();
 
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
-
-builder.Services.AddScoped<DatabaseInitializer>();
-
-builder.Services.AddRateLimiter(options =>
-{
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
-            factory: partition => new FixedWindowRateLimiterOptions
-            {
-                AutoReplenishment = true,
-                PermitLimit = 100,
-                QueueLimit = 0,
-                Window = TimeSpan.FromMinutes(1)
-            }));
-});
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<AuditLogService>();
 
 // request size limits
 builder.Services.Configure<FormOptions>(options =>
@@ -202,15 +192,6 @@ builder.Services.Configure<FormOptions>(options =>
 });
 
 var app = builder.Build();
-
-using (var scope = app.Services.CreateScope())
-{
-    if (app.Environment.IsDevelopment())
-    {
-        var seeder = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-        await seeder.SeedAsync();
-    }
-}
 
 var disableGeofencing = app.Configuration.GetValue<bool>("DeveloperMode:DisableGeofencing", false);
 
@@ -236,6 +217,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// global exception handling
+app.UseExceptionHandling();
+
 app.UseHttpsRedirection();
 
 // basic security headers
@@ -253,8 +237,6 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseRateLimiter();
-
 // static files disabled - files served through FilesController for authentication
 // app.UseStaticFiles();
 
@@ -270,6 +252,63 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<TrackingHub>("/hubs/tracking");
+
+// auto-import GIS zones if the table is empty
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var zoneRepo = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
+        var zones = await zoneRepo.GetActiveZonesAsync();
+
+        if (!zones.Any())
+        {
+            Log.Information("Zones table is empty, attempting auto-import from shapefile...");
+
+            // try to find shapefile in common locations
+            var possiblePaths = new[]
+            {
+                Path.Combine(app.Environment.ContentRootPath, "..", "..", "GIS", "Blocks_WGS84.shp"),
+                Path.Combine(app.Environment.ContentRootPath, "..", "GIS", "Blocks_WGS84.shp"),
+                Path.Combine(app.Environment.ContentRootPath, "GIS", "Blocks_WGS84.shp"),
+                @"C:\Users\hp\Documents\Jawlah\Jawlah-Repo\GIS\Blocks_WGS84.shp"
+            };
+
+            string? shapefilePath = null;
+            foreach (var path in possiblePaths)
+            {
+                var fullPath = Path.GetFullPath(path);
+                if (File.Exists(fullPath))
+                {
+                    shapefilePath = fullPath;
+                    break;
+                }
+            }
+
+            if (shapefilePath != null)
+            {
+                var gisService = scope.ServiceProvider.GetRequiredService<IGisService>();
+                // Import zones for default municipality (Al-Bireh = 1)
+                await gisService.ImportShapefileAsync(shapefilePath, municipalityId: 1);
+
+                var importedZones = await zoneRepo.GetActiveZonesAsync();
+                Log.Information("Auto-imported {Count} zones from shapefile", importedZones.Count());
+            }
+            else
+            {
+                Log.Warning("Shapefile not found. Zones table will remain empty. Use /api/zones/import-shapefile to import manually.");
+            }
+        }
+        else
+        {
+            Log.Information("Found {Count} zones in database", zones.Count());
+        }
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Failed to auto-import zones. This is not critical - zones can be imported manually.");
+    }
+}
 
 try
 {

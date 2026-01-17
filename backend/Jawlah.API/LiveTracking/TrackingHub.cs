@@ -1,12 +1,12 @@
 using Jawlah.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using System.Collections.Concurrent;
 using System.Security.Claims;
 
 namespace Jawlah.API.LiveTracking;
 
-// client-side methods that can be called from the server
+// interface that defines what methods the client (mobile/web) should have
+// SignalR will call these methods on the client side
 public interface ITrackingClient
 {
     // receive real-time location update from a worker
@@ -38,15 +38,15 @@ public class UserConnection
     public double? LastLongitude { get; set; }
 }
 
-// enhanced real-time tracking hub with connection management and zone-based broadcasting
+// real-time tracking hub for location updates between workers and supervisors
 [Authorize]
 public class TrackingHub : Hub<ITrackingClient>
 {
     private readonly ILogger<TrackingHub> _logger;
     private readonly IUserRepository _userRepository;
 
-    // thread-safe dictionary to track active connections
-    private static readonly ConcurrentDictionary<string, UserConnection> _connections = new();
+    // dictionary to track active connections
+    private static Dictionary<string, UserConnection> _connections = new();
 
     public TrackingHub(ILogger<TrackingHub> logger, IUserRepository userRepository)
     {
@@ -79,7 +79,7 @@ public class TrackingHub : Hub<ITrackingClient>
                 LastActivity = DateTime.UtcNow
             };
 
-            _connections.TryAdd(Context.ConnectionId, connection);
+            _connections[Context.ConnectionId] = connection;
 
             // put the user in groups based on their role
             if (role == "Admin" || role == "Supervisor")
@@ -113,8 +113,10 @@ public class TrackingHub : Hub<ITrackingClient>
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // remove the user from our connection list
-        if (_connections.TryRemove(Context.ConnectionId, out var connection))
+        if (_connections.ContainsKey(Context.ConnectionId))
         {
+            var connection = _connections[Context.ConnectionId];
+            _connections.Remove(Context.ConnectionId);
             // tell supervisors that this person went offline
             if (connection.Role == "Worker")
             {
@@ -152,11 +154,11 @@ public class TrackingHub : Hub<ITrackingClient>
         }
 
         // update the connection info in our memory
-        if (_connections.TryGetValue(Context.ConnectionId, out var connection))
+        if (_connections.ContainsKey(Context.ConnectionId))
         {
-            connection.LastLatitude = latitude;
-            connection.LastLongitude = longitude;
-            connection.LastActivity = DateTime.UtcNow;
+            _connections[Context.ConnectionId].LastLatitude = latitude;
+            _connections[Context.ConnectionId].LastLongitude = longitude;
+            _connections[Context.ConnectionId].LastActivity = DateTime.UtcNow;
         }
 
         // send the new location to all supervisors so they can see it on the map
@@ -270,9 +272,6 @@ public class TrackingHub : Hub<ITrackingClient>
             await Groups.AddToGroupAsync(Context.ConnectionId, "Supervisors");
 
             _logger.LogInformation("Supervisor joined tracking group");
-
-            // send current online workers list
-            SendOnlineWorkersList();
         }
     }
 
@@ -335,9 +334,9 @@ public class TrackingHub : Hub<ITrackingClient>
     public Task Heartbeat()
     {
         // just update when we last heard from the client
-        if (_connections.TryGetValue(Context.ConnectionId, out var connection))
+        if (_connections.ContainsKey(Context.ConnectionId))
         {
-            connection.LastActivity = DateTime.UtcNow;
+            _connections[Context.ConnectionId].LastActivity = DateTime.UtcNow;
         }
 
         return Task.CompletedTask;
@@ -368,12 +367,6 @@ public class TrackingHub : Hub<ITrackingClient>
             SupervisorsOnline = connections.Count(c => c.Role == "Admin" || c.Role == "Supervisor"),
             AdminsOnline = connections.Count(c => c.Role == "Admin")
         };
-    }
-
-    private void SendOnlineWorkersList()
-    {
-        var onlineWorkers = GetOnlineWorkers();
-        // this list exists for supervisors to call GetOnlineWorkers() manually
     }
 
     #endregion

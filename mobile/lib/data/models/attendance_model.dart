@@ -14,6 +14,17 @@
   final String? notes;
   final DateTime createdAt;
 
+  // Lateness and overtime tracking
+  final int lateMinutes;
+  final int earlyLeaveMinutes;
+  final int overtimeMinutes;
+  final String attendanceType; // OnTime, Late, EarlyLeave, Overtime, Manual
+
+  // Manual/GPS failure handling
+  final bool isManual;
+  final String? manualReason;
+  final String approvalStatus; // AutoApproved, Pending, Approved, Rejected
+
   AttendanceModel({
     required this.attendanceId,
     required this.userId,
@@ -29,6 +40,13 @@
     required this.isValid,
     this.notes,
     required this.createdAt,
+    this.lateMinutes = 0,
+    this.earlyLeaveMinutes = 0,
+    this.overtimeMinutes = 0,
+    this.attendanceType = 'OnTime',
+    this.isManual = false,
+    this.manualReason,
+    this.approvalStatus = 'AutoApproved',
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json) {
@@ -71,6 +89,15 @@
       createdAt: json['createdAt'] != null
           ? _parseAsUtc(json['createdAt'] as String)
           : DateTime.now().toUtc(),
+      // Lateness tracking
+      lateMinutes: json['lateMinutes'] as int? ?? 0,
+      earlyLeaveMinutes: json['earlyLeaveMinutes'] as int? ?? 0,
+      overtimeMinutes: json['overtimeMinutes'] as int? ?? 0,
+      attendanceType: json['attendanceType'] as String? ?? 'OnTime',
+      // Manual check-in
+      isManual: json['isManual'] as bool? ?? false,
+      manualReason: json['manualReason'] as String?,
+      approvalStatus: json['approvalStatus'] as String? ?? 'AutoApproved',
     );
   }
 

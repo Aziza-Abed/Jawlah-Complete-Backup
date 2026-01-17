@@ -10,7 +10,8 @@ class IssueModel {
   final String? location; // Text description of location (optional)
   final double? latitude; // GPS coordinate - can be null if not available
   final double? longitude; // GPS coordinate - can be null if not available
-  final String? photoUrl; // Photo of the issue (optional)
+  final String? photoUrl; // Legacy single photo URL (optional)
+  final List<String> photos; // Multiple photos from new API
   final String? resolutionNotes; // How was it fixed? (optional)
   final DateTime? resolvedAt; // When was it fixed? (optional)
   final DateTime createdAt; // When was it reported
@@ -29,6 +30,7 @@ class IssueModel {
     this.latitude,
     this.longitude,
     this.photoUrl,
+    this.photos = const [],
     this.resolutionNotes,
     this.resolvedAt,
     required this.createdAt,
@@ -44,7 +46,7 @@ class IssueModel {
       type: json['type'] as String? ?? json['Type'] as String? ?? 'Other',
       severity: json['severity'] as String? ??
           json['Severity'] as String? ??
-          'Moderate',
+          'Medium',
       status:
           json['status'] as String? ?? json['Status'] as String? ?? 'Reported',
       reportedByUserId:
@@ -61,6 +63,13 @@ class IssueModel {
           ? ((json['longitude'] ?? json['Longitude']) as num).toDouble()
           : null,
       photoUrl: json['photoUrl'] as String? ?? json['PhotoUrl'] as String?,
+      photos: (json['photos'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          (json['Photos'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
       resolutionNotes: json['resolutionNotes'] as String? ??
           json['ResolutionNotes'] as String?,
       resolvedAt: (json['resolvedAt'] ?? json['ResolvedAt']) != null
@@ -99,6 +108,7 @@ class IssueModel {
       'latitude': latitude,
       'longitude': longitude,
       'photoUrl': photoUrl,
+      'photos': photos,
       'resolutionNotes': resolutionNotes,
       'resolvedAt': resolvedAt?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
@@ -119,6 +129,7 @@ class IssueModel {
     double? latitude,
     double? longitude,
     String? photoUrl,
+    List<String>? photos,
     String? resolutionNotes,
     DateTime? resolvedAt,
     DateTime? createdAt,
@@ -137,6 +148,7 @@ class IssueModel {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       photoUrl: photoUrl ?? this.photoUrl,
+      photos: photos ?? this.photos,
       resolutionNotes: resolutionNotes ?? this.resolutionNotes,
       resolvedAt: resolvedAt ?? this.resolvedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -144,7 +156,17 @@ class IssueModel {
     );
   }
 
-  bool get hasPhoto => photoUrl != null && photoUrl!.isNotEmpty;
+  bool get hasPhoto => photos.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
+
+  /// Get all photo URLs (combines photos list and legacy photoUrl)
+  List<String> get allPhotos {
+    final result = <String>[];
+    result.addAll(photos);
+    if (photoUrl != null && photoUrl!.isNotEmpty && !photos.contains(photoUrl)) {
+      result.add(photoUrl!);
+    }
+    return result;
+  }
 
   bool get isResolved => status.toLowerCase() == 'resolved';
 
@@ -198,7 +220,7 @@ class IssueModel {
       case 'low':
         return 'بسيطة'; // Map to Minor
       case 'medium':
-        return 'متوسطة'; // Map to Moderate
+        return 'متوسطة';
       case 'high':
         return 'كبيرة'; // Map to Major
       default:

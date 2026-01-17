@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Jawlah.API.Controllers;
 
+// this controller handle zones and geofencing
 [Route("api/[controller]")]
 public class ZonesController : BaseApiController
 {
@@ -27,26 +28,28 @@ public class ZonesController : BaseApiController
         _mapper = mapper;
     }
 
+    // get zones assigned to current user
     [HttpGet("my")]
     public async Task<IActionResult> GetMyZones()
     {
-        // get the current user ID
+        // get user id
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
             return Unauthorized();
 
-        // find the user and his assigned zones
+        // get user with zones
         var user = await _users.GetUserWithZonesAsync(userId.Value);
         if (user == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("User not found"));
+            return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
-        // extract the zone list for the worker
+        // extract active zones
         var zones = user.AssignedZones.Select(uz => uz.Zone).Where(z => z.IsActive).ToList();
 
         return Ok(ApiResponse<IEnumerable<ZoneResponse>>.SuccessResponse(
             zones.Select(z => _mapper.Map<ZoneResponse>(z))));
     }
 
+    // get all active zones
     [HttpGet]
     public async Task<IActionResult> GetAllZones()
     {
@@ -55,6 +58,7 @@ public class ZonesController : BaseApiController
             zones.Select(z => _mapper.Map<ZoneResponse>(z))));
     }
 
+    // get zone by id
     [HttpGet("{id}")]
     public async Task<IActionResult> GetZoneById(int id)
     {
@@ -65,6 +69,41 @@ public class ZonesController : BaseApiController
         return Ok(ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone)));
     }
 
+    // get zones as geojson for map
+    [HttpGet("map-data")]
+    public async Task<IActionResult> GetMapData()
+    {
+        var zones = await _zones.GetActiveZonesAsync();
+
+        // convert to geojson format
+        var features = zones.Select(z => new
+        {
+            type = "Feature",
+            properties = new
+            {
+                zoneId = z.ZoneId,
+                zoneName = z.ZoneName,
+                zoneCode = z.ZoneCode,
+                district = z.District,
+                areaSquareMeters = z.AreaSquareMeters,
+                centerLatitude = z.CenterLatitude,
+                centerLongitude = z.CenterLongitude
+            },
+            geometry = string.IsNullOrEmpty(z.BoundaryGeoJson)
+                ? null
+                : System.Text.Json.JsonSerializer.Deserialize<object>(z.BoundaryGeoJson)
+        }).ToList();
+
+        var featureCollection = new
+        {
+            type = "FeatureCollection",
+            features = features
+        };
+
+        return Ok(ApiResponse<object>.SuccessResponse(featureCollection));
+    }
+
+    // get zone by code
     [HttpGet("by-code/{code}")]
     public async Task<IActionResult> GetZoneByCode(string code)
     {
@@ -75,13 +114,17 @@ public class ZonesController : BaseApiController
         return Ok(ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone)));
     }
 
+    // validate if gps point is inside any zone
     [HttpPost("validate-location")]
-    [HttpPost("validate")]  // Alias route for frontend compatibility
+    [HttpPost("validate")]
     public async Task<IActionResult> ValidateLocation([FromBody] ValidateLocationRequest request)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.ErrorResponse("بيانات الموقع غير صالحة"));
+
         try
         {
-            // check if the GPS point is inside any zone
+            // check if point is in any zone
             var zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude);
 
             if (zone == null)
@@ -109,41 +152,45 @@ public class ZonesController : BaseApiController
         }
     }
 
-    // zones are imported from shapefiles only (read-only + import)
+    // import zones from shapefile admin only
     [HttpPost("import-shapefile")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ImportShapefile([FromBody] ImportShapefileRequest request)
     {
         try
         {
+            // check file path is provided
             if (string.IsNullOrEmpty(request.FilePath))
             {
-                return BadRequest(ApiResponse<object>.ErrorResponse("File path is required"));
+                return BadRequest(ApiResponse<object>.ErrorResponse("مسار الملف مطلوب"));
             }
 
+            // check file exists
             if (!System.IO.File.Exists(request.FilePath))
             {
-                return BadRequest(ApiResponse<object>.ErrorResponse($"Shapefile not found at: {request.FilePath}"));
+                return BadRequest(ApiResponse<object>.ErrorResponse($"ملف الشكل غير موجود في: {request.FilePath}"));
             }
 
-            _logger.LogInformation("Starting shapefile import from: {FilePath}", request.FilePath);
+            _logger.LogInformation("Starting shapefile import from: {FilePath} for municipality {MunicipalityId}",
+                request.FilePath, request.MunicipalityId);
 
-            await _gis.ImportShapefileAsync(request.FilePath);
-            await _zones.SaveChangesAsync();
+            // do the import
+            await _gis.ImportShapefileAsync(request.FilePath, request.MunicipalityId);
 
+            // get count of zones
             var zones = await _zones.GetActiveZonesAsync();
             var count = zones.Count();
 
             _logger.LogInformation("Shapefile import completed. Total zones: {Count}", count);
 
             return Ok(ApiResponse<object>.SuccessResponse(
-                new { Message = $"Successfully imported zones from shapefile", TotalZones = count },
-                "Shapefile imported successfully"));
+                new { Message = "تم استيراد المناطق بنجاح", TotalZones = count },
+                "تم استيراد ملف الشكل بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to import shapefile from: {FilePath}", request.FilePath);
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("Failed to import shapefile. Please check the file format and try again."));
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("فشل استيراد ملف الشكل. يرجى التحقق من تنسيق الملف والمحاولة مرة أخرى."));
         }
     }
 }

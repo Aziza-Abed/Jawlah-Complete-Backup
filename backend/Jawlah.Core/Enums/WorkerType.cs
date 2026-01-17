@@ -2,8 +2,8 @@ namespace Jawlah.Core.Enums;
 
 public enum WorkerType
 {
-    Sanitation = 1,
-    Inspector = 2,
-    Emergency = 3,
-    Maintenance = 4
+    Sanitation = 0,      // عامل نظافة
+    Inspector = 1,       // مفتش
+    Emergency = 2,       // طوارئ
+    Maintenance = 3      // عامل صيانة
 }

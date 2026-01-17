@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/gps_notice_widget.dart';
+import '../../presentation/widgets/offline_banner.dart';
 import '../../providers/task_manager.dart';
 import '../../providers/sync_manager.dart';
 import '../../core/utils/photo_picker_helper.dart';
@@ -44,31 +45,35 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
     return BaseScreen(
       title: 'إرسال إثبات',
       showBackButton: true,
-      body: Consumer<TaskManager>(
-        builder: (context, provider, child) {
-          if (provider.isLoading && provider.currentTask == null) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-              ),
-            );
-          }
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: Consumer<TaskManager>(
+              builder: (context, provider, child) {
+                if (provider.isLoading && provider.currentTask == null) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                    ),
+                  );
+                }
 
-          final task = provider.currentTask;
-          if (task == null) {
-            return const Center(
-              child: Text(
-                'لم يتم اختيار مهمة',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'Cairo',
-                ),
-              ),
-            );
-          }
+                final task = provider.currentTask;
+                if (task == null) {
+                  return const Center(
+                    child: Text(
+                      'لم يتم اختيار مهمة',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: AppColors.textSecondary,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
+                  );
+                }
 
-          return SingleChildScrollView(
+                return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Form(
               key: _formKey,
@@ -88,7 +93,10 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
               ),
             ),
           );
-        },
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -284,7 +292,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
               fontFamily: 'Cairo',
             ),
             validator: (value) {
-              // notes are now optional
+              // notes is optional
               return null;
             },
             decoration: InputDecoration(
@@ -367,14 +375,10 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
     );
   }
 
-  // 🔒 كاميرا فقط – بدون معرض
+  // camera only no gallery
+  // uses default settings from PhotoPickerHelper (1024x1024, quality 70)
   Future<void> _pickImage() async {
-    final image = await PhotoPickerHelper.pickImageCameraOnly(
-      context,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
-    );
+    final image = await PhotoPickerHelper.pickImageCameraOnly(context);
 
     if (image != null) {
       setState(() {
@@ -383,9 +387,9 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
     }
   }
 
-  // method to send task completion
+  // send task completion
   Future<void> _submitEvidence() async {
-    // check if notes are valid (they are optional now)
+    // validate notes they are optional
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -393,7 +397,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
     final task = context.read<TaskManager>().currentTask;
     if (task == null) return;
 
-    // check if the task requires a photo and if the user added one
+    // check if photo is needed
     if (task.requiresPhotoProof && _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -407,10 +411,32 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
       return;
     }
 
+    // show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد إرسال الإثبات', style: TextStyle(fontFamily: 'Cairo')),
+        content: const Text('هل أنت متأكد من إرسال هذا الإثبات؟ لا يمكن التراجع بعد الإرسال.', style: TextStyle(fontFamily: 'Cairo')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('إرسال', style: TextStyle(color: AppColors.primary, fontFamily: 'Cairo')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isSubmitting = true);
 
-    // call the manager to finish the task
-    final success = await context.read<TaskManager>().finishTask(
+    // finish the task
+    final taskManager = context.read<TaskManager>();
+    final success = await taskManager.finishTask(
           task.taskId,
           notes: _notesController.text.trim(),
           proofPhoto: _selectedImage,
@@ -419,7 +445,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
     setState(() => _isSubmitting = false);
 
     if (success && mounted) {
-      // if success, show message and go back
+      // show sucess and go back
       final isOnline = context.read<SyncManager>().isOnline;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -435,7 +461,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
       Navigator.of(context).pop();
       Navigator.of(context).pop();
     } else if (mounted) {
-      // if failed, show what happened
+      // show error
       final provider = context.read<TaskManager>();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

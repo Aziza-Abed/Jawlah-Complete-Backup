@@ -9,6 +9,7 @@ public class JawlahDbContext : DbContext
     {
     }
 
+    public DbSet<Municipality> Municipalities { get; set; } = null!;
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<Attendance> Attendances { get; set; } = null!;
     public DbSet<Core.Entities.Task> Tasks { get; set; } = null!;
@@ -19,6 +20,7 @@ public class JawlahDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
     public DbSet<LocationHistory> LocationHistories { get; set; } = null!;
     public DbSet<Photo> Photos { get; set; } = null!;
+    public DbSet<AuditLog> AuditLogs { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

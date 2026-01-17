@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/task_model.dart';
 
@@ -37,12 +38,24 @@ class TaskDetailsCard extends StatelessWidget {
             valueColor: _getPriorityColor(task.priority),
           ),
           const Divider(height: 24),
-          if (task.location != null) ...[
+          if (task.zoneName != null || task.location != null) ...[
             _buildDetailRow(
               Icons.location_on,
-              'الموقع',
-              task.location!,
+              'المنطقة',
+              task.zoneName ?? 'غير محدد',
             ),
+            if (task.location != null && task.location!.isNotEmpty && task.location != task.zoneName) ...[
+              const SizedBox(height: 8),
+              _buildDetailRow(
+                Icons.place,
+                'الموقع التفصيلي',
+                task.location!,
+              ),
+            ],
+            if (task.hasLocation) ...[
+              const SizedBox(height: 12),
+              _buildNavigateButton(),
+            ],
             const Divider(height: 24),
           ],
           _buildDetailRow(
@@ -157,6 +170,45 @@ class TaskDetailsCard extends StatelessWidget {
         return AppColors.error;
       default:
         return AppColors.textSecondary;
+    }
+  }
+
+  Widget _buildNavigateButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _openInMaps,
+        icon: const Icon(Icons.navigation_rounded, size: 20),
+        label: const Text(
+          'الانتقال إلى الموقع',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Cairo',
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInMaps() async {
+    if (task.latitude == null || task.longitude == null) return;
+
+    // Try Google Maps first, fallback to Apple Maps on iOS
+    final googleMapsUrl = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${task.latitude},${task.longitude}&travelmode=driving'
+    );
+
+    if (await canLaunchUrl(googleMapsUrl)) {
+      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
     }
   }
 }
