@@ -12,7 +12,7 @@ class AttendanceCard extends StatelessWidget {
       builder: (context, attendanceProvider, child) {
         final attendance = attendanceProvider.todayRecord;
 
-        // not checked in today
+        // user not checked in today
         if (attendance == null) {
           return _buildNotCheckedInCard();
         }
@@ -21,13 +21,13 @@ class AttendanceCard extends StatelessWidget {
         final checkOutTime = attendance.checkOutTimeFormatted;
         final isActive = attendance.isActive;
 
-        // checked out (work completed)
+        // alredy checked out work done
         if (!isActive && checkOutTime != null) {
           return _buildCheckedOutCard(
               checkInTime, checkOutTime, attendance.workDurationFormatted);
         }
 
-        // active (still checked in)
+        // still working now
         return _buildActiveCard(
             checkInTime, attendance.workDurationFormatted, isActive);
       },
@@ -54,7 +54,7 @@ class AttendanceCard extends StatelessWidget {
           const SizedBox(width: 16),
           const Expanded(
             child: Text(
-              'لم يتم تسجيل الحضور اليوم',
+              'لم تبدأ العمل بعد اليوم',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
@@ -152,7 +152,7 @@ class AttendanceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'تم تسجيل حضورك بنجاح عند الساعة $checkInTime',
+                  'أنت في العمل منذ الساعة $checkInTime',
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
@@ -164,7 +164,7 @@ class AttendanceCard extends StatelessWidget {
                 if (isActive && workDuration != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'مدة العمل: $workDuration',
+                    'مدة العمل حتى الآن: $workDuration',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,

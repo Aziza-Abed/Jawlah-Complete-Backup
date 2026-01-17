@@ -1,14 +1,13 @@
-using System.Security.Claims;
 using Jawlah.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jawlah.API.Controllers;
 
-[ApiController]
+// this controller serve uploaded files securely
 [Route("api/[controller]")]
-[Authorize] // require authentication for all file access
-public class FilesController : ControllerBase
+[Authorize]
+public class FilesController : BaseApiController
 {
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<FilesController> _logger;
@@ -32,34 +31,34 @@ public class FilesController : ControllerBase
         _issues = issues;
     }
 
+    // get file by folder and filename
     [HttpGet("{folder}/{filename}")]
     public async Task<IActionResult> GetFile(string folder, string filename)
     {
         try
         {
-            // check if the folder name and file name are correct
+            // validate folder and filename are safe
             if (string.IsNullOrWhiteSpace(folder) || !System.Text.RegularExpressions.Regex.IsMatch(folder, "^[a-zA-Z0-9_-]+$") ||
-                string.IsNullOrWhiteSpace(filename) || filename.Contains("..") || filename.Contains("/") || filename.Contains("\\") || 
+                string.IsNullOrWhiteSpace(filename) || filename.Contains("..") || filename.Contains("/") || filename.Contains("\\") ||
                 !System.Text.RegularExpressions.Regex.IsMatch(filename, "^[a-zA-Z0-9_.-]+$"))
             {
                 _logger.LogWarning("Invalid folder or filename requested: {Folder}/{Filename}", folder, filename);
                 return BadRequest(new { error = "مسار الملف غير صالح" });
             }
 
-            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userRole = GetCurrentUserRole();
+            var userId = GetCurrentUserId();
 
-            // if the user is a worker, they should only see their own photos
+            // workers can only see there own photos
             if (userRole != "Admin" && userRole != "Supervisor")
             {
-                if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
+                if (!userId.HasValue)
                 {
                     return Unauthorized();
                 }
 
-                // find the photo in the database
-                var photos = await _photos.GetAllAsync();
-                var photo = photos.FirstOrDefault(p => p.PhotoUrl.Contains(filename));
+                // find photo in db
+                var photo = await _photos.GetByFilenameAsync(filename);
 
                 if (photo == null)
                 {
@@ -67,12 +66,12 @@ public class FilesController : ControllerBase
                     return NotFound(new { error = "الملف غير موجود" });
                 }
 
-                // check if the photo belongs to the worker's tasks or issues
+                // check if photo belongs to user
                 bool hasAccess = false;
                 if (photo.EntityType == "Task")
                 {
                     var task = await _tasks.GetByIdAsync(photo.EntityId);
-                    if (task != null && task.AssignedToUserId == userId)
+                    if (task != null && task.AssignedToUserId == userId.Value)
                     {
                         hasAccess = true;
                     }
@@ -80,7 +79,7 @@ public class FilesController : ControllerBase
                 else if (photo.EntityType == "Issue")
                 {
                     var issue = await _issues.GetByIdAsync(photo.EntityId);
-                    if (issue != null && issue.ReportedByUserId == userId)
+                    if (issue != null && issue.ReportedByUserId == userId.Value)
                     {
                         hasAccess = true;
                     }
@@ -88,12 +87,12 @@ public class FilesController : ControllerBase
 
                 if (!hasAccess)
                 {
-                    _logger.LogWarning("User {UserId} attempted to access unauthorized file: {PhotoUrl}", userId, photo.PhotoUrl);
+                    _logger.LogWarning("User {UserId} attempted to access unauthorized file: {PhotoUrl}", userId.Value, photo.PhotoUrl);
                     return Forbid();
                 }
             }
 
-            // check the file extension
+            // check extension is allowed
             var extension = Path.GetExtension(filename).ToLowerInvariant();
             if (!AllowedExtensions.Contains(extension))
             {
@@ -101,7 +100,7 @@ public class FilesController : ControllerBase
                 return BadRequest(new { error = "نوع الملف غير مسموح" });
             }
 
-            // get the full path of the file on the server
+            // build full file path
             var filePath = Path.Combine(
                 _env.ContentRootPath,
                 SecureStorageFolder,
@@ -110,7 +109,7 @@ public class FilesController : ControllerBase
                 filename
             );
 
-            // security check for path traversal
+            // check for path traversal attack
             var fullPath = Path.GetFullPath(filePath);
             var secureBasePath = Path.GetFullPath(Path.Combine(_env.ContentRootPath, SecureStorageFolder, "uploads"));
 
@@ -120,13 +119,14 @@ public class FilesController : ControllerBase
                 return BadRequest(new { error = "مسار الملف غير صالح" });
             }
 
+            // check file exists
             if (!System.IO.File.Exists(filePath))
             {
                 _logger.LogWarning("File not found: {FilePath}", filePath);
                 return NotFound(new { error = "الملف غير موجود" });
             }
 
-            // detect content type to return the file correctly
+            // get content type based on extension
             var contentType = extension switch
             {
                 ".jpg" or ".jpeg" => "image/jpeg",
@@ -135,6 +135,7 @@ public class FilesController : ControllerBase
                 _ => "application/octet-stream"
             };
 
+            // return file
             var fileStream = System.IO.File.OpenRead(filePath);
 
             return File(fileStream, contentType, filename);

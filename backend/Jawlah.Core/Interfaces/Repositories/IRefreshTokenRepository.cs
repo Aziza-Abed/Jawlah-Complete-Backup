@@ -1,10 +1,11 @@
 using Jawlah.Core.Entities;
+using Task = System.Threading.Tasks.Task;
 
 namespace Jawlah.Core.Interfaces.Repositories;
 
 public interface IRefreshTokenRepository : IRepository<RefreshToken>
 {
-    System.Threading.Tasks.Task<RefreshToken?> GetByTokenAsync(string token);
-    System.Threading.Tasks.Task<IEnumerable<RefreshToken>> GetUserTokensAsync(int userId);
-    System.Threading.Tasks.Task RevokeAllUserTokensAsync(int userId);
+    Task<RefreshToken?> GetByTokenAsync(string token);
+    Task<IEnumerable<RefreshToken>> GetUserTokensAsync(int userId);
+    Task RevokeAllUserTokensAsync(int userId);
 }

@@ -5,6 +5,11 @@ namespace Jawlah.Core.Entities;
 public class Notification
 {
     public int NotificationId { get; set; }
+
+    // Municipality that this notification belongs to
+    public int MunicipalityId { get; set; }
+    public Municipality Municipality { get; set; } = null!;
+
     public int UserId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;

@@ -6,6 +6,11 @@ namespace Jawlah.Core.Entities;
 public class Task
 {
     public int TaskId { get; set; }
+
+    // Municipality that this task belongs to
+    public int MunicipalityId { get; set; }
+    public Municipality Municipality { get; set; } = null!;
+
     public int AssignedToUserId { get; set; }
     public int? AssignedByUserId { get; set; }
     public int? ZoneId { get; set; }
@@ -37,6 +42,26 @@ public class Task
     public string? PhotoUrl { get; set; }
 
     public DateTime EventTime { get; set; }
+
+    // Task location verification - distance from task location when completing
+    public int MaxDistanceMeters { get; set; } = 100; // Default 100m radius
+    public int? CompletionDistanceMeters { get; set; } // Actual distance when completed
+    public bool IsDistanceWarning { get; set; } = false; // Flagged if completed too far from location
+
+    // Progress tracking for multi-day tasks
+    public int ProgressPercentage { get; set; } = 0; // 0-100%
+    public string? ProgressNotes { get; set; } // Notes about partial completion (e.g., "Rain delayed work")
+    public DateTime? ExtendedDeadline { get; set; } // Extended deadline for delayed tasks
+    public int? ExtendedByUserId { get; set; } // Supervisor who extended the deadline
+
+    // Auto-rejection tracking
+    public bool IsAutoRejected { get; set; } = false;
+    public string? RejectionReason { get; set; } // Reason for rejection (auto or manual)
+    public DateTime? RejectedAt { get; set; }
+    public int? RejectedByUserId { get; set; } // null if auto-rejected, userId if manual
+    public double? RejectionLatitude { get; set; } // Worker's location when auto-rejected
+    public double? RejectionLongitude { get; set; }
+    public int? RejectionDistanceMeters { get; set; } // Distance from task location when rejected
 
     // modern photo storage - use this for new uploads
     public virtual ICollection<Photo> Photos { get; set; } = new List<Photo>();

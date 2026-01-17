@@ -90,11 +90,7 @@ class _BottomNavigationScreenState extends State<BottomNavigationScreen> {
 
     return Expanded(
       child: InkWell(
-        onTap: () {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: () => setState(() => _currentIndex = index),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -127,11 +123,7 @@ class _BottomNavigationScreenState extends State<BottomNavigationScreen> {
 
     return Expanded(
       child: InkWell(
-        onTap: () {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: () => setState(() => _currentIndex = index),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -151,24 +143,10 @@ class _BottomNavigationScreenState extends State<BottomNavigationScreen> {
                     ),
                   ],
                 ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    const Icon(
-                      Icons.photo_camera_outlined,
-                      size: 30,
-                      color: Colors.white,
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      right: 12,
-                      child: Icon(
-                        Icons.location_on,
-                        size: 18,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  Icons.camera_alt_rounded,
+                  size: 32,
+                  color: Colors.white,
                 ),
               ),
             ),

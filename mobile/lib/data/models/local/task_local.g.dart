@@ -32,6 +32,7 @@ class TaskLocalAdapter extends TypeAdapter<TaskLocal> {
       priority: fields[12] as String,
       dueDate: fields[13] as DateTime?,
       zoneId: fields[14] as int?,
+      zoneName: fields[21] as String?,
       latitude: fields[15] as double?,
       longitude: fields[16] as double?,
       locationDescription: fields[17] as String?,
@@ -44,7 +45,7 @@ class TaskLocalAdapter extends TypeAdapter<TaskLocal> {
   @override
   void write(BinaryWriter writer, TaskLocal obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.clientId)
       ..writeByte(1)
@@ -75,6 +76,8 @@ class TaskLocalAdapter extends TypeAdapter<TaskLocal> {
       ..write(obj.dueDate)
       ..writeByte(14)
       ..write(obj.zoneId)
+      ..writeByte(21)
+      ..write(obj.zoneName)
       ..writeByte(15)
       ..write(obj.latitude)
       ..writeByte(16)

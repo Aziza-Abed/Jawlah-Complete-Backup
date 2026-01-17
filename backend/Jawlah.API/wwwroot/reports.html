@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جولة - التقارير</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .reports-content {
+            padding: 20px 32px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .filters-bar {
+            background: white;
+            padding: 15px 24px;
+            border-radius: 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 24px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .filter-item label { font-size: 0.85rem; color: var(--text-secondary); }
+        .filter-item select {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-main);
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+
+        .reports-grid {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 20px;
+        }
+
+        .report-section {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 12px;
+            height: 100%;
+        }
+
+        .summary-card {
+            border-radius: 12px;
+            padding: 16px;
+            color: white;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .summary-card .val { font-size: 1.25rem; font-weight: 700; }
+        .summary-card .lbl { font-size: 0.75rem; opacity: 0.9; }
+        .summary-card i { font-size: 1.5rem; margin-bottom: 5px; }
+
+        .sc-blue { background: #7895B2; }
+        .sc-green { background: #A3B18A; }
+        .sc-dark { background: #2D3748; }
+        .sc-white { background: white; color: var(--text-dark); border: 1px solid var(--border); }
+
+        .table-area {
+            grid-column: 1 / 2;
+        }
+
+        .donuts-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .mini-donut-container {
+            text-align: center;
+        }
+
+        .mini-donut-container h5 { font-size: 0.9rem; margin-bottom: 15px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { background: #fbfbfb; color: var(--text-secondary); text-align: center; padding: 12px; border-bottom: 2px solid var(--bg-main); }
+        td { padding: 12px; text-align: center; border-bottom: 1px solid var(--bg-main); }
+
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .badge-done { background: rgba(163, 177, 138, 0.2); color: var(--secondary-dark); }
+        .badge-active { background: rgba(120, 149, 178, 0.2); color: var(--primary-dark); }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-inner">
+                    <i class="fas fa-city" style="font-size: 2rem;"></i>
+                </div>
+                <h1>جولة</h1>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <i class="fas fa-th-large"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="map.html" class="nav-item">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>الخريطة الحية</span>
+                </a>
+                <a href="workers.html" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>إدارة العمال</span>
+                </a>
+                <a href="tasks.html" class="nav-item">
+                    <i class="fas fa-plus-square"></i>
+                    <span>تعيين مهمة</span>
+                </a>
+                <a href="all-tasks.html" class="nav-item">
+                    <i class="fas fa-tasks"></i>
+                    <span>جميع المهام</span>
+                </a>
+                <a href="issues.html" class="nav-item">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>البلاغات</span>
+                </a>
+                <a href="attendance.html" class="nav-item">
+                    <i class="fas fa-user-clock"></i>
+                    <span>الحضور</span>
+                </a>
+                <a href="reports.html" class="nav-item active">
+                    <i class="fas fa-chart-line"></i>
+                    <span>التقارير</span>
+                </a>
+                <a href="notifications.html" class="nav-item">
+                    <i class="fas fa-bell"></i>
+                    <span>الإشعارات</span>
+                </a>
+                <a href="profile.html" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>الملف الشخصي</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <span>تسجيل الخروج</span>
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <div class="header-icons">
+                        <div class="icon-btn"><i class="fas fa-cog"></i></div>
+                        <a href="profile.html" class="icon-btn" style="text-decoration: none;"><i class="fas fa-user"></i></a>
+                        <a href="notifications.html" class="icon-btn" style="position: relative; text-decoration: none;">
+                            <i class="fas fa-bell"></i>
+                            <span id="notifBadge" style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: none;"></span>
+                        </a>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" placeholder="ابحث" id="globalSearch">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="page-info">
+                        <h2>التقارير</h2>
+                        <p>استعراض وتحليل بيانات النظام</p>
+                    </div>
+                    <div class="icon-btn" style="font-size: 1.5rem;"><i class="fas fa-chart-bar"></i></div>
+                </div>
+            </header>
+
+            <div class="reports-content">
+                <div class="filters-bar">
+                    <div class="filter-item">
+                        <label>حالة المهمة :</label>
+                        <select><option>الكل</option></select>
+                    </div>
+                    <div class="filter-item">
+                        <label>الفترة الزمنية :</label>
+                        <select><option>شهر 6</option></select>
+                    </div>
+                    <div class="filter-item">
+                        <label>نوع التقرير :</label>
+                        <select><option>تقارير المهام</option></select>
+                    </div>
+                </div>
+
+                <div class="reports-grid">
+                    <div class="report-section">
+                        <canvas id="barChart" style="height: 300px; width: 100%;"></canvas>
+                    </div>
+
+                    <div class="summary-grid">
+                        <div class="summary-card sc-blue">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="val">12 مهمة</span>
+                            <span class="lbl">المهام اليومية :</span>
+                        </div>
+                        <div class="summary-card sc-green">
+                            <i class="fas fa-users"></i>
+                            <span class="val">35 / 28</span>
+                            <span class="lbl">العمال النشطين :</span>
+                        </div>
+                        <div class="summary-card sc-dark">
+                            <i class="fas fa-arrow-up"></i>
+                            <span class="val">78%</span>
+                            <span class="lbl">معدل الإنجاز :</span>
+                        </div>
+                        <div class="summary-card sc-white">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span class="val">3</span>
+                            <span class="lbl">التقارير المعلقة :</span>
+                        </div>
+                    </div>
+
+                    <div class="report-section table-area">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <h4 style="font-weight:700;">تقرير المهام التفصيلي :</h4>
+                            <div style="display:flex; gap:10px;">
+                                <button class="icon-btn" style="font-size:0.8rem;" onclick="window.print()"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="icon-btn" style="font-size:0.8rem;" onclick="downloadExcel()"><i class="fas fa-file-excel"></i> Excel</button>
+                            </div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>العامل</th>
+                                    <th>المهمة</th>
+                                    <th>المنطقة</th>
+                                    <th>الحالة</th>
+                                    <th>الوقت</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportsTableBody">
+                                <!-- Loaded by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="donuts-area">
+                        <div class="report-section mini-donut-container">
+                            <h5>حالة المهام :</h5>
+                            <canvas id="tasksDonut" style="height: 120px;"></canvas>
+                        </div>
+                        <div class="report-section mini-donut-container">
+                            <h5>حالة العمال :</h5>
+                            <canvas id="workersDonut" style="height: 120px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+            initCharts();
+            loadReportsData();
+            loadNotificationCount();
+        });
+
+        function downloadExcel() {
+            const today = new Date();
+            const startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+            const endDate = today.toISOString().split('T')[0];
+            reportsApi.downloadTasksExcel(startDate, endDate);
+        }
+
+        function initCharts() {
+            // Bar Chart
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '23', '30'],
+                    datasets: [
+                        { label: 'مكتملة', data: [10, 25, 40, 48, 32, 28, 35, 24, 25, 40, 28, 30], backgroundColor: '#A3B18A' },
+                        { label: 'قيد التنفيذ', data: [8, 12, 10, 15, 20, 18, 12, 15, 10, 12, 18, 10], backgroundColor: '#7895B2' },
+                        { label: 'ملغاة', data: [2, 5, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3], backgroundColor: '#C97A63' }
+                    ]
+                },
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 10, usePointStyle: true } } } }
+            });
+
+            // Donut Charts
+            const donutOptions = { cutout: '70%', plugins: { legend: { display: false } } };
+            
+            new Chart(document.getElementById('tasksDonut'), {
+                type: 'doughnut',
+                data: { datasets: [{ data: [60, 25, 15], backgroundColor: ['#A3B18A', '#7895B2', '#C97A63'] }] },
+                options: donutOptions
+            });
+
+            new Chart(document.getElementById('workersDonut'), {
+                type: 'doughnut',
+                data: { datasets: [{ data: [90, 10], backgroundColor: ['#A3B18A', '#C97A63'] }] },
+                options: donutOptions
+            });
+        }
+
+        async function loadReportsData() {
+            try {
+                // Get today's date range for filtering
+                const today = new Date();
+                const startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+                const endDate = today.toISOString().split('T')[0];
+
+                // Load tasks report data
+                const response = await reportsApi.getTasksReport(startDate, endDate);
+                const tbody = document.getElementById('reportsTableBody');
+
+                if (response.data && response.data.length > 0) {
+                    const tasks = response.data;
+
+                    // Update summary cards based on actual data
+                    const completedCount = tasks.filter(t => t.status === 'Completed' || t.status === 'Approved').length;
+                    const inProgressCount = tasks.filter(t => t.status === 'InProgress').length;
+                    const pendingCount = tasks.filter(t => t.status === 'Pending').length;
+
+                    // Update charts with real data
+                    updateChartsWithData(completedCount, inProgressCount, pendingCount);
+
+                    // Map status to Arabic
+                    const statusMap = {
+                        'Pending': 'معلقة',
+                        'InProgress': 'نشطة',
+                        'Completed': 'مكتملة',
+                        'Approved': 'مكتملة',
+                        'Rejected': 'مرفوضة',
+                        'Cancelled': 'ملغاة'
+                    };
+
+                    tbody.innerHTML = tasks.slice(0, 10).map((t, i) => `
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td>${escapeHtml(t.assignedToName) || 'غير معين'}</td>
+                            <td>${escapeHtml(t.title)}</td>
+                            <td>${escapeHtml(t.zoneName) || '---'}</td>
+                            <td><span class="badge ${getBadgeClass(t.status)}">${statusMap[t.status] || t.status}</span></td>
+                            <td>${formatTime(t.createdAt)}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-light);">لا يوجد بيانات</td></tr>';
+                }
+            } catch(e) {
+                console.error('Error loading reports:', e);
+                document.getElementById('reportsTableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-light);">فشل تحميل البيانات</td></tr>';
+            }
+        }
+
+        function getBadgeClass(status) {
+            if (status === 'Completed' || status === 'Approved') return 'badge-done';
+            if (status === 'InProgress' || status === 'Pending') return 'badge-active';
+            return '';
+        }
+
+        function formatTime(dateStr) {
+            if (!dateStr) return '---';
+            const date = new Date(dateStr);
+            return date.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function updateChartsWithData(completed, inProgress, pending) {
+            // Update donut chart with real data if available
+            const total = completed + inProgress + pending;
+            if (total > 0) {
+                // Charts are initialized with placeholder data,
+                // in a full implementation we would update them here
+            }
+        }
+
+        // logout() and loadNotificationCount() are in api.js
+    </script>
+</body>
+</html>

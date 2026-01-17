@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/notification_model.dart';
 import '../../providers/notice_manager.dart';
 import '../../presentation/widgets/base_screen.dart';
+import '../../presentation/widgets/offline_banner.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -16,7 +17,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    // Refresh notifications when entering the screen
+    // load notifications when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NoticeManager>().loadNotices();
     });
@@ -34,32 +35,85 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           onPressed: () => _showMarkAllReadDialog(context),
         ),
       ],
-      body: Consumer<NoticeManager>(
-        builder: (context, provider, child) {
-          if (provider.isLoading && provider.myNotices.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            );
-          }
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: Consumer<NoticeManager>(
+              builder: (context, provider, child) {
+                if (provider.isLoading && provider.myNotices.isEmpty) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
 
-          final notifications = provider.myNotices;
-          if (notifications.isEmpty) {
-            return _buildEmptyState();
-          }
+                // show error state
+                if (provider.errorMessage != null && provider.myNotices.isEmpty) {
+                  return _buildErrorState(provider);
+                }
 
-          return RefreshIndicator(
-            onRefresh: provider.loadNotices,
-            color: AppColors.primary,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: notifications.length,
-              itemBuilder: (context, index) {
-                return _buildNotificationCard(
-                    context, provider, notifications[index]);
+                final notifications = provider.myNotices;
+                if (notifications.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                return RefreshIndicator(
+                  onRefresh: provider.loadNotices,
+                  color: AppColors.primary,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: notifications.length,
+                    itemBuilder: (context, index) {
+                      return _buildNotificationCard(
+                          context, provider, notifications[index]);
+                    },
+                  ),
+                );
               },
             ),
-          );
-        },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(NoticeManager provider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              provider.errorMessage ?? 'حدث خطأ أثناء تحميل الإشعارات',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.textSecondary,
+                fontFamily: 'Cairo',
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => provider.loadNotices(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة', style: TextStyle(fontFamily: 'Cairo')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -117,7 +171,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         if (!isRead) {
           provider.seenNotice(notification.notificationId);
         }
-        // Handle navigation based on type if needed
+        // go to details if needed
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

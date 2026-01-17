@@ -15,42 +15,42 @@ public class Repository<T> : IRepository<T> where T : class
         _dbSet = context.Set<T>();
     }
 
-    public virtual async System.Threading.Tasks.Task<T?> GetByIdAsync(int id)
+    public virtual async Task<T?> GetByIdAsync(int id)
     {
         return await _dbSet.FindAsync(id);
     }
 
-    public virtual async System.Threading.Tasks.Task<IEnumerable<T>> GetAllAsync()
+    public virtual async Task<IEnumerable<T>> GetAllAsync()
     {
         // just get everything from the table
         return await _dbSet.ToListAsync();
     }
 
-    public virtual async System.Threading.Tasks.Task<T> AddAsync(T entity)
+    public virtual async Task<T> AddAsync(T entity)
     {
         await _dbSet.AddAsync(entity);
         return entity;
     }
 
-    public virtual async System.Threading.Tasks.Task<IEnumerable<T>> AddRangeAsync(IEnumerable<T> entities)
+    public virtual async Task<IEnumerable<T>> AddRangeAsync(IEnumerable<T> entities)
     {
         await _dbSet.AddRangeAsync(entities);
         return entities;
     }
 
-    public virtual System.Threading.Tasks.Task UpdateAsync(T entity)
+    public virtual Task UpdateAsync(T entity)
     {
         _dbSet.Update(entity);
-        return System.Threading.Tasks.Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
-    public virtual System.Threading.Tasks.Task DeleteAsync(T entity)
+    public virtual Task DeleteAsync(T entity)
     {
         _dbSet.Remove(entity);
-        return System.Threading.Tasks.Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
-    public virtual async System.Threading.Tasks.Task SaveChangesAsync()
+    public virtual async Task SaveChangesAsync()
     {
         await _context.SaveChangesAsync();
     }

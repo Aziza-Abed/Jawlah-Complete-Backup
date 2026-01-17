@@ -11,7 +11,9 @@ public class IssueResponse
     public IssueSeverity Severity { get; set; }
     public IssueStatus Status { get; set; }
     public int ReportedByUserId { get; set; }
+    public string? ReportedByName { get; set; }  // User name who reported
     public int? ZoneId { get; set; }
+    public string? ZoneName { get; set; }  // Zone name for display
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public string? LocationDescription { get; set; }
@@ -19,4 +21,17 @@ public class IssueResponse
     public DateTime ReportedAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
     public string? ResolutionNotes { get; set; }
+
+    // Sync fields for mobile offline support
+    public DateTime? SyncTime { get; set; }
+    public int SyncVersion { get; set; }
+
+    // Forwarding notes - where the issue was forwarded
+    public string? ForwardingNotes { get; set; }
+
+    // PDF download tracking
+    public DateTime? PdfDownloadedAt { get; set; }
+
+    // Web dashboard uses "priority" to refer to severity - provide alias
+    public string Priority => Severity.ToString();
 }

@@ -26,7 +26,12 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Role, opt => opt.MapFrom(src => src.Role.ToString()))
             .ForMember(dest => dest.WorkerType, opt => opt.MapFrom(src => src.WorkerType != null ? src.WorkerType.ToString() : null))
             .ForMember(dest => dest.EmployeeId, opt => opt.MapFrom(src => src.Pin ?? src.Username))
-            .ForMember(dest => dest.PhoneNumber, opt => opt.MapFrom(src => src.PhoneNumber ?? string.Empty));
+            .ForMember(dest => dest.PhoneNumber, opt => opt.MapFrom(src => src.PhoneNumber ?? string.Empty))
+            .ForMember(dest => dest.HasConsented, opt => opt.MapFrom(src => src.PrivacyConsentedAt.HasValue))
+            .ForMember(dest => dest.MunicipalityId, opt => opt.MapFrom(src => src.MunicipalityId))
+            .ForMember(dest => dest.MunicipalityCode, opt => opt.MapFrom(src => src.Municipality != null ? src.Municipality.Code : ""))
+            .ForMember(dest => dest.MunicipalityName, opt => opt.MapFrom(src => src.Municipality != null ? src.Municipality.Name : ""))
+            .ForMember(dest => dest.MunicipalityNameEnglish, opt => opt.MapFrom(src => src.Municipality != null ? src.Municipality.NameEnglish : null));
 
         // task → taskResponse (only map navigation properties and transformations)
         CreateMap<TaskEntity, TaskResponse>()
@@ -35,18 +40,22 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.ZoneName, opt => opt.MapFrom(src => src.Zone != null ? src.Zone.ZoneName : null))
             .ForMember(dest => dest.Photos, opt => opt.MapFrom(src => src.Photos.OrderBy(p => p.OrderIndex).Select(p => p.PhotoUrl).ToList()));
 
-        // issue → issueResponse (only map photo transformation)
+        // issue → issueResponse (map navigation properties and photo transformation)
         CreateMap<Issue, IssueResponse>()
+            .ForMember(dest => dest.ReportedByName, opt => opt.MapFrom(src => src.ReportedByUser.FullName))
+            .ForMember(dest => dest.ZoneName, opt => opt.MapFrom(src => src.Zone != null ? src.Zone.ZoneName : null))
             .ForMember(dest => dest.Photos, opt => opt.MapFrom(src => src.Photos.OrderBy(p => p.OrderIndex).Select(p => p.PhotoUrl).ToList()));
 
         // attendance → attendanceResponse (map navigation properties and renamed field)
         CreateMap<Attendance, AttendanceResponse>()
             .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.FullName))
             .ForMember(dest => dest.ZoneName, opt => opt.MapFrom(src => src.Zone != null ? src.Zone.ZoneName : null))
-            .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CheckInSyncTime));
+            .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CheckInSyncTime))
+            .ForMember(dest => dest.ApprovedByUserName, opt => opt.MapFrom(src => src.ApprovedByUser != null ? src.ApprovedByUser.FullName : null));
 
-        // notification → notificationResponse (all properties match)
-        CreateMap<Notification, NotificationResponse>();
+        // notification → notificationResponse (convert type enum to string for mobile compatibility)
+        CreateMap<Notification, NotificationResponse>()
+            .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type.ToString()));
 
         // zone → zoneResponse (all properties match)
         CreateMap<Zone, ZoneResponse>();

@@ -33,12 +33,9 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    final image = await PhotoPickerHelper.pickImageWithChoice(
-      context,
-      maxWidth: 1920,
-      maxHeight: 1080,
-      imageQuality: 85,
-    );
+    // use default settings from PhotoPickerHelper (1024x1024, quality 70)
+    // this ensures all images are compressed consistantly
+    final image = await PhotoPickerHelper.pickImageWithChoice(context);
 
     if (image != null) {
       setState(() {
@@ -121,7 +118,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // task Info Card
+            // task info card
             Card(
               elevation: 2,
               child: Padding(
@@ -179,7 +176,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
 
             const SizedBox(height: 24),
 
-            // completion Notes
+            // notes section
             const Text(
               'ملاحظات الإكمال *',
               style: TextStyle(
@@ -215,7 +212,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
 
             const SizedBox(height: 24),
 
-            // proof Photo
+            // photo section
             const Text(
               'صورة إثبات *',
               style: TextStyle(
@@ -288,7 +285,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
 
             const SizedBox(height: 32),
 
-            // submit Button
+            // send button
             ElevatedButton(
               onPressed: _isSubmitting ? null : _submitCompletion,
               style: ElevatedButton.styleFrom(
@@ -318,7 +315,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
 
             const SizedBox(height: 16),
 
-            // info Note
+            // gps info note
             const GpsNoticeWidget(
               customMessage:
                   'سيتم تسجيل موقعك الحالي تلقائياً عند إكمال المهمة',

@@ -31,6 +31,20 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceId"));
 
+                    b.Property<string>("ApprovalStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AttendanceType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CheckInEventTime")
                         .HasColumnType("datetime2");
 
@@ -59,11 +73,29 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("CheckOutSyncTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("EarlyLeaveMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsManual")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsSynced")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsValidated")
                         .HasColumnType("bit");
+
+                    b.Property<int>("LateMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ManualReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OvertimeMinutes")
+                        .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -86,18 +118,57 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.HasKey("AttendanceId");
 
-                    b.HasIndex("CheckInEventTime");
+                    b.HasIndex("ApprovedByUserId");
 
-                    b.HasIndex("Status");
+                    b.HasIndex("MunicipalityId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_Attendance_Status");
 
-                    b.HasIndex("ZoneId");
+                    b.HasIndex("ZoneId")
+                        .HasDatabaseName("IX_Attendance_ZoneId");
 
                     b.HasIndex("UserId", "CheckInEventTime")
                         .HasDatabaseName("IX_Attendance_User_CheckIn");
 
                     b.ToTable("Attendances");
+                });
+
+            modelBuilder.Entity("Jawlah.Core.Entities.AuditLog", b =>
+                {
+                    b.Property<int>("AuditLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AuditLogId"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Username")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("AuditLogId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("Jawlah.Core.Entities.Issue", b =>
@@ -108,10 +179,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IssueId"));
 
-                    b.Property<string>("AdditionalPhotosJson")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -119,6 +186,9 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.Property<DateTime>("EventTime")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ForwardingNotes")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsSynced")
                         .HasColumnType("bit");
@@ -134,6 +204,15 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<double>("Longitude")
                         .HasPrecision(18, 15)
                         .HasColumnType("float(18)");
+
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PdfDownloadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PdfDownloadedByUserId")
+                        .HasColumnType("int");
 
                     b.Property<string>("PhotoUrl")
                         .HasMaxLength(500)
@@ -185,15 +264,13 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.HasKey("IssueId");
 
-                    b.HasIndex("ReportedAt");
+                    b.HasIndex("MunicipalityId");
 
-                    b.HasIndex("ReportedByUserId");
+                    b.HasIndex("ReportedAt");
 
                     b.HasIndex("ResolvedByUserId");
 
                     b.HasIndex("Severity");
-
-                    b.HasIndex("Status");
 
                     b.HasIndex("Type");
 
@@ -223,10 +300,12 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<double>("Latitude")
-                        .HasColumnType("float");
+                        .HasPrecision(18, 15)
+                        .HasColumnType("float(18)");
 
                     b.Property<double>("Longitude")
-                        .HasColumnType("float");
+                        .HasPrecision(18, 15)
+                        .HasColumnType("float(18)");
 
                     b.Property<double?>("Speed")
                         .HasColumnType("float");
@@ -239,9 +318,115 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "Timestamp");
+                    b.HasIndex("UserId", "Timestamp")
+                        .HasDatabaseName("IX_LocationHistory_User_Timestamp");
 
                     b.ToTable("LocationHistories");
+                });
+
+            modelBuilder.Entity("Jawlah.Core.Entities.Municipality", b =>
+                {
+                    b.Property<int>("MunicipalityId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MunicipalityId"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("DefaultEndTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("DefaultGraceMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(15);
+
+                    b.Property<TimeSpan>("DefaultStartTime")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LicenseExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<double>("MaxAcceptableAccuracyMeters")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("float")
+                        .HasDefaultValue(150.0);
+
+                    b.Property<double>("MaxLatitude")
+                        .HasPrecision(18, 15)
+                        .HasColumnType("float(18)");
+
+                    b.Property<double>("MaxLongitude")
+                        .HasPrecision(18, 15)
+                        .HasColumnType("float(18)");
+
+                    b.Property<double>("MinLatitude")
+                        .HasPrecision(18, 15)
+                        .HasColumnType("float(18)");
+
+                    b.Property<double>("MinLongitude")
+                        .HasPrecision(18, 15)
+                        .HasColumnType("float(18)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NameEnglish")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("MunicipalityId");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Municipality_Code_Unique");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("IX_Municipality_IsActive");
+
+                    b.ToTable("Municipalities");
                 });
 
             modelBuilder.Entity("Jawlah.Core.Entities.Notification", b =>
@@ -259,10 +444,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<string>("FcmToken")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<bool>("IsRead")
                         .HasColumnType("bit");
 
@@ -273,6 +454,9 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
 
                     b.Property<string>("PayloadJson")
                         .HasMaxLength(2000)
@@ -300,6 +484,8 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("IsSent");
+
+                    b.HasIndex("MunicipalityId");
 
                     b.HasIndex("Type");
 
@@ -426,6 +612,9 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("CompletionDistanceMeters")
+                        .HasColumnType("int");
+
                     b.Property<string>("CompletionNotes")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -447,6 +636,18 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<DateTime>("EventTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("ExtendedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ExtendedDeadline")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAutoRejected")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDistanceWarning")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsSynced")
                         .HasColumnType("bit");
 
@@ -462,12 +663,42 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasPrecision(18, 15)
                         .HasColumnType("float(18)");
 
+                    b.Property<int>("MaxDistanceMeters")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
                     b.Property<string>("PhotoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("Priority")
                         .HasColumnType("int");
+
+                    b.Property<string>("ProgressNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProgressPercentage")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RejectedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("RejectionDistanceMeters")
+                        .HasColumnType("int");
+
+                    b.Property<double?>("RejectionLatitude")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("RejectionLongitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("RequiresPhotoProof")
                         .HasColumnType("bit");
@@ -504,15 +735,11 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.HasIndex("AssignedByUserId");
 
-                    b.HasIndex("AssignedToUserId");
-
                     b.HasIndex("DueDate");
 
+                    b.HasIndex("MunicipalityId");
+
                     b.HasIndex("Priority");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("SyncTime");
 
                     b.HasIndex("ZoneId");
 
@@ -530,6 +757,9 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserId"));
 
+                    b.Property<int>("ConsentVersion")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -541,16 +771,41 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<TimeSpan>("ExpectedEndTime")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("ExpectedStartTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("int");
+
                     b.Property<string>("FcmToken")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("GraceMinutes")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastWarningAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastWarningReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("LockoutEndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -565,6 +820,12 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasMaxLength(4)
                         .HasColumnType("nvarchar(4)");
 
+                    b.Property<DateTime?>("PrivacyConsentedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RegisteredDeviceId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("Role")
                         .HasColumnType("int");
 
@@ -576,6 +837,9 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int>("WarningCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("WorkerType")
                         .HasColumnType("int");
 
@@ -583,18 +847,14 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.HasIndex("Email");
 
+                    b.HasIndex("MunicipalityId");
+
                     b.HasIndex("Pin")
                         .IsUnique()
                         .HasFilter("[Pin] IS NOT NULL");
 
-                    b.HasIndex("Role");
-
-                    b.HasIndex("Status");
-
                     b.HasIndex("Username")
                         .IsUnique();
-
-                    b.HasIndex("Role", "Status");
 
                     b.ToTable("Users");
                 });
@@ -617,6 +877,8 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasColumnType("bit");
 
                     b.HasKey("UserId", "ZoneId");
+
+                    b.HasIndex("AssignedByUserId");
 
                     b.HasIndex("IsActive")
                         .HasDatabaseName("IX_UserZone_IsActive");
@@ -669,6 +931,9 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -699,6 +964,8 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.HasIndex("IsActive")
                         .HasDatabaseName("IX_Zone_IsActive");
 
+                    b.HasIndex("MunicipalityId");
+
                     b.HasIndex("ZoneCode")
                         .IsUnique()
                         .HasDatabaseName("IX_Zone_ZoneCode_Unique");
@@ -708,6 +975,16 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("Jawlah.Core.Entities.Attendance", b =>
                 {
+                    b.HasOne("Jawlah.Core.Entities.User", "ApprovedByUser")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByUserId");
+
+                    b.HasOne("Jawlah.Core.Entities.Municipality", "Municipality")
+                        .WithMany("Attendances")
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Jawlah.Core.Entities.User", "User")
                         .WithMany("AttendanceRecords")
                         .HasForeignKey("UserId")
@@ -719,13 +996,32 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.Navigation("ApprovedByUser");
+
+                    b.Navigation("Municipality");
+
                     b.Navigation("User");
 
                     b.Navigation("Zone");
                 });
 
+            modelBuilder.Entity("Jawlah.Core.Entities.AuditLog", b =>
+                {
+                    b.HasOne("Jawlah.Core.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Jawlah.Core.Entities.Issue", b =>
                 {
+                    b.HasOne("Jawlah.Core.Entities.Municipality", "Municipality")
+                        .WithMany("Issues")
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Jawlah.Core.Entities.User", "ReportedByUser")
                         .WithMany("ReportedIssues")
                         .HasForeignKey("ReportedByUserId")
@@ -741,6 +1037,8 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .WithMany("Issues")
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Municipality");
 
                     b.Navigation("ReportedByUser");
 
@@ -762,29 +1060,43 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("Jawlah.Core.Entities.Notification", b =>
                 {
+                    b.HasOne("Jawlah.Core.Entities.Municipality", "Municipality")
+                        .WithMany("Notifications")
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Jawlah.Core.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Municipality");
+
                     b.Navigation("User");
                 });
 
             modelBuilder.Entity("Jawlah.Core.Entities.Photo", b =>
                 {
-                    b.HasOne("Jawlah.Core.Entities.Issue", null)
+                    b.HasOne("Jawlah.Core.Entities.Issue", "Issue")
                         .WithMany("Photos")
-                        .HasForeignKey("IssueId");
+                        .HasForeignKey("IssueId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
-                    b.HasOne("Jawlah.Core.Entities.Task", null)
+                    b.HasOne("Jawlah.Core.Entities.Task", "Task")
                         .WithMany("Photos")
-                        .HasForeignKey("TaskId");
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Jawlah.Core.Entities.User", "UploadedByUser")
                         .WithMany()
                         .HasForeignKey("UploadedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Issue");
+
+                    b.Navigation("Task");
 
                     b.Navigation("UploadedByUser");
                 });
@@ -813,6 +1125,12 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Jawlah.Core.Entities.Municipality", "Municipality")
+                        .WithMany("Tasks")
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Jawlah.Core.Entities.Zone", "Zone")
                         .WithMany("Tasks")
                         .HasForeignKey("ZoneId")
@@ -822,11 +1140,30 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     b.Navigation("AssignedToUser");
 
+                    b.Navigation("Municipality");
+
                     b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("Jawlah.Core.Entities.User", b =>
+                {
+                    b.HasOne("Jawlah.Core.Entities.Municipality", "Municipality")
+                        .WithMany("Users")
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Municipality");
                 });
 
             modelBuilder.Entity("Jawlah.Core.Entities.UserZone", b =>
                 {
+                    b.HasOne("Jawlah.Core.Entities.User", "AssignedByUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Jawlah.Core.Entities.User", "User")
                         .WithMany("AssignedZones")
                         .HasForeignKey("UserId")
@@ -839,14 +1176,42 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("AssignedByUser");
+
                     b.Navigation("User");
 
                     b.Navigation("Zone");
                 });
 
+            modelBuilder.Entity("Jawlah.Core.Entities.Zone", b =>
+                {
+                    b.HasOne("Jawlah.Core.Entities.Municipality", "Municipality")
+                        .WithMany("Zones")
+                        .HasForeignKey("MunicipalityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Municipality");
+                });
+
             modelBuilder.Entity("Jawlah.Core.Entities.Issue", b =>
                 {
                     b.Navigation("Photos");
+                });
+
+            modelBuilder.Entity("Jawlah.Core.Entities.Municipality", b =>
+                {
+                    b.Navigation("Attendances");
+
+                    b.Navigation("Issues");
+
+                    b.Navigation("Notifications");
+
+                    b.Navigation("Tasks");
+
+                    b.Navigation("Users");
+
+                    b.Navigation("Zones");
                 });
 
             modelBuilder.Entity("Jawlah.Core.Entities.Task", b =>

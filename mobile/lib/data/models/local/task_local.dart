@@ -49,6 +49,9 @@ class TaskLocal extends HiveObject {
   @HiveField(14)
   int? zoneId;
 
+  @HiveField(21)
+  String? zoneName;
+
   @HiveField(15)
   double? latitude;
 
@@ -83,6 +86,7 @@ class TaskLocal extends HiveObject {
     this.priority = 'Medium',
     this.dueDate,
     this.zoneId,
+    this.zoneName,
     this.latitude,
     this.longitude,
     this.locationDescription,
@@ -106,6 +110,7 @@ class TaskLocal extends HiveObject {
       'priority': priority,
       'dueDate': dueDate?.toIso8601String(),
       'zoneId': zoneId,
+      'zoneName': zoneName,
       'latitude': latitude,
       'longitude': longitude,
       'locationDescription': locationDescription,

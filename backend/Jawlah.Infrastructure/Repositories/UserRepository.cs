@@ -15,6 +15,7 @@ public class UserRepository : Repository<User>, IUserRepository
     public override async Task<User?> GetByIdAsync(int id)
     {
         return await _dbSet
+            .Include(u => u.Municipality)
             .Include(u => u.AssignedZones)
                 .ThenInclude(uz => uz.Zone)
             .FirstOrDefaultAsync(u => u.UserId == id);
@@ -23,6 +24,7 @@ public class UserRepository : Repository<User>, IUserRepository
     public async Task<User?> GetByUsernameAsync(string username)
     {
         return await _dbSet
+            .Include(u => u.Municipality)
             .Include(u => u.AssignedZones)
                 .ThenInclude(uz => uz.Zone)
             .FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
@@ -31,6 +33,7 @@ public class UserRepository : Repository<User>, IUserRepository
     public async Task<User?> GetByEmailAsync(string email)
     {
         return await _dbSet
+            .Include(u => u.Municipality)
             .Include(u => u.AssignedZones)
                 .ThenInclude(uz => uz.Zone)
             .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == email.ToLower());
@@ -39,6 +42,7 @@ public class UserRepository : Repository<User>, IUserRepository
     public async Task<User?> GetByPinAsync(string pin)
     {
         return await _dbSet
+            .Include(u => u.Municipality)
             .Include(u => u.AssignedZones)
                 .ThenInclude(uz => uz.Zone)
             .FirstOrDefaultAsync(u => u.Pin == pin && u.Role == UserRole.Worker);
@@ -80,5 +84,14 @@ public class UserRepository : Repository<User>, IUserRepository
             .Include(u => u.AssignedZones)
                 .ThenInclude(uz => uz.Zone)
             .FirstOrDefaultAsync(u => u.UserId == userId);
+    }
+
+    public async Task<IEnumerable<User>> GetUsersByMunicipalityAsync(int municipalityId)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .Where(u => u.MunicipalityId == municipalityId)
+            .OrderBy(u => u.FullName)
+            .ToListAsync();
     }
 }

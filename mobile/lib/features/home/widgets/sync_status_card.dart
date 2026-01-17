@@ -13,7 +13,7 @@ class SyncStatusCard extends StatelessWidget {
         final pendingCount = connectivity.waitingItems;
         final isSyncing = connectivity.isSyncingNow;
 
-        // hide card if nothing to sync
+        // dont show card if nothing to sync
         if (pendingCount == 0 && !isSyncing) {
           return const SizedBox.shrink();
         }

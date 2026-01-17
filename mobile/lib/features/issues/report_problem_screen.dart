@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/gps_notice_widget.dart';
+import '../../presentation/widgets/offline_banner.dart';
 import '../../providers/issue_manager.dart';
 import '../../providers/sync_manager.dart';
 import '../../core/utils/photo_picker_helper.dart';
@@ -17,8 +18,11 @@ class ReportProblemScreen extends StatefulWidget {
 
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _locationController = TextEditingController();
   String _selectedProblemType = 'Infrastructure';
+  String _selectedSeverity = 'Medium';
   File? _photo1;
   File? _photo2;
   File? _photo3;
@@ -32,9 +36,18 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     'Other': 'أخرى',
   };
 
+  final Map<String, String> _severityLevels = {
+    'Minor': 'بسيطة',
+    'Medium': 'متوسطة',
+    'Major': 'كبيرة',
+    'Critical': 'حرجة',
+  };
+
   @override
   void dispose() {
+    _titleController.dispose();
     _descriptionController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
@@ -43,25 +56,72 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     return BaseScreen(
       title: 'الإبلاغ عن مشكلة',
       showBackButton: false, // Don't show back button when it's a bottom tab
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildProblemTypeDropdown(),
-              const SizedBox(height: 20),
-              _buildDescriptionField(),
-              const SizedBox(height: 20),
-              _buildPhotoUpload(),
-              const SizedBox(height: 20),
-              _buildGpsNotice(),
-              const SizedBox(height: 24),
-              _buildSubmitButton(),
-            ],
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTitleField(),
+                    const SizedBox(height: 16),
+                    _buildProblemTypeDropdown(),
+                    const SizedBox(height: 16),
+                    _buildSeverityDropdown(),
+                    const SizedBox(height: 16),
+                    _buildLocationField(),
+                    const SizedBox(height: 16),
+                    _buildDescriptionField(),
+                    const SizedBox(height: 16),
+                    _buildPhotoUpload(),
+                    const SizedBox(height: 16),
+                    _buildGpsNotice(),
+                    const SizedBox(height: 20),
+                    _buildSubmitButton(),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTitleField() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('عنوان البلاغ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Cairo')),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _titleController,
+            textDirection: TextDirection.rtl,
+            style: const TextStyle(fontSize: 16, fontFamily: 'Cairo'),
+            decoration: InputDecoration(
+              hintText: 'مثال: حفرة في الشارع',
+              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5), fontFamily: 'Cairo'),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) return 'يرجى إدخال عنوان البلاغ';
+              if (value.trim().length < 5) return 'العنوان قصير جداً';
+              return null;
+            },
+          ),
+        ],
       ),
     );
   }
@@ -124,6 +184,70 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                   }
                 },
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeverityDropdown() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('مستوى الخطورة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Cairo')),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.textSecondary.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedSeverity,
+                isExpanded: true,
+                style: const TextStyle(fontSize: 16, color: AppColors.textPrimary, fontFamily: 'Cairo'),
+                items: _severityLevels.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _selectedSeverity = value);
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocationField() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('وصف الموقع (اختياري)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Cairo')),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _locationController,
+            textDirection: TextDirection.rtl,
+            style: const TextStyle(fontSize: 16, fontFamily: 'Cairo'),
+            decoration: InputDecoration(
+              hintText: 'مثال: بجانب البوابة الرئيسية',
+              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5), fontFamily: 'Cairo'),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
             ),
           ),
         ],
@@ -393,12 +517,12 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   }
 
   Future<void> _submitReport() async {
-    // check if the form fields are valid
+    // check form is valid
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // make sure at least one photo is picked
+    // need at least one photo
     if (_photo1 == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -417,8 +541,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
   void _resetForm() {
     setState(() {
+      _titleController.clear();
       _descriptionController.clear();
+      _locationController.clear();
       _selectedProblemType = 'Infrastructure';
+      _selectedSeverity = 'Medium';
       _photo1 = null;
       _photo2 = null;
       _photo3 = null;
@@ -454,12 +581,18 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   }
 
   Future<void> _executeSubmit() async {
+    // guard against double submission and null photo
+    if (_isSubmitting || _photo1 == null) return;
+
     setState(() => _isSubmitting = true);
 
-    // call the manager to send the report
+    // send the report
     final success = await context.read<IssueManager>().sendIssueReport(
+          title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           type: _selectedProblemType,
+          severity: _selectedSeverity,
+          locationDescription: _locationController.text.trim(),
           photo1: _photo1!,
           photo2: _photo2,
           photo3: _photo3,
@@ -470,7 +603,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     if (!mounted) return;
 
     if (success) {
-      // if success, show a message
+      // show sucess message
       final isOnline = context.read<SyncManager>().isOnline;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -484,10 +617,10 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         ),
       );
 
-      // Reset form instead of popping to avoid black screen
+      // reset form to start over
       _resetForm();
     } else {
-      // if failed, show what went wrong
+      // show error
       final provider = context.read<IssueManager>();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

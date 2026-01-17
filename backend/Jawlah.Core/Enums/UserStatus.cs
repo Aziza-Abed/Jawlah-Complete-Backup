@@ -2,7 +2,7 @@ namespace Jawlah.Core.Enums;
 
 public enum UserStatus
 {
-    Active = 1,
-    Inactive = 2,
-    Suspended = 3
+    Active = 0,
+    Inactive = 1,
+    Suspended = 2
 }

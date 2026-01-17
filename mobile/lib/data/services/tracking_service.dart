@@ -74,7 +74,7 @@ class TrackingService {
     _hubConnection = null;
   }
 
-  // send location update
+  // send location update to server
   Future<void> sendLocation(double lat, double lng,
       {double? speed, double? accuracy, double? heading}) async {
     final point = LocationPoint(
@@ -101,15 +101,11 @@ class TrackingService {
     }
   }
 
-  // store point in Hive for later
+  // store point in Hive for later when offline
   Future<void> _bufferLocation(LocationPoint point) async {
     try {
       if (!Hive.isBoxOpen('location_buffer')) {
-        final encryptionKey = await SecureStorageHelper.getHiveEncryptionKey();
-        await Hive.openBox<LocationPoint>(
-          'location_buffer',
-          encryptionCipher: HiveAesCipher(encryptionKey),
-        );
+        await Hive.openBox<LocationPoint>('location_buffer');
       }
       final box = Hive.box<LocationPoint>('location_buffer');
 

@@ -31,36 +31,19 @@ public static class InputSanitizer
     public static bool IsStrongPassword(string password)
     {
         if (string.IsNullOrWhiteSpace(password)) return false;
-        
+
         // Minimum 8 characters
         if (password.Length < 8) return false;
-        
+
         // At least one letter
         if (!password.Any(char.IsLetter)) return false;
-        
+
         // At least one digit
         if (!password.Any(char.IsDigit)) return false;
 
+        // At least one special character
+        if (!password.Any(c => !char.IsLetterOrDigit(c))) return false;
+
         return true;
-    }
-
-    // validate PIN is 4 digits only
-    public static bool IsValidPin(string? pin)
-    {
-        if (string.IsNullOrWhiteSpace(pin))
-            return false;
-
-        return Regex.IsMatch(pin, @"^\d{4}$");
-    }
-
-    // validate coordinates are in valid range
-    public static bool IsValidLatitude(double lat)
-    {
-        return lat >= -90 && lat <= 90;
-    }
-
-    public static bool IsValidLongitude(double lon)
-    {
-        return lon >= -180 && lon <= 180;
     }
 }

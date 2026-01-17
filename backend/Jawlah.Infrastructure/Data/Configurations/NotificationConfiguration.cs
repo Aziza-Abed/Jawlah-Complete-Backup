@@ -10,6 +10,12 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
     {
         builder.HasKey(e => e.NotificationId);
 
+        // Municipality relationship
+        builder.HasOne(e => e.Municipality)
+            .WithMany(m => m.Notifications)
+            .HasForeignKey(e => e.MunicipalityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.Title)
             .IsRequired()
             .HasMaxLength(200);

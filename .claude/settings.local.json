@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(git clone:*)",
+      "Bash(xcopy:*)",
+      "Bash(wc:*)",
+      "Bash(node --version:*)",
+      "Bash(npm install)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(git fetch:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm i:*)",
+      "Bash(python:*)",
+      "Bash(node -e:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 using Jawlah.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using TaskEntity = Jawlah.Core.Entities.Task;
 
 namespace Jawlah.Infrastructure.Data.Configurations;
 
@@ -45,5 +46,17 @@ public class PhotoConfiguration : IEntityTypeConfiguration<Photo>
             .WithMany()
             .HasForeignKey(e => e.UploadedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // navigation to Task (optional - photo can belong to task)
+        builder.HasOne(e => e.Task)
+            .WithMany(t => t.Photos)
+            .HasForeignKey(e => e.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // navigation to Issue (optional - photo can belong to issue)
+        builder.HasOne(e => e.Issue)
+            .WithMany(i => i.Photos)
+            .HasForeignKey(e => e.IssueId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

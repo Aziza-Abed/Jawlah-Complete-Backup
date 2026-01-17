@@ -11,6 +11,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     {
         builder.HasKey(e => e.UserId);
 
+        // Municipality relationship
+        builder.HasOne(e => e.Municipality)
+            .WithMany(m => m.Users)
+            .HasForeignKey(e => e.MunicipalityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.Username)
             .IsRequired()
             .HasMaxLength(50);

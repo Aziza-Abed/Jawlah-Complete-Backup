@@ -22,10 +22,10 @@ class _TasksListScreenState extends State<TasksListScreen>
   @override
   void initState() {
     super.initState();
-    // set up the tabs (we have 4 filters)
+    // make the tabs we have 4 filters
     _tabController = TabController(length: 4, vsync: this);
 
-    // load the tasks when the screen opens
+    // get tasks when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskManager>().loadTasks();
     });
@@ -107,6 +107,11 @@ class _TasksListScreenState extends State<TasksListScreen>
           );
         }
 
+        // show error state if there's an error
+        if (provider.errorMessage != null && provider.myTasks.isEmpty) {
+          return _buildErrorState(provider);
+        }
+
         List<TaskModel> filteredTasks;
         switch (filterType) {
           case 'pending':
@@ -123,12 +128,7 @@ class _TasksListScreenState extends State<TasksListScreen>
         }
 
         if (filteredTasks.isEmpty) {
-          return Center(
-            child: Text(
-              'لا توجد مهام حالياً',
-              style: const TextStyle(fontFamily: 'Cairo'),
-            ),
-          );
+          return _buildEmptyState(filterType);
         }
 
         return RefreshIndicator(
@@ -145,6 +145,103 @@ class _TasksListScreenState extends State<TasksListScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEmptyState(String filterType) {
+    String message;
+    IconData icon;
+    switch (filterType) {
+      case 'pending':
+        message = 'لا توجد مهام جديدة';
+        icon = Icons.inbox_outlined;
+        break;
+      case 'inprogress':
+        message = 'لا توجد مهام قيد التنفيذ';
+        icon = Icons.hourglass_empty_rounded;
+        break;
+      case 'completed':
+        message = 'لم تكتمل أي مهام بعد';
+        icon = Icons.check_circle_outline;
+        break;
+      default:
+        message = 'لا توجد مهام حالياً';
+        icon = Icons.assignment_outlined;
+    }
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.05),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 64, color: AppColors.primary.withOpacity(0.3)),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: const TextStyle(
+              fontSize: 16,
+              color: AppColors.textSecondary,
+              fontFamily: 'Cairo',
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'اسحب للأسفل للتحديث',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              fontFamily: 'Cairo',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(TaskManager provider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              provider.errorMessage ?? 'حدث خطأ أثناء تحميل المهام',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.textSecondary,
+                fontFamily: 'Cairo',
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => provider.refreshData(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة', style: TextStyle(fontFamily: 'Cairo')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/config/api_config.dart';
 import '../../core/utils/storage_helper.dart';
@@ -35,11 +36,12 @@ class ApiService {
     dioClient.interceptors.add(makeAuthHelper());
 
     // enable logging if we are in debug mode
+    // note: requestHeader is false to avoid logging tokens
     if (ApiConfig.enableLogging) {
       dioClient.interceptors.add(LogInterceptor(
         requestBody: true,
         responseBody: true,
-        requestHeader: true,
+        requestHeader: false,
         responseHeader: false,
         error: true,
       ));
@@ -57,15 +59,14 @@ class ApiService {
         return handler.next(options);
       },
       onError: (error, handler) async {
-        // if we get 401, try to refresh the token
+        // if we get 401 try to refresh the token
         if (error.response?.statusCode == 401) {
           // try refreshing token
           bool refreshed = await renewToken();
           if (refreshed) {
-            // token refreshed, just return the error and let user retry manually
-            // TODO: maybe auto-retry the request here?
+            // token refreshed just return the error and let user retry manually
           } else {
-            // refresh failed, logout user
+            // refresh failed logout user
             await cleanAuthData();
           }
         }
@@ -100,7 +101,7 @@ class ApiService {
       }
       return false;
     } catch (e) {
-      print('error refreshing token: $e');
+      debugPrint('error refreshing token: $e');
       return false;
     }
   }
@@ -120,16 +121,16 @@ class ApiService {
     _token = await StorageHelper.getToken();
   }
 
+  // HTTP methods
   Future<Response> get(
     String endpoint, {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      final response = await dioClient.get(
+      return await dioClient.get(
         endpoint,
         queryParameters: queryParameters,
       );
-      return response;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -141,12 +142,11 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      final response = await dioClient.post(
+      return await dioClient.post(
         endpoint,
         data: data,
         queryParameters: queryParameters,
       );
-      return response;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -158,12 +158,11 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      final response = await dioClient.put(
+      return await dioClient.put(
         endpoint,
         data: data,
         queryParameters: queryParameters,
       );
-      return response;
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -174,54 +173,58 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
-      final response = await dioClient.delete(
+      return await dioClient.delete(
         endpoint,
         queryParameters: queryParameters,
       );
-      return response;
     } on DioException catch (e) {
       throw _handleError(e);
     }
   }
 
+  // handle dio errors and convert to app exceptions
   Exception _handleError(DioException error) {
-    // check what kind of error happened
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        return NetworkException('انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.');
-
-      case DioExceptionType.badResponse:
-        // the server responded with an error code
-        final statusCode = error.response?.statusCode;
-        final message = error.response?.data?['message'] ??
-            error.response?.data?['error'] ??
-            'Server Error';
-
-        if (statusCode == 401) {
-          return UnauthorizedException('غير مصرح. يرجى تسجيل الدخول مرة أخرى.');
-        } else if (statusCode == 403) {
-          return UnauthorizedException('غير مصرح. يرجى تسجيل الدخول مرة أخرى.');
-        } else if (statusCode == 404) {
-          return NotFoundException('الطلب المطلوب غير موجود.');
-        } else if (statusCode == 500) {
-          return ServerException(
-            'حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.',
-            statusCode: 500,
-          );
-        }
-
-        return ServerException(message, statusCode: statusCode);
-
-      case DioExceptionType.cancel:
-        return AppException('تم إلغاء الطلب.');
-
-      case DioExceptionType.connectionError:
-        return NetworkException('لا يوجد اتصال بالإنترنت.');
-
-      default:
-        return AppException('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
+    // timeout errors
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        error.type == DioExceptionType.receiveTimeout) {
+      return NetworkException('انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.');
     }
+
+    // no internet
+    if (error.type == DioExceptionType.connectionError) {
+      return NetworkException('لا يوجد اتصال بالإنترنت.');
+    }
+
+    // request cancelled
+    if (error.type == DioExceptionType.cancel) {
+      return AppException('تم إلغاء الطلب.');
+    }
+
+    // server errors
+    if (error.type == DioExceptionType.badResponse) {
+      final statusCode = error.response?.statusCode;
+      final message = error.response?.data?['message'] ??
+          error.response?.data?['error'] ??
+          'Server Error';
+
+      if (statusCode == 401 || statusCode == 403) {
+        return UnauthorizedException('غير مصرح. يرجى تسجيل الدخول مرة أخرى.');
+      }
+      if (statusCode == 404) {
+        return NotFoundException('الطلب المطلوب غير موجود.');
+      }
+      if (statusCode == 500) {
+        return ServerException(
+          'حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.',
+          statusCode: 500,
+        );
+      }
+
+      return ServerException(message, statusCode: statusCode);
+    }
+
+    // anything else
+    return AppException('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
   }
 }

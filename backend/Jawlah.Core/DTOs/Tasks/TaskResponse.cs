@@ -31,4 +31,24 @@ public class TaskResponse
     public List<string> Photos { get; set; } = new();
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
+
+    // Task location verification
+    public int MaxDistanceMeters { get; set; } = 100;
+    public int? CompletionDistanceMeters { get; set; }
+    public bool IsDistanceWarning { get; set; } = false;
+
+    // Progress tracking for multi-day tasks
+    public int ProgressPercentage { get; set; } = 0;
+    public string? ProgressNotes { get; set; }
+    public DateTime? ExtendedDeadline { get; set; }
+
+    // Rejection tracking
+    public bool IsAutoRejected { get; set; } = false;
+    public string? RejectionReason { get; set; }
+    public DateTime? RejectedAt { get; set; }
+    public int? RejectionDistanceMeters { get; set; }
+
+    // Sync fields for mobile offline support
+    public DateTime? SyncTime { get; set; }
+    public int SyncVersion { get; set; }
 }

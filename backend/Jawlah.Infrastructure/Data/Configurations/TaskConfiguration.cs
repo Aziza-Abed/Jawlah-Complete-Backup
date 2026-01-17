@@ -10,6 +10,12 @@ public class TaskConfiguration : IEntityTypeConfiguration<Core.Entities.Task>
     {
         builder.HasKey(e => e.TaskId);
 
+        // Municipality relationship
+        builder.HasOne(e => e.Municipality)
+            .WithMany(m => m.Tasks)
+            .HasForeignKey(e => e.MunicipalityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.Title)
             .IsRequired()
             .HasMaxLength(200);

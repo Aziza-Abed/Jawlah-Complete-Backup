@@ -21,4 +21,9 @@ public class LoginWithGPSRequest
     // GPS accuracy in meters (optional but recommended for validation)
     [Range(0, 1000, ErrorMessage = "Accuracy must be between 0 and 1000 meters")]
     public double? Accuracy { get; set; }
+
+    // Device ID for device binding security (prevents PIN theft)
+    // On first login, the device is registered. Subsequent logins must be from the same device.
+    [StringLength(100, ErrorMessage = "Device ID too long")]
+    public string? DeviceId { get; set; }
 }

@@ -27,9 +27,13 @@ public class AuthService : IAuthService
         _configuration = configuration;
     }
 
+    // SR1.5: Maximum 5 failed attempts before lockout
+    private const int MaxFailedAttempts = 5;
+    private const int LockoutMinutes = 15;
+
     public async Task<(bool Success, string? Token, string? RefreshToken, string? Error)> LoginAsync(string username, string password)
     {
-        // find the user by username
+        // get user from database
         var user = await _userRepository.GetByUsernameAsync(username);
 
         if (user == null)
@@ -37,21 +41,53 @@ public class AuthService : IAuthService
             return (false, null, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
-        // check if the user is active
+        // SR1.5: Check if account is locked
+        if (user.LockoutEndTime.HasValue && user.LockoutEndTime > DateTime.UtcNow)
+        {
+            var remainingMinutes = (int)(user.LockoutEndTime.Value - DateTime.UtcNow).TotalMinutes + 1;
+            return (false, null, null, $"الحساب مقفل. يرجى المحاولة بعد {remainingMinutes} دقيقة");
+        }
+
+        // Reset lockout if expired
+        if (user.LockoutEndTime.HasValue && user.LockoutEndTime <= DateTime.UtcNow)
+        {
+            user.FailedLoginAttempts = 0;
+            user.LockoutEndTime = null;
+        }
+
+        // user must be active
         if (user.Status != UserStatus.Active)
         {
             return (false, null, null, "حساب المستخدم غير نشط");
         }
 
-        // verify the password
+        // check password
         if (!VerifyPassword(password, user.PasswordHash))
         {
-            return (false, null, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
+            // SR1.5: Increment failed attempts
+            user.FailedLoginAttempts++;
+
+            if (user.FailedLoginAttempts >= MaxFailedAttempts)
+            {
+                user.LockoutEndTime = DateTime.UtcNow.AddMinutes(LockoutMinutes);
+                await _userRepository.UpdateAsync(user);
+                await _userRepository.SaveChangesAsync();
+                return (false, null, null, $"تم قفل الحساب بسبب {MaxFailedAttempts} محاولات فاشلة. يرجى المحاولة بعد {LockoutMinutes} دقيقة");
+            }
+
+            await _userRepository.UpdateAsync(user);
+            await _userRepository.SaveChangesAsync();
+
+            var remainingAttempts = MaxFailedAttempts - user.FailedLoginAttempts;
+            return (false, null, null, $"اسم المستخدم أو كلمة المرور غير صحيحة. ({remainingAttempts} محاولات متبقية)");
         }
 
-        // update login time and generate tokens
+        // Successful login - reset failed attempts
+        user.FailedLoginAttempts = 0;
+        user.LockoutEndTime = null;
         user.LastLoginAt = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user);
+        await _userRepository.SaveChangesAsync();
 
         var token = GenerateJwtToken(user);
         var refreshToken = await CreateRefreshTokenAsync(user.UserId);
@@ -149,7 +185,7 @@ public class AuthService : IAuthService
 
     private async Task<RefreshToken> CreateRefreshTokenAsync(int userId)
     {
-        var refreshTokenDays = int.Parse(_configuration["JwtSettings:RefreshTokenExpirationDays"] ?? "7");
+        var refreshTokenDays = int.TryParse(_configuration["JwtSettings:RefreshTokenExpirationDays"], out var days) ? days : 7;
 
         var refreshToken = new RefreshToken
         {
@@ -188,11 +224,12 @@ public class AuthService : IAuthService
             return (false, null, null, "حساب المستخدم غير نشط");
         }
 
-        // update last login time
+        // update when user last logged in
         user.LastLoginAt = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user);
+        await _userRepository.SaveChangesAsync();
 
-        // generate tokens
+        // make new tokens for user
         var token = GenerateJwtToken(user);
         var refreshToken = await CreateRefreshTokenAsync(user.UserId);
 
@@ -227,7 +264,7 @@ public class AuthService : IAuthService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
-        var expirationMinutes = int.Parse(jwtSettings["ExpirationMinutes"] ?? "1440");
+        var expirationMinutes = int.TryParse(jwtSettings["ExpirationMinutes"], out var expMin) ? expMin : 1440;
 
         var token = new JwtSecurityToken(
             issuer: jwtSettings["Issuer"],

@@ -12,7 +12,7 @@ import 'api_service.dart';
 class TasksService {
   final ApiService _apiService = ApiService();
 
-  // get tasks assigned to current user (with optional filters and pagination)
+  // get tasks assigned to current user with optional filters and pagination
   Future<List<TaskModel>> getMyTasks({
     String? status,
     String? priority,
@@ -63,11 +63,11 @@ class TasksService {
     String newStatus, {
     String? notes,
   }) async {
-    // send status in camelCase format (backend now configured for camelCase JSON)
+    // send status in camelCase format backend now configured for camelCase JSON
     final response = await _apiService.put(
       '${ApiConfig.updateTaskStatus}/$taskId/status',
       data: {
-        'status': newStatus, // Backend now uses camelCase JSON policy
+        'status': newStatus,
         if (notes != null) 'completionNotes': notes,
       },
     );
@@ -95,7 +95,7 @@ class TasksService {
 
     formData.fields.add(MapEntry('notes', notes));
 
-    // include GPS coordinates
+    // include GPS coordinates if we have them
     if (latitude != null) {
       formData.fields.add(MapEntry('latitude', latitude.toString()));
     }
@@ -118,7 +118,7 @@ class TasksService {
           'photo',
           await MultipartFile.fromFile(
             proofPhoto.path,
-            filename: path.basename(proofPhoto.path), // Get filename from path
+            filename: path.basename(proofPhoto.path),
           ),
         ),
       );

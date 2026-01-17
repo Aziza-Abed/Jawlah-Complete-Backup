@@ -1,23 +1,31 @@
+import 'dart:async';
 import '../data/models/notification_model.dart';
 import '../data/services/notifications_service.dart';
 import '../data/services/firebase_messaging_service.dart';
 import 'base_controller.dart';
 
-// manager to handle app notifications
+// this class handles all the notifications stuff
 class NoticeManager extends BaseController {
   final NotificationsService _service = NotificationsService();
   final FirebaseMessagingService _fcmService = FirebaseMessagingService();
+  StreamSubscription? _fcmSubscription;
 
   List<NotificationModel> myNotices = [];
   int newNoticesCount = 0;
 
   NoticeManager() {
-    _fcmService.onMessage.listen((_) {
+    _fcmSubscription = _fcmService.onMessage.listen((_) {
       loadNotices();
     });
   }
 
-  // fetch all notifications
+  @override
+  void dispose() {
+    _fcmSubscription?.cancel();
+    super.dispose();
+  }
+
+  // get all notifcations from server
   Future<void> loadNotices() async {
     await executeVoidWithErrorHandling(() async {
       myNotices = await _service.getMyNotifications();
@@ -51,8 +59,8 @@ class NoticeManager extends BaseController {
   Future<void> removeNotice(int noticeId) async {
     final success = await _service.deleteNotification(noticeId);
     if (success) {
-      final notice = myNotices.firstWhere((n) => n.notificationId == noticeId);
-      if (!notice.isRead) {
+      final index = myNotices.indexWhere((n) => n.notificationId == noticeId);
+      if (index != -1 && !myNotices[index].isRead) {
         newNoticesCount = (newNoticesCount > 0) ? newNoticesCount - 1 : 0;
       }
       myNotices.removeWhere((n) => n.notificationId == noticeId);

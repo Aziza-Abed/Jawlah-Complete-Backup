@@ -13,6 +13,11 @@ public class User
     };
 
     public int UserId { get; set; }
+
+    // Municipality that this user belongs to
+    public int MunicipalityId { get; set; }
+    public Municipality Municipality { get; set; } = null!;
+
     public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string? Pin { get; set; }
@@ -26,6 +31,29 @@ public class User
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public string? FcmToken { get; set; }
+
+    // Login attempt tracking (SR1.5)
+    public int FailedLoginAttempts { get; set; } = 0;
+    public DateTime? LockoutEndTime { get; set; }
+
+    // Device binding for security - stores the first registered device ID
+    // If a different device tries to login with the same PIN, it will be rejected
+    public string? RegisteredDeviceId { get; set; }
+
+    // Work schedule for lateness/overtime tracking
+    public TimeSpan ExpectedStartTime { get; set; } = new TimeSpan(8, 0, 0); // 08:00
+    public TimeSpan ExpectedEndTime { get; set; } = new TimeSpan(16, 0, 0); // 16:00
+    public int GraceMinutes { get; set; } = 15;
+
+    // Privacy consent tracking
+    public DateTime? PrivacyConsentedAt { get; set; }
+    public int ConsentVersion { get; set; } = 0;
+
+    // Warning system for policy violations (location mismatch, etc.)
+    public int WarningCount { get; set; } = 0;
+    public DateTime? LastWarningAt { get; set; }
+    public string? LastWarningReason { get; set; }
+
     public ICollection<Attendance> AttendanceRecords { get; set; } = new List<Attendance>();
     public ICollection<Task> AssignedTasks { get; set; } = new List<Task>();
     public ICollection<Issue> ReportedIssues { get; set; } = new List<Issue>();

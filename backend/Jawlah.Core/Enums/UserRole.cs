@@ -2,7 +2,7 @@ namespace Jawlah.Core.Enums;
 
 public enum UserRole
 {
-    Worker = 1,
-    Supervisor = 2,
-    Admin = 3
+    Admin = 0,
+    Supervisor = 1,
+    Worker = 2
 }

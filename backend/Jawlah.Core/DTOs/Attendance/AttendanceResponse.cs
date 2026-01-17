@@ -20,4 +20,18 @@ public class AttendanceResponse
     public string? ValidationMessage { get; set; }
     public AttendanceStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // Lateness and overtime tracking
+    public int LateMinutes { get; set; } = 0;
+    public int EarlyLeaveMinutes { get; set; } = 0;
+    public int OvertimeMinutes { get; set; } = 0;
+    public string AttendanceType { get; set; } = "OnTime"; // OnTime, Late, EarlyLeave, Overtime
+
+    // Manual/GPS failure handling
+    public bool IsManual { get; set; } = false;
+    public string? ManualReason { get; set; }
+    public string ApprovalStatus { get; set; } = "AutoApproved"; // AutoApproved, Pending, Approved, Rejected
+    public int? ApprovedByUserId { get; set; }
+    public string? ApprovedByUserName { get; set; }
+    public DateTime? ApprovedAt { get; set; }
 }

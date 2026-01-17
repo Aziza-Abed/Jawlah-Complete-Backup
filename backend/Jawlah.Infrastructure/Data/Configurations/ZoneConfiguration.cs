@@ -10,6 +10,12 @@ public class ZoneConfiguration : IEntityTypeConfiguration<Zone>
     {
         builder.HasKey(e => e.ZoneId);
 
+        // Municipality relationship
+        builder.HasOne(e => e.Municipality)
+            .WithMany(m => m.Zones)
+            .HasForeignKey(e => e.MunicipalityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.ZoneName)
             .IsRequired()
             .HasMaxLength(200);

@@ -10,6 +10,12 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
     {
         builder.HasKey(e => e.IssueId);
 
+        // Municipality relationship
+        builder.HasOne(e => e.Municipality)
+            .WithMany(m => m.Issues)
+            .HasForeignKey(e => e.MunicipalityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.Title)
             .IsRequired()
             .HasMaxLength(200);
@@ -43,9 +49,6 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
 
         builder.Property(e => e.PhotoUrl)
             .HasMaxLength(500);
-
-        builder.Property(e => e.AdditionalPhotosJson)
-            .HasMaxLength(2000);
 
         builder.Property(e => e.ReportedAt)
             .IsRequired();

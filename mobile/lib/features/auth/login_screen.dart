@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/services/auth_service.dart';
 import '../../providers/auth_manager.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _employeeIdController = TextEditingController();
   bool _rememberMe = false;
   bool _isLoading = false;
+  String _loadingMessage = 'جاري تسجيل الدخول...';
 
   @override
   void initState() {
@@ -235,8 +238,27 @@ class _LoginScreenState extends State<LoginScreen> {
                           elevation: 0,
                         ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white)
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    _loadingMessage,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontFamily: 'Cairo',
+                                    ),
+                                  ),
+                                ],
+                              )
                             : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -291,24 +313,74 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // this method handles the login logic
+  // Get current location with timeout
+  Future<Position?> _getLocation() async {
+    try {
+      // Check location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return null;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      // Check if location service is enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return null;
+      }
+
+      // Get position with timeout
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      return null;
+    }
+  }
+
+  // Login to the app with optional auto check-in
   Future<void> _login() async {
-    // validate the form
+    // check form is valid
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = 'جاري تحديد الموقع...';
+    });
 
     try {
       final employeeId = _employeeIdController.text.trim();
       final authProvider = context.read<AuthManager>();
 
-      // call the login method in the provider
-      final success = await authProvider.doLogin(employeeId);
+      // Try to get location for auto check-in
+      final position = await _getLocation();
+
+      if (!mounted) return;
+
+      setState(() {
+        _loadingMessage = 'جاري تسجيل الدخول...';
+      });
+
+      // Try to login with location
+      final success = await authProvider.doLogin(
+        employeeId,
+        latitude: position?.latitude,
+        longitude: position?.longitude,
+        accuracy: position?.accuracy,
+      );
 
       if (!mounted) return;
 
       if (success) {
-        // if successful, save the employee id if remember me is checked
+        // save employee id if remember me checked
         if (_rememberMe) {
           await authProvider.saveEmployeeId(employeeId);
           await authProvider.setRememberMe(true);
@@ -317,14 +389,90 @@ class _LoginScreenState extends State<LoginScreen> {
           await authProvider.setRememberMe(false);
         }
 
-        _showSuccessMessage('تم تسجيل الدخول بنجاح');
+        // Check if privacy consent is needed
+        if (authProvider.currentUser?.needsConsent == true) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            final consentGiven = await _showPrivacyConsentDialog();
+            if (!consentGiven) {
+              // User declined - log them out
+              await authProvider.doLogout();
+              if (mounted) {
+                _showErrorMessage('يجب الموافقة على سياسة الخصوصية لاستخدام التطبيق');
+              }
+              return;
+            }
+            // Record consent to backend
+            setState(() {
+              _isLoading = true;
+              _loadingMessage = 'جاري تسجيل الموافقة...';
+            });
+            final authService = AuthService();
+            await authService.recordPrivacyConsent();
+          }
+        }
 
-        // go to the home screen
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed(Routes.home);
+        // Check if check-in was successful or needs manual fallback
+        if (authProvider.isCheckedIn) {
+          // Show success message with lateness info if applicable
+          if (authProvider.lastLoginIsLate) {
+            _showWarningMessage(
+              'تم تسجيل الدخول والحضور (متأخر ${authProvider.lastLoginLateMinutes} دقيقة)',
+            );
+          } else if (authProvider.lastLoginRequiresApproval) {
+            _showWarningMessage(
+              'تم تسجيل الدخول - الحضور بانتظار موافقة المشرف',
+            );
+          } else {
+            _showSuccessMessage('تم تسجيل الدخول والحضور بنجاح');
+          }
+
+          // go to home
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed(Routes.home);
+          }
+        } else if (authProvider.checkInFailed) {
+          // GPS check-in failed - offer manual check-in option
+          if (mounted) {
+            setState(() => _isLoading = false);
+            final shouldUseManual = await _showGpsFailureDialog(
+              authProvider.lastCheckInFailureReason ?? 'فشل تحديد الموقع',
+            );
+
+            if (shouldUseManual != null && shouldUseManual.isNotEmpty) {
+              // Retry login with manual check-in
+              setState(() {
+                _isLoading = true;
+                _loadingMessage = 'جاري تسجيل الحضور اليدوي...';
+              });
+
+              await authProvider.doLogin(
+                employeeId,
+                allowManualCheckIn: true,
+                manualCheckInReason: shouldUseManual,
+              );
+
+              if (mounted) {
+                _showWarningMessage('تم تسجيل الدخول - الحضور بانتظار موافقة المشرف');
+                Navigator.of(context).pushReplacementNamed(Routes.home);
+              }
+            } else {
+              // User cancelled - still logged in but without check-in
+              if (mounted) {
+                _showWarningMessage('تم تسجيل الدخول - يرجى تسجيل الحضور من الشاشة الرئيسية');
+                Navigator.of(context).pushReplacementNamed(Routes.home);
+              }
+            }
+          }
+        } else {
+          // No location provided - logged in but without check-in
+          _showWarningMessage('تم تسجيل الدخول - يرجى تسجيل الحضور للبدء بالعمل');
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed(Routes.home);
+          }
         }
       } else {
-        // if failed, show the error message from the provider
+        // show error
         _showErrorMessage(authProvider.errorMessage ?? 'فشل تسجيل الدخول');
       }
     } catch (e) {
@@ -336,6 +484,105 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  // Show dialog when GPS check-in fails
+  Future<String?> _showGpsFailureDialog(String failureReason) async {
+    final reasonController = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.location_off, color: AppColors.warning),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'فشل تسجيل الحضور التلقائي',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              failureReason,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                color: AppColors.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'يمكنك إدخال سبب للحضور اليدوي (يتطلب موافقة المشرف):',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'مثال: GPS لا يعمل في الموقع',
+                hintStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 13),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              style: const TextStyle(fontFamily: 'Cairo'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text(
+              'تخطي',
+              style: TextStyle(fontFamily: 'Cairo'),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'يرجى إدخال سبب الحضور اليدوي',
+                      style: TextStyle(fontFamily: 'Cairo'),
+                    ),
+                  ),
+                );
+                return;
+              }
+              Navigator.of(context).pop(reason);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+            child: const Text(
+              'تسجيل يدوي',
+              style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showErrorMessage(String message) {
@@ -369,42 +616,163 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+
+  void _showWarningMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: 'Cairo'),
+        ),
+        backgroundColor: AppColors.warning,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
+  // Show privacy consent dialog
+  Future<bool> _showPrivacyConsentDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.privacy_tip_outlined, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text(
+              'سياسة الخصوصية',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'مرحباً بك في تطبيق جولة',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'لضمان تقديم خدمة أفضل، نحتاج موافقتك على:',
+                style: TextStyle(fontFamily: 'Cairo'),
+              ),
+              const SizedBox(height: 12),
+              _buildConsentItem(
+                Icons.location_on,
+                'تتبع الموقع',
+                'نستخدم موقعك لتسجيل الحضور والتحقق من إنجاز المهام',
+              ),
+              _buildConsentItem(
+                Icons.camera_alt,
+                'الكاميرا',
+                'لالتقاط صور إثبات إنجاز المهام والإبلاغ عن المشاكل',
+              ),
+              _buildConsentItem(
+                Icons.notifications,
+                'الإشعارات',
+                'لإرسال تنبيهات المهام الجديدة والتحديثات',
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'نحن ملتزمون بحماية خصوصيتك. بياناتك تُستخدم فقط لأغراض العمل ولن تُشارك مع أطراف ثالثة.',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 12,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'رفض',
+              style: TextStyle(fontFamily: 'Cairo', color: AppColors.error),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+            child: const Text(
+              'أوافق',
+              style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  Widget _buildConsentItem(IconData icon, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 12,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _LogoFloater extends StatefulWidget {
+// Simple wrapper widget - just displays the child (no animation needed)
+class _LogoFloater extends StatelessWidget {
   final Widget child;
   const _LogoFloater({required this.child});
 
   @override
-  State<_LogoFloater> createState() => _LogoFloaterState();
-}
-
-class _LogoFloaterState extends State<_LogoFloater>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-    _animation = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(0, 0.03),
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return SlideTransition(position: _animation, child: widget.child);
+    return child;
   }
 }

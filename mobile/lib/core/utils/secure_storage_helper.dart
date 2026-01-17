@@ -1,24 +1,16 @@
-import 'dart:convert';
-import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+// helper class to store sensitive data like tokens securely
 class SecureStorageHelper {
   SecureStorageHelper._();
 
   static const String _keyToken = 'jwt_token';
   static const String _keyRefreshToken = 'refresh_token';
   static const String _keyFcmToken = 'fcm_token';
-  static const String _keyHiveEncryption = 'hive_encryption_key';
+  static const String _keyEmployeeId = 'employee_id';
+  static const String _keyHashedPin = 'hashed_pin';
 
-  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      encryptedSharedPreferences: true,
-      resetOnError: true,
-    ),
-    iOptions: IOSOptions(
-      accessibility: KeychainAccessibility.first_unlock,
-    ),
-  );
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
   // token methods
   static Future<bool> saveToken(String token) async {
@@ -94,36 +86,124 @@ class SecureStorageHelper {
     }
   }
 
-  // hive encryption
-  static List<int> _generateEncryptionKey() {
-    final random = Random.secure();
-    return List<int>.generate(32, (_) => random.nextInt(256));
-  }
-
-  static Future<List<int>> getHiveEncryptionKey() async {
+  // employee ID (PIN) methods - stored securely
+  static Future<bool> saveEmployeeId(String employeeId) async {
     try {
-      final existingKey = await _secureStorage.read(key: _keyHiveEncryption);
-      if (existingKey != null && existingKey.isNotEmpty) {
-        return base64Decode(existingKey);
-      }
-      final newKey = _generateEncryptionKey();
-      await _secureStorage.write(
-        key: _keyHiveEncryption,
-        value: base64Encode(newKey),
-      );
-      return newKey;
+      await _secureStorage.write(key: _keyEmployeeId, value: employeeId);
+      return true;
     } catch (e) {
-      final fallbackKey = _generateEncryptionKey();
-      return fallbackKey;
+      return false;
     }
   }
 
-  // clear data (logout) - keeps hive key
+  static Future<String?> getEmployeeId() async {
+    return await _secureStorage.read(key: _keyEmployeeId);
+  }
+
+  static Future<bool> removeEmployeeId() async {
+    try {
+      await _secureStorage.delete(key: _keyEmployeeId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // hashed PIN for offline login
+  static Future<bool> saveHashedPin(String hashedPin) async {
+    try {
+      await _secureStorage.write(key: _keyHashedPin, value: hashedPin);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<String?> getHashedPin() async {
+    return await _secureStorage.read(key: _keyHashedPin);
+  }
+
+  static Future<bool> removeHashedPin() async {
+    try {
+      await _secureStorage.delete(key: _keyHashedPin);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // clear all data (logout) - keeps employeeId for "remember me" but clears session data
   static Future<bool> clearAll() async {
     try {
       await _secureStorage.delete(key: _keyToken);
       await _secureStorage.delete(key: _keyRefreshToken);
       await _secureStorage.delete(key: _keyFcmToken);
+      await _secureStorage.delete(key: _keyHashedPin);
+      await _secureStorage.delete(key: _keyUserProfile);
+      // Note: employeeId is kept for "remember me" feature
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // clear everything including employee ID (full logout)
+  static Future<bool> clearAllIncludingCredentials() async {
+    try {
+      await _secureStorage.delete(key: _keyToken);
+      await _secureStorage.delete(key: _keyRefreshToken);
+      await _secureStorage.delete(key: _keyFcmToken);
+      await _secureStorage.delete(key: _keyEmployeeId);
+      await _secureStorage.delete(key: _keyHashedPin);
+      await _secureStorage.delete(key: _keyUserProfile);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // user profile methods - stored securely
+  static const String _keyUserProfile = 'user_profile';
+
+  static Future<bool> saveUserProfile(String userJson) async {
+    try {
+      await _secureStorage.write(key: _keyUserProfile, value: userJson);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<String?> getUserProfile() async {
+    return await _secureStorage.read(key: _keyUserProfile);
+  }
+
+  static Future<bool> removeUserProfile() async {
+    try {
+      await _secureStorage.delete(key: _keyUserProfile);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // generic methods for custom keys
+  static Future<bool> saveString(String key, String value) async {
+    try {
+      await _secureStorage.write(key: key, value: value);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<String?> getString(String key) async {
+    return await _secureStorage.read(key: key);
+  }
+
+  static Future<bool> removeString(String key) async {
+    try {
+      await _secureStorage.delete(key: key);
       return true;
     } catch (e) {
       return false;

@@ -10,6 +10,12 @@ public class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
     {
         builder.HasKey(e => e.AttendanceId);
 
+        // Municipality relationship
+        builder.HasOne(e => e.Municipality)
+            .WithMany(m => m.Attendances)
+            .HasForeignKey(e => e.MunicipalityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.UserId)
             .IsRequired();
 

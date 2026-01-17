@@ -11,14 +11,16 @@ class ApiConfig {
     }
 
     // local IP for development
-    return 'http://192.168.1.2:5000/api';
+    return 'http://192.168.1.3:5000/api';
   }
 
   // authentication endpoints
-  static const String loginWithGPS = '/auth/login-gps';
+  static const String loginWithPin = '/auth/login-pin';
+  static const String loginWithGPS = '/auth/login-gps';  // legacy: login + auto check-in
   static const String profile = '/auth/profile';
   static const String logout = '/auth/logout';
   static const String registerFcmToken = '/auth/register-fcm-token';
+  static const String privacyConsent = '/auth/consent';
 
   // tasks endpoints
   static const String myTasks = '/tasks/my-tasks';
@@ -39,7 +41,6 @@ class ApiConfig {
   // zones endpoints
   static const String activeZones = '/zones';
   static const String myZones = '/zones/my';
-  static const String validateZone = '/zones/validate-location';
 
   // notifications endpoints
   static const String notifications = '/notifications';
@@ -48,9 +49,6 @@ class ApiConfig {
   static const String markAsRead = '/notifications';
   static const String markAllAsRead = '/notifications/mark-all-read';
   static const String deleteNotification = '/notifications';
-
-  // tracking/location endpoints
-  static const String trackingHistory = '/tracking/history';
 
   static const int timeoutSeconds = 60;
 
@@ -67,11 +65,7 @@ class ApiConfig {
     return '$rootUrl$endpoint';
   }
 
-  // helper methods for dynamic endpoints (returning relative paths for Dio)
-  static String getTrackingHistoryUrl(int userId) {
-    return '$trackingHistory/$userId';
-  }
-
+  // helper methods for dynamic endpoints
   static String getMarkAsReadUrl(int notificationId) {
     return '$markAsRead/$notificationId/mark-read';
   }

@@ -5,11 +5,12 @@ import '../../core/theme/app_colors.dart';
 import '../../core/routing/app_router.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/authenticated_image.dart';
+import '../../presentation/widgets/offline_banner.dart';
 import '../../providers/task_manager.dart';
 import '../../data/models/task_model.dart';
 import 'widgets/task_details_card.dart';
 
-// screens for viewing single task details and updating status
+// screen to see task details and change status
 class TaskDetailsScreen extends StatefulWidget {
   const TaskDetailsScreen({super.key});
 
@@ -34,23 +35,32 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     return BaseScreen(
       title: 'تفاصيل المهمة',
       showBackButton: true,
-      body: Consumer<TaskManager>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            );
-          }
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: Consumer<TaskManager>(
+              builder: (context, provider, child) {
+                if (provider.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
 
-          final task = provider.currentTask;
-          if (task == null) {
-            return Center(
-              child: Text(
-                'لم يتم اختيار مهمة',
-                style: const TextStyle(fontFamily: 'Cairo'),
-              ),
-            );
-          }
+                // show error state
+                if (provider.errorMessage != null && provider.currentTask == null) {
+                  return _buildErrorState(provider);
+                }
+
+                final task = provider.currentTask;
+                if (task == null) {
+                  return const Center(
+                    child: Text(
+                      'لم يتم اختيار مهمة',
+                      style: TextStyle(fontFamily: 'Cairo'),
+                    ),
+                  );
+                }
 
           final statusLower = task.status.toLowerCase();
 
@@ -82,7 +92,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                 TaskDetailsCard(task: task),
                 const SizedBox(height: 32),
 
-                // actions depending on status
+                // show diferent buttons based on status
                 if (statusLower == 'pending') ...[
                   _buildPrimaryActionButton(
                     icon: Icons.play_arrow_rounded,
@@ -131,7 +141,56 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               ],
             ),
           );
-        },
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(TaskManager provider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              provider.errorMessage ?? 'حدث خطأ أثناء تحميل المهمة',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.textSecondary,
+                fontFamily: 'Cairo',
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                final taskId = ModalRoute.of(context)?.settings.arguments as int?;
+                if (taskId != null) {
+                  provider.getTaskDetails(taskId);
+                }
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة', style: TextStyle(fontFamily: 'Cairo')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -241,6 +300,26 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   Future<void> _handleStartTask(int taskId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('بدء المهمة', style: TextStyle(fontFamily: 'Cairo')),
+        content: const Text('هل تريد بدء العمل على هذه المهمة؟', style: TextStyle(fontFamily: 'Cairo')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('بدء', style: TextStyle(color: AppColors.primary, fontFamily: 'Cairo')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     final success = await context.read<TaskManager>().startWorkOnTask(taskId);
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -255,8 +334,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   Widget _buildCompletedSection(TaskModel task) {
+    // Use photos array first (modern), fallback to photoUrl (legacy)
     final String imageUrl =
-        task.photoUrl ?? (task.photos.isNotEmpty ? task.photos.first : '');
+        task.photos.isNotEmpty ? task.photos.first : (task.photoUrl ?? '');
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -339,6 +419,30 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   Future<void> _handleStatusUpdate(int taskId, String newStatus) async {
+    // show confirmation for pause action
+    if (newStatus == 'pending') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('إيقاف مؤقت', style: TextStyle(fontFamily: 'Cairo')),
+          content: const Text('هل تريد إيقاف العمل على هذه المهمة مؤقتاً؟', style: TextStyle(fontFamily: 'Cairo')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('إيقاف', style: TextStyle(color: AppColors.warning, fontFamily: 'Cairo')),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !mounted) return;
+    }
+
+    if (!mounted) return;
     final success =
         await context.read<TaskManager>().changeTaskStatus(taskId, newStatus);
     if (success && mounted) {
