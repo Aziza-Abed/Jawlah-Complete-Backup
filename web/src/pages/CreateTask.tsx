@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom"; // ✅ NEW
 import { getWorkers } from "../api/users";
 import { getZones } from "../api/zones";
 import { createTask } from "../api/tasks";
@@ -12,10 +13,26 @@ const priorityOptions: PriorityOption[] = [
   { value: "Low", label: "منخفضة" },
   { value: "Medium", label: "متوسطة" },
   { value: "High", label: "عالية" },
-  { value: "Urgent", label: "عاجلة" },
 ];
 
+// ✅ NEW: shape coming from IssueDetails navigate state
+type FromIssue = {
+  issueId?: string;
+  title?: string;
+  description?: string;
+  zoneId?: number | string;
+  zone?: string; // e.g. "المنطقة 4"
+  locationText?: string;
+  severity?: "low" | "medium" | "high" | "critical";
+  type?: string;
+  images?: string[];
+  gps?: { lat: number; lng: number };
+};
+
 export default function CreateTask() {
+  const location = useLocation(); // ✅ NEW
+  const fromIssue = (location.state as any)?.fromIssue as FromIssue | undefined; // ✅ NEW
+
   const [employees, setEmployees] = useState<UserResponse[]>([]);
   const [zones, setZones] = useState<ZoneResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,13 +47,18 @@ export default function CreateTask() {
   const [employeeId, setEmployeeId] = useState("");
   const [zoneId, setZoneId] = useState("");
 
+  // ✅ NEW: helper to map severity -> priority
+  const mapSeverityToPriority = (sev?: FromIssue["severity"]): TaskPriority | "" => {
+    if (!sev) return "";
+    if (sev === "critical" || sev === "high") return "High";
+    if (sev === "medium") return "Medium";
+    return "Low";
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [workersData, zonesData] = await Promise.all([
-          getWorkers(),
-          getZones(),
-        ]);
+        const [workersData, zonesData] = await Promise.all([getWorkers(), getZones()]);
         setEmployees(workersData);
         setZones(zonesData);
       } catch (err) {
@@ -47,6 +69,55 @@ export default function CreateTask() {
     };
     fetchData();
   }, []);
+
+  // ✅ NEW: Prefill form if coming from issue
+  useEffect(() => {
+    if (!fromIssue) return;
+
+    // Title
+    if (fromIssue.title) setTitle(fromIssue.title);
+
+    // Description (we add location/type nicely without forcing)
+    const parts: string[] = [];
+    if (fromIssue.description) parts.push(fromIssue.description);
+
+    if (fromIssue.type) parts.push(`نوع المشكلة: ${fromIssue.type}`);
+    if (fromIssue.locationText) parts.push(`الموقع: ${fromIssue.locationText}`);
+    if (fromIssue.issueId) parts.push(`(محوّلة من بلاغ رقم: ${fromIssue.issueId})`);
+
+    const finalDesc = parts.filter(Boolean).join("\n");
+    if (finalDesc) setDescription(finalDesc);
+
+    // Priority
+    const mapped = mapSeverityToPriority(fromIssue.severity);
+    if (mapped) setPriority(mapped);
+
+    // Zone (if zoneId exists use it directly)
+    if (fromIssue.zoneId !== undefined && fromIssue.zoneId !== null && String(fromIssue.zoneId).trim() !== "") {
+      setZoneId(String(fromIssue.zoneId));
+    }
+  }, [fromIssue]);
+
+  // ✅ NEW: If we only received zone name, match it after zones are loaded
+  useEffect(() => {
+    if (!fromIssue) return;
+    if (zoneId) return; // already set (zoneId came directly)
+    if (!fromIssue.zone) return;
+    if (zones.length === 0) return;
+
+    // match by exact name first
+    const exact = zones.find((z) => z.zoneName === fromIssue.zone);
+    if (exact) {
+      setZoneId(String(exact.zoneId));
+      return;
+    }
+
+    // fallback: if issue has "المنطقة 4" match by inclusion of number / partial
+    const relaxed = zones.find((z) => z.zoneName.includes(fromIssue.zone as string) || (fromIssue.zone as string).includes(z.zoneName));
+    if (relaxed) {
+      setZoneId(String(relaxed.zoneId));
+    }
+  }, [fromIssue, zones, zoneId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +136,7 @@ export default function CreateTask() {
       });
 
       setSuccess("تم إنشاء المهمة بنجاح");
+
       // Reset form
       setTitle("");
       setDescription("");
@@ -94,6 +166,12 @@ export default function CreateTask() {
           <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F] mb-6">
             تعيين مهمة جديدة
           </h1>
+
+          {fromIssue?.issueId && (
+            <div className="mb-4 p-3 bg-[#F3F1ED] border border-black/10 rounded-[10px] text-right text-[#2F2F2F]">
+              تم تعبئة الحقول تلقائيًا من البلاغ: <span className="font-semibold">#{fromIssue.issueId}</span>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-[10px] text-right">
@@ -190,13 +268,7 @@ export default function CreateTask() {
 
 /* ---------- UI building blocks ---------- */
 
-function FieldRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] items-start gap-3 md:gap-4">
       <div className="text-right font-sans font-semibold text-[#2F2F2F] text-[16px] sm:text-[17px] md:text-[18px] pt-2">

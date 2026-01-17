@@ -6,14 +6,22 @@ import Dashboard from "../pages/Dashboard";
 import Reports from "../pages/Reports";
 import Zones from "../pages/Zones";
 import CreateTask from "../pages/CreateTask";
-
+import Notifications from "../pages/Notifications";
+import TaskDetails from "../pages/TaskDetails";
+import IssueDetails from "../pages/IssueDetails"
+import TasksList from "../pages/Tasks";;
 import ProtectedRoute from "./ProtectedRoute";
+import Issues from "../pages/Issues";
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
 
 export default function AppRoutes() {
   return (
     <Routes>
       {/* Public */}
-      <Route path="/login" element={<Login />} />
+<Route path="/login" element={<Login />} />
+  <Route path="/forgot-password" element={<ForgotPassword />} />
+  <Route path="/reset-password" element={<ResetPassword />} />      
 
       {/* Protected */}
       <Route
@@ -24,8 +32,10 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
+        {/* Default */}
         <Route index element={<Navigate to="/dashboard" replace />} />
 
+        {/* Dashboard */}
         <Route path="dashboard" element={<Dashboard />} />
 
         {/* Task Creation */}
@@ -36,6 +46,15 @@ export default function AppRoutes() {
 
         {/* Zones */}
         <Route path="zones" element={<Zones />} />
+
+        <Route path="tasks/:id" element={<TaskDetails />} />
+        <Route path="tasks" element={<TasksList />} />
+
+        <Route path="issues/:id" element={<IssueDetails />} />
+        <Route path="issues" element={<Issues />} />
+        {/* Notifications */}
+        <Route path="notifications" element={<Notifications />} />
+
       </Route>
 
       {/* Fallback */}
