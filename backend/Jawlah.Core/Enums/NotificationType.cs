@@ -6,5 +6,6 @@ public enum NotificationType
     TaskReminder = 2,
     TaskUpdated = 3,
     IssueReviewed = 4,
-    SystemAlert = 5
+    SystemAlert = 5,
+    BatteryLow = 6
 }

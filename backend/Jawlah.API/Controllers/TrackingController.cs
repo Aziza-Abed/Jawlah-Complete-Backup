@@ -1,88 +1,125 @@
 using Jawlah.API.LiveTracking;
+using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.DTOs.Tracking;
 using Jawlah.Core.Entities;
 using Jawlah.Core.Interfaces.Repositories;
-using Jawlah.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using System.Security.Claims;
 
 namespace Jawlah.API.Controllers;
 
-[Authorize]
-[ApiController]
+// this controller handle gps tracking for workers
 [Route("api/[controller]")]
-public class TrackingController : ControllerBase
+public class TrackingController : BaseApiController
 {
-    private readonly ILocationHistoryRepository _locationHistoryRepo;
-    private readonly JawlahDbContext _context;
-    private readonly IHubContext<TrackingHub, ITrackingClient> _hubContext;
+    private readonly ILocationHistoryRepository _history;
+    private readonly IHubContext<TrackingHub, ITrackingClient> _hub;
     private readonly ILogger<TrackingController> _logger;
 
     public TrackingController(
-        ILocationHistoryRepository locationHistoryRepo,
-        JawlahDbContext context,
-        IHubContext<TrackingHub, ITrackingClient> hubContext,
+        ILocationHistoryRepository history,
+        IHubContext<TrackingHub, ITrackingClient> hub,
         ILogger<TrackingController> logger)
     {
-        _locationHistoryRepo = locationHistoryRepo;
-        _context = context;
-        _hubContext = hubContext;
+        _history = history;
+        _hub = hub;
         _logger = logger;
     }
 
+    // save worker location and send to supervisor
     [HttpPost("location")]
     public async Task<IActionResult> UpdateLocation([FromBody] LocationUpdateDto dto)
     {
-        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdStr, out var userId))
-        {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
             return Unauthorized();
-        }
 
-        try
+        // check gps is not zero
+        if (dto.Latitude == 0 && dto.Longitude == 0)
+            return BadRequest(ApiResponse<object>.ErrorResponse("إحداثيات GPS غير صالحة (0, 0). يرجى التأكد من تفعيل GPS"));
+
+        // check coords are inside work area
+        if (dto.Latitude < Core.Constants.GeofencingConstants.MinLatitude ||
+            dto.Latitude > Core.Constants.GeofencingConstants.MaxLatitude ||
+            dto.Longitude < Core.Constants.GeofencingConstants.MinLongitude ||
+            dto.Longitude > Core.Constants.GeofencingConstants.MaxLongitude)
         {
-            // 1. Store in Database
-            var history = new LocationHistory
-            {
-                UserId = userId,
-                Latitude = dto.Latitude,
-                Longitude = dto.Longitude,
-                Speed = dto.Speed,
-                Accuracy = dto.Accuracy,
-                Heading = dto.Heading,
-                Timestamp = dto.Timestamp == default ? DateTime.UtcNow : dto.Timestamp,
-                IsSync = true // Coming from offline batch or direct API
-            };
-
-            await _locationHistoryRepo.AddAsync(history);
-            await _context.SaveChangesAsync();
-
-            // 2. Broadcast via SignalR (optional, if we want REST updates to also move the map)
-            // Useful if the client falls back to REST but we still want live updates if possible
-            await _hubContext.Clients.Group("Supervisors").ReceiveLocationUpdate(userId, dto.Latitude, dto.Longitude);
-
-            return Ok(new { success = true });
+            return BadRequest(ApiResponse<object>.ErrorResponse("أنت خارج منطقة العمل المسموح بها"));
         }
-        catch (Exception ex)
+
+        // save location to history table
+        var history = new LocationHistory
         {
-            _logger.LogError(ex, "Error updating location for user {UserId}", userId);
-            return StatusCode(500, new { success = false, message = "Internal Server Error" });
-        }
+            UserId = userId.Value,
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            Speed = dto.Speed,
+            Accuracy = dto.Accuracy,
+            Heading = dto.Heading,
+            Timestamp = dto.Timestamp == default ? DateTime.UtcNow : dto.Timestamp,
+            IsSync = true
+        };
+
+        await _history.AddAsync(history);
+        await _history.SaveChangesAsync();
+
+        // send location to supervisors in realtime
+        var userName = User.Identity?.Name ?? "Unknown";
+        await _hub.Clients.Group("Supervisors").ReceiveLocationUpdate(
+            userId.Value,
+            userName,
+            dto.Latitude,
+            dto.Longitude,
+            history.Timestamp);
+
+        return Ok(ApiResponse<object?>.SuccessResponse(null));
     }
 
+    // get current locations for all workers (for live map)
+    [Authorize(Roles = "Admin,Supervisor")]
+    [HttpGet("locations")]
+    public async Task<IActionResult> GetWorkerLocations()
+    {
+        var today = DateTime.UtcNow.Date;
+        var now = DateTime.UtcNow;
+
+        // get latest location for each worker from today
+        var locations = await _history.GetLatestLocationsAsync(today);
+
+        // map to response with worker info
+        var result = locations.Select(loc => new
+        {
+            UserId = loc.UserId,
+            FullName = loc.User?.FullName ?? "غير معروف",
+            Username = loc.User?.Username,
+            Latitude = loc.Latitude,
+            Longitude = loc.Longitude,
+            Speed = loc.Speed,
+            Accuracy = loc.Accuracy,
+            Timestamp = loc.Timestamp,
+            // consider online if location updated in last 10 minutes
+            IsOnline = (now - loc.Timestamp).TotalMinutes <= 10,
+            Status = (now - loc.Timestamp).TotalMinutes <= 10 ? "Online" : "Offline",
+            ZoneName = loc.User?.AssignedZones?.FirstOrDefault()?.Zone?.ZoneName
+        });
+
+        return Ok(ApiResponse<object>.SuccessResponse(result));
+    }
+
+    // get location history for worker
     [Authorize(Roles = "Admin,Supervisor")]
     [HttpGet("history/{userId}")]
     public async Task<IActionResult> GetHistory(int userId, [FromQuery] DateTime? date)
     {
-        // Default to today if not provided
+        // use today if no date given
         var targetDate = date ?? DateTime.UtcNow.Date;
         var startOfDay = targetDate.Date;
         var endOfDay = targetDate.Date.AddDays(1).AddTicks(-1);
 
-        var history = await _locationHistoryRepo.GetUserHistoryAsync(userId, startOfDay, endOfDay);
+        var history = await _history.GetUserHistoryAsync(userId, startOfDay, endOfDay);
 
+        // map to dto
         var dtos = history.Select(x => new LocationUpdateDto
         {
             Latitude = x.Latitude,
@@ -93,6 +130,6 @@ public class TrackingController : ControllerBase
             Timestamp = x.Timestamp
         });
 
-        return Ok(new { success = true, data = dtos });
+        return Ok(ApiResponse<IEnumerable<LocationUpdateDto>>.SuccessResponse(dtos));
     }
 }

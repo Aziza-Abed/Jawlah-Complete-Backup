@@ -22,6 +22,7 @@ public class Repository<T> : IRepository<T> where T : class
 
     public virtual async Task<IEnumerable<T>> GetAllAsync()
     {
+        // just get everything from the table
         return await _dbSet.ToListAsync();
     }
 

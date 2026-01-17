@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جولة - تعيين مهمة جديدة</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .task-content {
+            padding: 40px;
+            display: flex;
+            gap: 60px;
+            flex: 1;
+        }
+
+        .map-side {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .map-side h4 { font-weight: 700; color: var(--text-dark); }
+
+        .map-preview {
+            height: 200px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .form-side {
+            flex: 1;
+            max-width: 500px;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+            gap: 20px;
+        }
+
+        .form-label {
+            width: 120px;
+            font-weight: 700;
+            color: var(--text-dark);
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .form-row input, .form-row select, .form-row textarea {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: white;
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .form-row textarea { min-height: 80px; }
+
+        .submit-container {
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        .submit-btn {
+            background: var(--secondary);
+            color: white;
+            padding: 14px 80px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(163, 177, 138, 0.3);
+            transition: all 0.2s;
+        }
+
+        .submit-btn:hover { background: var(--secondary-dark); transform: translateY(-2px); }
+        .submit-btn:disabled { background: var(--text-light); opacity: 0.7; }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-inner">
+                    <i class="fas fa-city" style="font-size: 2rem;"></i>
+                </div>
+                <h1>جولة</h1>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <i class="fas fa-th-large"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="map.html" class="nav-item">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>الخريطة الحية</span>
+                </a>
+                <a href="workers.html" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>إدارة العمال</span>
+                </a>
+                <a href="tasks.html" class="nav-item active">
+                    <i class="fas fa-plus-square"></i>
+                    <span>تعيين مهمة</span>
+                </a>
+                <a href="all-tasks.html" class="nav-item">
+                    <i class="fas fa-tasks"></i>
+                    <span>جميع المهام</span>
+                </a>
+                <a href="issues.html" class="nav-item">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>البلاغات</span>
+                </a>
+                <a href="attendance.html" class="nav-item">
+                    <i class="fas fa-user-clock"></i>
+                    <span>الحضور</span>
+                </a>
+                <a href="reports.html" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span>التقارير</span>
+                </a>
+                <a href="notifications.html" class="nav-item">
+                    <i class="fas fa-bell"></i>
+                    <span>الإشعارات</span>
+                </a>
+                <a href="profile.html" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>الملف الشخصي</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <span>تسجيل الخروج</span>
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <div class="header-icons">
+                        <div class="icon-btn"><i class="fas fa-cog"></i></div>
+                        <a href="profile.html" class="icon-btn" style="text-decoration: none;"><i class="fas fa-user"></i></a>
+                        <a href="notifications.html" class="icon-btn" style="position: relative; text-decoration: none;">
+                            <i class="fas fa-bell"></i>
+                            <span id="notifBadge" style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: none;"></span>
+                        </a>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" placeholder="ابحث" id="globalSearch">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="page-info">
+                        <h2>تعيين مهمة جديدة</h2>
+                        <p>إنشاء وتوزيع المهام للعاملين بسهولة</p>
+                    </div>
+                    <div class="icon-btn" style="font-size: 1.5rem;"><i class="fas fa-plus-square"></i></div>
+                </div>
+            </header>
+
+            <div class="task-content">
+                <div class="map-side">
+                    <h4>الموقع</h4>
+                    <div class="map-preview" id="map"></div>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary);">يمكنك تحديد الموقع بدقة من خلال الخريطة</p>
+                </div>
+
+                <form class="form-side" id="taskForm" onsubmit="handleTaskSubmit(event)">
+                    <div class="form-row">
+                        <label class="form-label">عنوان المهمة</label>
+                        <input type="text" id="taskTitle" placeholder="اسم المهمة" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">وصف المهمة</label>
+                        <textarea id="taskDescription" placeholder="يرجى كتابة وصف مختصر للمهمة..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">موعد التنفيذ</label>
+                        <input type="date" id="taskDueDate" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">الأولوية</label>
+                        <select id="taskPriority">
+                            <option value="Low">منخفضة</option>
+                            <option value="Medium">متوسطة</option>
+                            <option value="High" selected>عالية</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label">الموظف</label>
+                        <select id="taskWorker" required>
+                            <option value="">اختر الموظف</option>
+                            <!-- Workers loaded by JS -->
+                        </select>
+                    </div>
+
+                    <div class="submit-container">
+                        <button type="submit" class="submit-btn" id="submitBtn">تعيين المهمة</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+        let map;
+        let marker;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+            initMap();
+            loadWorkers();
+            loadNotificationCount();
+            
+            // Set tomorrow as default date
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('taskDueDate').value = tomorrow.toISOString().split('T')[0];
+        });
+
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([31.9038, 35.2034], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            marker = L.marker([31.9038, 35.2034], { draggable: true }).addTo(map);
+            
+            map.on('click', (e) => {
+                marker.setLatLng(e.latlng);
+            });
+        }
+
+        async function loadWorkers() {
+            try {
+                const response = await usersApi.getWorkers();
+                const select = document.getElementById('taskWorker');
+                if (response.data) {
+                    response.data.forEach(w => {
+                        const opt = document.createElement('option');
+                        opt.value = w.userId;
+                        opt.textContent = w.fullName || w.username; // textContent is XSS safe
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function handleTaskSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'جاري الإرسال...';
+
+            try {
+                const pos = marker.getLatLng();
+                const task = {
+                    title: document.getElementById('taskTitle').value,
+                    description: document.getElementById('taskDescription').value || 'لا يوجد وصف',
+                    dueDate: document.getElementById('taskDueDate').value,
+                    priority: document.getElementById('taskPriority').value,
+                    assignedToUserId: parseInt(document.getElementById('taskWorker').value, 10),
+                    latitude: pos.lat,
+                    longitude: pos.lng
+                };
+
+                const response = await tasksApi.create(task);
+                if (response.data) {
+                    alert('تم تعيين المهمة بنجاح!');
+                    document.getElementById('taskForm').reset();
+                }
+            } catch (error) {
+                alert('حدث خطأ أثناء تعيين المهمة');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'تعيين المهمة';
+            }
+        }
+
+        // logout() and loadNotificationCount() are in api.js
+    </script>
+</body>
+</html>

@@ -1,8 +1,6 @@
 namespace Jawlah.API.Models;
 
-/// <summary>
-/// Request model for completing a task with a photo upload
-/// </summary>
+// request model for completing a task with a photo upload
 public class CompleteTaskWithPhotoRequest
 {
     public string CompletionNotes { get; set; } = string.Empty;

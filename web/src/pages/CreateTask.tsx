@@ -1,62 +1,91 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { getWorkers } from "../api/users";
+import { getZones } from "../api/zones";
+import { createTask } from "../api/tasks";
+import type { UserResponse } from "../types/user";
+import type { ZoneResponse } from "../types/zone";
+import type { TaskPriority } from "../types/task";
 
-type Priority = "منخفضة" | "متوسطة" | "عالية";
+type PriorityOption = { value: TaskPriority; label: string };
 
-type EmployeeOption = { id: string; name: string };
-type LocationOption = { id: string; name: string };
+const priorityOptions: PriorityOption[] = [
+  { value: "Low", label: "منخفضة" },
+  { value: "Medium", label: "متوسطة" },
+  { value: "High", label: "عالية" },
+  { value: "Urgent", label: "عاجلة" },
+];
 
 export default function CreateTask() {
-  // TODO: Replace with API data from backend
-  const employees: EmployeeOption[] = useMemo(
-    () => [
-      { id: "e1", name: "أبو عمار" },
-      { id: "e2", name: "محمد" },
-      { id: "e3", name: "أحمد" },
-    ],
-    []
-  );
-
-  // TODO: Replace with API data from backend (zones/locations)
-  const locations: LocationOption[] = useMemo(
-    () => [
-      { id: "z1", name: "دوار المنارة" },
-      { id: "z2", name: "شارع الإرسال" },
-      { id: "z3", name: "البلدة القديمة" },
-    ],
-    []
-  );
-
-  const priorities: Priority[] = ["منخفضة", "متوسطة", "عالية"];
+  const [employees, setEmployees] = useState<UserResponse[]>([]);
+  const [zones, setZones] = useState<ZoneResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<Priority | "">("");
+  const [priority, setPriority] = useState<TaskPriority | "">("");
   const [employeeId, setEmployeeId] = useState("");
-  const [locationId, setLocationId] = useState("");
+  const [zoneId, setZoneId] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [workersData, zonesData] = await Promise.all([
+          getWorkers(),
+          getZones(),
+        ]);
+        setEmployees(workersData);
+        setZones(zonesData);
+      } catch (err) {
+        setError("فشل في تحميل البيانات");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setSuccess("");
+    setSubmitting(true);
 
-    // TODO: Send payload to backend
-    // NOTE: Suggested payload shape:
-    // {
-    //   title,
-    //   description,
-    //   dueDate,
-    //   priority,
-    //   employeeId,
-    //   locationId
-    // }
-    console.log({
-      title,
-      description,
-      dueDate,
-      priority,
-      employeeId,
-      locationId,
-    });
+    try {
+      await createTask({
+        title,
+        description,
+        assignedToUserId: parseInt(employeeId),
+        zoneId: zoneId ? parseInt(zoneId) : undefined,
+        priority: priority as TaskPriority,
+        dueDate: dueDate || undefined,
+      });
+
+      setSuccess("تم إنشاء المهمة بنجاح");
+      // Reset form
+      setTitle("");
+      setDescription("");
+      setDueDate("");
+      setPriority("");
+      setEmployeeId("");
+      setZoneId("");
+    } catch (err) {
+      setError("فشل في إنشاء المهمة");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="h-full w-full bg-[#D9D9D9] flex items-center justify-center">
+        <div className="text-[#2F2F2F]">جاري التحميل...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
@@ -66,6 +95,18 @@ export default function CreateTask() {
             تعيين مهمة جديدة
           </h1>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-[10px] text-right">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-[10px] text-right">
+              {success}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="w-full">
             <div className="grid grid-cols-1 gap-6">
               <FieldRow label="عنوان المهمة">
@@ -73,6 +114,8 @@ export default function CreateTask() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="اسم المهمة"
+                  required
+                  disabled={submitting}
                 />
               </FieldRow>
 
@@ -81,19 +124,23 @@ export default function CreateTask() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="يرجى كتابة وصف مختصر للمهمة..."
+                  required
+                  disabled={submitting}
                 />
               </FieldRow>
 
               <FieldRow label="موعد التنفيذ">
-                <DateInput value={dueDate} onChange={setDueDate} />
+                <DateInput value={dueDate} onChange={setDueDate} disabled={submitting} />
               </FieldRow>
 
               <FieldRow label="الأولوية">
                 <Select
                   value={priority}
-                  onChange={(v) => setPriority(v as Priority)}
+                  onChange={(v) => setPriority(v as TaskPriority)}
                   placeholder="اختر درجة الأهمية..."
-                  options={priorities.map((p) => ({ value: p, label: p }))}
+                  options={priorityOptions.map((p) => ({ value: p.value, label: p.label }))}
+                  required
+                  disabled={submitting}
                 />
               </FieldRow>
 
@@ -103,21 +150,24 @@ export default function CreateTask() {
                   onChange={setEmployeeId}
                   placeholder="اسم الموظف..."
                   options={employees.map((e) => ({
-                    value: e.id,
-                    label: e.name,
+                    value: e.userId.toString(),
+                    label: e.fullName,
                   }))}
+                  required
+                  disabled={submitting}
                 />
               </FieldRow>
 
               <FieldRow label="الموقع">
                 <Select
-                  value={locationId}
-                  onChange={setLocationId}
+                  value={zoneId}
+                  onChange={setZoneId}
                   placeholder="حدد موقع المهمة"
-                  options={locations.map((z) => ({
-                    value: z.id,
-                    label: z.name,
+                  options={zones.map((z) => ({
+                    value: z.zoneId.toString(),
+                    label: z.zoneName,
                   }))}
+                  disabled={submitting}
                 />
               </FieldRow>
             </div>
@@ -125,9 +175,10 @@ export default function CreateTask() {
             <div className="mt-10 flex justify-center">
               <button
                 type="submit"
-                className="w-[220px] h-[56px] rounded-[10px] bg-[#60778E] text-white font-sans font-semibold text-[18px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 active:opacity-90"
+                disabled={submitting}
+                className="w-[220px] h-[56px] rounded-[10px] bg-[#60778E] text-white font-sans font-semibold text-[18px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 active:opacity-90 disabled:opacity-50"
               >
-                تعيين المهمة
+                {submitting ? "جاري الإنشاء..." : "تعيين المهمة"}
               </button>
             </div>
           </form>
@@ -163,17 +214,23 @@ function Input({
   value,
   onChange,
   placeholder,
+  required,
+  disabled,
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <input
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className="w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4 text-right outline-none focus:ring-2 focus:ring-black/10"
+      required={required}
+      disabled={disabled}
+      className="w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
     />
   );
 }
@@ -182,18 +239,24 @@ function Textarea({
   value,
   onChange,
   placeholder,
+  required,
+  disabled,
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <textarea
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      required={required}
+      disabled={disabled}
       rows={3}
-      className="w-full min-h-[78px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4 py-3 text-right outline-none resize-none focus:ring-2 focus:ring-black/10"
+      className="w-full min-h-[78px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4 py-3 text-right outline-none resize-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
     />
   );
 }
@@ -201,9 +264,11 @@ function Textarea({
 function DateInput({
   value,
   onChange,
+  disabled,
 }: {
   value: string;
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4 flex items-center justify-between gap-3">
@@ -213,7 +278,8 @@ function DateInput({
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-transparent outline-none text-right"
+        disabled={disabled}
+        className="bg-transparent outline-none text-right disabled:opacity-50"
       />
     </div>
   );
@@ -224,22 +290,28 @@ function Select({
   onChange,
   placeholder,
   options,
+  required,
+  disabled,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   options: { value: string; label: string }[];
+  required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className="relative">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        required={required}
+        disabled={disabled}
         className={[
           "w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4",
           "text-right outline-none focus:ring-2 focus:ring-black/10",
           value ? "text-[#111827]" : "text-[#9CA3AF]",
-          "appearance-none",
+          "appearance-none disabled:opacity-50",
         ].join(" ")}
       >
         <option value="">{placeholder}</option>

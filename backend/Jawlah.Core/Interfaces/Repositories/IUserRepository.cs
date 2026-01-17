@@ -12,4 +12,5 @@ public interface IUserRepository : IRepository<User>
     Task<IEnumerable<User>> GetByRoleAsync(UserRole role);
     Task<IEnumerable<User>> GetActiveUsersAsync();
     Task<User?> GetUserWithZonesAsync(int userId);
+    Task<IEnumerable<User>> GetUsersByMunicipalityAsync(int municipalityId);
 }

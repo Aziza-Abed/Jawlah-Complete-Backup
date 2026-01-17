@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { MapPin, User, Pin } from "lucide-react";
+import { getDashboardOverview } from "../api/dashboard";
+import type { DashboardOverview } from "../types/dashboard";
 
 type StatChip = {
   label: string;
@@ -16,18 +18,36 @@ type ActivityItem = {
 };
 
 const Dashboard: React.FC = () => {
-  // TODO: Replace all mock values with API data (dashboard summary endpoint)
-  const workersTotal = 35;
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getDashboardOverview();
+        setOverview(data);
+      } catch (err) {
+        setError("فشل في تحميل البيانات");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Calculate values from API data or use defaults
+  const workersTotal = overview?.workers.total ?? 0;
   const workersChips: StatChip[] = [
-    { label: "غياب", value: 5, bg: "#C86E5D", text: "#FFFFFF" },
-    { label: "حضور", value: 30, bg: "#8FA36A", text: "#FFFFFF" },
+    { label: "غياب", value: overview?.workers.notCheckedIn ?? 0, bg: "#C86E5D", text: "#FFFFFF" },
+    { label: "حضور", value: overview?.workers.checkedIn ?? 0, bg: "#8FA36A", text: "#FFFFFF" },
   ];
 
-  const tasksTotal = 33;
+  const tasksTotal = (overview?.tasks.pending ?? 0) + (overview?.tasks.inProgress ?? 0) + (overview?.tasks.completedToday ?? 0);
   const tasksChips: StatChip[] = [
-    { label: "قيد التنفيذ", value: 12, bg: "#F5B300", text: "#1F2937" },
-    { label: "مغلقة", value: 3, bg: "#C86E5D", text: "#FFFFFF" },
-    { label: "معلقة", value: 18, bg: "#8FA36A", text: "#FFFFFF" },
+    { label: "قيد التنفيذ", value: overview?.tasks.inProgress ?? 0, bg: "#F5B300", text: "#1F2937" },
+    { label: "مكتملة", value: overview?.tasks.completedToday ?? 0, bg: "#C86E5D", text: "#FFFFFF" },
+    { label: "معلقة", value: overview?.tasks.pending ?? 0, bg: "#8FA36A", text: "#FFFFFF" },
   ];
 
   const activities: ActivityItem[] = [
@@ -51,6 +71,22 @@ const Dashboard: React.FC = () => {
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="h-full w-full bg-[#D9D9D9] flex items-center justify-center">
+        <div className="text-[#2F2F2F]">جاري التحميل...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full w-full bg-[#D9D9D9] flex items-center justify-center">
+        <div className="text-red-500">{error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
@@ -64,7 +100,6 @@ const Dashboard: React.FC = () => {
               title="إجمالي العمال"
               total={workersTotal}
               donut={{
-                // TODO: Replace with backend distribution (attendance vs absence)
                 parts: [
                   { value: workersChips[0].value, color: workersChips[0].bg },
                   { value: workersChips[1].value, color: workersChips[1].bg },
@@ -77,7 +112,6 @@ const Dashboard: React.FC = () => {
               title="المهام الحالية"
               total={tasksTotal}
               donut={{
-                // TODO: Replace with backend distribution (in progress/closed/pending)
                 parts: [
                   { value: tasksChips[0].value, color: tasksChips[0].bg },
                   { value: tasksChips[1].value, color: tasksChips[1].bg },
@@ -131,7 +165,6 @@ const Dashboard: React.FC = () => {
               </h2>
 
               <div className="mt-4 rounded-[14px] overflow-hidden bg-white border border-black/10">
-                {/* TODO: Replace iframe with live map component + markers from backend */}
                 <iframe
                   title="map"
                   className="w-full h-[290px] sm:h-[320px] md:h-[360px]"

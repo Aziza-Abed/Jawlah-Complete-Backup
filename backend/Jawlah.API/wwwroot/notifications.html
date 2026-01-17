@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جولة - الإشعارات</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .notif-content {
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .notif-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .notif-header h3 { font-weight: 700; color: var(--text-dark); }
+
+        .notif-list { display: flex; flex-direction: column; gap: 12px; }
+
+        .notif-item {
+            background: white;
+            border-radius: var(--radius);
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+            cursor: pointer;
+            border-right: 4px solid transparent;
+        }
+
+        .notif-item:hover { transform: scale(1.01); box-shadow: 0 6px 20px rgba(0,0,0,0.08); }
+        .notif-item.unread { border-right-color: var(--accent); background: rgba(201, 122, 99, 0.02); }
+
+        .notif-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--bg-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            flex-shrink: 0;
+            font-size: 1.2rem;
+        }
+
+        .notif-body { flex: 1; }
+        .notif-body h4 { font-size: 1rem; margin-bottom: 4px; color: var(--text-dark); font-weight: 700; }
+        .notif-body p { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 8px; }
+        .notif-body .time { font-size: 0.75rem; color: var(--text-light); }
+
+        .mark-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-inner">
+                    <i class="fas fa-city" style="font-size: 2rem;"></i>
+                </div>
+                <h1>جولة</h1>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <i class="fas fa-th-large"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="map.html" class="nav-item">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>الخريطة الحية</span>
+                </a>
+                <a href="workers.html" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>إدارة العمال</span>
+                </a>
+                <a href="tasks.html" class="nav-item">
+                    <i class="fas fa-plus-square"></i>
+                    <span>تعيين مهمة</span>
+                </a>
+                <a href="all-tasks.html" class="nav-item">
+                    <i class="fas fa-tasks"></i>
+                    <span>جميع المهام</span>
+                </a>
+                <a href="issues.html" class="nav-item">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>البلاغات</span>
+                </a>
+                <a href="attendance.html" class="nav-item">
+                    <i class="fas fa-user-clock"></i>
+                    <span>الحضور</span>
+                </a>
+                <a href="reports.html" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span>التقارير</span>
+                </a>
+                <a href="notifications.html" class="nav-item active">
+                    <i class="fas fa-bell"></i>
+                    <span>الإشعارات</span>
+                </a>
+                <a href="profile.html" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>الملف الشخصي</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <span>تسجيل الخروج</span>
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <div class="header-icons">
+                        <div class="icon-btn"><i class="fas fa-cog"></i></div>
+                        <a href="profile.html" class="icon-btn" style="text-decoration: none;"><i class="fas fa-user"></i></a>
+                        <div class="icon-btn active" style="position: relative;">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="page-info">
+                        <h2>الإشعارات</h2>
+                        <p>تنبيهات النظام وآخر التحديثات</p>
+                    </div>
+                    <div class="icon-btn" style="font-size: 1.5rem;"><i class="fas fa-bell"></i></div>
+                </div>
+            </header>
+
+            <div class="notif-content">
+                <div class="notif-header">
+                    <h3 id="unreadCountText">لديك 0 إشعارات غير مقروءة</h3>
+                    <button class="mark-btn" onclick="markAllAsRead()">تحديد الكل كمقروء</button>
+                </div>
+
+                <div class="notif-list" id="notifList">
+                    <!-- Loaded by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadNotifications();
+        });
+
+        async function loadNotifications() {
+            try {
+                const response = await notificationsApi.getAll();
+                const list = document.getElementById('notifList');
+                if (response.data) {
+                    const notifs = response.data;
+                    const unreadCount = notifs.filter(n => !n.isRead).length;
+                    document.getElementById('unreadCountText').textContent = `لديك ${unreadCount} إشعارات غير مقروءة`;
+                    
+                    if (notifs.length === 0) {
+                        list.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:40px;">لا يوجد إشعارات حالياً</p>';
+                        return;
+                    }
+
+                    list.innerHTML = notifs.map(n => `
+                        <div class="notif-item ${!n.isRead ? 'unread' : ''}" onclick="markAsRead('${n.notificationId}')">
+                            <div class="notif-icon">
+                                <i class="fas ${getNotifIcon(n.type)}"></i>
+                            </div>
+                            <div class="notif-body">
+                                <h4>${escapeHtml(n.title)}</h4>
+                                <p>${escapeHtml(n.message)}</p>
+                                <div class="time">${formatTime(n.createdAt)}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {}
+        }
+
+        function getNotifIcon(type) {
+            if (type.includes('Task')) return 'fa-tasks';
+            if (type.includes('Issue') || type.includes('Problem')) return 'fa-exclamation-triangle';
+            if (type.includes('Attendance')) return 'fa-user-clock';
+            return 'fa-bell';
+        }
+
+        function formatTime(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+        }
+
+        async function markAsRead(id) {
+            try {
+                await notificationsApi.markAsRead(id);
+                loadNotifications();
+            } catch (e) {}
+        }
+
+        async function markAllAsRead() {
+            try {
+                await notificationsApi.markAllAsRead();
+                loadNotifications();
+            } catch (e) {}
+        }
+        // logout() is in api.js
+    </script>
+</body>
+</html>

@@ -1,4 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { getTasksReport, getWorkersReport, getZonesReport } from "../api/reports";
+import type {
+  TasksReportData,
+  WorkersReportData,
+  ZonesReportData,
+  ReportPeriod,
+} from "../types/report";
 
 type TabKey = "tasks" | "workers" | "zones";
 type PeriodPreset = "daily" | "weekly" | "monthly" | "yearly" | "custom";
@@ -131,16 +138,53 @@ export default function Reports() {
 
   const [applied, setApplied] = useState<FiltersDraft>(draft);
 
+  // API data states
+  const [tasksData, setTasksData] = useState<TasksReportData | null>(null);
+  const [workersData, setWorkersData] = useState<WorkersReportData | null>(null);
+  const [zonesData, setZonesData] = useState<ZonesReportData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchReport = async (currentTab: TabKey, filters: FiltersDraft) => {
+    setLoading(true);
+    setError("");
+    try {
+      const apiFilters = {
+        period: filters.period as ReportPeriod,
+        status: filters.status !== "all" ? filters.status : undefined,
+        startDate: filters.from || undefined,
+        endDate: filters.to || undefined,
+      };
+
+      if (currentTab === "tasks") {
+        const data = await getTasksReport(apiFilters);
+        setTasksData(data);
+      } else if (currentTab === "workers") {
+        const data = await getWorkersReport(apiFilters);
+        setWorkersData(data);
+      } else {
+        const data = await getZonesReport(apiFilters);
+        setZonesData(data);
+      }
+    } catch (err) {
+      setError("فشل في تحميل التقرير");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReport(tab, applied);
+  }, [tab, applied]);
+
   const onApply = () => {
     setApplied(draft);
-    // TODO: Replace mock builder with API call using { tab, applied.period, applied.from, applied.to, applied.status }
   };
 
   const onReset = () => {
     const base: FiltersDraft = { period: "monthly", status: "all", from: "", to: "" };
     setDraft(base);
     setApplied(base);
-    // TODO: Re-fetch default report
   };
 
   const lastUpdated = useMemo(() => {
@@ -150,7 +194,20 @@ export default function Reports() {
     return `${hh}:${mm}`;
   }, [tab, applied]);
 
-  const view = useMemo<ViewModel>(() => buildMockView(tab, applied, lastUpdated), [tab, applied, lastUpdated]);
+  const view = useMemo<ViewModel>(() => {
+    // Use API data if available, otherwise fallback to mock
+    if (tab === "tasks" && tasksData) {
+      return buildViewFromTasksApi(tasksData, applied, lastUpdated);
+    }
+    if (tab === "workers" && workersData) {
+      return buildViewFromWorkersApi(workersData, applied, lastUpdated);
+    }
+    if (tab === "zones" && zonesData) {
+      return buildViewFromZonesApi(zonesData, applied, lastUpdated);
+    }
+    // Fallback to mock while loading
+    return buildMockView(tab, applied, lastUpdated);
+  }, [tab, applied, lastUpdated, tasksData, workersData, zonesData]);
 
   const exportCsv = () => {
     const csv =
@@ -178,8 +235,17 @@ export default function Reports() {
             <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F]">
               التقارير
             </h1>
-            <div className="text-right text-[12px] text-[#6B7280]">آخر تحديث: {view.lastUpdated}</div>
+            <div className="flex items-center gap-3">
+              {loading && <div className="text-[12px] text-[#6B7280]">جاري التحميل...</div>}
+              <div className="text-right text-[12px] text-[#6B7280]">آخر تحديث: {view.lastUpdated}</div>
+            </div>
           </div>
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-[10px] text-right">
+              {error}
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="mt-4">
@@ -826,6 +892,207 @@ function rowsToCsvZones(rows: ZoneRow[]) {
   const escape = (v: string | number) => `"${String(v).replaceAll('"', '""')}"`;
   const lines = [headers.join(","), ...rows.map((r) => headers.map((h) => escape((r as any)[h])).join(","))];
   return lines.join("\n");
+}
+
+/* ---------- API to ViewModel Builders ---------- */
+
+const palette = {
+  blue: "#60778E",
+  green: "#8FA36A",
+  red: "#C86E5D",
+  gray: "#6B7280",
+  light: "#E5E7EB",
+};
+
+function buildViewFromTasksApi(data: TasksReportData, f: FiltersDraft, lastUpdated: string): ViewModel {
+  const total = data.total || 1;
+  const completedPct = Math.round((data.completed / total) * 100);
+  const inProgressPct = Math.round((data.inProgress / total) * 100);
+  const pendingPct = 100 - completedPct - inProgressPct;
+
+  // Map byPeriod to chart points
+  const points: SeriesPoint[] = data.byPeriod.map((p) => ({
+    label: p.label,
+    a: p.completed,
+    b: p.inProgress,
+    c: p.pending,
+  }));
+
+  // Map tasks to table rows
+  const statusMap: Record<string, string> = {
+    Pending: "معلقة",
+    InProgress: "نشطة",
+    Completed: "مكتملة",
+    Cancelled: "ملغاة",
+  };
+  const priorityMap: Record<string, string> = {
+    Low: "منخفضة",
+    Medium: "متوسطة",
+    High: "عالية",
+    Urgent: "عاجلة",
+  };
+
+  const rows: TaskRow[] = data.tasks.map((t) => ({
+    id: t.id.toString(),
+    title: t.title,
+    worker: t.worker,
+    zone: t.zone,
+    status: statusMap[t.status] || t.status,
+    priority: priorityMap[t.priority] || t.priority,
+    dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("ar-EG") : "—",
+    time: t.createdAt ? new Date(t.createdAt).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "—",
+  }));
+
+  return {
+    tab: "tasks",
+    title: "تقرير المهام",
+    lastUpdated,
+    filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
+    kpis: [
+      { title: "إجمالي المهام", value: data.total.toString(), icon: "check", bg: palette.blue },
+      { title: "معدل الإنجاز", value: `${completedPct}%`, icon: "speed", bg: palette.gray },
+      { title: "مهام معلقة", value: data.pending.toString(), icon: "alert", bg: palette.light, text: "#2F2F2F" },
+      { title: "العمال النشطين", value: `${data.activeWorkers} / ${data.totalWorkers}`, icon: "users", bg: palette.green },
+    ],
+    chart1: {
+      title: "تقرير المهام حسب الفترة",
+      legend: [
+        { label: "مكتملة", color: palette.green },
+        { label: "نشطة", color: palette.blue },
+        { label: "معلقة", color: palette.red },
+      ],
+      points: points.length > 0 ? points : buildLabelsForPeriod(f.period).map((label) => ({ label, a: 0, b: 0, c: 0 })),
+    },
+    chart2: {
+      title: "توزيع حالة المهام",
+      parts: [
+        { label: "مكتملة", value: completedPct, color: palette.green },
+        { label: "نشطة", value: inProgressPct, color: palette.blue },
+        { label: "معلقة", value: pendingPct, color: palette.red },
+      ],
+    },
+    table: {
+      title: "تقرير المهام التفصيلي:",
+      columns: ["#", "المهمة", "العامل", "المنطقة", "الحالة", "الأولوية", "الموعد", "الوقت"],
+      rows,
+    },
+  };
+}
+
+function buildViewFromWorkersApi(data: WorkersReportData, f: FiltersDraft, lastUpdated: string): ViewModel {
+  // Map byPeriod to chart points
+  const points: SeriesPoint[] = data.byPeriod.map((p) => ({
+    label: p.label,
+    a: p.present,
+    b: p.absent,
+  }));
+
+  // Top workload horizontal bars
+  const topWorkload = data.topWorkload.map((w) => ({
+    label: w.name,
+    value: w.activeTasks,
+    color: palette.blue,
+  }));
+
+  // Worker table rows
+  const rows: WorkerRow[] = data.workers.map((w) => ({
+    id: w.id.toString(),
+    name: w.name,
+    presence: w.isPresent ? "حضور" : "غياب",
+    lastSeen: w.lastCheckIn ? new Date(w.lastCheckIn).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "—",
+    activeTasks: w.activeTasks,
+    doneTasks: w.completedTasks,
+  }));
+
+  return {
+    tab: "workers",
+    title: "تقرير العمال",
+    lastUpdated,
+    filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
+    kpis: [
+      { title: "إجمالي العمال", value: data.totalWorkers.toString(), icon: "users", bg: palette.green },
+      { title: "الحضور", value: data.checkedIn.toString(), icon: "check", bg: palette.blue },
+      { title: "الغياب", value: data.absent.toString(), icon: "alert", bg: palette.gray },
+      { title: "الالتزام", value: `${data.compliancePercent}%`, icon: "speed", bg: palette.light, text: "#2F2F2F" },
+    ],
+    chart1: {
+      title: "حضور / غياب العمال حسب الفترة",
+      legend: [
+        { label: "حضور", color: palette.green },
+        { label: "غياب", color: palette.red },
+      ],
+      points: points.length > 0 ? points : buildLabelsForPeriod(f.period).map((label) => ({ label, a: 0, b: 0 })),
+    },
+    chart2: {
+      title: "أعلى 5 عمّال من حيث الضغط (مهام فعالة)",
+      items: topWorkload.length > 0 ? topWorkload : [{ label: "—", value: 0, color: palette.blue }],
+    },
+    table: {
+      title: "تقرير العمال التفصيلي:",
+      columns: ["العامل", "الحالة", "آخر ظهور", "مهام فعّالة", "مهام منجزة"],
+      rows,
+    },
+  };
+}
+
+function buildViewFromZonesApi(data: ZonesReportData, _f: FiltersDraft, lastUpdated: string): ViewModel {
+  const total = data.totalTasks || 1;
+  const completedPct = Math.round((data.totalCompleted / total) * 100);
+  const inProgressPct = Math.round((data.totalInProgress / total) * 100);
+  const delayedPct = Math.round((data.totalDelayed / total) * 100);
+
+  // Top zones by task count
+  const topZones = data.zones
+    .slice()
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
+    .map((z) => ({
+      label: z.name,
+      value: z.total,
+      color: palette.blue,
+    }));
+
+  // Zone table rows
+  const rows: ZoneRow[] = data.zones.map((z) => ({
+    id: z.id.toString(),
+    zone: z.name,
+    total: z.total,
+    done: z.completed,
+    inProgress: z.inProgress,
+    delayed: z.delayed,
+    rate: z.total > 0 ? `${Math.round((z.completed / z.total) * 100)}%` : "0%",
+    updatedAt: z.lastUpdate ? new Date(z.lastUpdate).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "—",
+  }));
+
+  return {
+    tab: "zones",
+    title: "تقرير المناطق",
+    lastUpdated,
+    filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
+    kpis: [
+      { title: "عدد المناطق", value: data.totalZones.toString(), icon: "users", bg: palette.blue },
+      { title: "أعلى ضغط", value: data.highestPressureZone || "—", icon: "alert", bg: palette.gray },
+      { title: "معدل الإنجاز", value: `${completedPct}%`, icon: "speed", bg: palette.light, text: "#2F2F2F" },
+      { title: "بلاغات/تأخير", value: data.totalDelayed.toString(), icon: "check", bg: palette.green },
+    ],
+    chart1: {
+      title: "أكثر 5 مناطق من حيث عدد المهام خلال الفترة",
+      items: topZones.length > 0 ? topZones : [{ label: "—", value: 0, color: palette.blue }],
+    },
+    chart2: {
+      title: "توزيع حالة المناطق",
+      parts: [
+        { label: "منجزة", value: completedPct, color: palette.green },
+        { label: "قيد التنفيذ", value: inProgressPct, color: palette.blue },
+        { label: "متأخرة", value: delayedPct, color: palette.red },
+      ],
+    },
+    table: {
+      title: "تقرير المناطق التفصيلي:",
+      columns: ["المنطقة", "الإجمالي", "منجزة", "قيد التنفيذ", "متأخرة", "الإنجاز", "آخر تحديث"],
+      rows,
+    },
+  };
 }
 
 /* ---------- Mock Builder ---------- */

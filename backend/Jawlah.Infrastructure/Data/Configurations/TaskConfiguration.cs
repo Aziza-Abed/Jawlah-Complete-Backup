@@ -10,6 +10,12 @@ public class TaskConfiguration : IEntityTypeConfiguration<Core.Entities.Task>
     {
         builder.HasKey(e => e.TaskId);
 
+        // Municipality relationship
+        builder.HasOne(e => e.Municipality)
+            .WithMany(m => m.Tasks)
+            .HasForeignKey(e => e.MunicipalityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.Title)
             .IsRequired()
             .HasMaxLength(200);
@@ -52,6 +58,10 @@ public class TaskConfiguration : IEntityTypeConfiguration<Core.Entities.Task>
 
         builder.Property(e => e.SyncVersion)
             .IsRequired();
+
+        // for handling concurrent updates
+        builder.Property(e => e.RowVersion)
+            .IsRowVersion();
 
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status })
             .HasDatabaseName("IX_Task_AssignedUser_Status");

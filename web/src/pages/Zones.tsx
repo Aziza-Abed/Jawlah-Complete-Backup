@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
+import { getWorkerLocations } from "../api/tracking";
+import type { WorkerLocation as ApiWorkerLocation } from "../types/tracking";
 
 type WorkerLocation = {
   id: string;
   name: string;
   lat: number;
   lng: number;
-  status?: "online" | "offline";
+  status: "online" | "offline";
+  timestamp?: string;
 };
 
 // Fix Leaflet default marker icons (Vite build)
@@ -45,27 +48,54 @@ function FlyAndOpenPopup({
 }
 
 export default function Zones() {
-  // TODO: Replace with live workers locations from backend (polling or websocket)
-  const workers: WorkerLocation[] = useMemo(
-    () => [
-      { id: "w1", name: "محمد أحمد", lat: 31.905, lng: 35.205, status: "online" },
-      { id: "w2", name: "أبو عمار", lat: 31.91, lng: 35.215, status: "online" },
-      { id: "w3", name: "أحمد", lat: 31.897, lng: 35.23, status: "offline" },
-      { id: "w4", name: "محمود", lat: 31.914, lng: 35.223, status: "online" },
-    ],
-    []
-  );
+  const [workers, setWorkers] = useState<WorkerLocation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const center: [number, number] = [31.907, 35.215];
 
   const [selectedId, setSelectedId] = useState<string>("");
 
-  const selectedWorker = useMemo(
-    () => workers.find((w) => w.id === selectedId) || null,
-    [workers, selectedId]
-  );
+  const selectedWorker = workers.find((w) => w.id === selectedId) || null;
 
   const markerRefs = useRef<Record<string, L.Marker | null>>({});
+
+  // Fetch worker locations
+  const fetchLocations = async () => {
+    try {
+      const data = await getWorkerLocations();
+      const mapped: WorkerLocation[] = data.map((w: ApiWorkerLocation) => ({
+        id: w.userId.toString(),
+        name: w.fullName,
+        lat: w.latitude,
+        lng: w.longitude,
+        status: w.isOnline ? "online" : "offline",
+        timestamp: w.timestamp,
+      }));
+      setWorkers(mapped);
+      setError("");
+    } catch (err) {
+      setError("فشل في تحميل مواقع العمال");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLocations();
+
+    // Poll every 30 seconds for updates
+    const interval = setInterval(fetchLocations, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="h-full w-full bg-[#D9D9D9] flex items-center justify-center">
+        <div className="text-[#2F2F2F]">جاري التحميل...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
@@ -77,10 +107,16 @@ export default function Zones() {
             </h1>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-[10px] text-right">
+              {error}
+            </div>
+          )}
+
           <div className="bg-[#F3F1ED] rounded-[16px] border border-[#0EA5E9] shadow-[0_2px_0_rgba(0,0,0,0.08)] p-4 sm:p-5">
             <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4 mb-4">
               <div className="text-right font-sans font-semibold text-[#2F2F2F]">
-                مواقع العمال على الخريطة
+                مواقع العمال على الخريطة ({workers.length})
               </div>
 
               <div className="flex-1" />
@@ -94,7 +130,7 @@ export default function Zones() {
                   <option value="">اختر اسم العامل...</option>
                   {workers.map((w) => (
                     <option key={w.id} value={w.id}>
-                      {w.name}
+                      {w.name} ({w.status === "online" ? "متصل" : "غير متصل"})
                     </option>
                   ))}
                 </select>
@@ -134,7 +170,11 @@ export default function Zones() {
                         <div className="text-[12px] text-[#6B7280]">
                           {w.lat.toFixed(4)}, {w.lng.toFixed(4)}
                         </div>
-                        {/* TODO: Add worker lastSeen/time from backend */}
+                        {w.timestamp && (
+                          <div className="text-[12px] text-[#6B7280]">
+                            آخر تحديث: {new Date(w.timestamp).toLocaleTimeString("ar-EG")}
+                          </div>
+                        )}
                       </div>
                     </Popup>
                   </Marker>
@@ -142,7 +182,9 @@ export default function Zones() {
               </MapContainer>
             </div>
 
-            {/* TODO: Backend should stream updates; update workers state to move markers in real time */}
+            <div className="mt-3 text-right text-[12px] text-[#6B7280]">
+              يتم تحديث المواقع تلقائياً كل 30 ثانية
+            </div>
           </div>
         </div>
       </div>

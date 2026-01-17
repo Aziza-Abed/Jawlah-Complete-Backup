@@ -1,12 +1,13 @@
 using Jawlah.Core.Entities;
+using Task = System.Threading.Tasks.Task;
 
 namespace Jawlah.Core.Interfaces.Repositories;
 
 public interface INotificationRepository : IRepository<Notification>
 {
-    System.Threading.Tasks.Task<IEnumerable<Notification>> GetUserNotificationsAsync(int userId, bool unreadOnly = false);
-    System.Threading.Tasks.Task<int> GetUnreadCountAsync(int userId);
-    System.Threading.Tasks.Task MarkAsReadAsync(int notificationId);
-    System.Threading.Tasks.Task MarkAllAsReadAsync(int userId);
-    System.Threading.Tasks.Task<IEnumerable<Notification>> GetNotificationsCreatedAfterAsync(int userId, DateTime lastSyncTime);
+    Task<IEnumerable<Notification>> GetUserNotificationsAsync(int userId, bool unreadOnly = false);
+    Task<int> GetUnreadCountAsync(int userId);
+    Task MarkAsReadAsync(int notificationId);
+    Task MarkAllAsReadAsync(int userId);
+    Task<IEnumerable<Notification>> GetNotificationsCreatedAfterAsync(int userId, DateTime lastSyncTime);
 }
