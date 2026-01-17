@@ -1,52 +1,53 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Jawlah.Infrastructure.Data;
 
 namespace Jawlah.API.Controllers;
 
+// this controller check if api and database are working
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class HealthController : ControllerBase
 {
-    private readonly JawlahDbContext _context;
+    private readonly JawlahDbContext _db;
     private readonly ILogger<HealthController> _logger;
 
-    public HealthController(JawlahDbContext context, ILogger<HealthController> logger)
+    public HealthController(JawlahDbContext db, ILogger<HealthController> logger)
     {
-        _context = context;
+        _db = db;
         _logger = logger;
     }
 
+    // main health check endpoint
     [HttpGet]
     public async Task<IActionResult> Get()
     {
         try
         {
-            // Check database connectivity
-            var canConnect = await _context.Database.CanConnectAsync();
+            // check if we can connect to database
+            var canConnect = await _db.Database.CanConnectAsync();
 
             if (!canConnect)
             {
-                _logger.LogWarning("Health check failed: Database connection failed");
                 return StatusCode(503, new
                 {
-                    status = "Unhealthy",
-                    message = "Database connection failed",
+                    status = "غير صحي",
+                    message = "فشل الاتصال بقاعدة البيانات",
                     timestamp = DateTime.UtcNow
                 });
             }
 
-            // Get basic stats
-            var userCount = await _context.Users.CountAsync();
-            var taskCount = await _context.Tasks.CountAsync();
-            var zoneCount = await _context.Zones.CountAsync();
-
-            _logger.LogInformation("Health check passed");
+            // count some records to show system is working
+            var userCount = await _db.Users.CountAsync();
+            var taskCount = await _db.Tasks.CountAsync();
+            var zoneCount = await _db.Zones.CountAsync();
 
             return Ok(new
             {
-                status = "Healthy",
-                message = "API is running and database is accessible",
+                status = "صحي",
+                message = "API يعمل وقاعدة البيانات متاحة",
                 timestamp = DateTime.UtcNow,
                 database = new
                 {
@@ -63,15 +64,17 @@ public class HealthController : ControllerBase
             _logger.LogError(ex, "Health check failed with exception");
             return StatusCode(500, new
             {
-                status = "Unhealthy",
-                message = "Health check failed",
+                status = "غير صحي",
+                message = "فشل فحص الصحة",
                 error = ex.Message,
                 timestamp = DateTime.UtcNow
             });
         }
     }
 
+    // simple ping endpoint - public for load balancer health checks
     [HttpGet("ping")]
+    [AllowAnonymous]
     public IActionResult Ping()
     {
         return Ok(new

@@ -8,5 +8,7 @@ public interface IAttendanceRepository : IRepository<Attendance>
     Task<IEnumerable<Attendance>> GetUserAttendanceHistoryAsync(int userId, DateTime fromDate, DateTime toDate);
     Task<IEnumerable<Attendance>> GetZoneAttendanceAsync(int zoneId, DateTime date);
     Task<bool> HasActiveAttendanceAsync(int userId);
+    Task<Attendance?> GetActiveAttendanceAsync(int userId);
     Task<IEnumerable<Attendance>> GetFilteredAttendanceAsync(int? userId, int? zoneId, DateTime? fromDate, DateTime? toDate);
+    Task<IEnumerable<Attendance>> GetPendingManualAttendanceAsync();
 }

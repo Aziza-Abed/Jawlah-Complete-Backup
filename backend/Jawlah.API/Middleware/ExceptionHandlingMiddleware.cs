@@ -8,16 +8,11 @@ public class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
-    private readonly IHostEnvironment _environment;
 
-    public ExceptionHandlingMiddleware(
-        RequestDelegate next,
-        ILogger<ExceptionHandlingMiddleware> logger,
-        IHostEnvironment environment)
+    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
     {
         _next = next;
         _logger = logger;
-        _environment = environment;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -28,60 +23,57 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Unhandled exception occurred: {Message}", ex.Message);
             await HandleExceptionAsync(context, ex);
         }
     }
 
-    private async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var (statusCode, message) = exception switch
-        {
-            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "Unauthorized access"),
-            ArgumentNullException => (HttpStatusCode.BadRequest, "Invalid request: missing required data"),
-            ArgumentException => (HttpStatusCode.BadRequest, exception.Message),
-            KeyNotFoundException => (HttpStatusCode.NotFound, "Resource not found"),
-            InvalidOperationException => (HttpStatusCode.BadRequest, exception.Message),
-            _ => (HttpStatusCode.InternalServerError, "An internal error occurred")
-        };
-
-        _logger.LogError(exception, "Unhandled exception occurred. TraceId: {TraceId}",
-            context.TraceIdentifier);
-
         context.Response.ContentType = "application/json";
+
+        // determine status code and message based on exception type
+        HttpStatusCode statusCode;
+        string message;
+
+        if (exception is ArgumentException)
+        {
+            statusCode = HttpStatusCode.BadRequest;
+            message = exception.Message;
+        }
+        else if (exception is UnauthorizedAccessException)
+        {
+            statusCode = HttpStatusCode.Unauthorized;
+            message = "غير مصرح";
+        }
+        else if (exception is KeyNotFoundException)
+        {
+            statusCode = HttpStatusCode.NotFound;
+            message = "غير موجود";
+        }
+        else
+        {
+            statusCode = HttpStatusCode.InternalServerError;
+            message = "حدث خطأ داخلي في الخادم";
+        }
+
         context.Response.StatusCode = (int)statusCode;
 
-        var response = new ErrorResponse
-        {
-            Success = false,
-            Message = message,
-            TraceId = context.TraceIdentifier,
-            Errors = _environment.IsDevelopment()
-                ? new List<string> { exception.Message, exception.StackTrace ?? "" }
-                : new List<string> { message }
-        };
-
-        var options = new JsonSerializerOptions
+        var response = ApiResponse<object>.ErrorResponse(message);
+        var jsonResponse = JsonSerializer.Serialize(response, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
+        });
 
-        var json = JsonSerializer.Serialize(response, options);
-        await context.Response.WriteAsync(json);
+        await context.Response.WriteAsync(jsonResponse);
     }
 }
 
-public class ErrorResponse
-{
-    public bool Success { get; set; }
-    public string Message { get; set; } = string.Empty;
-    public string TraceId { get; set; } = string.Empty;
-    public List<string> Errors { get; set; } = new();
-}
-
+// extension method to easily add the middleware in Program.cs
 public static class ExceptionHandlingMiddlewareExtensions
 {
-    public static IApplicationBuilder UseExceptionHandling(this IApplicationBuilder builder)
+    public static IApplicationBuilder UseExceptionHandling(this IApplicationBuilder app)
     {
-        return builder.UseMiddleware<ExceptionHandlingMiddleware>();
+        return app.UseMiddleware<ExceptionHandlingMiddleware>();
     }
 }

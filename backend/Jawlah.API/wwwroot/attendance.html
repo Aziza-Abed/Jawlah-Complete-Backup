@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جولة - سجل الحضور</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .attendance-content {
+            padding: 32px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .page-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .filter-input, .filter-select {
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            font-family: inherit;
+            min-width: 150px;
+        }
+
+        .btn-primary {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .stat-item .icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .stat-item .icon.present {
+            background: rgba(163, 177, 138, 0.15);
+            color: var(--secondary);
+        }
+
+        .stat-item .icon.late {
+            background: rgba(255, 193, 7, 0.15);
+            color: #F57F17;
+        }
+
+        .stat-item .icon.absent {
+            background: rgba(201, 122, 99, 0.15);
+            color: var(--accent);
+        }
+
+        .stat-item .icon.hours {
+            background: rgba(120, 149, 178, 0.15);
+            color: var(--primary);
+        }
+
+        .stat-item .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .stat-item .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .attendance-table-container {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        .attendance-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .attendance-table th,
+        .attendance-table td {
+            padding: 14px 16px;
+            text-align: right;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .attendance-table th {
+            background: var(--bg-main);
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 0.9rem;
+        }
+
+        .attendance-table tbody tr:hover {
+            background: rgba(120, 149, 178, 0.05);
+        }
+
+        .attendance-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .worker-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .worker-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .worker-name {
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .worker-id {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-Present {
+            background: rgba(163, 177, 138, 0.2);
+            color: var(--secondary-dark);
+        }
+
+        .status-Late {
+            background: rgba(255, 193, 7, 0.2);
+            color: #F57F17;
+        }
+
+        .status-Absent {
+            background: rgba(201, 122, 99, 0.2);
+            color: var(--accent-dark);
+        }
+
+        .status-OnLeave {
+            background: rgba(120, 149, 178, 0.2);
+            color: var(--primary-dark);
+        }
+
+        .time-cell {
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .hours-cell {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .zone-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: var(--bg-main);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 20px;
+            background: var(--bg-main);
+        }
+
+        .pagination button {
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            padding: 8px 16px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .attendance-table {
+                font-size: 0.85rem;
+            }
+
+            .attendance-table th,
+            .attendance-table td {
+                padding: 10px 8px;
+            }
+
+            .worker-avatar {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-inner">
+                    <i class="fas fa-city" style="font-size: 2rem;"></i>
+                </div>
+                <h1>جولة</h1>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <i class="fas fa-th-large"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="map.html" class="nav-item">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>الخريطة الحية</span>
+                </a>
+                <a href="workers.html" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>إدارة العمال</span>
+                </a>
+                <a href="tasks.html" class="nav-item">
+                    <i class="fas fa-plus-square"></i>
+                    <span>تعيين مهمة</span>
+                </a>
+                <a href="all-tasks.html" class="nav-item">
+                    <i class="fas fa-tasks"></i>
+                    <span>جميع المهام</span>
+                </a>
+                <a href="issues.html" class="nav-item">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>البلاغات</span>
+                </a>
+                <a href="attendance.html" class="nav-item active">
+                    <i class="fas fa-user-clock"></i>
+                    <span>الحضور</span>
+                </a>
+                <a href="reports.html" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span>التقارير</span>
+                </a>
+                <a href="notifications.html" class="nav-item">
+                    <i class="fas fa-bell"></i>
+                    <span>الإشعارات</span>
+                </a>
+                <a href="profile.html" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>الملف الشخصي</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <span>تسجيل الخروج</span>
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <div class="header-icons">
+                        <div class="icon-btn"><i class="fas fa-cog"></i></div>
+                        <a href="profile.html" class="icon-btn" style="text-decoration: none;"><i class="fas fa-user"></i></a>
+                        <a href="notifications.html" class="icon-btn" style="position: relative; text-decoration: none;">
+                            <i class="fas fa-bell"></i>
+                            <span id="notifBadge" style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: none;"></span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="page-info">
+                        <h2>سجل الحضور</h2>
+                        <p>متابعة حضور وانصراف العمال</p>
+                    </div>
+                    <div class="icon-btn" style="font-size: 1.5rem;"><i class="fas fa-user-clock"></i></div>
+                </div>
+            </header>
+
+            <div class="attendance-content">
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <div class="icon present"><i class="fas fa-user-check"></i></div>
+                        <div>
+                            <div class="value" id="presentCount">0</div>
+                            <div class="label">حاضرون</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="icon late"><i class="fas fa-user-clock"></i></div>
+                        <div>
+                            <div class="value" id="lateCount">0</div>
+                            <div class="label">متأخرون</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="icon absent"><i class="fas fa-user-times"></i></div>
+                        <div>
+                            <div class="value" id="absentCount">0</div>
+                            <div class="label">غائبون</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="icon hours"><i class="fas fa-clock"></i></div>
+                        <div>
+                            <div class="value" id="avgHours">0</div>
+                            <div class="label">متوسط الساعات</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="page-actions">
+                    <div class="filters">
+                        <input type="date" class="filter-input" id="startDate">
+                        <input type="date" class="filter-input" id="endDate">
+                        <select class="filter-select" id="workerFilter">
+                            <option value="">جميع العمال</option>
+                        </select>
+                        <button class="btn-primary" onclick="loadAttendance()">
+                            <i class="fas fa-search"></i>
+                            بحث
+                        </button>
+                    </div>
+                </div>
+
+                <div class="attendance-table-container">
+                    <table class="attendance-table">
+                        <thead>
+                            <tr>
+                                <th>العامل</th>
+                                <th>التاريخ</th>
+                                <th>وقت الحضور</th>
+                                <th>وقت الانصراف</th>
+                                <th>المنطقة</th>
+                                <th>ساعات العمل</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceBody">
+                            <!-- Loaded by JS -->
+                        </tbody>
+                    </table>
+                    <div class="pagination" id="pagination">
+                        <!-- Pagination controls -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        const statusMap = {
+            'Present': 'حاضر',
+            'Late': 'متأخر',
+            'Absent': 'غائب',
+            'OnLeave': 'إجازة'
+        };
+
+        let currentPage = 1;
+        const pageSize = 20;
+        let totalRecords = 0;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Set default date range to current week
+            const today = new Date();
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+
+            document.getElementById('startDate').value = weekAgo.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+
+            loadWorkers();
+            loadAttendance();
+            loadNotificationCount();
+        });
+
+        async function loadWorkers() {
+            try {
+                const response = await usersApi.getWorkers();
+                const select = document.getElementById('workerFilter');
+
+                if (response.data && response.data.length > 0) {
+                    response.data.forEach(worker => {
+                        const option = document.createElement('option');
+                        option.value = worker.userId;
+                        option.textContent = worker.fullName;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to load workers:', e);
+            }
+        }
+
+        async function loadAttendance() {
+            const tbody = document.getElementById('attendanceBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="spinner"></div><p>جاري التحميل...</p></td></tr>';
+
+            try {
+                const params = {
+                    page: currentPage,
+                    pageSize: pageSize
+                };
+
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                const workerId = document.getElementById('workerFilter').value;
+
+                if (startDate) params.startDate = startDate;
+                if (endDate) params.endDate = endDate;
+                if (workerId) params.userId = workerId;
+
+                const response = await attendanceApi.getHistory(params);
+
+                if (response.data && response.data.length > 0) {
+                    const records = response.data;
+                    totalRecords = response.totalCount || records.length;
+
+                    // Calculate stats (use backend field names: userName, checkInEventTime, checkOutEventTime, workDuration)
+                    const presentCount = records.filter(r => r.status === 'Present').length;
+                    const lateCount = records.filter(r => r.status === 'Late').length;
+                    const absentCount = records.filter(r => r.status === 'Absent').length;
+
+                    const totalHours = records.reduce((sum, r) => sum + parseWorkDuration(r.workDuration), 0);
+                    const avgHours = records.length > 0 ? (totalHours / records.length).toFixed(1) : 0;
+
+                    document.getElementById('presentCount').textContent = presentCount;
+                    document.getElementById('lateCount').textContent = lateCount;
+                    document.getElementById('absentCount').textContent = absentCount;
+                    document.getElementById('avgHours').textContent = avgHours;
+
+                    tbody.innerHTML = records.map(record => `
+                        <tr>
+                            <td>
+                                <div class="worker-info">
+                                    <div class="worker-avatar">${getInitials(record.userName)}</div>
+                                    <div>
+                                        <div class="worker-name">${escapeHtml(record.userName) || 'غير معروف'}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>${formatDate(record.checkInEventTime)}</td>
+                            <td class="time-cell">${formatTime(record.checkInEventTime)}</td>
+                            <td class="time-cell">${formatTime(record.checkOutEventTime)}</td>
+                            <td>${record.zoneName ? `<span class="zone-badge">${escapeHtml(record.zoneName)}</span>` : '-'}</td>
+                            <td class="hours-cell">${formatWorkDuration(record.workDuration)}</td>
+                            <td><span class="status-badge status-${record.status}">${statusMap[record.status] || record.status || 'غير محدد'}</span></td>
+                        </tr>
+                    `).join('');
+
+                    renderPagination();
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-calendar-times"></i><p>لا توجد سجلات حضور</p></td></tr>';
+                    document.getElementById('pagination').innerHTML = '';
+                    document.getElementById('presentCount').textContent = 0;
+                    document.getElementById('lateCount').textContent = 0;
+                    document.getElementById('absentCount').textContent = 0;
+                    document.getElementById('avgHours').textContent = 0;
+                }
+            } catch (e) {
+                console.error(e);
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-exclamation-circle"></i><p>فشل تحميل سجلات الحضور</p></td></tr>';
+            }
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            const pagination = document.getElementById('pagination');
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            pagination.innerHTML = `
+                <button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <span class="page-info">صفحة ${currentPage} من ${totalPages}</span>
+                <button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            `;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            loadAttendance();
+        }
+
+        function getInitials(name) {
+            if (!name) return '؟';
+            const parts = name.split(' ');
+            if (parts.length >= 2) {
+                return parts[0].charAt(0) + parts[1].charAt(0);
+            }
+            return name.charAt(0);
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleDateString('ar-SA');
+        }
+
+        function formatTime(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Parse TimeSpan string "HH:MM:SS" to hours (decimal)
+        function parseWorkDuration(duration) {
+            if (!duration) return 0;
+            const parts = duration.split(':');
+            if (parts.length >= 2) {
+                const hours = parseInt(parts[0]) || 0;
+                const minutes = parseInt(parts[1]) || 0;
+                return hours + (minutes / 60);
+            }
+            return 0;
+        }
+
+        // Format TimeSpan string to readable Arabic
+        function formatWorkDuration(duration) {
+            if (!duration) return '-';
+            const hours = parseWorkDuration(duration);
+            if (hours === 0) return '-';
+            return hours.toFixed(1) + ' ساعة';
+        }
+    </script>
+</body>
+</html>

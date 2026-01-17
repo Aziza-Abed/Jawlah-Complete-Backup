@@ -8,4 +8,5 @@ public interface IRepository<T> where T : class
     Task<IEnumerable<T>> AddRangeAsync(IEnumerable<T> entities);
     Task UpdateAsync(T entity);
     Task DeleteAsync(T entity);
+    Task SaveChangesAsync();
 }

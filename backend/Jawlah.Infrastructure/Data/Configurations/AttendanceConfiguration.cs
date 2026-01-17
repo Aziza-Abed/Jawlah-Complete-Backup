@@ -10,6 +10,12 @@ public class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
     {
         builder.HasKey(e => e.AttendanceId);
 
+        // Municipality relationship
+        builder.HasOne(e => e.Municipality)
+            .WithMany(m => m.Attendances)
+            .HasForeignKey(e => e.MunicipalityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.UserId)
             .IsRequired();
 
@@ -49,9 +55,11 @@ public class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
         builder.HasIndex(e => new { e.UserId, e.CheckInEventTime })
             .HasDatabaseName("IX_Attendance_User_CheckIn");
 
-        builder.HasIndex(e => e.Status);
+        builder.HasIndex(e => e.Status)
+            .HasDatabaseName("IX_Attendance_Status");
 
-        builder.HasIndex(e => e.ZoneId);
+        builder.HasIndex(e => e.ZoneId)
+            .HasDatabaseName("IX_Attendance_ZoneId");
 
         builder.HasOne(e => e.User)
             .WithMany(u => u.AttendanceRecords)

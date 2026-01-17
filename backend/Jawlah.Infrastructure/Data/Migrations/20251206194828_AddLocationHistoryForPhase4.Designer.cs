@@ -16,7 +16,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
     [Migration("20251206194828_AddLocationHistoryForPhase4")]
     partial class AddLocationHistoryForPhase4
     {
-        /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618

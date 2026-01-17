@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جولة - إدارة العمال</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .workers-content {
+            padding: 32px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .page-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+        }
+
+        .filter-select {
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            font-family: inherit;
+            min-width: 150px;
+        }
+
+        .workers-table {
+            background: white;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .workers-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .workers-table th {
+            background: var(--bg-main);
+            padding: 16px;
+            text-align: right;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .workers-table td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .worker-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .worker-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .worker-name {
+            font-weight: 600;
+        }
+
+        .worker-username {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background: rgba(163, 177, 138, 0.2);
+            color: var(--secondary-dark);
+        }
+
+        .status-inactive {
+            background: rgba(201, 122, 99, 0.2);
+            color: var(--accent-dark);
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 4px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-zones {
+            background: rgba(120, 149, 178, 0.15);
+            color: var(--primary);
+        }
+
+        .btn-reset {
+            background: rgba(201, 122, 99, 0.15);
+            color: var(--accent);
+        }
+
+        .btn-toggle {
+            background: rgba(163, 177, 138, 0.15);
+            color: var(--secondary-dark);
+        }
+
+        .zones-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .zone-tag {
+            background: var(--bg-main);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .modal-overlay {
+            display: none;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .zones-checkbox-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .zone-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .zone-checkbox input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-inner">
+                    <i class="fas fa-city" style="font-size: 2rem;"></i>
+                </div>
+                <h1>جولة</h1>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <i class="fas fa-th-large"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="map.html" class="nav-item">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>الخريطة الحية</span>
+                </a>
+                <a href="workers.html" class="nav-item active">
+                    <i class="fas fa-users"></i>
+                    <span>إدارة العمال</span>
+                </a>
+                <a href="tasks.html" class="nav-item">
+                    <i class="fas fa-plus-square"></i>
+                    <span>تعيين مهمة</span>
+                </a>
+                <a href="all-tasks.html" class="nav-item">
+                    <i class="fas fa-tasks"></i>
+                    <span>جميع المهام</span>
+                </a>
+                <a href="issues.html" class="nav-item">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>البلاغات</span>
+                </a>
+                <a href="attendance.html" class="nav-item">
+                    <i class="fas fa-user-clock"></i>
+                    <span>الحضور</span>
+                </a>
+                <a href="reports.html" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span>التقارير</span>
+                </a>
+                <a href="notifications.html" class="nav-item">
+                    <i class="fas fa-bell"></i>
+                    <span>الإشعارات</span>
+                </a>
+                <a href="profile.html" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>الملف الشخصي</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <span>تسجيل الخروج</span>
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <div class="header-icons">
+                        <div class="icon-btn"><i class="fas fa-cog"></i></div>
+                        <a href="profile.html" class="icon-btn" style="text-decoration: none;"><i class="fas fa-user"></i></a>
+                        <a href="notifications.html" class="icon-btn" style="position: relative; text-decoration: none;">
+                            <i class="fas fa-bell"></i>
+                            <span id="notifBadge" style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: none;"></span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="page-info">
+                        <h2>إدارة العمال</h2>
+                        <p>عرض وإدارة العمال الميدانيين</p>
+                    </div>
+                    <div class="icon-btn" style="font-size: 1.5rem;"><i class="fas fa-users"></i></div>
+                </div>
+            </header>
+
+            <div class="workers-content">
+                <div class="page-actions">
+                    <div class="filters">
+                        <select class="filter-select" id="statusFilter" onchange="loadWorkers()">
+                            <option value="">جميع الحالات</option>
+                            <option value="Active">نشط</option>
+                            <option value="Inactive">غير نشط</option>
+                        </select>
+                    </div>
+                    <div class="stats" style="color: var(--text-secondary);">
+                        إجمالي العمال: <strong id="totalCount">0</strong>
+                    </div>
+                </div>
+
+                <div class="workers-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>العامل</th>
+                                <th>الهاتف</th>
+                                <th>المناطق</th>
+                                <th>الحالة</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workersTableBody">
+                            <!-- Loaded by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Zones Modal -->
+    <div class="modal-overlay" id="zonesModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">تعيين المناطق</h3>
+                <button class="modal-close" onclick="closeZonesModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: var(--text-secondary);">اختر المناطق لتعيينها للعامل:</p>
+                <div class="zones-checkbox-list" id="zonesCheckboxList">
+                    <!-- Loaded by JS -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveZones()">حفظ</button>
+                <button class="btn btn-outline" onclick="closeZonesModal()">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let allZones = [];
+        let selectedWorkerId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadWorkers();
+            loadZones();
+            loadNotificationCount();
+        });
+
+        async function loadWorkers() {
+            const tbody = document.getElementById('workersTableBody');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;"><div class="spinner"></div></td></tr>';
+
+            try {
+                const response = await usersApi.getWorkers();
+                const statusFilter = document.getElementById('statusFilter').value;
+
+                if (response.data && response.data.length > 0) {
+                    let workers = response.data;
+
+                    if (statusFilter) {
+                        workers = workers.filter(w => w.status === statusFilter);
+                    }
+
+                    document.getElementById('totalCount').textContent = workers.length;
+
+                    tbody.innerHTML = workers.map(w => `
+                        <tr>
+                            <td>
+                                <div class="worker-info">
+                                    <div class="worker-avatar">${escapeHtml((w.fullName || w.username || '?').charAt(0))}</div>
+                                    <div>
+                                        <div class="worker-name">${escapeHtml(w.fullName || w.username)}</div>
+                                        <div class="worker-username">@${escapeHtml(w.username)}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>${escapeHtml(w.phoneNumber) || '---'}</td>
+                            <td id="zones-${w.userId}">
+                                <span style="color:var(--text-light)">جاري التحميل...</span>
+                            </td>
+                            <td>
+                                <span class="status-badge ${w.status === 'Active' ? 'status-active' : 'status-inactive'}">
+                                    ${w.status === 'Active' ? 'نشط' : 'غير نشط'}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="action-btn btn-zones" onclick="openZonesModal(${w.userId})">
+                                    <i class="fas fa-map"></i> المناطق
+                                </button>
+                                <button class="action-btn btn-reset" onclick="resetDevice(${w.userId})">
+                                    <i class="fas fa-mobile-alt"></i> إعادة تعيين
+                                </button>
+                                <button class="action-btn btn-toggle" onclick="toggleStatus(${w.userId}, '${w.status}')">
+                                    <i class="fas fa-${w.status === 'Active' ? 'ban' : 'check'}"></i>
+                                    ${w.status === 'Active' ? 'تعطيل' : 'تفعيل'}
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    // Load zones for each worker
+                    workers.forEach(w => loadWorkerZones(w.userId));
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-users"></i><p>لا يوجد عمال</p></div></td></tr>';
+                    document.getElementById('totalCount').textContent = 0;
+                }
+            } catch (e) {
+                console.error(e);
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--accent);">فشل تحميل البيانات</td></tr>';
+            }
+        }
+
+        async function loadWorkerZones(userId) {
+            try {
+                const response = await usersApi.getUserZones(userId);
+                const cell = document.getElementById(`zones-${userId}`);
+                if (response.data && response.data.length > 0) {
+                    cell.innerHTML = `<div class="zones-list">${response.data.map(z =>
+                        `<span class="zone-tag">${escapeHtml(z.zoneName)}</span>`
+                    ).join('')}</div>`;
+                } else {
+                    cell.innerHTML = '<span style="color:var(--text-light)">لم يتم التعيين</span>';
+                }
+            } catch (e) {
+                document.getElementById(`zones-${userId}`).innerHTML = '<span style="color:var(--text-light)">---</span>';
+            }
+        }
+
+        async function loadZones() {
+            try {
+                const response = await zonesApi.getAll();
+                if (response.data) {
+                    allZones = response.data;
+                }
+            } catch (e) {
+                console.error('Failed to load zones', e);
+            }
+        }
+
+        function openZonesModal(userId) {
+            selectedWorkerId = userId;
+            const list = document.getElementById('zonesCheckboxList');
+
+            // First load current zones for this worker
+            usersApi.getUserZones(userId).then(response => {
+                const currentZoneIds = response.data ? response.data.map(z => z.zoneId) : [];
+
+                list.innerHTML = allZones.map(z => `
+                    <label class="zone-checkbox">
+                        <input type="checkbox" value="${z.zoneId}" ${currentZoneIds.includes(z.zoneId) ? 'checked' : ''}>
+                        <span>${escapeHtml(z.zoneName)} (${escapeHtml(z.zoneCode)})</span>
+                    </label>
+                `).join('');
+
+                document.getElementById('zonesModal').classList.add('active');
+            }).catch(() => {
+                list.innerHTML = allZones.map(z => `
+                    <label class="zone-checkbox">
+                        <input type="checkbox" value="${z.zoneId}">
+                        <span>${escapeHtml(z.zoneName)} (${escapeHtml(z.zoneCode)})</span>
+                    </label>
+                `).join('');
+
+                document.getElementById('zonesModal').classList.add('active');
+            });
+        }
+
+        function closeZonesModal() {
+            document.getElementById('zonesModal').classList.remove('active');
+            selectedWorkerId = null;
+        }
+
+        async function saveZones() {
+            if (!selectedWorkerId) return;
+
+            const checkboxes = document.querySelectorAll('#zonesCheckboxList input:checked');
+            const zoneIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+            if (zoneIds.length === 0) {
+                alert('يجب تحديد منطقة واحدة على الأقل');
+                return;
+            }
+
+            try {
+                await usersApi.assignZones(selectedWorkerId, zoneIds);
+                alert('تم تحديث المناطق بنجاح');
+                closeZonesModal();
+                loadWorkerZones(selectedWorkerId);
+            } catch (e) {
+                alert('فشل تحديث المناطق');
+            }
+        }
+
+        async function resetDevice(userId) {
+            if (!confirm('هل أنت متأكد من إعادة تعيين الجهاز لهذا العامل؟')) return;
+
+            try {
+                await usersApi.resetDevice(userId);
+                alert('تم إعادة تعيين الجهاز بنجاح. يمكن للعامل تسجيل الدخول من جهاز جديد.');
+            } catch (e) {
+                alert('فشل إعادة تعيين الجهاز');
+            }
+        }
+
+        async function toggleStatus(userId, currentStatus) {
+            const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+            const action = newStatus === 'Active' ? 'تفعيل' : 'تعطيل';
+
+            if (!confirm(`هل أنت متأكد من ${action} هذا العامل؟`)) return;
+
+            try {
+                await usersApi.updateStatus(userId, newStatus);
+                alert(`تم ${action} العامل بنجاح`);
+                loadWorkers();
+            } catch (e) {
+                alert('فشل تحديث الحالة');
+            }
+        }
+    </script>
+</body>
+</html>

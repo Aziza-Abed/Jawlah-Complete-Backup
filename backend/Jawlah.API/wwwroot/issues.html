@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جولة - البلاغات والمشاكل</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .issues-content {
+            padding: 32px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .page-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+        }
+
+        .filter-select {
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            font-family: inherit;
+            min-width: 150px;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stat-item .icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .stat-item .icon.critical {
+            background: rgba(201, 122, 99, 0.15);
+            color: var(--accent);
+        }
+
+        .stat-item .icon.open {
+            background: rgba(255, 193, 7, 0.15);
+            color: #F57F17;
+        }
+
+        .stat-item .icon.resolved {
+            background: rgba(163, 177, 138, 0.15);
+            color: var(--secondary);
+        }
+
+        .stat-item .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .stat-item .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .issues-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .issue-card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 20px;
+            border-right: 4px solid var(--primary);
+        }
+
+        .issue-card.priority-Critical {
+            border-right-color: #d32f2f;
+        }
+
+        .issue-card.priority-High {
+            border-right-color: var(--accent);
+        }
+
+        .issue-card.status-Resolved {
+            border-right-color: var(--secondary);
+            opacity: 0.8;
+        }
+
+        .issue-photos {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .issue-photo {
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: var(--bg-main);
+            cursor: pointer;
+        }
+
+        .issue-photo:hover {
+            opacity: 0.9;
+        }
+
+        .issue-content {
+            flex: 1;
+        }
+
+        .issue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .issue-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text-dark);
+        }
+
+        .issue-priority {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .priority-Critical {
+            background: rgba(211, 47, 47, 0.15);
+            color: #d32f2f;
+        }
+
+        .priority-High {
+            background: rgba(201, 122, 99, 0.2);
+            color: var(--accent-dark);
+        }
+
+        .priority-Medium {
+            background: rgba(120, 149, 178, 0.2);
+            color: var(--primary-dark);
+        }
+
+        .priority-Low {
+            background: var(--bg-main);
+            color: var(--text-secondary);
+        }
+
+        .issue-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .issue-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .issue-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .issue-meta i {
+            color: var(--primary);
+        }
+
+        .issue-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-Open {
+            background: rgba(255, 193, 7, 0.2);
+            color: #F57F17;
+        }
+
+        .status-InProgress {
+            background: rgba(120, 149, 178, 0.2);
+            color: var(--primary-dark);
+        }
+
+        .status-Resolved {
+            background: rgba(163, 177, 138, 0.2);
+            color: var(--secondary-dark);
+        }
+
+        .status-Closed {
+            background: var(--bg-main);
+            color: var(--text-secondary);
+        }
+
+        .issue-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .issue-actions button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-resolve {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-resolve:hover {
+            background: var(--secondary-dark);
+        }
+
+        .btn-progress {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-progress:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-close {
+            background: var(--bg-main);
+            color: var(--text-dark);
+        }
+
+        .btn-close:hover {
+            background: var(--border);
+        }
+
+        .btn-pdf {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-pdf:hover {
+            background: #c82333;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .photo-modal img {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-inner">
+                    <i class="fas fa-city" style="font-size: 2rem;"></i>
+                </div>
+                <h1>جولة</h1>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <i class="fas fa-th-large"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="map.html" class="nav-item">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>الخريطة الحية</span>
+                </a>
+                <a href="workers.html" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>إدارة العمال</span>
+                </a>
+                <a href="tasks.html" class="nav-item">
+                    <i class="fas fa-plus-square"></i>
+                    <span>تعيين مهمة</span>
+                </a>
+                <a href="all-tasks.html" class="nav-item">
+                    <i class="fas fa-tasks"></i>
+                    <span>جميع المهام</span>
+                </a>
+                <a href="issues.html" class="nav-item active">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>البلاغات</span>
+                </a>
+                <a href="attendance.html" class="nav-item">
+                    <i class="fas fa-user-clock"></i>
+                    <span>الحضور</span>
+                </a>
+                <a href="reports.html" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span>التقارير</span>
+                </a>
+                <a href="notifications.html" class="nav-item">
+                    <i class="fas fa-bell"></i>
+                    <span>الإشعارات</span>
+                </a>
+                <a href="profile.html" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>الملف الشخصي</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <span>تسجيل الخروج</span>
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <div class="header-icons">
+                        <div class="icon-btn"><i class="fas fa-cog"></i></div>
+                        <a href="profile.html" class="icon-btn" style="text-decoration: none;"><i class="fas fa-user"></i></a>
+                        <a href="notifications.html" class="icon-btn" style="position: relative; text-decoration: none;">
+                            <i class="fas fa-bell"></i>
+                            <span id="notifBadge" style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: none;"></span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="page-info">
+                        <h2>البلاغات والمشاكل</h2>
+                        <p>مراجعة البلاغات المرسلة من العمال</p>
+                    </div>
+                    <div class="icon-btn" style="font-size: 1.5rem;"><i class="fas fa-exclamation-triangle"></i></div>
+                </div>
+            </header>
+
+            <div class="issues-content">
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <div class="icon critical"><i class="fas fa-exclamation-circle"></i></div>
+                        <div>
+                            <div class="value" id="criticalCount">0</div>
+                            <div class="label">حرجة</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="icon open"><i class="fas fa-clock"></i></div>
+                        <div>
+                            <div class="value" id="openCount">0</div>
+                            <div class="label">مفتوحة</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="icon resolved"><i class="fas fa-check-circle"></i></div>
+                        <div>
+                            <div class="value" id="resolvedCount">0</div>
+                            <div class="label">تم الحل</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="page-actions">
+                    <div class="filters">
+                        <select class="filter-select" id="statusFilter" onchange="loadIssues()">
+                            <option value="">جميع الحالات</option>
+                            <option value="Open">مفتوحة</option>
+                            <option value="InProgress">قيد المعالجة</option>
+                            <option value="Resolved">تم الحل</option>
+                            <option value="Closed">مغلقة</option>
+                        </select>
+                        <select class="filter-select" id="priorityFilter" onchange="loadIssues()">
+                            <option value="">جميع الأولويات</option>
+                            <option value="Critical">حرجة</option>
+                            <option value="High">عالية</option>
+                            <option value="Medium">متوسطة</option>
+                            <option value="Low">منخفضة</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="issues-list" id="issuesList">
+                    <!-- Loaded by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Photo Modal -->
+    <div class="modal-overlay photo-modal" id="photoModal" onclick="closePhotoModal()">
+        <img id="modalPhoto" src="" alt="صورة البلاغ">
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        const statusMap = {
+            'Reported': 'تم الإبلاغ',
+            'UnderReview': 'قيد المراجعة',
+            'Resolved': 'تم الحل',
+            'Dismissed': 'تم الرفض',
+            // Legacy mappings for compatibility
+            'Open': 'مفتوحة',
+            'InProgress': 'قيد المعالجة',
+            'Closed': 'مغلقة'
+        };
+
+        const priorityMap = {
+            'Minor': 'بسيطة',
+            'Moderate': 'متوسطة',
+            'Major': 'كبيرة',
+            'Critical': 'حرجة',
+            // Legacy mappings for compatibility
+            'Low': 'منخفضة',
+            'Medium': 'متوسطة',
+            'High': 'عالية'
+        };
+
+        let allIssues = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadIssues();
+            loadNotificationCount();
+        });
+
+        async function loadIssues() {
+            const list = document.getElementById('issuesList');
+            list.innerHTML = '<div class="empty-state"><div class="spinner"></div><p>جاري التحميل...</p></div>';
+
+            try {
+                const response = await issuesApi.getAll();
+
+                if (response.data && response.data.length > 0) {
+                    allIssues = response.data;
+
+                    // Apply filters
+                    let issues = [...allIssues];
+                    const statusFilter = document.getElementById('statusFilter').value;
+                    const priorityFilter = document.getElementById('priorityFilter').value;
+
+                    if (statusFilter) {
+                        issues = issues.filter(i => i.status === statusFilter);
+                    }
+                    if (priorityFilter) {
+                        issues = issues.filter(i => i.priority === priorityFilter);
+                    }
+
+                    // Update stats
+                    document.getElementById('criticalCount').textContent = allIssues.filter(i => i.priority === 'Critical' || i.priority === 'High').length;
+                    document.getElementById('openCount').textContent = allIssues.filter(i => i.status === 'Open' || i.status === 'InProgress').length;
+                    document.getElementById('resolvedCount').textContent = allIssues.filter(i => i.status === 'Resolved' || i.status === 'Closed').length;
+
+                    if (issues.length === 0) {
+                        list.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i><p>لا توجد بلاغات تطابق الفلتر</p></div>';
+                        return;
+                    }
+
+                    list.innerHTML = issues.map(issue => `
+                        <div class="issue-card priority-${issue.priority} status-${issue.status}">
+                            ${issue.photos && issue.photos.length > 0 ? `
+                                <div class="issue-photos">
+                                    ${issue.photos.slice(0, 2).map(photo => `
+                                        <img src="${API_CONFIG.BASE_URL.replace('/api', '')}/${photo}"
+                                             class="issue-photo"
+                                             onclick="openPhotoModal('${API_CONFIG.BASE_URL.replace('/api', '')}/${photo}')"
+                                             onerror="this.style.display='none'">
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            <div class="issue-content">
+                                <div class="issue-header">
+                                    <span class="issue-title">${escapeHtml(issue.title)}</span>
+                                    <span class="issue-priority priority-${issue.priority}">${priorityMap[issue.priority] || issue.priority}</span>
+                                </div>
+                                <p class="issue-desc">${escapeHtml(issue.description) || 'لا يوجد وصف'}</p>
+                                <div class="issue-meta">
+                                    <span><i class="fas fa-user"></i> ${escapeHtml(issue.reportedByName) || 'غير معروف'}</span>
+                                    <span><i class="fas fa-calendar"></i> ${new Date(issue.createdAt).toLocaleDateString('ar-SA')}</span>
+                                    ${issue.zoneName ? `<span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(issue.zoneName)}</span>` : ''}
+                                </div>
+                                <span class="issue-status status-${issue.status}">${statusMap[issue.status] || issue.status}</span>
+                            </div>
+                            <div class="issue-actions">
+                                <button class="btn-pdf" onclick="downloadPdf(${issue.issueId})">
+                                    <i class="fas fa-file-pdf"></i> تحميل PDF
+                                </button>
+                                ${issue.status === 'Open' || issue.status === 'Reported' ? `
+                                    <button class="btn-progress" onclick="updateStatus(${issue.issueId}, 'UnderReview')">
+                                        <i class="fas fa-play"></i> بدء المراجعة
+                                    </button>
+                                ` : ''}
+                                ${issue.status === 'InProgress' || issue.status === 'UnderReview' ? `
+                                    <button class="btn-resolve" onclick="updateStatus(${issue.issueId}, 'Resolved')">
+                                        <i class="fas fa-check"></i> تم الحل
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i><p>لا توجد بلاغات</p></div>';
+                    document.getElementById('criticalCount').textContent = 0;
+                    document.getElementById('openCount').textContent = 0;
+                    document.getElementById('resolvedCount').textContent = 0;
+                }
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>فشل تحميل البلاغات</p></div>';
+            }
+        }
+
+        async function updateStatus(issueId, newStatus) {
+            const statusText = statusMap[newStatus];
+            if (!confirm(`هل أنت متأكد من تغيير الحالة إلى "${statusText}"؟`)) return;
+
+            try {
+                await issuesApi.updateStatus(issueId, newStatus);
+                alert('تم تحديث الحالة بنجاح');
+                loadIssues();
+            } catch (e) {
+                alert('فشل تحديث الحالة');
+            }
+        }
+
+        function openPhotoModal(src) {
+            document.getElementById('modalPhoto').src = src;
+            document.getElementById('photoModal').classList.add('active');
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photoModal').classList.remove('active');
+        }
+
+        async function downloadPdf(issueId) {
+            try {
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التحميل...';
+                btn.disabled = true;
+
+                await issuesApi.downloadPdf(issueId);
+
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            } catch (e) {
+                alert('فشل تحميل التقرير');
+                const btn = event.target.closest('button');
+                btn.innerHTML = '<i class="fas fa-file-pdf"></i> تحميل PDF';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جولة - جميع المهام</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .tasks-content {
+            padding: 32px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .page-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+        }
+
+        .filter-select {
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            font-family: inherit;
+            min-width: 150px;
+        }
+
+        .tasks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .task-card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border-right: 4px solid var(--primary);
+            transition: transform 0.2s;
+        }
+
+        .task-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .task-card.status-Completed {
+            border-right-color: var(--secondary);
+        }
+
+        .task-card.status-Approved {
+            border-right-color: #4CAF50;
+        }
+
+        .task-card.status-Rejected {
+            border-right-color: var(--accent);
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .task-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text-dark);
+        }
+
+        .task-priority {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .priority-High, .priority-Urgent {
+            background: rgba(201, 122, 99, 0.2);
+            color: var(--accent-dark);
+        }
+
+        .priority-Medium {
+            background: rgba(120, 149, 178, 0.2);
+            color: var(--primary-dark);
+        }
+
+        .priority-Low {
+            background: var(--bg-main);
+            color: var(--text-secondary);
+        }
+
+        .task-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .task-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .task-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .task-meta i {
+            color: var(--primary);
+        }
+
+        .task-status {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        .status-Pending {
+            background: rgba(255, 193, 7, 0.2);
+            color: #F57F17;
+        }
+
+        .status-InProgress {
+            background: rgba(120, 149, 178, 0.2);
+            color: var(--primary-dark);
+        }
+
+        .status-Completed {
+            background: rgba(163, 177, 138, 0.2);
+            color: var(--secondary-dark);
+        }
+
+        .status-Approved {
+            background: rgba(76, 175, 80, 0.2);
+            color: #2E7D32;
+        }
+
+        .status-Rejected {
+            background: rgba(201, 122, 99, 0.2);
+            color: var(--accent-dark);
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .task-actions button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .btn-approve {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background: var(--secondary-dark);
+        }
+
+        .btn-reject {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background: var(--accent-dark);
+        }
+
+        .btn-view {
+            background: var(--bg-main);
+            color: var(--text-dark);
+        }
+
+        .btn-view:hover {
+            background: var(--border);
+        }
+
+        .task-photo {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            background: var(--bg-main);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .stat-item .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-item .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .modal-overlay {
+            display: none;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .evidence-photo {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 8px;
+            background: var(--bg-main);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-inner">
+                    <i class="fas fa-city" style="font-size: 2rem;"></i>
+                </div>
+                <h1>جولة</h1>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <i class="fas fa-th-large"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="map.html" class="nav-item">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>الخريطة الحية</span>
+                </a>
+                <a href="workers.html" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>إدارة العمال</span>
+                </a>
+                <a href="tasks.html" class="nav-item">
+                    <i class="fas fa-plus-square"></i>
+                    <span>تعيين مهمة</span>
+                </a>
+                <a href="all-tasks.html" class="nav-item active">
+                    <i class="fas fa-tasks"></i>
+                    <span>جميع المهام</span>
+                </a>
+                <a href="issues.html" class="nav-item">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>البلاغات</span>
+                </a>
+                <a href="attendance.html" class="nav-item">
+                    <i class="fas fa-user-clock"></i>
+                    <span>الحضور</span>
+                </a>
+                <a href="reports.html" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span>التقارير</span>
+                </a>
+                <a href="notifications.html" class="nav-item">
+                    <i class="fas fa-bell"></i>
+                    <span>الإشعارات</span>
+                </a>
+                <a href="profile.html" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>الملف الشخصي</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <span>تسجيل الخروج</span>
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <div class="header-icons">
+                        <div class="icon-btn"><i class="fas fa-cog"></i></div>
+                        <a href="profile.html" class="icon-btn" style="text-decoration: none;"><i class="fas fa-user"></i></a>
+                        <a href="notifications.html" class="icon-btn" style="position: relative; text-decoration: none;">
+                            <i class="fas fa-bell"></i>
+                            <span id="notifBadge" style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: none;"></span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="page-info">
+                        <h2>جميع المهام</h2>
+                        <p>مراجعة وإدارة المهام</p>
+                    </div>
+                    <div class="icon-btn" style="font-size: 1.5rem;"><i class="fas fa-tasks"></i></div>
+                </div>
+            </header>
+
+            <div class="tasks-content">
+                <div class="stats-bar" id="statsBar">
+                    <div class="stat-item">
+                        <div class="value" id="pendingCount">0</div>
+                        <div class="label">قيد الانتظار</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value" id="inProgressCount">0</div>
+                        <div class="label">قيد التنفيذ</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value" id="completedCount">0</div>
+                        <div class="label">بحاجة للمراجعة</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="value" id="approvedCount">0</div>
+                        <div class="label">معتمدة</div>
+                    </div>
+                </div>
+
+                <div class="page-actions">
+                    <div class="filters">
+                        <select class="filter-select" id="statusFilter" onchange="loadTasks()">
+                            <option value="">جميع الحالات</option>
+                            <option value="Pending">قيد الانتظار</option>
+                            <option value="InProgress">قيد التنفيذ</option>
+                            <option value="Completed">مكتملة (بحاجة للمراجعة)</option>
+                            <option value="Approved">معتمدة</option>
+                            <option value="Rejected">مرفوضة</option>
+                        </select>
+                        <select class="filter-select" id="priorityFilter" onchange="loadTasks()">
+                            <option value="">جميع الأولويات</option>
+                            <option value="Urgent">عاجلة</option>
+                            <option value="High">عالية</option>
+                            <option value="Medium">متوسطة</option>
+                            <option value="Low">منخفضة</option>
+                        </select>
+                    </div>
+                    <a href="tasks.html" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> تعيين مهمة جديدة
+                    </a>
+                </div>
+
+                <div class="tasks-grid" id="tasksGrid">
+                    <!-- Loaded by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Task Details Modal -->
+    <div class="modal-overlay" id="taskModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">تفاصيل المهمة</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Loaded by JS -->
+            </div>
+            <div class="modal-footer" id="modalFooter">
+                <!-- Loaded by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        const statusMap = {
+            'Pending': 'قيد الانتظار',
+            'InProgress': 'قيد التنفيذ',
+            'Completed': 'مكتملة',
+            'Approved': 'معتمدة',
+            'Rejected': 'مرفوضة'
+        };
+
+        const priorityMap = {
+            'Low': 'منخفضة',
+            'Medium': 'متوسطة',
+            'High': 'عالية',
+            'Urgent': 'عاجلة'
+        };
+
+        let allTasks = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadTasks();
+            loadNotificationCount();
+        });
+
+        async function loadTasks() {
+            const grid = document.getElementById('tasksGrid');
+            grid.innerHTML = '<div class="empty-state"><div class="spinner"></div><p>جاري التحميل...</p></div>';
+
+            try {
+                const response = await tasksApi.getAll();
+
+                if (response.data && response.data.length > 0) {
+                    allTasks = response.data;
+
+                    // Apply filters
+                    let tasks = [...allTasks];
+                    const statusFilter = document.getElementById('statusFilter').value;
+                    const priorityFilter = document.getElementById('priorityFilter').value;
+
+                    if (statusFilter) {
+                        tasks = tasks.filter(t => t.status === statusFilter);
+                    }
+                    if (priorityFilter) {
+                        tasks = tasks.filter(t => t.priority === priorityFilter);
+                    }
+
+                    // Update stats
+                    document.getElementById('pendingCount').textContent = allTasks.filter(t => t.status === 'Pending').length;
+                    document.getElementById('inProgressCount').textContent = allTasks.filter(t => t.status === 'InProgress').length;
+                    document.getElementById('completedCount').textContent = allTasks.filter(t => t.status === 'Completed').length;
+                    document.getElementById('approvedCount').textContent = allTasks.filter(t => t.status === 'Approved').length;
+
+                    if (tasks.length === 0) {
+                        grid.innerHTML = '<div class="empty-state"><i class="fas fa-tasks"></i><p>لا توجد مهام تطابق الفلتر</p></div>';
+                        return;
+                    }
+
+                    grid.innerHTML = tasks.map(t => `
+                        <div class="task-card status-${t.status}">
+                            ${t.evidencePhotoPath ? `<img src="${API_CONFIG.BASE_URL.replace('/api', '')}/${t.evidencePhotoPath}" class="task-photo" onerror="this.style.display='none'">` : ''}
+                            <div class="task-header">
+                                <span class="task-title">${escapeHtml(t.title)}</span>
+                                <span class="task-priority priority-${t.priority}">${priorityMap[t.priority] || t.priority}</span>
+                            </div>
+                            <p class="task-desc">${escapeHtml(t.description) || 'لا يوجد وصف'}</p>
+                            <span class="task-status status-${t.status}">${statusMap[t.status] || t.status}</span>
+                            <div class="task-meta">
+                                <span><i class="fas fa-user"></i> ${escapeHtml(t.assignedToName) || 'غير معين'}</span>
+                                <span><i class="fas fa-calendar"></i> ${t.dueDate ? new Date(t.dueDate).toLocaleDateString('ar-SA') : '---'}</span>
+                                ${t.zoneName ? `<span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(t.zoneName)}</span>` : ''}
+                            </div>
+                            <div class="task-actions">
+                                ${t.status === 'Completed' ? `
+                                    <button class="btn-approve" onclick="approveTask(${t.taskId})">
+                                        <i class="fas fa-check"></i> اعتماد
+                                    </button>
+                                    <button class="btn-reject" onclick="rejectTask(${t.taskId})">
+                                        <i class="fas fa-times"></i> رفض
+                                    </button>
+                                ` : ''}
+                                <button class="btn-view" onclick="viewTask(${t.taskId})">
+                                    <i class="fas fa-eye"></i> عرض
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    grid.innerHTML = '<div class="empty-state"><i class="fas fa-tasks"></i><p>لا توجد مهام</p></div>';
+                    document.getElementById('pendingCount').textContent = 0;
+                    document.getElementById('inProgressCount').textContent = 0;
+                    document.getElementById('completedCount').textContent = 0;
+                    document.getElementById('approvedCount').textContent = 0;
+                }
+            } catch (e) {
+                console.error(e);
+                grid.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>فشل تحميل المهام</p></div>';
+            }
+        }
+
+        async function viewTask(taskId) {
+            const task = allTasks.find(t => t.taskId === taskId);
+            if (!task) return;
+
+            const modalBody = document.getElementById('modalBody');
+            const modalFooter = document.getElementById('modalFooter');
+            document.getElementById('modalTitle').textContent = task.title;
+
+            modalBody.innerHTML = `
+                ${task.evidencePhotoPath ? `<img src="${API_CONFIG.BASE_URL.replace('/api', '')}/${task.evidencePhotoPath}" class="evidence-photo" style="margin-bottom: 20px;">` : ''}
+                <p style="margin-bottom: 16px;">${escapeHtml(task.description) || 'لا يوجد وصف'}</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.9rem;">
+                    <div><strong>الحالة:</strong> ${statusMap[task.status] || task.status}</div>
+                    <div><strong>الأولوية:</strong> ${priorityMap[task.priority] || task.priority}</div>
+                    <div><strong>المكلف:</strong> ${escapeHtml(task.assignedToName) || 'غير معين'}</div>
+                    <div><strong>المنطقة:</strong> ${escapeHtml(task.zoneName) || '---'}</div>
+                    <div><strong>تاريخ الاستحقاق:</strong> ${task.dueDate ? new Date(task.dueDate).toLocaleDateString('ar-SA') : '---'}</div>
+                    <div><strong>تاريخ الإنشاء:</strong> ${new Date(task.createdAt).toLocaleDateString('ar-SA')}</div>
+                    ${task.completedAt ? `<div><strong>تاريخ الإنجاز:</strong> ${new Date(task.completedAt).toLocaleDateString('ar-SA')}</div>` : ''}
+                </div>
+            `;
+
+            if (task.status === 'Completed') {
+                modalFooter.innerHTML = `
+                    <button class="btn btn-secondary" onclick="approveTask(${task.taskId}); closeModal();">
+                        <i class="fas fa-check"></i> اعتماد
+                    </button>
+                    <button class="btn btn-accent" onclick="rejectTask(${task.taskId}); closeModal();">
+                        <i class="fas fa-times"></i> رفض
+                    </button>
+                    <button class="btn btn-outline" onclick="closeModal()">إغلاق</button>
+                `;
+            } else {
+                modalFooter.innerHTML = `<button class="btn btn-outline" onclick="closeModal()">إغلاق</button>`;
+            }
+
+            document.getElementById('taskModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('taskModal').classList.remove('active');
+        }
+
+        async function approveTask(taskId) {
+            if (!confirm('هل أنت متأكد من اعتماد هذه المهمة؟')) return;
+
+            try {
+                await tasksApi.approve(taskId);
+                alert('تم اعتماد المهمة بنجاح');
+                loadTasks();
+            } catch (e) {
+                alert('فشل اعتماد المهمة');
+            }
+        }
+
+        async function rejectTask(taskId) {
+            const reason = prompt('سبب الرفض (اختياري):');
+            if (reason === null) return; // User cancelled
+
+            try {
+                await tasksApi.reject(taskId, reason);
+                alert('تم رفض المهمة');
+                loadTasks();
+            } catch (e) {
+                alert('فشل رفض المهمة');
+            }
+        }
+    </script>
+</body>
+</html>

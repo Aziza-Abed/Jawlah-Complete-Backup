@@ -9,4 +9,5 @@ public interface IIssueRepository : IRepository<Issue>
     Task<IEnumerable<Issue>> GetIssuesByStatusAsync(IssueStatus status);
     Task<IEnumerable<Issue>> GetIssuesByTypeAsync(IssueType type);
     Task<IEnumerable<Issue>> GetCriticalIssuesAsync();
+    Task<IEnumerable<Issue>> GetIssuesModifiedAfterAsync(int userId, DateTime lastSyncTime);
 }

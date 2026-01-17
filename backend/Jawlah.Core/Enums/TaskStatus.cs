@@ -1,11 +1,13 @@
 namespace Jawlah.Core.Enums;
 
+// workflow: Pending → InProgress → Completed → Approved/Rejected (supervisor review)
+// or: Pending → Cancelled
 public enum TaskStatus
 {
-    Pending = 1,
-    InProgress = 2,
-    Completed = 3,
-    Cancelled = 4,
-    Approved = 5,
-    Rejected = 6
+    Pending = 0,
+    InProgress = 1,
+    Completed = 2,
+    Cancelled = 3,
+    Approved = 4,    // supervisor approved completed task
+    Rejected = 5     // supervisor rejected completed task
 }

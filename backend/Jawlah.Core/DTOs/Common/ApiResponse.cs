@@ -7,7 +7,7 @@ public class ApiResponse<T>
     public T? Data { get; set; }
     public List<string>? Errors { get; set; }
 
-    public static ApiResponse<T> SuccessResult(T data, string? message = null)
+    public static ApiResponse<T> SuccessResponse(T data, string? message = null)
     {
         return new ApiResponse<T>
         {
@@ -17,7 +17,7 @@ public class ApiResponse<T>
         };
     }
 
-    public static ApiResponse<T> ErrorResult(string error)
+    public static ApiResponse<T> ErrorResponse(string error)
     {
         return new ApiResponse<T>
         {
@@ -27,7 +27,7 @@ public class ApiResponse<T>
         };
     }
 
-    public static ApiResponse<T> ErrorResult(List<string> errors)
+    public static ApiResponse<T> ErrorResponse(List<string> errors)
     {
         return new ApiResponse<T>
         {
@@ -36,8 +36,4 @@ public class ApiResponse<T>
             Errors = errors
         };
     }
-
-    public static ApiResponse<T> SuccessResponse(T data, string? message = null) => SuccessResult(data, message);
-    public static ApiResponse<T> ErrorResponse(string error) => ErrorResult(error);
-    public static ApiResponse<T> ErrorResponse(List<string> errors) => ErrorResult(errors);
 }

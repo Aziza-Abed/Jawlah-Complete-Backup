@@ -2,29 +2,18 @@ using Microsoft.AspNetCore.Http;
 
 namespace Jawlah.Core.Interfaces.Services;
 
-/// <summary>
-/// Service for handling file uploads and storage
-/// </summary>
+// file upload and storage service
 public interface IFileStorageService
 {
-    /// <summary>
-    /// Uploads an image file to local storage
-    /// </summary>
-    /// <param name="file">The image file to upload</param>
-    /// <param name="folder">Folder name (tasks, issues, profiles)</param>
-    /// <returns>The URL path to access the uploaded file</returns>
-    Task<string> UploadImageAsync(IFormFile file, string folder);
+    // upload image to storage
+    Task<string> UploadImageAsync(IFormFile file, string folder, int? userId = null, string? entityType = null, int? entityId = null);
 
-    /// <summary>
-    /// Deletes an image file from local storage
-    /// </summary>
-    /// <param name="fileUrl">The URL of the file to delete</param>
-    Task DeleteImageAsync(string fileUrl);
+    // delete single image (returns true if deleted, false if not found or error)
+    Task<bool> DeleteImageAsync(string fileUrl);
 
-    /// <summary>
-    /// Validates if the file is a valid image
-    /// </summary>
-    /// <param name="file">The file to validate</param>
-    /// <returns>True if valid, false otherwise</returns>
+    // delete multiple images with error handling
+    Task DeleteImagesAsync(IEnumerable<string> fileUrls);
+
+    // validate image file
     bool ValidateImage(IFormFile file);
 }
