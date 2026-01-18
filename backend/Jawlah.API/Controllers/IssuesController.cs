@@ -468,31 +468,6 @@ public class IssuesController : BaseApiController
         return NoContent();
     }
 
-    // ============ Issue Forwarding Notes ============
-
-    /// <summary>
-    /// Update forwarding notes for an issue (supervisor records where they sent the PDF)
-    /// </summary>
-    [HttpPut("{id}/forwarding-notes")]
-    [Authorize(Roles = "Admin,Supervisor")]
-    public async Task<IActionResult> UpdateForwardingNotes(int id, [FromBody] UpdateForwardingNotesRequest request)
-    {
-        var issue = await _issues.GetByIdAsync(id);
-        if (issue == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("البلاغ غير موجود"));
-
-        issue.ForwardingNotes = request.Notes;
-        issue.SyncTime = DateTime.UtcNow;
-        issue.SyncVersion++;
-
-        await _issues.UpdateAsync(issue);
-        await _issues.SaveChangesAsync();
-
-        _logger.LogInformation("Issue {IssueId} forwarding notes updated", id);
-
-        return Ok(ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue)));
-    }
-
     // ============ PDF Generation ============
 
     /// <summary>
@@ -680,12 +655,6 @@ public class IssuesController : BaseApiController
 
         // Generate PDF bytes
         var pdfBytes = document.GeneratePdf();
-
-        // Log the download
-        issue.PdfDownloadedAt = DateTime.UtcNow;
-        issue.PdfDownloadedByUserId = userId.Value;
-        await _issues.UpdateAsync(issue);
-        await _issues.SaveChangesAsync();
 
         _logger.LogInformation("Issue {IssueId} PDF downloaded by user {UserId}", id, userId.Value);
 

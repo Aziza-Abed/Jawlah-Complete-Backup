@@ -8,7 +8,6 @@ export type LoginRequest = {
 export type LoginResponse = {
   success: boolean;
   token?: string;
-  refreshToken?: string;
   expiresAt?: string;
   user?: UserDto;
   error?: string;

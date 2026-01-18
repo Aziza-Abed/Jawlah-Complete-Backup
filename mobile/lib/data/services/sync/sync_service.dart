@@ -124,7 +124,7 @@ class SyncService {
 
       final response = await _retryRequest(() async {
         return await _dio.post(
-          '/sync/attendance/batch',
+          'sync/attendance/batch',
           data: {
             'deviceId': await _getDeviceId(),
             'clientTime': DateTime.now().toIso8601String(),
@@ -203,7 +203,7 @@ class SyncService {
 
         final response = await _retryRequest(() async {
           return await _dio.post(
-            '/sync/tasks/batch',
+            'sync/tasks/batch',
             data: {
               'deviceId': await _getDeviceId(),
               'clientTime': DateTime.now().toIso8601String(),
@@ -280,7 +280,8 @@ class SyncService {
           );
 
           if (issue.clientId != null) {
-            await _issueLocalRepo.markAsSynced(issue.clientId!, newIssue.issueId);
+            await _issueLocalRepo.markAsSynced(
+                issue.clientId!, newIssue.issueId);
           }
           result.success++;
         } catch (e) {
@@ -301,7 +302,7 @@ class SyncService {
       final lastSyncTime = await _getLastSyncTime();
 
       final response = await _dio.get(
-        '/sync/changes',
+        'sync/changes',
         queryParameters: {
           'lastSyncTime': lastSyncTime?.toIso8601String(),
         },
@@ -365,7 +366,8 @@ class SyncService {
             longitude: (issueJson['longitude'] as num?)?.toDouble() ?? 0.0,
             locationDescription: issueJson['locationDescription'],
             photoUrl: issueJson['photoUrl'],
-            reportedAt: _safeParseDateTimeUtc(issueJson['reportedAt']) ?? DateTime.now(),
+            reportedAt: _safeParseDateTimeUtc(issueJson['reportedAt']) ??
+                DateTime.now(),
             isSynced: true,
             createdAt: DateTime.now(),
             syncedAt: DateTime.now(),

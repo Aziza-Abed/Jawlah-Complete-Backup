@@ -1,13 +1,29 @@
 import React, { useMemo, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
-import { Bell, User, Settings, Search, Menu } from "lucide-react";
+import { Bell, User, Settings, Search, Menu, LogOut } from "lucide-react";
+import { logout } from "../../api/auth";
 
 export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
 
   const unreadCount = 3;
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
+      // Clear local storage
+      localStorage.removeItem("jawlah_token");
+      localStorage.removeItem("jawlah_user");
+      // Navigate to login
+      navigate("/login");
+    }
+  };
 
   const isNotificationsActive = useMemo(() => {
     return location.pathname.startsWith("/notifications");
@@ -23,7 +39,7 @@ export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* ✅ RTL: first child appears on the RIGHT automatically */}
       <div className="h-full flex items-center justify-between gap-3">
         {/* ✅ RIGHT (Logo) */}
-        <div className="flex items-center justify-end w-[90px] sm:w-[120px] md:w-[140px]">
+        <div className="flex items-center justify-start w-[90px] sm:w-[120px] md:w-[140px]">
           <img
             src={logo}
             alt="بلدية البيرة"
@@ -87,7 +103,7 @@ export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     >
       <Bell size={22} className="text-[#60778E]" />
       {unreadCount > 0 && (
-        <span className="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#C86E5D] text-white text-[11px] font-sans font-bold flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#C86E5D] text-white text-[11px] font-sans font-bold flex items-center justify-center">
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}
@@ -110,7 +126,7 @@ export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
     >
       <Bell size={22} className="text-[#60778E]" />
       {unreadCount > 0 && (
-        <span className="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#C86E5D] text-white text-[11px] font-sans font-bold flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#C86E5D] text-white text-[11px] font-sans font-bold flex items-center justify-center">
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}
@@ -126,6 +142,12 @@ export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
     <PillIcon ariaLabel="الإعدادات">
       <Settings size={22} className="text-[#60778E]" />
+    </PillIcon>
+
+    <div className="w-[1px] h-6 bg-[#60778E]/20" />
+
+    <PillIcon ariaLabel="تسجيل الخروج" onClick={handleLogout}>
+      <LogOut size={22} className="text-[#C86E5D]" />
     </PillIcon>
   </div>
 </div>

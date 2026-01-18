@@ -8,7 +8,7 @@ namespace Jawlah.API.Controllers;
 // UR23: Audit log viewer for administrators
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Supervisor")]
 public class AuditController : ControllerBase
 {
     private readonly AuditLogService _auditService;

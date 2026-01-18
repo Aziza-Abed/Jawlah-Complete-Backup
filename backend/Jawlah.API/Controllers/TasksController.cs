@@ -174,6 +174,8 @@ public class TasksController : BaseApiController
             RequiresPhotoProof = request.RequiresPhotoProof,
             EstimatedDurationMinutes = request.EstimatedDurationMinutes,
             DueDate = request.DueDate,
+            Latitude = request.Latitude,         // NEW: Map GPS coordinates
+            Longitude = request.Longitude,       // NEW: Map GPS coordinates
             LocationDescription = sanitizedLocation,
             CreatedAt = DateTime.UtcNow,
             EventTime = DateTime.UtcNow,
@@ -300,6 +302,12 @@ public class TasksController : BaseApiController
             }
             task.DueDate = request.DueDate.Value;
         }
+
+        if (request.Latitude.HasValue)
+            task.Latitude = request.Latitude.Value;
+
+        if (request.Longitude.HasValue)
+            task.Longitude = request.Longitude.Value;
 
         if (!string.IsNullOrEmpty(request.LocationDescription))
             task.LocationDescription = InputSanitizer.SanitizeString(request.LocationDescription, 500);
@@ -849,6 +857,7 @@ public class TasksController : BaseApiController
 
     // update task progress (for multi-day tasks)
     [HttpPut("{id}/progress")]
+    [Authorize]
     public async Task<IActionResult> UpdateTaskProgress(int id, [FromBody] UpdateTaskProgressRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -856,11 +865,18 @@ public class TasksController : BaseApiController
             return NotFound(ApiResponse<object>.ErrorResponse("المهمة غير موجودة"));
 
         var userId = GetCurrentUserId();
+        if (userId == null)
+            return Unauthorized(ApiResponse<object>.ErrorResponse("رمز غير صالح"));
+
         var userRole = GetCurrentUserRole();
 
         // workers can only update their own tasks
         if (userRole == "Worker" && task.AssignedToUserId != userId)
             return Forbid();
+
+        // CRITICAL: Only update tasks that are in progress or pending
+        if (task.Status != TaskStatus.InProgress && task.Status != TaskStatus.Pending)
+            return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكن تحديث التقدم - المهمة ليست قيد التنفيذ"));
 
         // validate progress value
         if (request.ProgressPercentage < 0 || request.ProgressPercentage > 100)
@@ -882,9 +898,27 @@ public class TasksController : BaseApiController
 
         // update progress
         task.ProgressPercentage = request.ProgressPercentage;
-        task.ProgressNotes = InputSanitizer.SanitizeString(request.ProgressNotes, 500);
+        task.ProgressNotes = InputSanitizer.SanitizeString(request.ProgressNotes, 1000);
         task.SyncTime = DateTime.UtcNow;
         task.SyncVersion++;
+
+        // handle deadline extension request (worker requests, supervisor approves via /extend endpoint)
+        if (request.ExtendedDeadline.HasValue && request.ExtendedDeadline > task.DueDate)
+        {
+            task.ExtendedDeadline = request.ExtendedDeadline;
+            task.ExtendedByUserId = userId; // Track who requested extension
+
+            // notify supervisor about extension request
+            if (task.AssignedByUserId.HasValue)
+            {
+                await _notifications.SendTaskExtensionRequestAsync(
+                    task.AssignedByUserId.Value,
+                    task.TaskId,
+                    task.Title,
+                    task.DueDate ?? DateTime.UtcNow,
+                    request.ExtendedDeadline.Value);
+            }
+        }
 
         // auto-set status based on progress
         if (request.ProgressPercentage == 100)

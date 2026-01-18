@@ -48,29 +48,33 @@ export async function getZonesReport(filters: ReportFilters): Promise<ZonesRepor
 
 // Download attendance report as file
 export function getAttendanceReportUrl(
-  format: "excel" | "csv",
-  filters?: { workerId?: number; zoneId?: number; startDate?: string; endDate?: string }
+  format: "excel" | "csv" | "pdf",
+  filters?: { period?: string; startDate?: string; endDate?: string }
 ): string {
   const params = new URLSearchParams();
-  params.append("format", format);
-  if (filters?.workerId) params.append("workerId", filters.workerId.toString());
-  if (filters?.zoneId) params.append("zoneId", filters.zoneId.toString());
+  if (filters?.period) params.append("period", filters.period);
   if (filters?.startDate) params.append("startDate", filters.startDate);
   if (filters?.endDate) params.append("endDate", filters.endDate);
-  return `/api/reports/attendance?${params.toString()}`;
+
+  const baseUrl = "/api/reports/attendance";
+  if (format === "pdf") return `${baseUrl}/pdf?${params.toString()}`;
+  params.append("format", format);
+  return `${baseUrl}?${params.toString()}`;
 }
 
 // Download tasks report as file
 export function getTasksReportUrl(
-  format: "excel" | "csv",
-  filters?: { workerId?: number; zoneId?: number; startDate?: string; endDate?: string; status?: string }
+  format: "excel" | "csv" | "pdf",
+  filters?: { period?: string; startDate?: string; endDate?: string; status?: string }
 ): string {
   const params = new URLSearchParams();
-  params.append("format", format);
-  if (filters?.workerId) params.append("workerId", filters.workerId.toString());
-  if (filters?.zoneId) params.append("zoneId", filters.zoneId.toString());
+  if (filters?.period) params.append("period", filters.period);
   if (filters?.startDate) params.append("startDate", filters.startDate);
   if (filters?.endDate) params.append("endDate", filters.endDate);
-  if (filters?.status) params.append("status", filters.status);
-  return `/api/reports/tasks?${params.toString()}`;
+  if (filters?.status && filters.status !== "all") params.append("status", filters.status);
+
+  const baseUrl = "/api/reports/tasks";
+  if (format === "pdf") return `${baseUrl}/pdf?${params.toString()}`;
+  params.append("format", format);
+  return `${baseUrl}?${params.toString()}`;
 }

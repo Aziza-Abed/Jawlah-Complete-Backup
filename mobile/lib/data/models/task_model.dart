@@ -47,6 +47,17 @@ class TaskModel {
   final int? completionDistanceMeters;
   final bool isDistanceWarning;
 
+  // Progress tracking for multi-day tasks
+  final int progressPercentage;
+  final String? progressNotes;
+  final DateTime? extendedDeadline;
+
+  // Auto-rejection tracking
+  final bool isAutoRejected;
+  final String? rejectionReason;
+  final DateTime? rejectedAt;
+  final int? rejectionDistanceMeters;
+
   TaskModel({
     required this.taskId,
     required this.title,
@@ -74,6 +85,13 @@ class TaskModel {
     this.maxDistanceMeters = 100,
     this.completionDistanceMeters,
     this.isDistanceWarning = false,
+    this.progressPercentage = 0,
+    this.progressNotes,
+    this.extendedDeadline,
+    this.isAutoRejected = false,
+    this.rejectionReason,
+    this.rejectedAt,
+    this.rejectionDistanceMeters,
   }) : photos = photos ?? (photoUrl != null ? [photoUrl] : []);
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -148,6 +166,20 @@ class TaskModel {
           json['completionDistanceMeters'] as int? ?? json['CompletionDistanceMeters'] as int?,
       isDistanceWarning:
           json['isDistanceWarning'] as bool? ?? json['IsDistanceWarning'] as bool? ?? false,
+      progressPercentage:
+          json['progressPercentage'] as int? ?? json['ProgressPercentage'] as int? ?? 0,
+      progressNotes:
+          json['progressNotes'] as String? ?? json['ProgressNotes'] as String?,
+      extendedDeadline:
+          _safeParseDateTimeUtc(json['extendedDeadline'] ?? json['ExtendedDeadline']),
+      isAutoRejected:
+          json['isAutoRejected'] as bool? ?? json['IsAutoRejected'] as bool? ?? false,
+      rejectionReason:
+          json['rejectionReason'] as String? ?? json['RejectionReason'] as String?,
+      rejectedAt:
+          _safeParseDateTimeUtc(json['rejectedAt'] ?? json['RejectedAt']),
+      rejectionDistanceMeters:
+          json['rejectionDistanceMeters'] as int? ?? json['RejectionDistanceMeters'] as int?,
     );
   }
 

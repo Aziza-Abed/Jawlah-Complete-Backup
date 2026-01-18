@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getIssues } from "../api/issues";
+import type { IssueResponse } from "../types/issue";
 
 type Severity = "low" | "medium" | "high" | "critical";
 type IssueStatus = "new" | "reviewing" | "converted" | "closed";
@@ -18,62 +20,85 @@ type IssueListItem = {
 
 type FilterKey = "all" | "new" | "reviewing" | "converted" | "closed";
 
+// Map backend severity to frontend severity
+const mapSeverity = (severity: string): Severity => {
+  switch (severity.toLowerCase()) {
+    case "minor": return "low";
+    case "medium": return "medium";
+    case "major": return "high";
+    case "critical": return "critical";
+    default: return "medium";
+  }
+};
+
+// Map backend status to frontend status
+const mapStatus = (status: string): IssueStatus => {
+  switch (status) {
+    case "Reported": return "new";
+    case "UnderReview": return "reviewing";
+    case "Resolved": return "closed";
+    case "Dismissed": return "closed";
+    default: return "new";
+  }
+};
+
+// Map backend IssueType enum to Arabic
+const mapTypeToArabic = (type: string): string => {
+  switch (type) {
+    case "Infrastructure": return "بنية تحتية";
+    case "Safety": return "سلامة";
+    case "Sanitation": return "صحة ونظافة";
+    case "Equipment": return "معدات";
+    case "Other": return "أخرى";
+    default: return type;
+  }
+};
+
+// Convert backend IssueResponse to frontend IssueListItem
+const mapIssueToListItem = (issue: IssueResponse): IssueListItem => {
+  const date = new Date(issue.reportedAt);
+  const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+
+  return {
+    id: `i-${issue.issueId}`,
+    title: issue.title,
+    type: mapTypeToArabic(issue.type),
+    severity: mapSeverity(issue.severity),
+    reporterName: issue.reportedByName || "غير محدد",
+    zone: issue.zoneName || "غير محدد",
+    locationText: issue.locationDescription || "غير محدد",
+    reportedAt: formattedDate,
+    status: mapStatus(issue.status),
+  };
+};
+
 export default function Issues() {
   const navigate = useNavigate();
 
-  const data: IssueListItem[] = useMemo(
-    () => [
-      {
-        id: "i-77",
-        title: "تسريب مياه قرب دوار البلدية",
-        type: "تسريب مياه",
-        severity: "high",
-        reporterName: "أبو عمار",
-        zone: "المنطقة 4",
-        locationText: "قرب دوار البلدية - بجانب الرصيف",
-        reportedAt: "2026-01-17 09:58",
-        status: "reviewing",
-      },
-      {
-        id: "i-78",
-        title: "حفرة خطرة في شارع المدارس",
-        type: "حفرة",
-        severity: "critical",
-        reporterName: "محمد أحمد",
-        zone: "المنطقة 2",
-        locationText: "شارع المدارس - مقابل المدخل الرئيسي",
-        reportedAt: "2026-01-17 10:12",
-        status: "new",
-      },
-      {
-        id: "i-79",
-        title: "تلف حاوية نفايات",
-        type: "نفايات",
-        severity: "medium",
-        reporterName: "محمود",
-        zone: "المنطقة 1",
-        locationText: "قرب دوار السوق",
-        reportedAt: "2026-01-16 14:30",
-        status: "converted",
-      },
-      {
-        id: "i-80",
-        title: "عائق على الرصيف",
-        type: "عوائق",
-        severity: "low",
-        reporterName: "أحمد",
-        zone: "المنطقة 3",
-        locationText: "شارع القدس - بجانب المخبز",
-        reportedAt: "2026-01-15 11:05",
-        status: "closed",
-      },
-    ],
-    []
-  );
-
-  const [items, setItems] = useState<IssueListItem[]>(data);
+  const [items, setItems] = useState<IssueListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [q, setQ] = useState("");
+
+  // Fetch issues from backend
+  useEffect(() => {
+    const fetchIssues = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const issues = await getIssues();
+        const listItems = issues.map(mapIssueToListItem);
+        setItems(listItems);
+      } catch (err) {
+        console.error("Failed to fetch issues:", err);
+        setError("فشل تحميل البلاغات");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchIssues();
+  }, []);
 
   const counts = useMemo(() => {
     const base = { all: items.length, new: 0, reviewing: 0, converted: 0, closed: 0 };
@@ -128,7 +153,19 @@ export default function Issues() {
             </button>
           </div>
 
-          <div className="mt-4 bg-[#F3F1ED] rounded-[14px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.08)] p-3 sm:p-4">
+          {loading && (
+            <div className="mt-8 text-center text-[#2F2F2F] font-sans">جاري التحميل...</div>
+          )}
+
+          {error && (
+            <div className="mt-4 p-4 rounded-[12px] bg-red-100 text-red-700 text-right font-sans">
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && (
+            <>
+              <div className="mt-4 bg-[#F3F1ED] rounded-[14px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.08)] p-3 sm:p-4">
             <div className="flex flex-col md:flex-row md:items-center gap-3">
               <div className="flex-1">
                 <div className="relative">
@@ -231,6 +268,8 @@ export default function Issues() {
               ))
             )}
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

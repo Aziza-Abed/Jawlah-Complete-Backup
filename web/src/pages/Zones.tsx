@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, GeoJSON } from "react-leaflet";
 import L from "leaflet";
 import { getWorkerLocations } from "../api/tracking";
+import { getZonesMapData } from "../api/zones";
 import type { WorkerLocation as ApiWorkerLocation } from "../types/tracking";
 
 type WorkerLocation = {
@@ -11,6 +12,7 @@ type WorkerLocation = {
   lng: number;
   status: "online" | "offline";
   timestamp?: string;
+  zoneName?: string;
 };
 
 // Fix Leaflet default marker icons (Vite build)
@@ -49,6 +51,7 @@ function FlyAndOpenPopup({
 
 export default function Zones() {
   const [workers, setWorkers] = useState<WorkerLocation[]>([]);
+  const [zonesData, setZonesData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -60,32 +63,40 @@ export default function Zones() {
 
   const markerRefs = useRef<Record<string, L.Marker | null>>({});
 
-  // Fetch worker locations
-  const fetchLocations = async () => {
+  // Fetch map data
+  const fetchMapData = async () => {
     try {
-      const data = await getWorkerLocations();
-      const mapped: WorkerLocation[] = data.map((w: ApiWorkerLocation) => ({
+      const [locations, zones] = await Promise.all([
+        getWorkerLocations(),
+        getZonesMapData()
+      ]);
+
+      const mappedWorkers: WorkerLocation[] = locations.map((w: ApiWorkerLocation) => ({
         id: w.userId.toString(),
         name: w.fullName,
         lat: w.latitude,
         lng: w.longitude,
         status: w.isOnline ? "online" : "offline",
         timestamp: w.timestamp,
+        zoneName: (w as any).zoneName || "غير محدد",
       }));
-      setWorkers(mapped);
+
+      setWorkers(mappedWorkers);
+      setZonesData(zones);
       setError("");
     } catch (err) {
-      setError("فشل في تحميل مواقع العمال");
+      console.error("Map fetch error:", err);
+      setError("فشل في تحميل بيانات الخريطة");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLocations();
+    fetchMapData();
 
-    // Poll every 30 seconds for updates
-    const interval = setInterval(fetchLocations, 30000);
+    // Poll every 10 seconds for updates (Live feel)
+    const interval = setInterval(fetchMapData, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -148,6 +159,24 @@ export default function Zones() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
+                {zonesData && (
+                  <GeoJSON 
+                    data={zonesData} 
+                    style={{
+                      fillColor: "#7895B2",
+                      weight: 2,
+                      opacity: 1,
+                      color: "#60778E",
+                      fillOpacity: 0.15,
+                    }}
+                    onEachFeature={(feature, layer) => {
+                      if (feature.properties && feature.properties.zoneName) {
+                        layer.bindPopup(`<div class="text-right font-sans"><b>${feature.properties.zoneName}</b></div>`);
+                      }
+                    }}
+                  />
+                )}
+
                 <FlyAndOpenPopup worker={selectedWorker} markerRefs={markerRefs} />
 
                 {workers.map((w) => (
@@ -165,6 +194,9 @@ export default function Zones() {
                           {w.name}
                         </div>
                         <div className="text-[12px] text-[#6B7280] mt-1">
+                          المنطقة: {w.zoneName || "غير محدد"}
+                        </div>
+                        <div className="text-[12px] text-[#6B7280]">
                           الحالة: {w.status === "online" ? "متصل" : "غير متصل"}
                         </div>
                         <div className="text-[12px] text-[#6B7280]">
@@ -183,7 +215,7 @@ export default function Zones() {
             </div>
 
             <div className="mt-3 text-right text-[12px] text-[#6B7280]">
-              يتم تحديث المواقع تلقائياً كل 30 ثانية
+              يتم تحديث المواقع تلقائياً كل 10 ثوانٍ
             </div>
           </div>
         </div>

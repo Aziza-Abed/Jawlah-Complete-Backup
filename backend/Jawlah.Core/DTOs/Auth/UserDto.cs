@@ -17,15 +17,4 @@ public class UserDto
     public string MunicipalityCode { get; set; } = string.Empty;
     public string MunicipalityName { get; set; } = string.Empty;
     public string? MunicipalityNameEnglish { get; set; }
-
-    // Privacy consent tracking
-    public bool HasConsented { get; set; } = false;
-    public DateTime? PrivacyConsentedAt { get; set; }
-    public int ConsentVersion { get; set; } = 0;
-
-    // Current required consent version - increment this when privacy policy changes
-    public const int RequiredConsentVersion = 1;
-
-    // Helper to check if user needs to consent
-    public bool NeedsConsent => ConsentVersion < RequiredConsentVersion;
 }

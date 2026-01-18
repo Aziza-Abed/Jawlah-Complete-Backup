@@ -55,16 +55,4 @@ class NoticeManager extends BaseController {
       notifyListeners();
     }
   }
-
-  Future<void> removeNotice(int noticeId) async {
-    final success = await _service.deleteNotification(noticeId);
-    if (success) {
-      final index = myNotices.indexWhere((n) => n.notificationId == noticeId);
-      if (index != -1 && !myNotices[index].isRead) {
-        newNoticesCount = (newNoticesCount > 0) ? newNoticesCount - 1 : 0;
-      }
-      myNotices.removeWhere((n) => n.notificationId == noticeId);
-      notifyListeners();
-    }
-  }
 }

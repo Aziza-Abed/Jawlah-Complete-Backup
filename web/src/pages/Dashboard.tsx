@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { MapPin, User, Pin } from "lucide-react";
 import { getDashboardOverview } from "../api/dashboard";
 import type { DashboardOverview } from "../types/dashboard";
+import { apiClient } from "../api/client";
 
 type StatChip = {
   label: string;
@@ -21,12 +22,45 @@ const Dashboard: React.FC = () => {
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const data = await getDashboardOverview();
         setOverview(data);
+
+        // Fetch recent activities from audit logs
+        try {
+          const auditResponse = await apiClient.get('/audit?count=3');
+          const logs = auditResponse.data.data || [];
+          const mappedActivities: ActivityItem[] = logs.map((log: any) => {
+            const date = new Date(log.createdAt);
+            const hours = date.getHours();
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            const period = hours >= 12 ? 'م' : 'ص';
+            const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+            const time = `${displayHours}:${minutes} ${period}`;
+
+            let icon: "pin" | "user" | "map" = "user";
+            let text = log.details || log.action;
+
+            if (log.action?.includes('Task')) icon = "pin";
+            else if (log.action?.includes('Zone')) icon = "map";
+
+            return {
+              id: log.auditLogId.toString(),
+              time,
+              text: text || `${log.userFullName || log.username} - ${log.action}`,
+              icon
+            };
+          });
+          setActivities(mappedActivities);
+        } catch (auditErr) {
+          // Fallback to empty activities if audit logs fail
+          console.warn("Could not load activities:", auditErr);
+          setActivities([]);
+        }
       } catch (err) {
         setError("فشل في تحميل البيانات");
       } finally {
@@ -50,26 +84,7 @@ const Dashboard: React.FC = () => {
     { label: "معلقة", value: overview?.tasks.pending ?? 0, bg: "#8FA36A", text: "#FFFFFF" },
   ];
 
-  const activities: ActivityItem[] = [
-    {
-      id: "a1",
-      time: "09:15 ص",
-      text: "آخر مهمة أُسندت للعامل",
-      icon: "pin",
-    },
-    {
-      id: "a2",
-      time: "09:12 ص",
-      text: "أبو عمار سجّل دخول",
-      icon: "user",
-    },
-    {
-      id: "a3",
-      time: "09:05 ص",
-      text: "آخر منطقة تم تحديثها",
-      icon: "map",
-    },
-  ];
+  // Activities now loaded from audit logs in useEffect above
 
   if (loading) {
     return (
@@ -88,10 +103,10 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-gradient-to-br from-[#E2E8F0] to-[#D9D9D9] overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
-        <div className="max-w-[980px] mx-auto">
-          <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F] mb-4">
+        <div className="max-w-[1100px] mx-auto">
+          <h1 className="text-right font-sans font-bold text-[22px] sm:text-[24px] text-[#2F2F2F] mb-6">
             لوحة التحكم
           </h1>
 
@@ -185,7 +200,7 @@ export default Dashboard;
 
 function CardShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-[#F3F1ED] rounded-[16px] shadow-[0_2px_0_rgba(0,0,0,0.08)] border border-black/10 p-5 sm:p-6">
+    <div className="bg-white/60 backdrop-blur-sm rounded-[24px] shadow-[0_10px_25px_rgba(0,0,0,0.03)] border border-white/50 p-6 sm:p-8 transition-all duration-300">
       {children}
     </div>
   );

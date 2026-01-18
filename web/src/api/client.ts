@@ -12,6 +12,12 @@ if (!BASE_URL) {
 // 2) Create a single axios instance for the whole app
 export const apiClient = axios.create({
   baseURL: BASE_URL,
+  headers: {
+    'Accept': 'application/json; charset=utf-8',
+    'Content-Type': 'application/json; charset=utf-8',
+  },
+  responseType: 'json',
+  responseEncoding: 'utf8',
 });
 
 // 3) Request interceptor: inject JWT token automatically (if present)
@@ -42,7 +48,10 @@ apiClient.interceptors.response.use(
       console.error("API Error:", status, error.response.data);
 
       if (status === 401) {
-        // TODO: Enable redirect to "/login" on 401 errors when the authentication flow is finalized.
+        // Token expired or invalid - redirect to login
+        localStorage.removeItem('jawlah_token');
+        localStorage.removeItem('jawlah_user');
+        window.location.href = '/login';
       }
     } else {
       console.error("Network or CORS error:", error.message);

@@ -60,17 +60,4 @@ class NotificationsService {
       return false;
     }
   }
-
-  // delete notification
-  Future<bool> deleteNotification(int notificationId) async {
-    try {
-      final response = await _apiService.delete(
-        ApiConfig.getDeleteNotificationUrl(notificationId),
-      );
-      return response.data['success'] == true;
-    } catch (e) {
-      if (e is AppException) rethrow;
-      return false;
-    }
-  }
 }
