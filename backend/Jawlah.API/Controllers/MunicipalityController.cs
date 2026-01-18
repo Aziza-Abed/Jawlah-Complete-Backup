@@ -381,7 +381,7 @@ public class MunicipalityController : BaseApiController
 
             _logger.LogInformation("Deactivated municipality {MunicipalityId}", id);
 
-            return Ok(ApiResponse<object>.SuccessResponse(null, "تم إيقاف البلدية بنجاح"));
+            return Ok(ApiResponse<object>.SuccessResponse(new { }, "تم إيقاف البلدية بنجاح"));
         }
         catch (Exception ex)
         {
@@ -413,7 +413,7 @@ public class MunicipalityController : BaseApiController
 
             _logger.LogInformation("Activated municipality {MunicipalityId}", id);
 
-            return Ok(ApiResponse<object>.SuccessResponse(null, "تم تفعيل البلدية بنجاح"));
+            return Ok(ApiResponse<object>.SuccessResponse(new { }, "تم تفعيل البلدية بنجاح"));
         }
         catch (Exception ex)
         {

@@ -3,7 +3,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
-import '../../data/services/auth_service.dart';
 import '../../providers/auth_manager.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -389,29 +388,6 @@ class _LoginScreenState extends State<LoginScreen> {
           await authProvider.setRememberMe(false);
         }
 
-        // Check if privacy consent is needed
-        if (authProvider.currentUser?.needsConsent == true) {
-          if (mounted) {
-            setState(() => _isLoading = false);
-            final consentGiven = await _showPrivacyConsentDialog();
-            if (!consentGiven) {
-              // User declined - log them out
-              await authProvider.doLogout();
-              if (mounted) {
-                _showErrorMessage('يجب الموافقة على سياسة الخصوصية لاستخدام التطبيق');
-              }
-              return;
-            }
-            // Record consent to backend
-            setState(() {
-              _isLoading = true;
-              _loadingMessage = 'جاري تسجيل الموافقة...';
-            });
-            final authService = AuthService();
-            await authService.recordPrivacyConsent();
-          }
-        }
-
         // Check if check-in was successful or needs manual fallback
         if (authProvider.isCheckedIn) {
           // Show success message with lateness info if applicable
@@ -630,137 +606,6 @@ class _LoginScreenState extends State<LoginScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-      ),
-    );
-  }
-
-  // Show privacy consent dialog
-  Future<bool> _showPrivacyConsentDialog() async {
-    return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.privacy_tip_outlined, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text(
-              'سياسة الخصوصية',
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'مرحباً بك في تطبيق جولة',
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'لضمان تقديم خدمة أفضل، نحتاج موافقتك على:',
-                style: TextStyle(fontFamily: 'Cairo'),
-              ),
-              const SizedBox(height: 12),
-              _buildConsentItem(
-                Icons.location_on,
-                'تتبع الموقع',
-                'نستخدم موقعك لتسجيل الحضور والتحقق من إنجاز المهام',
-              ),
-              _buildConsentItem(
-                Icons.camera_alt,
-                'الكاميرا',
-                'لالتقاط صور إثبات إنجاز المهام والإبلاغ عن المشاكل',
-              ),
-              _buildConsentItem(
-                Icons.notifications,
-                'الإشعارات',
-                'لإرسال تنبيهات المهام الجديدة والتحديثات',
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'نحن ملتزمون بحماية خصوصيتك. بياناتك تُستخدم فقط لأغراض العمل ولن تُشارك مع أطراف ثالثة.',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    fontSize: 12,
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(
-              'رفض',
-              style: TextStyle(fontFamily: 'Cairo', color: AppColors.error),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-            ),
-            child: const Text(
-              'أوافق',
-              style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
-
-  Widget _buildConsentItem(IconData icon, String title, String description) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Cairo',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontFamily: 'Cairo',
-                    fontSize: 12,
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

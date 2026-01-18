@@ -8,7 +8,6 @@ public class LoginWithPinResponse
 {
     public bool Success { get; set; }
     public string? Token { get; set; }
-    public string? RefreshToken { get; set; }
     public DateTime? ExpiresAt { get; set; }
     public UserDto? User { get; set; }
     public bool IsCheckedIn { get; set; }  // indicates if worker has active attendance (new or existing)

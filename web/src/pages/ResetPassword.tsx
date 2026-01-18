@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import logo from "../assets/logo.png";
 
 export default function ResetPassword() {
-  const navigate = useNavigate();
   const location = useLocation();
   const phone = (location.state as any)?.phone as string | undefined;
 
@@ -33,12 +32,11 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      // TODO backend:
-      // POST /auth/forgot-password/verify-otp-and-reset
-      // { phone, code, newPassword: newPass }
-      await new Promise((r) => setTimeout(r, 700));
-
-      navigate("/login");
+      // NOTE: Backend password reset endpoints not implemented yet
+      // Required endpoints:
+      //   POST /api/auth/forgot-password (send OTP)
+      //   POST /api/auth/reset-password (verify OTP & reset)
+      setError("خاصية إعادة تعيين كلمة السر غير متوفرة حالياً. يرجى التواصل مع المسؤول.");
     } catch (err) {
       setError("فشل التحقق من الرمز أو تغيير كلمة السر.");
     } finally {
@@ -51,8 +49,8 @@ export default function ResetPassword() {
     setLoading(true);
     setError("");
     try {
-      // TODO backend: POST /auth/forgot-password/resend-otp { phone }
-      await new Promise((r) => setTimeout(r, 500));
+      // NOTE: Backend password reset endpoints not implemented yet
+      setError("خاصية إعادة تعيين كلمة السر غير متوفرة حالياً. يرجى التواصل مع المسؤول.");
     } catch (err) {
       setError("فشل إعادة إرسال الرمز.");
     } finally {

@@ -16,6 +16,10 @@ Thumbs.db
 *.log
 logs/
 
+# Session/conversation logs
+**/2026-*-*.txt
+**/20[0-9][0-9]-*-*.txt
+
 # Environment files
 .env
 .env.local

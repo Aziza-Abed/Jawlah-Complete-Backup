@@ -163,10 +163,6 @@ class AuthManager extends BaseController {
       // save user data
       await _storageService.saveToken(loginResult.token);
       await _storageService.saveUserId(loginResult.user.userId);
-      if (loginResult.refreshToken != null &&
-          loginResult.refreshToken!.isNotEmpty) {
-        await _storageService.saveRefreshToken(loginResult.refreshToken!);
-      }
 
       await _storageService.saveHashedPin(_hashPin(pin));
       await _storageService
@@ -297,7 +293,6 @@ class AuthManager extends BaseController {
     await BackgroundServiceUtils.stopService();
 
     await _storageService.clearAll();
-    await _storageService.removeRefreshToken();
 
     try {
       await HiveInit.clearAllData();

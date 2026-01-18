@@ -11,11 +11,16 @@ namespace Jawlah.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "IssueForwardings");
+            // Only drop tables if they exist
+            migrationBuilder.Sql(@"
+                IF OBJECT_ID('dbo.IssueForwardings', 'U') IS NOT NULL
+                    DROP TABLE [IssueForwardings];
+            ");
 
-            migrationBuilder.DropTable(
-                name: "ExternalDepartments");
+            migrationBuilder.Sql(@"
+                IF OBJECT_ID('dbo.ExternalDepartments', 'U') IS NOT NULL
+                    DROP TABLE [ExternalDepartments];
+            ");
 
             migrationBuilder.AddColumn<string>(
                 name: "ForwardingNotes",

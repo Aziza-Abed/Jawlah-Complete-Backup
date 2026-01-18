@@ -17,7 +17,7 @@ DELETE FROM LocationHistories;
 DELETE FROM Issues;
 DELETE FROM Tasks;
 DELETE FROM Attendances;
-DELETE FROM RefreshTokens;
+-- DELETE FROM RefreshTokens;
 DELETE FROM UserZones;
 DELETE FROM Users;
 -- Note: We keep Zones because they come from GIS shapefile

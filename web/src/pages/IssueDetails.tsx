@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { getIssue, updateIssueStatus } from "../api/issues";
+import type { IssueResponse } from "../types/issue";
 
 type Severity = "low" | "medium" | "high" | "critical";
 type IssueStatus = "new" | "reviewing" | "converted" | "forwarded" | "rejected" | "closed";
@@ -25,31 +27,68 @@ type IssueDTO = {
 
 type Option = { id: string; name: string };
 
+// Map backend severity to frontend severity
+const mapSeverity = (severity: string): Severity => {
+  switch (severity.toLowerCase()) {
+    case "minor": return "low";
+    case "medium": return "medium";
+    case "major": return "high";
+    case "critical": return "critical";
+    default: return "medium";
+  }
+};
+
+// Map backend status to frontend status
+const mapStatus = (status: string): IssueStatus => {
+  switch (status) {
+    case "Reported": return "new";
+    case "UnderReview": return "reviewing";
+    case "Resolved": return "closed";
+    case "Dismissed": return "rejected";
+    default: return "new";
+  }
+};
+
+// Map backend IssueType to Arabic
+const mapTypeToArabic = (type: string): string => {
+  switch (type) {
+    case "Infrastructure": return "بنية تحتية";
+    case "Safety": return "سلامة";
+    case "Sanitation": return "صحة ونظافة";
+    case "Equipment": return "معدات";
+    case "Other": return "أخرى";
+    default: return type;
+  }
+};
+
+// Convert backend IssueResponse to frontend IssueDTO
+const mapIssueResponseToDTO = (issue: IssueResponse): IssueDTO => {
+  const date = new Date(issue.reportedAt);
+  const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+
+  return {
+    id: `i-${issue.issueId}`,
+    title: issue.title,
+    description: issue.description,
+    type: mapTypeToArabic(issue.type),
+    severity: mapSeverity(issue.severity),
+    reporterName: issue.reportedByName || "غير محدد",
+    zone: issue.zoneName || "غير محدد",
+    locationText: issue.locationDescription || "غير محدد",
+    gps: issue.latitude && issue.longitude ? { lat: issue.latitude, lng: issue.longitude } : undefined,
+    reportedAt: formattedDate,
+    images: issue.photos || [],
+    status: mapStatus(issue.status),
+  };
+};
+
 export default function IssueDetails() {
   const { id } = useParams(); // /issues/:id
   const navigate = useNavigate();
 
-  // TODO: Replace with API call GET /issues/:id
-  const mock: IssueDTO = useMemo(
-    () => ({
-      id: (id as string) || "i-77",
-      title: "بلاغ: تسريب مياه",
-      description:
-        "العامل أبلغ عن تسريب مياه قرب دوار البلدية. يحتاج متابعة من القسم المختص أو تحويله لمهمة لعامل.",
-      type: "تسريب مياه",
-      severity: "high",
-      reporterName: "أبو عمار",
-      zone: "المنطقة 4",
-      locationText: "قرب دوار البلدية - بجانب الرصيف",
-      gps: { lat: 31.903, lng: 35.211 }, // placeholder
-      reportedAt: "2026-01-17 09:58",
-      images: [],
-      status: "reviewing",
-    }),
-    [id]
-  );
-
   const [issue, setIssue] = useState<IssueDTO | null>(null);
+  const [_loading, setLoading] = useState(true);
+  const [_error, setError] = useState("");
 
   // Modals
   const [forwardOpen, setForwardOpen] = useState(false);
@@ -69,9 +108,28 @@ export default function IssueDetails() {
     []
   );
 
+  // Fetch issue details from backend
   useEffect(() => {
-    setIssue(mock);
-  }, [mock]);
+    const fetchIssue = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        // Extract numeric ID from "i-77" format
+        const numericId = id?.startsWith("i-") ? id.slice(2) : id;
+        if (!numericId) throw new Error("Invalid issue ID");
+
+        const issueData = await getIssue(Number(numericId));
+        const dto = mapIssueResponseToDTO(issueData);
+        setIssue(dto);
+      } catch (err) {
+        console.error("Failed to fetch issue:", err);
+        setError("فشل تحميل بيانات البلاغ");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchIssue();
+  }, [id]);
 
   const onConvertToTask = () => {
     if (!issue) return;
@@ -102,27 +160,47 @@ export default function IssueDetails() {
     if (!issue) return;
     if (!selectedSupervisorId) return;
 
-    // UI optimistic
-    setIssue({ ...issue, status: "forwarded" });
-    setForwardOpen(false);
-    setNote("");
-    setSelectedSupervisorId("");
+    try {
+      const numericId = id?.startsWith("i-") ? id.slice(2) : id;
+      if (!numericId) return;
 
-    // TODO backend:
-    // POST /issues/:id/forward  body: { supervisorId, note }
+      // Update status to UnderReview when forwarding
+      await updateIssueStatus(Number(numericId), {
+        status: "UnderReview",
+        resolutionNotes: `تم التحويل للمشرف (${selectedSupervisorId}). ${note || ''}`
+      });
+
+      setIssue({ ...issue, status: "reviewing" });
+      setForwardOpen(false);
+      setNote("");
+      setSelectedSupervisorId("");
+    } catch (err) {
+      console.error("Failed to forward issue:", err);
+      alert("فشل في تحويل البلاغ");
+    }
   };
 
   const submitReject = async () => {
     if (!issue) return;
     if (!rejectReason.trim()) return;
 
-    // UI optimistic
-    setIssue({ ...issue, status: "rejected" });
-    setRejectOpen(false);
-    setRejectReason("");
+    try {
+      const numericId = id?.startsWith("i-") ? id.slice(2) : id;
+      if (!numericId) return;
 
-    // TODO backend:
-    // POST /issues/:id/reject  body: { reason }
+      // Update status to Dismissed when rejecting
+      await updateIssueStatus(Number(numericId), {
+        status: "Dismissed",
+        resolutionNotes: rejectReason
+      });
+
+      setIssue({ ...issue, status: "rejected" });
+      setRejectOpen(false);
+      setRejectReason("");
+    } catch (err) {
+      console.error("Failed to reject issue:", err);
+      alert("فشل في رفض البلاغ");
+    }
   };
 
   if (!issue) {

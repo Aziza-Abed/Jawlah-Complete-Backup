@@ -1,4 +1,3 @@
-using System.Text;
 using ClosedXML.Excel;
 using Jawlah.Core.DTOs.Common;
 using Jawlah.Core.DTOs.Reports;
@@ -6,6 +5,9 @@ using Jawlah.Core.Enums;
 using Jawlah.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 using TaskStatus = Jawlah.Core.Enums.TaskStatus;
 
 namespace Jawlah.API.Controllers;
@@ -401,17 +403,6 @@ public class ReportsController : ControllerBase
                     $"attendance_{DateTime.UtcNow:yyyyMMdd}.xlsx");
             }
 
-            if (format.Equals("csv", StringComparison.OrdinalIgnoreCase))
-            {
-                var sb = new StringBuilder();
-                sb.AppendLine("AttendanceId,UserId,WorkerName,ZoneId,ZoneName,CheckInTime,CheckOutTime,WorkDuration,Status");
-                foreach (var a in records)
-                {
-                    sb.AppendLine($"{a.AttendanceId},{a.UserId},{CsvEscape(a.User?.FullName)},{a.ZoneId},{CsvEscape(a.Zone?.ZoneName)},{a.CheckInEventTime:yyyy-MM-dd HH:mm},{a.CheckOutEventTime?.ToString("yyyy-MM-dd HH:mm")},{a.WorkDuration?.ToString(@"hh\:mm")},{a.Status}");
-                }
-                return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", $"attendance_{DateTime.UtcNow:yyyyMMdd}.csv");
-            }
-
             // JSON
             return Ok(ApiResponse<object>.SuccessResponse(records.Select(a => new
             {
@@ -480,17 +471,6 @@ public class ReportsController : ControllerBase
                 workbook.SaveAs(stream);
                 return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     $"tasks_{DateTime.UtcNow:yyyyMMdd}.xlsx");
-            }
-
-            if (format.Equals("csv", StringComparison.OrdinalIgnoreCase))
-            {
-                var sb = new StringBuilder();
-                sb.AppendLine("TaskId,Title,Worker,Zone,Priority,Status,DueDate,CompletedAt,CreatedAt");
-                foreach (var t in tasks)
-                {
-                    sb.AppendLine($"{t.TaskId},{CsvEscape(t.Title)},{CsvEscape(t.AssignedToUser?.FullName)},{CsvEscape(t.Zone?.ZoneName)},{t.Priority},{t.Status},{t.DueDate:yyyy-MM-dd},{t.CompletedAt?.ToString("yyyy-MM-dd HH:mm")},{t.CreatedAt:yyyy-MM-dd HH:mm}");
-                }
-                return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", $"tasks_{DateTime.UtcNow:yyyyMMdd}.csv");
             }
 
             // JSON
@@ -609,13 +589,433 @@ public class ReportsController : ControllerBase
         return Math.Max(1, days);
     }
 
-    private static string CsvEscape(string? value)
+    // ========== PDF EXPORT ENDPOINTS ==========
+
+    /// <summary>
+    /// Export attendance report as PDF
+    /// </summary>
+    [HttpGet("attendance/pdf")]
+    public async Task<IActionResult> ExportAttendancePdf(
+        [FromQuery] string period = "monthly",
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
     {
-        if (string.IsNullOrEmpty(value)) return "";
-        if (value.StartsWith('=') || value.StartsWith('+') || value.StartsWith('-') || value.StartsWith('@'))
-            value = "'" + value;
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
-            return $"\"{value.Replace("\"", "\"\"")}\"";
-        return value;
+        try
+        {
+            var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
+            var attendance = (await _attendance.GetFilteredAttendanceAsync(null, null, fromDate, toDate)).ToList();
+            var workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
+
+            // Configure QuestPDF license
+            QuestPDF.Settings.License = LicenseType.Community;
+
+            // Generate PDF
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
+
+                    // Header
+                    page.Header().Element(c =>
+                    {
+                        c.Column(col =>
+                        {
+                            col.Item().AlignCenter().Text("تقرير الحضور والغياب").FontSize(18).Bold();
+                            col.Item().AlignCenter().Text($"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}").FontSize(12);
+                            col.Item().PaddingVertical(10).LineHorizontal(1);
+                        });
+                    });
+
+                    // Content
+                    page.Content().Column(col =>
+                    {
+                        // Summary
+                        col.Item().PaddingBottom(10).Row(row =>
+                        {
+                            row.RelativeItem().Text($"إجمالي العمال: {workers.Count}").FontSize(12);
+                            row.RelativeItem().Text($"سجلات الحضور: {attendance.Count}").FontSize(12);
+                        });
+
+                        // Attendance table
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.ConstantColumn(40);  // #
+                                columns.RelativeColumn(2);   // Name
+                                columns.RelativeColumn(1);   // Date
+                                columns.RelativeColumn(1);   // Check-in
+                                columns.RelativeColumn(1);   // Check-out
+                                columns.RelativeColumn(1);   // Hours
+                            });
+
+                            // Header row
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CellStyle).Text("#");
+                                header.Cell().Element(CellStyle).Text("الاسم");
+                                header.Cell().Element(CellStyle).Text("التاريخ");
+                                header.Cell().Element(CellStyle).Text("دخول");
+                                header.Cell().Element(CellStyle).Text("خروج");
+                                header.Cell().Element(CellStyle).Text("ساعات");
+
+                                IContainer CellStyle(IContainer c) => c.Border(1).Padding(5).AlignCenter().Background(Colors.Grey.Lighten3);
+                            });
+
+                            // Data rows
+                            int rowNumber = 1;
+                            foreach (var record in attendance.OrderByDescending(a => a.CheckInEventTime).Take(100))
+                            {
+                                var worker = workers.FirstOrDefault(w => w.UserId == record.UserId);
+                                var hours = record.CheckOutEventTime.HasValue
+                                    ? (record.CheckOutEventTime.Value - record.CheckInEventTime).TotalHours
+                                    : 0;
+
+                                table.Cell().Element(DataCellStyle).Text(rowNumber.ToString());
+                                table.Cell().Element(DataCellStyle).Text(worker?.FullName ?? "غير معروف");
+                                table.Cell().Element(DataCellStyle).Text(record.CheckInEventTime.ToString("yyyy-MM-dd"));
+                                table.Cell().Element(DataCellStyle).Text(record.CheckInEventTime.ToString("HH:mm"));
+                                table.Cell().Element(DataCellStyle).Text(record.CheckOutEventTime?.ToString("HH:mm") ?? "-");
+                                table.Cell().Element(DataCellStyle).Text(hours > 0 ? $"{hours:F1}" : "-");
+
+                                rowNumber++;
+                            }
+
+                            IContainer DataCellStyle(IContainer c) => c.Border(1).Padding(5).AlignCenter();
+                        });
+                    });
+
+                    // Footer
+                    page.Footer().AlignCenter().Text(text =>
+                    {
+                        text.Span("تم إنشاء هذا التقرير بواسطة نظام جولة - ");
+                        text.Span(DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+                    });
+                });
+            });
+
+            var pdfBytes = document.GeneratePdf();
+            var fileName = $"attendance_report_{DateTime.Now:yyyyMMdd}.pdf";
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating attendance PDF");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("فشل إنشاء تقرير PDF"));
+        }
+    }
+
+    /// <summary>
+    /// Export tasks report as PDF
+    /// </summary>
+    [HttpGet("tasks/pdf")]
+    public async Task<IActionResult> ExportTasksPdf(
+        [FromQuery] string period = "monthly",
+        [FromQuery] string? status = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
+
+            TaskStatus? statusFilter = status?.ToLower() switch
+            {
+                "pending" => TaskStatus.Pending,
+                "in_progress" => TaskStatus.InProgress,
+                "completed" => TaskStatus.Completed,
+                _ => null
+            };
+
+            var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
+
+            // Configure QuestPDF license
+            QuestPDF.Settings.License = LicenseType.Community;
+
+            // Status mapping
+            var statusMap = new Dictionary<TaskStatus, string>
+            {
+                { TaskStatus.Pending, "قيد الانتظار" },
+                { TaskStatus.InProgress, "قيد التنفيذ" },
+                { TaskStatus.Completed, "مكتملة" },
+                { TaskStatus.Approved, "معتمدة" },
+                { TaskStatus.Rejected, "مرفوضة" },
+                { TaskStatus.Cancelled, "ملغاة" }
+            };
+
+            // Generate PDF
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
+
+                    // Header
+                    page.Header().Element(c =>
+                    {
+                        c.Column(col =>
+                        {
+                            col.Item().AlignCenter().Text("تقرير المهام").FontSize(18).Bold();
+                            col.Item().AlignCenter().Text($"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}").FontSize(12);
+                            col.Item().PaddingVertical(10).LineHorizontal(1);
+                        });
+                    });
+
+                    // Content
+                    page.Content().Column(col =>
+                    {
+                        // Summary
+                        col.Item().PaddingBottom(10).Row(row =>
+                        {
+                            row.RelativeItem().Text($"إجمالي المهام: {tasks.Count}").FontSize(12);
+                            row.RelativeItem().Text($"مكتملة: {tasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved)}").FontSize(12);
+                        });
+
+                        // Tasks table
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.ConstantColumn(30);  // #
+                                columns.RelativeColumn(2);   // Title
+                                columns.RelativeColumn(1);   // Worker
+                                columns.RelativeColumn(1);   // Zone
+                                columns.RelativeColumn(1);   // Status
+                                columns.RelativeColumn(1);   // Date
+                            });
+
+                            // Header row
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CellStyle).Text("#");
+                                header.Cell().Element(CellStyle).Text("العنوان");
+                                header.Cell().Element(CellStyle).Text("العامل");
+                                header.Cell().Element(CellStyle).Text("المنطقة");
+                                header.Cell().Element(CellStyle).Text("الحالة");
+                                header.Cell().Element(CellStyle).Text("التاريخ");
+
+                                IContainer CellStyle(IContainer c) => c.Border(1).Padding(5).AlignCenter().Background(Colors.Grey.Lighten3);
+                            });
+
+                            // Data rows
+                            int rowNumber = 1;
+                            foreach (var task in tasks.OrderByDescending(t => t.CreatedAt).Take(100))
+                            {
+                                table.Cell().Element(DataCellStyle).Text(rowNumber.ToString());
+                                table.Cell().Element(DataCellStyle).Text(task.Title);
+                                table.Cell().Element(DataCellStyle).Text(task.AssignedToUser?.FullName ?? "-");
+                                table.Cell().Element(DataCellStyle).Text(task.Zone?.ZoneName ?? "-");
+                                table.Cell().Element(DataCellStyle).Text(statusMap.GetValueOrDefault(task.Status, task.Status.ToString()));
+                                table.Cell().Element(DataCellStyle).Text(task.CreatedAt.ToString("yyyy-MM-dd"));
+
+                                rowNumber++;
+                            }
+
+                            IContainer DataCellStyle(IContainer c) => c.Border(1).Padding(5).AlignCenter();
+                        });
+                    });
+
+                    // Footer
+                    page.Footer().AlignCenter().Text(text =>
+                    {
+                        text.Span("تم إنشاء هذا التقرير بواسطة نظام جولة - ");
+                        text.Span(DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+                    });
+                });
+            });
+
+            var pdfBytes = document.GeneratePdf();
+            var fileName = $"tasks_report_{DateTime.Now:yyyyMMdd}.pdf";
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating tasks PDF");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("فشل إنشاء تقرير PDF"));
+        }
+    }
+
+    // ========== EXCEL EXPORT ENDPOINTS ==========
+
+    /// <summary>
+    /// Export attendance report as Excel
+    /// </summary>
+    [HttpGet("attendance/excel")]
+    public async Task<IActionResult> ExportAttendanceExcel(
+        [FromQuery] string period = "monthly",
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
+            var attendance = (await _attendance.GetFilteredAttendanceAsync(null, null, fromDate, toDate)).ToList();
+            var workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("تقرير الحضور");
+
+            // Title
+            worksheet.Cell(1, 1).Value = "تقرير الحضور والغياب";
+            worksheet.Cell(1, 1).Style.Font.Bold = true;
+            worksheet.Cell(1, 1).Style.Font.FontSize = 16;
+            worksheet.Range(1, 1, 1, 6).Merge();
+
+            worksheet.Cell(2, 1).Value = $"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}";
+            worksheet.Range(2, 1, 2, 6).Merge();
+
+            // Headers
+            var headerRow = 4;
+            worksheet.Cell(headerRow, 1).Value = "#";
+            worksheet.Cell(headerRow, 2).Value = "الاسم";
+            worksheet.Cell(headerRow, 3).Value = "التاريخ";
+            worksheet.Cell(headerRow, 4).Value = "دخول";
+            worksheet.Cell(headerRow, 5).Value = "خروج";
+            worksheet.Cell(headerRow, 6).Value = "ساعات العمل";
+
+            var headerRange = worksheet.Range(headerRow, 1, headerRow, 6);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+            headerRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thick;
+
+            // Data
+            int currentRow = headerRow + 1;
+            int rowNumber = 1;
+            foreach (var record in attendance.OrderByDescending(a => a.CheckInEventTime))
+            {
+                var worker = workers.FirstOrDefault(w => w.UserId == record.UserId);
+                var hours = record.CheckOutEventTime.HasValue
+                    ? (record.CheckOutEventTime.Value - record.CheckInEventTime).TotalHours
+                    : 0;
+
+                worksheet.Cell(currentRow, 1).Value = rowNumber;
+                worksheet.Cell(currentRow, 2).Value = worker?.FullName ?? "غير معروف";
+                worksheet.Cell(currentRow, 3).Value = record.CheckInEventTime.ToString("yyyy-MM-dd");
+                worksheet.Cell(currentRow, 4).Value = record.CheckInEventTime.ToString("HH:mm");
+                worksheet.Cell(currentRow, 5).Value = record.CheckOutEventTime?.ToString("HH:mm") ?? "-";
+                worksheet.Cell(currentRow, 6).Value = hours > 0 ? $"{hours:F1}" : "-";
+
+                currentRow++;
+                rowNumber++;
+            }
+
+            // Auto-fit columns
+            worksheet.Columns().AdjustToContents();
+
+            // Return file
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            var content = stream.ToArray();
+            var fileName = $"attendance_report_{DateTime.Now:yyyyMMdd}.xlsx";
+
+            return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating attendance Excel");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("فشل إنشاء تقرير Excel"));
+        }
+    }
+
+    /// <summary>
+    /// Export tasks report as Excel
+    /// </summary>
+    [HttpGet("tasks/excel")]
+    public async Task<IActionResult> ExportTasksExcel(
+        [FromQuery] string period = "monthly",
+        [FromQuery] string? status = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
+
+            TaskStatus? statusFilter = status?.ToLower() switch
+            {
+                "pending" => TaskStatus.Pending,
+                "in_progress" => TaskStatus.InProgress,
+                "completed" => TaskStatus.Completed,
+                _ => null
+            };
+
+            var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
+
+            // Status mapping
+            var statusMap = new Dictionary<TaskStatus, string>
+            {
+                { TaskStatus.Pending, "قيد الانتظار" },
+                { TaskStatus.InProgress, "قيد التنفيذ" },
+                { TaskStatus.Completed, "مكتملة" },
+                { TaskStatus.Approved, "معتمدة" },
+                { TaskStatus.Rejected, "مرفوضة" },
+                { TaskStatus.Cancelled, "ملغاة" }
+            };
+
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("تقرير المهام");
+
+            // Title
+            worksheet.Cell(1, 1).Value = "تقرير المهام";
+            worksheet.Cell(1, 1).Style.Font.Bold = true;
+            worksheet.Cell(1, 1).Style.Font.FontSize = 16;
+            worksheet.Range(1, 1, 1, 7).Merge();
+
+            worksheet.Cell(2, 1).Value = $"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}";
+            worksheet.Range(2, 1, 2, 7).Merge();
+
+            // Headers
+            var headerRow = 4;
+            worksheet.Cell(headerRow, 1).Value = "#";
+            worksheet.Cell(headerRow, 2).Value = "العنوان";
+            worksheet.Cell(headerRow, 3).Value = "الوصف";
+            worksheet.Cell(headerRow, 4).Value = "العامل";
+            worksheet.Cell(headerRow, 5).Value = "المنطقة";
+            worksheet.Cell(headerRow, 6).Value = "الحالة";
+            worksheet.Cell(headerRow, 7).Value = "التاريخ";
+
+            var headerRange = worksheet.Range(headerRow, 1, headerRow, 7);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+            headerRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thick;
+
+            // Data
+            int currentRow = headerRow + 1;
+            int rowNumber = 1;
+            foreach (var task in tasks.OrderByDescending(t => t.CreatedAt))
+            {
+                worksheet.Cell(currentRow, 1).Value = rowNumber;
+                worksheet.Cell(currentRow, 2).Value = task.Title;
+                worksheet.Cell(currentRow, 3).Value = task.Description;
+                worksheet.Cell(currentRow, 4).Value = task.AssignedToUser?.FullName ?? "-";
+                worksheet.Cell(currentRow, 5).Value = task.Zone?.ZoneName ?? "-";
+                worksheet.Cell(currentRow, 6).Value = statusMap.GetValueOrDefault(task.Status, task.Status.ToString());
+                worksheet.Cell(currentRow, 7).Value = task.CreatedAt.ToString("yyyy-MM-dd");
+
+                currentRow++;
+                rowNumber++;
+            }
+
+            // Auto-fit columns
+            worksheet.Columns().AdjustToContents();
+
+            // Return file
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            var content = stream.ToArray();
+            var fileName = $"tasks_report_{DateTime.Now:yyyyMMdd}.xlsx";
+
+            return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating tasks Excel");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("فشل إنشاء تقرير Excel"));
+        }
     }
 }

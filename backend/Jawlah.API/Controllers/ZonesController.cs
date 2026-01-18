@@ -69,29 +69,51 @@ public class ZonesController : BaseApiController
         return Ok(ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone)));
     }
 
-    // get zones as geojson for map
+    // get zones as geojson for map (full boundaries - cached for 1 hour)
     [HttpGet("map-data")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetMapData()
     {
+        // Add cache headers
+        Response.Headers.Append("Cache-Control", "public, max-age=3600");
+        Response.Headers.Append("Vary", "Accept-Encoding");
+
         var zones = await _zones.GetActiveZonesAsync();
 
         // convert to geojson format
-        var features = zones.Select(z => new
+        var features = zones.Select(z =>
         {
-            type = "Feature",
-            properties = new
+            object? geometry = null;
+
+            // Try to parse BoundaryGeoJson if it exists and looks like JSON
+            if (!string.IsNullOrEmpty(z.BoundaryGeoJson) && z.BoundaryGeoJson.TrimStart().StartsWith("{"))
             {
-                zoneId = z.ZoneId,
-                zoneName = z.ZoneName,
-                zoneCode = z.ZoneCode,
-                district = z.District,
-                areaSquareMeters = z.AreaSquareMeters,
-                centerLatitude = z.CenterLatitude,
-                centerLongitude = z.CenterLongitude
-            },
-            geometry = string.IsNullOrEmpty(z.BoundaryGeoJson)
-                ? null
-                : System.Text.Json.JsonSerializer.Deserialize<object>(z.BoundaryGeoJson)
+                try
+                {
+                    geometry = System.Text.Json.JsonSerializer.Deserialize<object>(z.BoundaryGeoJson);
+                }
+                catch
+                {
+                    // Skip invalid GeoJSON
+                    geometry = null;
+                }
+            }
+
+            return new
+            {
+                type = "Feature",
+                properties = new
+                {
+                    zoneId = z.ZoneId,
+                    zoneName = z.ZoneName,
+                    zoneCode = z.ZoneCode,
+                    district = z.District,
+                    areaSquareMeters = z.AreaSquareMeters,
+                    centerLatitude = z.CenterLatitude,
+                    centerLongitude = z.CenterLongitude
+                },
+                geometry
+            };
         }).ToList();
 
         var featureCollection = new
@@ -101,6 +123,29 @@ public class ZonesController : BaseApiController
         };
 
         return Ok(ApiResponse<object>.SuccessResponse(featureCollection));
+    }
+
+    // get zone markers only (lightweight for map initialization)
+    [HttpGet("map-markers")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
+    public async Task<IActionResult> GetMapMarkers()
+    {
+        Response.Headers.Append("Cache-Control", "public, max-age=3600");
+
+        var zones = await _zones.GetActiveZonesAsync();
+
+        var markers = zones.Select(z => new
+        {
+            zoneId = z.ZoneId,
+            zoneName = z.ZoneName,
+            zoneCode = z.ZoneCode,
+            latitude = z.CenterLatitude,
+            longitude = z.CenterLongitude,
+            district = z.District,
+            areaSquareMeters = z.AreaSquareMeters
+        }).ToList();
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { markers }));
     }
 
     // get zone by code

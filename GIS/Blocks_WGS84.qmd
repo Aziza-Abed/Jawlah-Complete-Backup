@@ -6,6 +6,15 @@
   <type>dataset</type>
   <title>A2.DBO.Blocks</title>
   <abstract></abstract>
+  <contact>
+    <name></name>
+    <organization></organization>
+    <position></position>
+    <voice></voice>
+    <fax></fax>
+    <email></email>
+    <role></role>
+  </contact>
   <links/>
   <dates/>
   <fees></fees>
@@ -24,6 +33,12 @@
     </spatialrefsys>
   </crs>
   <extent>
-    <spatial maxx="35.25869699999999796" maxz="0" maxy="31.94256599999999935" minx="35.19305399999999651" minz="0" crs="EPSG:28191" miny="31.87730600000000081" dimensions="2"/>
+    <spatial maxy="31.94259999999999877" miny="31.87730000000000175" minz="0" maxx="35.25869999999999749" dimensions="2" minx="35.19310000000000116" crs="EPSG:28191" maxz="0"/>
+    <temporal>
+      <period>
+        <start></start>
+        <end></end>
+      </period>
+    </temporal>
   </extent>
 </qgis>

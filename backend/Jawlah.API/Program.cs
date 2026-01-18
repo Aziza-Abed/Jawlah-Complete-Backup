@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -10,8 +11,10 @@ using Jawlah.Core.Interfaces.Services;
 using Jawlah.Infrastructure.Data;
 using Jawlah.Infrastructure.Repositories;
 using Jawlah.Infrastructure.Services;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -36,6 +39,24 @@ builder.Services.AddControllers()
         // Allow Arabic/Unicode characters to be output without escaping
         options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
     });
+
+// Enable response compression (gzip/brotli)
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
+
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
 
 builder.Services.AddSignalR();
 
@@ -167,6 +188,9 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 builder.Services.AddHttpContextAccessor();
 
+// Add password hasher for database seeding
+builder.Services.AddSingleton<IPasswordHasher<Jawlah.Core.Entities.User>, PasswordHasher<Jawlah.Core.Entities.User>>();
+
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
@@ -220,6 +244,9 @@ if (app.Environment.IsDevelopment())
 // global exception handling
 app.UseExceptionHandling();
 
+// Enable response compression (reduces payload size by 70-90%)
+app.UseResponseCompression();
+
 app.UseHttpsRedirection();
 
 // basic security headers
@@ -253,6 +280,22 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<TrackingHub>("/hubs/tracking");
 
+// seed database with initial data (UTF-8 safe via Entity Framework)
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var context = scope.ServiceProvider.GetRequiredService<JawlahDbContext>();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<Jawlah.Core.Entities.User>>();
+        var seeder = new DatabaseSeeder(context, passwordHasher);
+        await seeder.SeedAsync();
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Failed to seed database.");
+    }
+}
+
 // auto-import GIS zones if the table is empty
 using (var scope = app.Services.CreateScope())
 {
@@ -263,41 +306,8 @@ using (var scope = app.Services.CreateScope())
 
         if (!zones.Any())
         {
-            Log.Information("Zones table is empty, attempting auto-import from shapefile...");
-
-            // try to find shapefile in common locations
-            var possiblePaths = new[]
-            {
-                Path.Combine(app.Environment.ContentRootPath, "..", "..", "GIS", "Blocks_WGS84.shp"),
-                Path.Combine(app.Environment.ContentRootPath, "..", "GIS", "Blocks_WGS84.shp"),
-                Path.Combine(app.Environment.ContentRootPath, "GIS", "Blocks_WGS84.shp"),
-                @"C:\Users\hp\Documents\Jawlah\Jawlah-Repo\GIS\Blocks_WGS84.shp"
-            };
-
-            string? shapefilePath = null;
-            foreach (var path in possiblePaths)
-            {
-                var fullPath = Path.GetFullPath(path);
-                if (File.Exists(fullPath))
-                {
-                    shapefilePath = fullPath;
-                    break;
-                }
-            }
-
-            if (shapefilePath != null)
-            {
-                var gisService = scope.ServiceProvider.GetRequiredService<IGisService>();
-                // Import zones for default municipality (Al-Bireh = 1)
-                await gisService.ImportShapefileAsync(shapefilePath, municipalityId: 1);
-
-                var importedZones = await zoneRepo.GetActiveZonesAsync();
-                Log.Information("Auto-imported {Count} zones from shapefile", importedZones.Count());
-            }
-            else
-            {
-                Log.Warning("Shapefile not found. Zones table will remain empty. Use /api/zones/import-shapefile to import manually.");
-            }
+            Log.Information("Zones table is empty. Use /api/gis/import-blocks to import zones manually.");
+            // AUTO-IMPORT DISABLED to prevent duplicates
         }
         else
         {
