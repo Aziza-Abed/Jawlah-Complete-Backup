@@ -14,16 +14,13 @@ namespace Jawlah.Infrastructure.Services;
 public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
-    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IConfiguration _configuration;
 
     public AuthService(
         IUserRepository userRepository,
-        IRefreshTokenRepository refreshTokenRepository,
         IConfiguration configuration)
     {
         _userRepository = userRepository;
-        _refreshTokenRepository = refreshTokenRepository;
         _configuration = configuration;
     }
 
@@ -31,21 +28,21 @@ public class AuthService : IAuthService
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 15;
 
-    public async Task<(bool Success, string? Token, string? RefreshToken, string? Error)> LoginAsync(string username, string password)
+    public async Task<(bool Success, string? Token, string? Error)> LoginAsync(string username, string password)
     {
         // get user from database
         var user = await _userRepository.GetByUsernameAsync(username);
 
         if (user == null)
         {
-            return (false, null, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
+            return (false, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
         // SR1.5: Check if account is locked
         if (user.LockoutEndTime.HasValue && user.LockoutEndTime > DateTime.UtcNow)
         {
             var remainingMinutes = (int)(user.LockoutEndTime.Value - DateTime.UtcNow).TotalMinutes + 1;
-            return (false, null, null, $"الحساب مقفل. يرجى المحاولة بعد {remainingMinutes} دقيقة");
+            return (false, null, $"الحساب مقفل. يرجى المحاولة بعد {remainingMinutes} دقيقة");
         }
 
         // Reset lockout if expired
@@ -58,7 +55,7 @@ public class AuthService : IAuthService
         // user must be active
         if (user.Status != UserStatus.Active)
         {
-            return (false, null, null, "حساب المستخدم غير نشط");
+            return (false, null, "حساب المستخدم غير نشط");
         }
 
         // check password
@@ -72,14 +69,14 @@ public class AuthService : IAuthService
                 user.LockoutEndTime = DateTime.UtcNow.AddMinutes(LockoutMinutes);
                 await _userRepository.UpdateAsync(user);
                 await _userRepository.SaveChangesAsync();
-                return (false, null, null, $"تم قفل الحساب بسبب {MaxFailedAttempts} محاولات فاشلة. يرجى المحاولة بعد {LockoutMinutes} دقيقة");
+                return (false, null, $"تم قفل الحساب بسبب {MaxFailedAttempts} محاولات فاشلة. يرجى المحاولة بعد {LockoutMinutes} دقيقة");
             }
 
             await _userRepository.UpdateAsync(user);
             await _userRepository.SaveChangesAsync();
 
             var remainingAttempts = MaxFailedAttempts - user.FailedLoginAttempts;
-            return (false, null, null, $"اسم المستخدم أو كلمة المرور غير صحيحة. ({remainingAttempts} محاولات متبقية)");
+            return (false, null, $"اسم المستخدم أو كلمة المرور غير صحيحة. ({remainingAttempts} محاولات متبقية)");
         }
 
         // Successful login - reset failed attempts
@@ -90,9 +87,8 @@ public class AuthService : IAuthService
         await _userRepository.SaveChangesAsync();
 
         var token = GenerateJwtToken(user);
-        var refreshToken = await CreateRefreshTokenAsync(user.UserId);
 
-        return (true, token, refreshToken.Token, null);
+        return (true, token, null);
     }
 
     public async Task<(bool Success, User? User, string? Error)> RegisterAsync(User user, string password)
@@ -149,79 +145,22 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<(bool Success, string? Token, string? Error)> RefreshTokenAsync(string refreshToken)
+    public Task LogoutAsync(int userId)
     {
-        var storedToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
-
-        if (storedToken == null)
-        {
-            return (false, null, "رمز التحديث غير صالح");
-        }
-
-        if (storedToken.IsRevoked)
-        {
-            return (false, null, "تم إلغاء الرمز");
-        }
-
-        if (storedToken.IsExpired)
-        {
-            return (false, null, "انتهت صلاحية رمز التحديث");
-        }
-
-        if (storedToken.User.Status != UserStatus.Active)
-        {
-            return (false, null, "حساب المستخدم غير نشط");
-        }
-
-        storedToken.RevokedAt = DateTime.UtcNow;
-
-        var newJwtToken = GenerateJwtToken(storedToken.User);
-        var newRefreshToken = await CreateRefreshTokenAsync(storedToken.UserId);
-
-        await _userRepository.SaveChangesAsync();
-
-        return (true, newJwtToken, null);
+        // No refresh tokens to revoke - just return completed task
+        return Task.CompletedTask;
     }
 
-    private async Task<RefreshToken> CreateRefreshTokenAsync(int userId)
-    {
-        var refreshTokenDays = int.TryParse(_configuration["JwtSettings:RefreshTokenExpirationDays"], out var days) ? days : 7;
-
-        var refreshToken = new RefreshToken
-        {
-            Token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
-            UserId = userId,
-            ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays),
-            CreatedAt = DateTime.UtcNow
-        };
-
-        await _refreshTokenRepository.AddAsync(refreshToken);
-        await _refreshTokenRepository.SaveChangesAsync();
-
-        return refreshToken;
-    }
-
-    private async Task RevokeAllUserTokensAsync(int userId)
-    {
-        await _refreshTokenRepository.RevokeAllUserTokensAsync(userId);
-        await _refreshTokenRepository.SaveChangesAsync();
-    }
-
-    public async Task LogoutAsync(int userId)
-    {
-        await RevokeAllUserTokensAsync(userId);
-    }
-
-    public async Task<(bool Success, string? Token, string? RefreshToken, string? Error)> GenerateTokenForUserAsync(User user)
+    public async Task<(bool Success, string? Token, string? Error)> GenerateTokenForUserAsync(User user)
     {
         if (user == null)
         {
-            return (false, null, null, "المستخدم غير موجود");
+            return (false, null, "المستخدم غير موجود");
         }
 
         if (user.Status != UserStatus.Active)
         {
-            return (false, null, null, "حساب المستخدم غير نشط");
+            return (false, null, "حساب المستخدم غير نشط");
         }
 
         // update when user last logged in
@@ -229,11 +168,10 @@ public class AuthService : IAuthService
         await _userRepository.UpdateAsync(user);
         await _userRepository.SaveChangesAsync();
 
-        // make new tokens for user
+        // make new token for user
         var token = GenerateJwtToken(user);
-        var refreshToken = await CreateRefreshTokenAsync(user.UserId);
 
-        return (true, token, refreshToken.Token, null);
+        return (true, token, null);
     }
 
     public string HashPassword(string password)

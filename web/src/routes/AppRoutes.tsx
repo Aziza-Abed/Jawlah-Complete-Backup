@@ -14,6 +14,9 @@ import ProtectedRoute from "./ProtectedRoute";
 import Issues from "../pages/Issues";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
+import Profile from "../pages/Profile";
+import Settings from "../pages/Settings";
+import Accounts from "../pages/Accounts";
 
 export default function AppRoutes() {
   return (
@@ -55,6 +58,12 @@ export default function AppRoutes() {
         {/* Notifications */}
         <Route path="notifications" element={<Notifications />} />
 
+        {/* Profile & Settings */}
+        <Route path="profile" element={<Profile />} />
+        <Route path="settings" element={<Settings />} />
+
+        {/* Admin only */}
+        <Route path="accounts" element={<Accounts />} />
       </Route>
 
       {/* Fallback */}

@@ -27,7 +27,6 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.WorkerType, opt => opt.MapFrom(src => src.WorkerType != null ? src.WorkerType.ToString() : null))
             .ForMember(dest => dest.EmployeeId, opt => opt.MapFrom(src => src.Pin ?? src.Username))
             .ForMember(dest => dest.PhoneNumber, opt => opt.MapFrom(src => src.PhoneNumber ?? string.Empty))
-            .ForMember(dest => dest.HasConsented, opt => opt.MapFrom(src => src.PrivacyConsentedAt.HasValue))
             .ForMember(dest => dest.MunicipalityId, opt => opt.MapFrom(src => src.MunicipalityId))
             .ForMember(dest => dest.MunicipalityCode, opt => opt.MapFrom(src => src.Municipality != null ? src.Municipality.Code : ""))
             .ForMember(dest => dest.MunicipalityName, opt => opt.MapFrom(src => src.Municipality != null ? src.Municipality.Name : ""))

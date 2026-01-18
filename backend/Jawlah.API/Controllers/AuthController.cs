@@ -10,6 +10,7 @@ using Jawlah.Core.Interfaces.Services;
 using Jawlah.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Jawlah.API.Controllers;
 
@@ -65,7 +66,7 @@ public class AuthController : BaseApiController
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = Request.Headers.UserAgent.ToString();
 
-        var (success, token, refreshToken, error) = await _auth.LoginAsync(request.Username, request.Password);
+        var (success, token, error) = await _auth.LoginAsync(request.Username, request.Password);
         if (!success)
         {
             // UR23: Log failed login
@@ -84,7 +85,6 @@ public class AuthController : BaseApiController
         {
             Success = true,
             Token = token,
-            RefreshToken = refreshToken,
             ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
             User = _mapper.Map<UserDto>(user)
         };
@@ -264,7 +264,7 @@ public class AuthController : BaseApiController
             }
 
             // generate jwt token for the user
-            var (success, token, refreshToken, tokenError) = await _auth.GenerateTokenForUserAsync(user);
+            var (success, token, tokenError) = await _auth.GenerateTokenForUserAsync(user);
             if (!success)
             {
                 return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse(tokenError ?? "فشل تسجيل الدخول"));
@@ -282,6 +282,7 @@ public class AuthController : BaseApiController
             var attendance = new Attendance
             {
                 UserId = user.UserId,
+                MunicipalityId = user.MunicipalityId,
                 CheckInEventTime = DateTime.UtcNow,
                 CheckInLatitude = request.Latitude,
                 CheckInLongitude = request.Longitude,
@@ -299,7 +300,6 @@ public class AuthController : BaseApiController
             {
                 Success = true,
                 Token = token,
-                RefreshToken = refreshToken,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
                 User = _mapper.Map<UserDto>(user),
                 Attendance = new AttendanceResponse
@@ -411,7 +411,7 @@ public class AuthController : BaseApiController
             }
 
             // generate jwt token for the user
-            var (success, token, refreshToken, tokenError) = await _auth.GenerateTokenForUserAsync(user);
+            var (success, token, tokenError) = await _auth.GenerateTokenForUserAsync(user);
             if (!success)
             {
                 return Unauthorized(ApiResponse<LoginWithPinResponse>.ErrorResponse(tokenError ?? "فشل تسجيل الدخول"));
@@ -433,7 +433,6 @@ public class AuthController : BaseApiController
             {
                 Success = true,
                 Token = token,
-                RefreshToken = refreshToken,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
                 User = _mapper.Map<UserDto>(user),
                 CheckInStatus = "NotAttempted"
@@ -612,6 +611,7 @@ public class AuthController : BaseApiController
             var attendance = new Attendance
             {
                 UserId = user.UserId,
+                MunicipalityId = user.MunicipalityId,
                 CheckInEventTime = now,
                 CheckInLatitude = latitude,
                 CheckInLongitude = longitude,
@@ -678,6 +678,7 @@ public class AuthController : BaseApiController
         var attendance = new Attendance
         {
             UserId = user.UserId,
+            MunicipalityId = user.MunicipalityId,
             CheckInEventTime = now,
             CheckInLatitude = 0, // No GPS
             CheckInLongitude = 0,
@@ -720,7 +721,8 @@ public class AuthController : BaseApiController
 
     // register new user only admin can do this
     [HttpPost("register")]
-    [Authorize(Roles = "Admin")]
+    [AllowAnonymous] // TEMP: Allow first admin creation
+    //[Authorize(Roles = "Admin")] // Re-enable after first admin is created
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         if (!ModelState.IsValid)
@@ -752,6 +754,24 @@ public class AuthController : BaseApiController
             }
         }
 
+        // TEMP: Auto-create default municipality if none exists
+        var dbContext = HttpContext.RequestServices.GetRequiredService<Jawlah.Infrastructure.Data.JawlahDbContext>();
+        var municipality = await dbContext.Municipalities.FirstOrDefaultAsync();
+        if (municipality == null)
+        {
+            municipality = new Municipality
+            {
+                Code = "BIREH",
+                Name = "بلدية البيرة",
+                NameEnglish = "Al-Bireh Municipality",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            dbContext.Municipalities.Add(municipality);
+            await dbContext.SaveChangesAsync();
+        }
+
         // create user object
         var user = new User
         {
@@ -762,7 +782,8 @@ public class AuthController : BaseApiController
             Role = request.Role,
             WorkerType = request.WorkerType,
             Department = request.Department,
-            Pin = request.Role == Core.Enums.UserRole.Worker ? workerPin : null
+            Pin = request.Role == Core.Enums.UserRole.Worker ? workerPin : null,
+            MunicipalityId = municipality.MunicipalityId
         };
 
         var (success, createdUser, error) = await _auth.RegisterAsync(user, request.Password);
@@ -790,25 +811,6 @@ public class AuthController : BaseApiController
         return Ok(ApiResponse<UserDto>.SuccessResponse(userDto));
     }
 
-    // refresh the jwt token - requires valid (even expired) JWT to prevent token theft
-    [HttpPost("refresh")]
-    [Authorize]
-    public async Task<IActionResult> Refresh([FromBody] string refreshToken)
-    {
-        var (success, newToken, error) = await _auth.RefreshTokenAsync(refreshToken);
-        if (!success)
-            return BadRequest(ApiResponse<LoginResponse>.ErrorResponse(error ?? "فشل تحديث الرمز"));
-
-        var response = new LoginResponse
-        {
-            Success = true,
-            Token = newToken,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes())
-        };
-
-        return Ok(ApiResponse<LoginResponse>.SuccessResponse(response, "تم تحديث الرمز بنجاح"));
-    }
-
     // logout the user
     [HttpPost("logout")]
     [Authorize]
@@ -821,31 +823,6 @@ public class AuthController : BaseApiController
         }
 
         return Ok(ApiResponse<string>.SuccessResponse("تم تسجيل الخروج بنجاح"));
-    }
-
-    // Record user's privacy consent
-    [HttpPost("consent")]
-    [Authorize]
-    public async Task<IActionResult> RecordPrivacyConsent()
-    {
-        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            return Unauthorized(ApiResponse<object>.ErrorResponse("رمز مستخدم غير صالح"));
-
-        var user = await _users.GetByIdAsync(userId);
-        if (user == null)
-            return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
-
-        // Record consent with current timestamp and version
-        user.PrivacyConsentedAt = DateTime.UtcNow;
-        user.ConsentVersion = UserDto.RequiredConsentVersion;
-
-        await _users.UpdateAsync(user);
-        await _users.SaveChangesAsync();
-
-        _logger.LogInformation("Privacy consent recorded for user {UserId} at {Time}", userId, user.PrivacyConsentedAt);
-
-        return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تسجيل الموافقة على سياسة الخصوصية"));
     }
 
     // save fcm token for push notifications

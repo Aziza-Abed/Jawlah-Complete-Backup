@@ -26,12 +26,6 @@ public class IssueResponse
     public DateTime? SyncTime { get; set; }
     public int SyncVersion { get; set; }
 
-    // Forwarding notes - where the issue was forwarded
-    public string? ForwardingNotes { get; set; }
-
-    // PDF download tracking
-    public DateTime? PdfDownloadedAt { get; set; }
-
     // Web dashboard uses "priority" to refer to severity - provide alias
     public string Priority => Severity.ToString();
 }

@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../core/config/api_config.dart';
 import '../../core/utils/storage_helper.dart';
@@ -59,58 +58,19 @@ class ApiService {
         return handler.next(options);
       },
       onError: (error, handler) async {
-        // if we get 401 try to refresh the token
+        // if we get 401, logout user
         if (error.response?.statusCode == 401) {
-          // try refreshing token
-          bool refreshed = await renewToken();
-          if (refreshed) {
-            // token refreshed just return the error and let user retry manually
-          } else {
-            // refresh failed logout user
-            await cleanAuthData();
-          }
+          await cleanAuthData();
         }
         return handler.next(error);
       },
     );
   }
 
-  // refresh the token when it expires
-  Future<bool> renewToken() async {
-    try {
-      final refreshToken = await StorageHelper.getRefreshToken();
-      if (refreshToken == null || refreshToken.isEmpty) {
-        return false;
-      }
-
-      final response = await dioClient.post(
-        '/auth/refresh',
-        data: refreshToken,
-        options: Options(
-          headers: {'Content-Type': 'text/plain'},
-        ),
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data['data'];
-        if (data != null && data['token'] != null) {
-          _token = data['token'];
-          await StorageHelper.saveToken(_token!);
-          return true;
-        }
-      }
-      return false;
-    } catch (e) {
-      debugPrint('error refreshing token: $e');
-      return false;
-    }
-  }
-
   Future<void> cleanAuthData() async {
     _token = null;
     await StorageHelper.removeToken();
     await StorageHelper.removeUser();
-    await StorageHelper.removeRefreshToken();
   }
 
   void updateToken(String? token) {

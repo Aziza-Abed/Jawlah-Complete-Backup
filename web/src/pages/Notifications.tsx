@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../api/notifications";
+import type { NotificationResponse } from "../types/notification";
 
 type NoticeType = "task_update" | "task_done" | "issue_report" | "system";
 type NoticeStatus = "unread" | "read";
@@ -17,55 +19,55 @@ type Notice = {
 
 type FilterKey = "all" | "unread" | "tasks" | "issues";
 
+// Map backend notification type to frontend type
+const mapNotificationType = (type: string): NoticeType => {
+  if (type.includes("Task")) return "task_update";
+  if (type.includes("Issue")) return "issue_report";
+  return "system";
+};
+
+// Convert backend NotificationResponse to frontend Notice
+const mapNotificationToNotice = (notification: NotificationResponse): Notice => {
+  const date = new Date(notification.createdAt);
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+
+  return {
+    id: notification.notificationId.toString(),
+    type: mapNotificationType(notification.type),
+    status: notification.isRead ? "read" : "unread",
+    title: notification.title,
+    body: notification.message,
+    time: `${hours}:${minutes}`,
+  };
+};
+
 export default function Notifications() {
   const navigate = useNavigate();
 
-  // TODO: Replace with backend notifications:
-  // - GET /notifications?role=supervisor
-  // - Add realtime via WebSocket or polling
-  const data: Notice[] = useMemo(
-    () => [
-      {
-        id: "n1",
-        type: "task_done",
-        status: "unread",
-        title: "تم إنهاء مهمة",
-        body: "العامل محمود أنهى مهمة: إصلاح حفرة (المنطقة 4) وأرفق صورة إثبات.",
-        time: "10:42",
-        taskId: "t-204",
-      },
-      {
-        id: "n2",
-        type: "task_update",
-        status: "unread",
-        title: "تحديث جديد على مهمة",
-        body: "العامل محمد رفع صورة تقدم لمهمة: تنظيف شارع (المنطقة 2).",
-        time: "10:35",
-        taskId: "t-102",
-      },
-      {
-        id: "n3",
-        type: "issue_report",
-        status: "read",
-        title: "بلاغ جديد",
-        body: "العامل أبو عمار أبلغ عن مشكلة خارج المسؤولية: تسريب مياه قرب دوار البلدية.",
-        time: "09:58",
-        issueId: "i-77",
-      },
-      {
-        id: "n4",
-        type: "system",
-        status: "read",
-        title: "تنبيه النظام",
-        body: "تم تحديث إعدادات التقارير لهذا الأسبوع.",
-        time: "09:20",
-      },
-    ],
-    []
-  );
-
-  const [items, setItems] = useState<Notice[]>(data);
+  const [items, setItems] = useState<Notice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+
+  // Fetch notifications from backend
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const notifications = await getNotifications();
+        const notices = notifications.map(mapNotificationToNotice);
+        setItems(notices);
+      } catch (err) {
+        console.error("Failed to fetch notifications:", err);
+        setError("فشل تحميل الإشعارات");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchNotifications();
+  }, []);
 
   const unreadCount = useMemo(
     () => items.filter((x) => x.status === "unread").length,
@@ -79,19 +81,27 @@ export default function Notifications() {
     return items.filter((x) => x.type === "issue_report");
   }, [items, filter]);
 
-  const markAllRead = () => {
-    setItems((prev) => prev.map((x) => ({ ...x, status: "read" })));
-    // TODO: PATCH /notifications/mark-all-read
+  const markAllRead = async () => {
+    try {
+      await markAllNotificationsAsRead();
+      setItems((prev) => prev.map((x) => ({ ...x, status: "read" })));
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
   };
 
-  const markOneRead = (id: string) => {
-    setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: "read" } : x)));
-    // TODO: PATCH /notifications/{id}/read
+  const markOneRead = async (id: string) => {
+    try {
+      await markNotificationAsRead(Number(id));
+      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: "read" } : x)));
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
   };
 
   const clearRead = () => {
     setItems((prev) => prev.filter((x) => x.status !== "read"));
-    // TODO: DELETE /notifications?status=read (or endpoint provided by backend)
+    // Note: Backend doesn't have bulk delete endpoint yet
   };
 
   const openNotice = (n: Notice) => {
@@ -126,7 +136,8 @@ export default function Notifications() {
               <button
                 type="button"
                 onClick={clearRead}
-                className="h-[38px] px-3 rounded-[10px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[13px] hover:opacity-95"
+                disabled={loading}
+                className="h-[38px] px-3 rounded-[10px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[13px] hover:opacity-95 disabled:opacity-50"
               >
                 مسح المقروء
               </button>
@@ -141,8 +152,20 @@ export default function Notifications() {
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="mt-4 bg-[#F3F1ED] rounded-[14px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.08)] p-3 sm:p-4">
+          {loading && (
+            <div className="mt-8 text-center text-[#2F2F2F] font-sans">جاري التحميل...</div>
+          )}
+
+          {error && (
+            <div className="mt-4 p-4 rounded-[12px] bg-red-100 text-red-700 text-right font-sans">
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && (
+            <>
+              {/* Filters */}
+              <div className="mt-4 bg-[#F3F1ED] rounded-[14px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.08)] p-3 sm:p-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
@@ -222,12 +245,10 @@ export default function Notifications() {
           </div>
 
           <div className="mt-6 text-right text-[12px] text-[#6B7280]">
-            {/* TODO: Backend should provide:
-                - notifications list
-                - unread count
-                - read/unread actions
-                - deep links to task/issue details */}
+            {/* Notifications loaded from backend API */}
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

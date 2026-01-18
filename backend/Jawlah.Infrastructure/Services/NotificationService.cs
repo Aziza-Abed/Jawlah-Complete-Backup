@@ -80,11 +80,16 @@ public class NotificationService : INotificationService
 
         // get user to get their municipality
         var user = await _users.GetByIdAsync(userId);
+        if (user == null)
+        {
+            _logger.LogWarning("Cannot send task assigned notification - User {UserId} not found", userId);
+            return;
+        }
 
         var notification = new AppNotification
         {
             UserId = userId,
-            MunicipalityId = user?.MunicipalityId ?? 0,
+            MunicipalityId = user.MunicipalityId,
             Title = title,
             Message = body,
             Type = NotificationType.TaskAssigned,
@@ -112,11 +117,16 @@ public class NotificationService : INotificationService
 
         // get user to get their municipality
         var user = await _users.GetByIdAsync(userId);
+        if (user == null)
+        {
+            _logger.LogWarning("Cannot send task updated notification - User {UserId} not found", userId);
+            return;
+        }
 
         var notification = new AppNotification
         {
             UserId = userId,
-            MunicipalityId = user?.MunicipalityId ?? 0,
+            MunicipalityId = user.MunicipalityId,
             Title = title,
             Message = body,
             Type = NotificationType.TaskUpdated,
@@ -144,11 +154,16 @@ public class NotificationService : INotificationService
 
         // get user to get their municipality
         var user = await _users.GetByIdAsync(userId);
+        if (user == null)
+        {
+            _logger.LogWarning("Cannot send issue reviewed notification - User {UserId} not found", userId);
+            return;
+        }
 
         var notification = new AppNotification
         {
             UserId = userId,
-            MunicipalityId = user?.MunicipalityId ?? 0,
+            MunicipalityId = user.MunicipalityId,
             Title = title,
             Message = body,
             Type = NotificationType.IssueReviewed,
@@ -254,11 +269,16 @@ public class NotificationService : INotificationService
 
         // get user to get their municipality
         var user = await _users.GetByIdAsync(userId);
+        if (user == null)
+        {
+            _logger.LogWarning("Cannot send system alert - User {UserId} not found", userId);
+            return;
+        }
 
         var notification = new AppNotification
         {
             UserId = userId,
-            MunicipalityId = user?.MunicipalityId ?? 0,
+            MunicipalityId = user.MunicipalityId,
             Title = title,
             Message = message,
             Type = NotificationType.SystemAlert,
@@ -330,11 +350,16 @@ public class NotificationService : INotificationService
 
         // get user to get their municipality
         var user = await _users.GetByIdAsync(workerId);
+        if (user == null)
+        {
+            _logger.LogWarning("Cannot send task auto-rejected notification - Worker {WorkerId} not found", workerId);
+            return;
+        }
 
         var notification = new AppNotification
         {
             UserId = workerId,
-            MunicipalityId = user?.MunicipalityId ?? 0,
+            MunicipalityId = user.MunicipalityId,
             Title = title,
             Message = body,
             Type = NotificationType.TaskUpdated,
@@ -401,11 +426,16 @@ public class NotificationService : INotificationService
 
         // get user to get their municipality
         var user = await _users.GetByIdAsync(workerId);
+        if (user == null)
+        {
+            _logger.LogWarning("Cannot send warning notification - Worker {WorkerId} not found", workerId);
+            return;
+        }
 
         var notification = new AppNotification
         {
             UserId = workerId,
-            MunicipalityId = user?.MunicipalityId ?? 0,
+            MunicipalityId = user.MunicipalityId,
             Title = title,
             Message = body,
             Type = NotificationType.SystemAlert,
@@ -516,6 +546,55 @@ public class NotificationService : INotificationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send FCM push notification to user {UserId}", userId);
+        }
+    }
+
+    // send notification to supervisor when worker requests task deadline extension
+    public async Task SendTaskExtensionRequestAsync(
+        int supervisorId,
+        int taskId,
+        string taskTitle,
+        DateTime originalDeadline,
+        DateTime requestedDeadline)
+    {
+        var supervisor = await _users.GetByIdAsync(supervisorId);
+        if (supervisor == null)
+        {
+            _logger.LogWarning("Cannot send extension request - Supervisor {SupervisorId} not found", supervisorId);
+            return;
+        }
+
+        var notification = new AppNotification
+        {
+            UserId = supervisorId,
+            MunicipalityId = supervisor.MunicipalityId,
+            Type = NotificationType.TaskUpdated, // Reuse existing type
+            Title = "طلب تمديد موعد مهمة",
+            Message = $"تم طلب تمديد موعد المهمة \"{taskTitle}\" من {originalDeadline:dd/MM/yyyy} إلى {requestedDeadline:dd/MM/yyyy}",
+            IsRead = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _notifications.AddAsync(notification);
+        await _notifications.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Extension request notification sent to supervisor {SupervisorId} for task {TaskId}",
+            supervisorId, taskId);
+
+        // send push notification
+        if (!string.IsNullOrEmpty(supervisor.FcmToken) && _fcmEnabled)
+        {
+            await SendPushNotificationAsync(
+                supervisorId,
+                notification.Title,
+                notification.Message,
+                new Dictionary<string, string>
+                {
+                    { "type", "task_extension_request" },
+                    { "taskId", taskId.ToString() },
+                    { "notificationId", notification.NotificationId.ToString() }
+                });
         }
     }
 }

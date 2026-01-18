@@ -180,7 +180,7 @@ public class GisService : IGisService
                     }
                     string zoneCode = GetAttributeValue(shapeFileDataReader, new[] { "BlockNumbe", "Quarter_Nu", "CODE", "Code", "ID" })
                         ?? $"ZONE-{featureIndex:D3}";
-                    string englishName = GetAttributeValue(shapeFileDataReader, new[] { "BlockName1", "BlockName_E", "NAME_EN" });
+                    string? englishName = GetAttributeValue(shapeFileDataReader, new[] { "BlockName1", "BlockName_E", "NAME_EN" });
                     string description = englishName ?? zoneName;
                     string district = GetAttributeValue(shapeFileDataReader, new[] { "Governorat", "Governor_1", "District" })
                         ?? municipality.Region ?? municipality.Name;
@@ -195,7 +195,7 @@ public class GisService : IGisService
                         ZoneCode = zoneCode,
                         Description = description,
                         Boundary = normalizedGeometry,
-                        BoundaryGeoJson = normalizedGeometry.AsText(),
+                        BoundaryGeoJson = WriteGeoJson(normalizedGeometry),
                         CenterLatitude = centroid.Y,
                         CenterLongitude = centroid.X,
                         AreaSquareMeters = normalizedGeometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180),
@@ -285,12 +285,24 @@ public class GisService : IGisService
                 // fix ring orientation for sql server
                 var normalizedGeometry = NormalizeGeometry(geometry);
 
+                // validate geometry
+                if (!normalizedGeometry.IsValid)
+                {
+                    _logger.LogWarning("Feature {Index} has invalid geometry, attempting to fix", featureIndex);
+                    normalizedGeometry = NetTopologySuite.Geometries.Utilities.GeometryFixer.Fix(normalizedGeometry);
+                    if (!normalizedGeometry.IsValid)
+                    {
+                        _logger.LogError("Feature {Index} geometry cannot be fixed, skipping", featureIndex);
+                        continue;
+                    }
+                }
+
                 // get zone info from feature properties
-                string zoneName = GetGeoJsonProperty(feature, new[] { "name", "NAME", "zoneName", "BlockName_Arabic" })
+                string zoneName = GetGeoJsonProperty(feature, new[] { "name", "NAME", "zoneName", "BlockName_Arabic", "QuarterNam" })
                     ?? $"Zone {featureIndex}";
-                string zoneCode = GetGeoJsonProperty(feature, new[] { "code", "CODE", "id", "ID", "zoneCode", "BlockNumber" })
+                string zoneCode = GetGeoJsonProperty(feature, new[] { "code", "CODE", "id", "ID", "zoneCode", "BlockNumber", "Quarter_Nu" })
                     ?? $"ZONE-{featureIndex:D3}";
-                string description = GetGeoJsonProperty(feature, new[] { "description", "BlockName_English", "nameEn" })
+                string description = GetGeoJsonProperty(feature, new[] { "description", "BlockName_English", "nameEn", "QuarterN_1" })
                     ?? zoneName;
                 string district = GetGeoJsonProperty(feature, new[] { "district", "governorate", "region" })
                     ?? municipality.Region ?? municipality.Name;
@@ -305,7 +317,7 @@ public class GisService : IGisService
                     ZoneCode = zoneCode,
                     Description = description,
                     Boundary = normalizedGeometry,
-                    BoundaryGeoJson = normalizedGeometry.AsText(),
+                    BoundaryGeoJson = WriteGeoJson(normalizedGeometry),
                     CenterLatitude = centroid.Y,
                     CenterLongitude = centroid.X,
                     AreaSquareMeters = normalizedGeometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180),
@@ -353,6 +365,142 @@ public class GisService : IGisService
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Failed to import GeoJSON: {ex.Message}", ex);
+        }
+    }
+
+    public async Task ImportBlocksFromGeoJsonAsync(string filePath, int municipalityId)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"GeoJSON file not found at: {filePath}", filePath);
+
+        var geoJson = await File.ReadAllTextAsync(filePath);
+        await ImportBlocksFromGeoJsonStringAsync(geoJson, municipalityId);
+    }
+
+    public async Task ImportBlocksFromGeoJsonStringAsync(string geoJson, int municipalityId)
+    {
+        // Verify municipality exists
+        var municipality = await _municipalityRepository.GetByIdAsync(municipalityId);
+        if (municipality == null)
+            throw new ArgumentException($"Municipality with ID {municipalityId} not found", nameof(municipalityId));
+
+        try
+        {
+            var geoJsonReader = new NetTopologySuite.IO.GeoJsonReader();
+            var featureCollection = geoJsonReader.Read<NetTopologySuite.Features.FeatureCollection>(geoJson);
+
+            if (featureCollection == null || featureCollection.Count == 0)
+                throw new InvalidOperationException("No features found in GeoJSON");
+
+            var zones = new List<Zone>();
+            int featureIndex = 0;
+
+            foreach (var feature in featureCollection)
+            {
+                featureIndex++;
+                var geometry = feature.Geometry;
+
+                if (geometry == null)
+                    continue;
+
+                // fix ring orientation for sql server
+                var normalizedGeometry = NormalizeGeometry(geometry);
+
+                // get block info from feature properties
+                string blockNumber = GetGeoJsonProperty(feature, new[] { "BlockNumbe", "BlockNumber", "block_number" })
+                    ?? featureIndex.ToString();
+                string blockNameArabic = GetGeoJsonProperty(feature, new[] { "BlockName_", "BlockName_Arabic" })
+                    ?? "";
+                string blockNameEnglish = GetGeoJsonProperty(feature, new[] { "BlockName1", "BlockName_English" })
+                    ?? "";
+                string neighborhoodArabic = GetGeoJsonProperty(feature, new[] { "CommunityN", "Community_Arabic" })
+                    ?? "";
+                string neighborhoodEnglish = GetGeoJsonProperty(feature, new[] { "Communit_1", "Community_English" })
+                    ?? "";
+
+                // Create zone name: "BlockName - Neighborhood" or "Block X - Neighborhood"
+                string zoneName;
+                string zoneCode;
+
+                if (!string.IsNullOrEmpty(blockNameArabic))
+                {
+                    zoneName = string.IsNullOrEmpty(neighborhoodArabic)
+                        ? blockNameArabic
+                        : $"{blockNameArabic} - {neighborhoodArabic}";
+                }
+                else
+                {
+                    zoneName = string.IsNullOrEmpty(neighborhoodArabic)
+                        ? $"بلوك {blockNumber}"
+                        : $"بلوك {blockNumber} - {neighborhoodArabic}";
+                }
+
+                zoneCode = $"BLK-{blockNumber}";
+
+                string description = string.IsNullOrEmpty(blockNameEnglish)
+                    ? $"Block {blockNumber} - {neighborhoodEnglish}"
+                    : $"{blockNameEnglish} - {neighborhoodEnglish}";
+
+                string district = neighborhoodArabic ?? municipality.Region ?? municipality.Name;
+
+                // get center of the zone
+                var centroid = normalizedGeometry.Centroid;
+
+                var zone = new Zone
+                {
+                    MunicipalityId = municipalityId,
+                    ZoneName = zoneName,
+                    ZoneCode = zoneCode,
+                    Description = description,
+                    Boundary = normalizedGeometry,
+                    BoundaryGeoJson = WriteGeoJson(normalizedGeometry),
+                    CenterLatitude = centroid.Y,
+                    CenterLongitude = centroid.X,
+                    AreaSquareMeters = normalizedGeometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180),
+                    District = district,
+                    Version = 1,
+                    VersionDate = DateTime.UtcNow,
+                    VersionNotes = "Imported from Blocks GeoJSON",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                zones.Add(zone);
+            }
+
+            // save zones to database
+            foreach (var zone in zones)
+            {
+                // check if zone already exists for this municipality
+                var existing = await _zoneRepository.GetByCodeAndMunicipalityAsync(zone.ZoneCode, municipalityId);
+                if (existing != null)
+                {
+                    // update it
+                    existing.ZoneName = zone.ZoneName;
+                    existing.Description = zone.Description;
+                    existing.Boundary = zone.Boundary;
+                    existing.BoundaryGeoJson = zone.BoundaryGeoJson;
+                    existing.CenterLatitude = zone.CenterLatitude;
+                    existing.CenterLongitude = zone.CenterLongitude;
+                    existing.AreaSquareMeters = zone.AreaSquareMeters;
+                    existing.Version++;
+                    existing.VersionDate = DateTime.UtcNow;
+                    existing.VersionNotes = "Updated from Blocks GeoJSON";
+                    existing.UpdatedAt = DateTime.UtcNow;
+                    await _zoneRepository.UpdateAsync(existing);
+                }
+                else
+                {
+                    await _zoneRepository.AddAsync(zone);
+                }
+            }
+
+            await _zoneRepository.SaveChangesAsync();
+            _logger.LogInformation("Imported {Count} blocks as zones from GeoJSON for municipality {MunicipalityId}", zones.Count, municipalityId);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to import blocks from GeoJSON: {ex.Message}", ex);
         }
     }
 
@@ -470,5 +618,12 @@ public class GisService : IGisService
     private double DegreesToRadians(double degrees)
     {
         return degrees * Math.PI / 180.0;
+    }
+
+    // helper to write geometry as GeoJSON string
+    private string WriteGeoJson(Geometry geometry)
+    {
+        var writer = new NetTopologySuite.IO.GeoJsonWriter();
+        return writer.Write(geometry);
     }
 }

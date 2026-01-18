@@ -14,6 +14,18 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
     {
     }
 
+    public override async Task<IEnumerable<TaskEntity>> GetAllAsync()
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .Include(t => t.AssignedToUser)
+            .Include(t => t.AssignedByUser)
+            .Include(t => t.Zone)
+            .Include(t => t.Photos)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+    }
+
     public override async Task<TaskEntity?> GetByIdAsync(int id)
     {
         // load the task with all its related data like user and zone

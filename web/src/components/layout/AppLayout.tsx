@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { X, User, Settings } from "lucide-react";
@@ -14,6 +14,8 @@ type NavItem = {
 
 const supervisorItems: NavItem[] = [
   { to: "/dashboard", label: "لوحة التحكم", end: true },
+  { to: "/tasks", label: "المهام" },
+  { to: "/issues", label: "البلاغات" },
   { to: "/tasks/new", label: "تعيين مهمة جديدة" },
   { to: "/zones", label: "الخريطة الحية" },
   { to: "/reports", label: "التقارير" },
@@ -29,8 +31,25 @@ export default function AppLayout() {
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // TODO لاحقاً: جيبي role من الباك
-  const role: UserRole = "supervisor";
+  // Get user role from localStorage
+  const getUserRole = (): UserRole => {
+    try {
+      const userStr = localStorage.getItem("jawlah_user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        const backendRole = user.role?.toLowerCase();
+        // Admin sees manager menu (with account management)
+        if (backendRole === "admin") return "manager";
+        // Supervisor sees field operations menu
+        if (backendRole === "supervisor") return "supervisor";
+      }
+    } catch (err) {
+      console.error("Failed to parse user role:", err);
+    }
+    return "supervisor"; // Default fallback
+  };
+
+  const role = getUserRole();
   const items = role === "manager" ? managerItems : supervisorItems;
 
   useEffect(() => {

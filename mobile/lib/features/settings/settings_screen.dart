@@ -148,13 +148,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!context.mounted) return;
 
     // Calculate work stats
-    final completedToday = taskManager.myTasks.where((t) =>
-        t.isCompleted &&
-        t.completedAt != null &&
-        t.completedAt!.day == DateTime.now().day &&
-        t.completedAt!.month == DateTime.now().month &&
-        t.completedAt!.year == DateTime.now().year
-    ).length;
+    final completedToday = taskManager.myTasks
+        .where((t) =>
+            t.isCompleted &&
+            t.completedAt != null &&
+            t.completedAt!.day == DateTime.now().day &&
+            t.completedAt!.month == DateTime.now().month &&
+            t.completedAt!.year == DateTime.now().year)
+        .length;
 
     String workDuration = 'غير محدد';
     String checkInTime = 'غير محدد';
@@ -162,21 +163,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String lateInfo = '';
 
     if (todayAttendance != null) {
-      final checkIn = todayAttendance.checkInTime;
-      checkInTime = '${checkIn.hour.toString().padLeft(2, '0')}:${checkIn.minute.toString().padLeft(2, '0')}';
+      // Convert UTC times to local for display
+      final checkIn = todayAttendance.checkInTime.toLocal();
+      checkInTime =
+          '${checkIn.hour.toString().padLeft(2, '0')}:${checkIn.minute.toString().padLeft(2, '0')}';
 
       if (todayAttendance.checkOutTime != null) {
-        final checkOut = todayAttendance.checkOutTime!;
-        checkOutTime = '${checkOut.hour.toString().padLeft(2, '0')}:${checkOut.minute.toString().padLeft(2, '0')}';
-        final duration = checkOut.difference(checkIn);
+        final checkOut = todayAttendance.checkOutTime!.toLocal();
+        checkOutTime =
+            '${checkOut.hour.toString().padLeft(2, '0')}:${checkOut.minute.toString().padLeft(2, '0')}';
+        // Use UTC times for duration calculation
+        final duration = todayAttendance.checkOutTime!
+            .difference(todayAttendance.checkInTime);
         final hours = duration.inHours;
-        final minutes = duration.inMinutes % 60;
+        final minutes = duration.inMinutes.remainder(60);
         workDuration = '$hours ساعة و $minutes دقيقة';
       } else {
-        final now = DateTime.now();
-        final duration = now.difference(checkIn);
+        // Use UTC for both to calculate correct duration
+        final now = DateTime.now().toUtc();
+        final duration = now.difference(todayAttendance.checkInTime);
         final hours = duration.inHours;
-        final minutes = duration.inMinutes % 60;
+        final minutes = duration.inMinutes.remainder(60);
         workDuration = '$hours ساعة و $minutes دقيقة (جاري)';
       }
 
@@ -192,7 +199,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Icon(Icons.summarize, color: AppColors.primary),
             SizedBox(width: 8),
-            Text('ملخص العمل اليوم', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+            Text('ملخص العمل اليوم',
+                style: TextStyle(
+                    fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
@@ -205,10 +214,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             _buildSummaryRow(Icons.timer, 'مدة العمل', workDuration),
             const SizedBox(height: 8),
-            _buildSummaryRow(Icons.task_alt, 'المهام المكتملة', '$completedToday مهمة'),
+            _buildSummaryRow(
+                Icons.task_alt, 'المهام المكتملة', '$completedToday مهمة'),
             if (lateInfo.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _buildSummaryRow(Icons.warning_amber, 'ملاحظة', lateInfo, color: AppColors.warning),
+              _buildSummaryRow(Icons.warning_amber, 'ملاحظة', lateInfo,
+                  color: AppColors.warning),
             ],
             const SizedBox(height: 16),
             Container(
@@ -224,7 +235,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Expanded(
                     child: Text(
                       'سيتم تسجيل الانصراف تلقائياً عند الخروج',
-                      style: TextStyle(fontFamily: 'Cairo', fontSize: 12, color: AppColors.info),
+                      style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 12,
+                          color: AppColors.info),
                     ),
                   ),
                 ],
@@ -241,29 +255,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               context.read<AuthManager>().doLogout();
-              Navigator.of(context).pushNamedAndRemoveUntil(Routes.login, (route) => false);
+              Navigator.of(context)
+                  .pushNamedAndRemoveUntil(Routes.login, (route) => false);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('تسجيل الخروج', style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
+            child: const Text('تسجيل الخروج',
+                style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryRow(IconData icon, String label, String value, {Color? color}) {
+  Widget _buildSummaryRow(IconData icon, String label, String value,
+      {Color? color}) {
     return Row(
       children: [
         Icon(icon, size: 20, color: color ?? AppColors.primary),
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+          style:
+              const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
         ),
         Expanded(
           child: Text(
             value,
-            style: TextStyle(fontFamily: 'Cairo', color: color ?? AppColors.textPrimary),
+            style: TextStyle(
+                fontFamily: 'Cairo', color: color ?? AppColors.textPrimary),
           ),
         ),
       ],

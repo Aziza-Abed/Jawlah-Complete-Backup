@@ -45,10 +45,6 @@ public class User
     public TimeSpan ExpectedEndTime { get; set; } = new TimeSpan(16, 0, 0); // 16:00
     public int GraceMinutes { get; set; } = 15;
 
-    // Privacy consent tracking
-    public DateTime? PrivacyConsentedAt { get; set; }
-    public int ConsentVersion { get; set; } = 0;
-
     // Warning system for policy violations (location mismatch, etc.)
     public int WarningCount { get; set; } = 0;
     public DateTime? LastWarningAt { get; set; }
@@ -58,7 +54,6 @@ public class User
     public ICollection<Task> AssignedTasks { get; set; } = new List<Task>();
     public ICollection<Issue> ReportedIssues { get; set; } = new List<Issue>();
     public ICollection<UserZone> AssignedZones { get; set; } = new List<UserZone>();
-    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 
     // set and validate worker pin
     public void SetPin(string pin)

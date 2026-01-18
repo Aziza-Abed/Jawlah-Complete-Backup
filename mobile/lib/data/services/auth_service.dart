@@ -81,7 +81,6 @@ class AuthService {
       return AuthResult(
         user: UserModel.fromJson(data['user'] as Map<String, dynamic>),
         token: data['token'] as String,
-        refreshToken: data['refreshToken'] as String?,
         isCheckedIn: data['isCheckedIn'] as bool? ?? false,
         activeAttendanceId: data['activeAttendanceId'] as int?,
         checkInStatus: data['checkInStatus'] as String? ?? 'NotAttempted',
@@ -134,23 +133,11 @@ class AuthService {
       if (kDebugMode) debugPrint('Logout error (ignored): $e');
     }
   }
-
-  // Record privacy consent
-  Future<bool> recordPrivacyConsent() async {
-    try {
-      final response = await _apiService.post(ApiConfig.privacyConsent);
-      return response.statusCode == 200;
-    } catch (e) {
-      if (kDebugMode) debugPrint('Privacy consent error: $e');
-      return false;
-    }
-  }
 }
 
 class AuthResult {
   final UserModel user;
   final String token;
-  final String? refreshToken;
   final bool isCheckedIn;
   final int? activeAttendanceId;
 
@@ -170,7 +157,6 @@ class AuthResult {
   AuthResult({
     required this.user,
     required this.token,
-    this.refreshToken,
     this.isCheckedIn = false,
     this.activeAttendanceId,
     this.checkInStatus = 'NotAttempted',

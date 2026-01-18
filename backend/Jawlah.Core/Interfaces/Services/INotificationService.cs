@@ -20,4 +20,7 @@ public interface INotificationService
     // Warning system notifications
     Task SendWarningIssuedToWorkerAsync(int workerId, string reason, int totalWarnings);
     Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings);
+
+    // Task extension request notification
+    Task SendTaskExtensionRequestAsync(int supervisorId, int taskId, string taskTitle, DateTime originalDeadline, DateTime requestedDeadline);
 }

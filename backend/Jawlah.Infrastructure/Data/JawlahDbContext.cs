@@ -17,7 +17,6 @@ public class JawlahDbContext : DbContext
     public DbSet<Zone> Zones { get; set; } = null!;
     public DbSet<UserZone> UserZones { get; set; } = null!;
     public DbSet<Notification> Notifications { get; set; } = null!;
-    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
     public DbSet<LocationHistory> LocationHistories { get; set; } = null!;
     public DbSet<Photo> Photos { get; set; } = null!;
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;

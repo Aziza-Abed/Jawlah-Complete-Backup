@@ -187,9 +187,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<DateTime>("EventTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("ForwardingNotes")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<bool>("IsSynced")
                         .HasColumnType("bit");
 
@@ -206,12 +203,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                         .HasColumnType("float(18)");
 
                     b.Property<int>("MunicipalityId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("PdfDownloadedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("PdfDownloadedByUserId")
                         .HasColumnType("int");
 
                     b.Property<string>("PhotoUrl")
@@ -560,41 +551,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.ToTable("Photos");
                 });
 
-            modelBuilder.Entity("Jawlah.Core.Entities.RefreshToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Token")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("RefreshTokens");
-                });
-
             modelBuilder.Entity("Jawlah.Core.Entities.Task", b =>
                 {
                     b.Property<int>("TaskId")
@@ -757,9 +713,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserId"));
 
-                    b.Property<int>("ConsentVersion")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -819,9 +772,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Property<string>("Pin")
                         .HasMaxLength(4)
                         .HasColumnType("nvarchar(4)");
-
-                    b.Property<DateTime?>("PrivacyConsentedAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("RegisteredDeviceId")
                         .HasColumnType("nvarchar(max)");
@@ -1101,17 +1051,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Navigation("UploadedByUser");
                 });
 
-            modelBuilder.Entity("Jawlah.Core.Entities.RefreshToken", b =>
-                {
-                    b.HasOne("Jawlah.Core.Entities.User", "User")
-                        .WithMany("RefreshTokens")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Jawlah.Core.Entities.Task", b =>
                 {
                     b.HasOne("Jawlah.Core.Entities.User", "AssignedByUser")
@@ -1226,8 +1165,6 @@ namespace Jawlah.Infrastructure.Data.Migrations
                     b.Navigation("AssignedZones");
 
                     b.Navigation("AttendanceRecords");
-
-                    b.Navigation("RefreshTokens");
 
                     b.Navigation("ReportedIssues");
                 });

@@ -28,15 +28,14 @@ export async function logout(): Promise<void> {
   await apiClient.post("/auth/logout");
 }
 
-export async function refreshToken(token: string): Promise<LoginResponse> {
-  const response = await apiClient.post<ApiResponse<LoginResponse>>("/auth/refresh", { refreshToken: token });
-
-  if (response.data.success && response.data.data) {
-    return response.data.data;
-  }
-
-  return {
-    success: false,
-    error: response.data.errors?.join(", ") || response.data.message || "فشل تحديث الرمز"
-  };
-}
+// Note: Refresh token not implemented in backend yet
+// export async function refreshToken(token: string): Promise<LoginResponse> {
+//   const response = await apiClient.post<ApiResponse<LoginResponse>>("/auth/refresh", { refreshToken: token });
+//   if (response.data.success && response.data.data) {
+//     return response.data.data;
+//   }
+//   return {
+//     success: false,
+//     error: response.data.errors?.join(", ") || response.data.message || "فشل تحديث الرمز"
+//   };
+// }

@@ -31,6 +31,19 @@ export type TaskResponse = {
   longitude?: number;
   syncTime?: string;
   syncVersion: number;
+  // Progress tracking for multi-day tasks
+  progressPercentage: number;
+  progressNotes?: string;
+  extendedDeadline?: string;
+  // Auto-rejection tracking
+  isAutoRejected: boolean;
+  rejectionReason?: string;
+  rejectedAt?: string;
+  rejectionDistanceMeters?: number;
+  // Distance verification
+  maxDistanceMeters: number;
+  completionDistanceMeters?: number;
+  isDistanceWarning: boolean;
 };
 
 export type CreateTaskRequest = {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getTasksReport, getWorkersReport, getZonesReport } from "../api/reports";
+import { getTasksReport, getWorkersReport, getZonesReport, getAttendanceReportUrl, getTasksReportUrl } from "../api/reports";
 import type {
   TasksReportData,
   WorkersReportData,
@@ -209,19 +209,30 @@ export default function Reports() {
     return buildMockView(tab, applied, lastUpdated);
   }, [tab, applied, lastUpdated, tasksData, workersData, zonesData]);
 
-  const exportCsv = () => {
-    const csv =
-      view.tab === "tasks"
-        ? rowsToCsvTasks(view.table.rows)
-        : view.tab === "workers"
-        ? rowsToCsvWorkers(view.table.rows)
-        : rowsToCsvZones(view.table.rows);
+  const handleExport = (format: "excel" | "pdf") => {
+    const filters = {
+      period: applied.period,
+      status: applied.status,
+      startDate: applied.from || undefined,
+      endDate: applied.to || undefined,
+    };
 
-    downloadTextFile(csv, `report-${view.tab}.csv`, "text/csv;charset=utf-8");
+    let url = "";
+    if (tab === "tasks") {
+      url = getTasksReportUrl(format, filters);
+    } else {
+      url = getAttendanceReportUrl(format, filters);
+    }
+    
+    window.open(url, "_blank");
   };
 
   const exportPdf = () => {
-    alert("PDF export will be connected to backend later.");
+    handleExport("pdf");
+  };
+
+  const exportExcel = () => {
+    handleExport("excel");
   };
 
   const showStatusFilter = tab === "tasks";
@@ -389,7 +400,7 @@ export default function Reports() {
                   <div className="flex items-center gap-2 justify-end">
                     <button
                       type="button"
-                      onClick={exportCsv}
+                      onClick={exportExcel}
                       className="h-[36px] px-3 rounded-[8px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[13px] hover:opacity-95"
                     >
                       Excel
@@ -861,38 +872,6 @@ function ChevronDown() {
 
 /* ---------- Export Helpers ---------- */
 
-function downloadTextFile(text: string, filename: string, mime: string) {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function rowsToCsvTasks(rows: TaskRow[]) {
-  const headers = ["id", "title", "worker", "zone", "status", "priority", "dueDate", "time"];
-  const escape = (v: string | number) => `"${String(v).replaceAll('"', '""')}"`;
-  const lines = [headers.join(","), ...rows.map((r) => headers.map((h) => escape((r as any)[h])).join(","))];
-  return lines.join("\n");
-}
-
-function rowsToCsvWorkers(rows: WorkerRow[]) {
-  const headers = ["name", "presence", "lastSeen", "activeTasks", "doneTasks"];
-  const escape = (v: string | number) => `"${String(v).replaceAll('"', '""')}"`;
-  const lines = [headers.join(","), ...rows.map((r) => headers.map((h) => escape((r as any)[h])).join(","))];
-  return lines.join("\n");
-}
-
-function rowsToCsvZones(rows: ZoneRow[]) {
-  const headers = ["zone", "total", "done", "inProgress", "delayed", "rate", "updatedAt"];
-  const escape = (v: string | number) => `"${String(v).replaceAll('"', '""')}"`;
-  const lines = [headers.join(","), ...rows.map((r) => headers.map((h) => escape((r as any)[h])).join(","))];
-  return lines.join("\n");
-}
 
 /* ---------- API to ViewModel Builders ---------- */
 

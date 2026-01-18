@@ -46,4 +46,18 @@ public interface IGisService
     /// <param name="geoJson">GeoJSON content as string</param>
     /// <param name="municipalityId">The municipality ID to associate imported zones with</param>
     Task ImportGeoJsonStringAsync(string geoJson, int municipalityId);
+
+    /// <summary>
+    /// Imports blocks from a GeoJSON file as zones with neighborhood names
+    /// </summary>
+    /// <param name="filePath">Path to the blocks GeoJSON file</param>
+    /// <param name="municipalityId">The municipality ID to associate imported blocks with</param>
+    Task ImportBlocksFromGeoJsonAsync(string filePath, int municipalityId);
+
+    /// <summary>
+    /// Imports blocks from a GeoJSON string as zones with neighborhood names
+    /// </summary>
+    /// <param name="geoJson">GeoJSON content as string</param>
+    /// <param name="municipalityId">The municipality ID to associate imported blocks with</param>
+    Task ImportBlocksFromGeoJsonStringAsync(string geoJson, int municipalityId);
 }

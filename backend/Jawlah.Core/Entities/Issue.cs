@@ -45,13 +45,6 @@ public class Issue
     public User? ResolvedByUser { get; set; }
     public Zone? Zone { get; set; }
 
-    // Forwarding notes - supervisor can add notes about where the issue was forwarded
-    public string? ForwardingNotes { get; set; }
-
-    // PDF download tracking
-    public DateTime? PdfDownloadedAt { get; set; }
-    public int? PdfDownloadedByUserId { get; set; }
-
     // helper method to get all photos (both legacy PhotoUrl and Photos collection)
     public IEnumerable<string> GetAllPhotoUrls()
     {

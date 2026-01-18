@@ -84,8 +84,8 @@ public class TrackingController : BaseApiController
         var today = DateTime.UtcNow.Date;
         var now = DateTime.UtcNow;
 
-        // get latest location for each worker from today
-        var locations = await _history.GetLatestLocationsAsync(today);
+        // get latest location for each worker (regardless of date, show last known position)
+        var locations = await _history.GetLatestLocationsAsync(DateTime.MinValue);
 
         // map to response with worker info
         var result = locations.Select(loc => new
@@ -98,9 +98,9 @@ public class TrackingController : BaseApiController
             Speed = loc.Speed,
             Accuracy = loc.Accuracy,
             Timestamp = loc.Timestamp,
-            // consider online if location updated in last 10 minutes
-            IsOnline = (now - loc.Timestamp).TotalMinutes <= 10,
-            Status = (now - loc.Timestamp).TotalMinutes <= 10 ? "Online" : "Offline",
+            // consider online if location updated in last 15 minutes
+            IsOnline = (now - loc.Timestamp).TotalMinutes <= 15,
+            Status = (now - loc.Timestamp).TotalMinutes <= 15 ? "Online" : "Offline",
             ZoneName = loc.User?.AssignedZones?.FirstOrDefault()?.Zone?.ZoneName
         });
 

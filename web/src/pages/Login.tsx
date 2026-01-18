@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import logo from "../assets/logo.png";
+import { login } from "../api/auth";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -17,25 +18,37 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // TODO backend:
-      // POST /auth/login  { username, password }
-      // return token + role
-      // store token (localStorage/cookie) then navigate
-      await new Promise((r) => setTimeout(r, 700));
+      const response = await login({ username, password });
 
-      navigate("/dashboard");
+      if (response.success && response.token) {
+        // Store token in localStorage
+        localStorage.setItem("jawlah_token", response.token);
+
+        // Store user data if needed
+        if (response.user) {
+          localStorage.setItem("jawlah_user", JSON.stringify(response.user));
+        }
+
+        // Navigate to dashboard
+        navigate("/dashboard");
+      } else {
+        setError(response.error || "بيانات الدخول غير صحيحة");
+      }
     } catch (err) {
-      setError("بيانات الدخول غير صحيحة");
+      setError("حدث خطأ في الاتصال بالخادم");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div dir="rtl" className="min-h-screen w-full bg-[#D9D9D9] grid place-items-center p-4">
+    <div
+      dir="rtl"
+      className="min-h-screen w-full bg-gradient-to-br from-[#E2E8F0] to-[#D9D9D9] grid place-items-center p-4"
+    >
       <div className="w-full max-w-[980px] grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Info Card */}
-        <div className="hidden lg:block bg-[#7895B2] rounded-[18px] p-10 text-right shadow-[0_10px_25px_rgba(0,0,0,0.08)]">
+        <div className="hidden lg:block bg-gradient-to-tr from-[#60778E] to-[#7895B2] rounded-[24px] p-10 text-right shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/10">
           <div className="flex items-center justify-end gap-4">
             <div className="text-white">
               <div className="text-[22px] font-sans font-semibold">Jawlah</div>
@@ -43,16 +56,21 @@ export default function Login() {
                 نظام إدارة فرق العمل والمهمات
               </div>
             </div>
-            <img src={logo} alt="بلدية البيرة" className="w-[72px] h-[72px] object-contain" />
+            <img
+              src={logo}
+              alt="بلدية البيرة"
+              className="w-[72px] h-[72px] object-contain"
+            />
           </div>
 
           <div className="mt-10 text-white/90 text-[15px] leading-relaxed">
-            سجّل دخولك كمشرف/مدير لمتابعة المهام، البلاغات، والخريطة الحية والتقارير.
+            سجّل دخولك كمشرف/مدير لمتابعة المهام، البلاغات، والخريطة الحية
+            والتقارير.
           </div>
         </div>
 
         {/* Right: Login Form */}
-        <div className="bg-[#F3F1ED] rounded-[18px] p-6 sm:p-8 shadow-[0_10px_25px_rgba(0,0,0,0.08)] border border-black/10">
+        <div className="bg-white/90 backdrop-blur-md rounded-[24px] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white/50">
           <div className="flex items-center justify-between">
             <div className="text-right">
               <h1 className="text-[#2F2F2F] font-sans font-semibold text-[22px]">
@@ -64,7 +82,11 @@ export default function Login() {
             </div>
 
             <div className="lg:hidden">
-              <img src={logo} alt="بلدية البيرة" className="w-[56px] h-[56px] object-contain" />
+              <img
+                src={logo}
+                alt="بلدية البيرة"
+                className="w-[56px] h-[56px] object-contain"
+              />
             </div>
           </div>
 
@@ -119,12 +141,6 @@ export default function Login() {
             >
               {loading ? "جاري تسجيل الدخول..." : "دخول"}
             </button>
-
-            <div className="text-right text-[12px] text-[#6B7280] leading-relaxed">
-              {/* TODO backend:
-                  - login returns token/role
-                  - store token then ProtectedRoute uses it */}
-            </div>
           </form>
         </div>
       </div>
@@ -132,7 +148,13 @@ export default function Login() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <div className="text-right font-sans font-semibold text-[#2F2F2F] text-[14px] mb-2">

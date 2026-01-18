@@ -1,9 +1,26 @@
 import { apiClient } from "./client";
 import type { TaskResponse, CreateTaskRequest, UpdateTaskRequest } from "../types/task";
 
-// Get all tasks (admin/supervisor)
-export async function getTasks(): Promise<TaskResponse[]> {
-  const response = await apiClient.get<{ data: TaskResponse[] }>("/tasks/all");
+// Get all tasks with filters (admin/supervisor)
+export async function getTasks(filters?: {
+  status?: string;
+  priority?: string;
+  workerId?: number;
+  zoneId?: number;
+  page?: number;
+  pageSize?: number;
+}): Promise<TaskResponse[]> {
+  const params = new URLSearchParams();
+  if (filters?.status && filters.status !== "all") params.append("status", filters.status);
+  if (filters?.priority) params.append("priority", filters.priority);
+  if (filters?.workerId) params.append("workerId", filters.workerId.toString());
+  if (filters?.zoneId) params.append("zoneId", filters.zoneId.toString());
+  if (filters?.page) params.append("page", filters.page.toString());
+  if (filters?.pageSize) params.append("pageSize", filters.pageSize.toString());
+
+  const response = await apiClient.get<{ data: TaskResponse[] }>(
+    `/tasks/all?${params.toString()}`
+  );
   return response.data.data;
 }
 

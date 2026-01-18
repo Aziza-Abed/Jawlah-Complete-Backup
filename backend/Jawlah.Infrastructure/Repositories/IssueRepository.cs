@@ -12,6 +12,18 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
     {
     }
 
+    public override async Task<IEnumerable<Issue>> GetAllAsync()
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .Include(i => i.ReportedByUser)
+            .Include(i => i.Zone)
+            .Include(i => i.ResolvedByUser)
+            .Include(i => i.Photos)
+            .OrderByDescending(i => i.ReportedAt)
+            .ToListAsync();
+    }
+
     public override async Task<Issue?> GetByIdAsync(int id)
     {
         return await _dbSet

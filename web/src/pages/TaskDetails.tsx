@@ -1,6 +1,8 @@
 // src/pages/TaskDetails.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { getTask, approveTask, rejectTask } from "../api/tasks";
+import type { TaskResponse } from "../types/task";
 
 type Priority = "Low" | "Medium" | "High";
 
@@ -582,59 +584,53 @@ function formatDateTime(d: string) {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 }
 
-async function apiGetTaskDetails(taskId: string): Promise<TaskDTO> {
-  await wait(200);
+// Map backend status to frontend status
+const mapBackendStatus = (status: string): TaskStatus => {
+  switch (status) {
+    case "Pending": return "open";
+    case "InProgress": return "in_progress";
+    case "Completed": return "pending_approval";
+    case "Approved": return "approved";
+    case "Rejected": return "rejected";
+    default: return "open";
+  }
+};
+
+// Map backend priority
+const mapBackendPriority = (priority: string): Priority => {
+  if (priority === "Urgent") return "High";
+  return priority as Priority;
+};
+
+// Convert backend TaskResponse to frontend TaskDTO
+const mapBackendTaskToDTO = (task: TaskResponse): TaskDTO => {
   return {
-    id: taskId || "t-204",
-    title: "إصلاح حفرة - قرب دوار البلدية",
-    description: "يرجى إصلاح الحفرة وتأمين المكان. المهمة تحتاج يومين حسب التقدير.",
-    dueDate: "2026-01-20",
-    priority: "High",
-    status: "pending_approval",
-    assignedWorkerName: "محمود",
-    zoneName: "المنطقة 4",
-    updates: [
-      {
-        id: "u1",
-        createdAt: "2026-01-18T16:30:00Z",
-        statusSnapshot: "in_progress",
-        progressPercent: 50,
-        note: "تم تجهيز الموقع ووضع إشارات تنبيه.",
-        images: [
-          "https://picsum.photos/seed/one/600/400",
-          "https://picsum.photos/seed/two/600/400",
-        ],
-        locationText: "قرب دوار البلدية - بجانب الرصيف",
-        gps: { lat: 31.903, lng: 35.211 },
-      },
-      {
-        id: "u2",
-        createdAt: "2026-01-19T16:40:00Z",
-        statusSnapshot: "completed",
-        progressPercent: 100,
-        note: "تم الإغلاق والصب النهائي.",
-        images: [
-          "https://picsum.photos/seed/three/600/400",
-          "https://picsum.photos/seed/four/600/400",
-        ],
-        locationText: "قرب دوار البلدية - بجانب الرصيف",
-        gps: { lat: 31.903, lng: 35.211 },
-      },
-    ],
-    lastRejectReason: "",
+    id: task.taskId.toString(),
+    title: task.title,
+    description: task.description,
+    dueDate: task.dueDate?.split("T")[0],
+    priority: mapBackendPriority(task.priority),
+    status: mapBackendStatus(task.status),
+    assignedWorkerName: task.assignedToUserName || "غير محدد",
+    zoneName: task.zoneName,
+    lastLocationText: task.locationDescription,
+    lastGps: task.latitude && task.longitude ? { lat: task.latitude, lng: task.longitude } : undefined,
+    updates: [], // Backend doesn't have task updates yet, keep empty
+    lastRejectReason: task.status === "Rejected" ? "تم الرفض" : undefined,
   };
+};
+
+async function apiGetTaskDetails(taskId: string): Promise<TaskDTO> {
+  const task = await getTask(Number(taskId));
+  return mapBackendTaskToDTO(task);
 }
 
 async function apiApproveTask(taskId: string) {
-  await wait(200);
+  await approveTask(Number(taskId), "تمت الموافقة على المهمة");
   return true;
 }
 
 async function apiRejectTask(taskId: string, reason: string) {
-  await wait(200);
+  await rejectTask(Number(taskId), reason);
   return true;
-}
-
-function wait(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }

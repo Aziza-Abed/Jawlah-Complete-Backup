@@ -43,6 +43,11 @@ public class AttendanceController : BaseApiController
         if (userId == null)
             return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("رمز غير صالح"));
 
+        // get user to access MunicipalityId
+        var user = await _users.GetByIdAsync(userId.Value);
+        if (user == null)
+            return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("مستخدم غير موجود"));
+
         // check if worker already checked in today
         var hasActive = await _attendance.HasActiveAttendanceAsync(userId.Value);
         if (hasActive)
@@ -57,6 +62,7 @@ public class AttendanceController : BaseApiController
         var attendance = new Attendance
         {
             UserId = userId.Value,
+            MunicipalityId = user.MunicipalityId,
             ZoneId = zone.ZoneId,
             CheckInEventTime = DateTime.UtcNow,
             CheckInSyncTime = DateTime.UtcNow,
@@ -139,6 +145,37 @@ public class AttendanceController : BaseApiController
         }
         attendance.WorkDuration = duration;
 
+        // Calculate overtime or early leave
+        var user = await _users.GetByIdAsync(attendance.UserId);
+        if (user != null)
+        {
+            var expectedEnd = checkOutTime.Date.Add(user.ExpectedEndTime); // e.g., 16:00
+            var earlyThreshold = expectedEnd.AddMinutes(-30); // Leave early if >30 min before expected end
+
+            if (checkOutTime > expectedEnd)
+            {
+                // Worker stayed late - overtime
+                attendance.OvertimeMinutes = (int)(checkOutTime - expectedEnd).TotalMinutes;
+
+                // Update AttendanceType: if already late, keep "Late", otherwise "Overtime"
+                if (attendance.AttendanceType != "Late")
+                {
+                    attendance.AttendanceType = "Overtime";
+                }
+            }
+            else if (checkOutTime < earlyThreshold)
+            {
+                // Worker left more than 30 min early
+                attendance.EarlyLeaveMinutes = (int)(expectedEnd - checkOutTime).TotalMinutes;
+                attendance.AttendanceType = "EarlyLeave";
+            }
+            else if (attendance.AttendanceType != "Late" && attendance.AttendanceType != "Overtime")
+            {
+                // Normal work hours (no late, no overtime, no early leave)
+                attendance.AttendanceType = "OnTime";
+            }
+        }
+
         await _attendance.UpdateAsync(attendance);
         await _attendance.SaveChangesAsync();
 
@@ -203,6 +240,11 @@ public class AttendanceController : BaseApiController
         if (userId == null)
             return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("رمز غير صالح"));
 
+        // get user to access MunicipalityId
+        var user = await _users.GetByIdAsync(userId.Value);
+        if (user == null)
+            return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("مستخدم غير موجود"));
+
         // check if worker already has attendance today
         var hasActive = await _attendance.HasActiveAttendanceAsync(userId.Value);
         if (hasActive)
@@ -212,6 +254,7 @@ public class AttendanceController : BaseApiController
         var attendance = new Attendance
         {
             UserId = userId.Value,
+            MunicipalityId = user.MunicipalityId,
             ZoneId = request.ZoneId,
             CheckInEventTime = request.CheckInTime ?? DateTime.UtcNow,
             CheckInLatitude = 0,

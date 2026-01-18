@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getTasks } from "../api/tasks";
+import type { TaskResponse } from "../types/task";
 
 type TaskStatus = "Open" | "InProgress" | "Submitted" | "Approved" | "Rejected";
 type TaskPriority = "Low" | "Medium" | "High";
@@ -17,68 +19,70 @@ type TaskRow = {
 
 type FilterKey = "all" | "open" | "inprogress" | "submitted" | "approved" | "rejected";
 
+// Map backend status to frontend status
+const mapStatus = (backendStatus: string): TaskStatus => {
+  switch (backendStatus) {
+    case "Pending": return "Open";
+    case "InProgress": return "InProgress";
+    case "Completed": return "Submitted";
+    case "Approved": return "Approved";
+    case "Rejected": return "Rejected";
+    default: return "Open";
+  }
+};
+
+// Map backend priority to frontend priority
+const mapPriority = (backendPriority: string): TaskPriority => {
+  if (backendPriority === "Urgent") return "High";
+  return backendPriority as TaskPriority;
+};
+
+// Convert backend TaskResponse to frontend TaskRow
+const mapTaskToRow = (task: TaskResponse): TaskRow => {
+  const updatedTime = task.completedAt || task.startedAt || task.createdAt;
+  const date = new Date(updatedTime);
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+
+  return {
+    id: task.taskId.toString(),
+    title: task.title,
+    workerName: task.assignedToUserName || "غير محدد",
+    zoneName: task.zoneName || "غير محدد",
+    status: mapStatus(task.status),
+    priority: mapPriority(task.priority),
+    dueDate: task.dueDate?.split("T")[0],
+    updatedAt: `${hours}:${minutes}`,
+  };
+};
+
 export default function TasksList() {
   const navigate = useNavigate();
 
-  const mockData: TaskRow[] = useMemo(
-    () => [
-      {
-        id: "t-204",
-        title: "إصلاح حفرة",
-        workerName: "محمود",
-        zoneName: "المنطقة 4",
-        status: "Submitted",
-        priority: "High",
-        dueDate: "2026-01-19",
-        updatedAt: "10:42",
-      },
-      {
-        id: "t-102",
-        title: "تنظيف شارع",
-        workerName: "محمد",
-        zoneName: "المنطقة 2",
-        status: "InProgress",
-        priority: "Medium",
-        dueDate: "2026-01-20",
-        updatedAt: "10:35",
-      },
-      {
-        id: "t-088",
-        title: "رفع نفايات",
-        workerName: "أبو عمار",
-        zoneName: "المنطقة 1",
-        status: "Open",
-        priority: "Low",
-        dueDate: "2026-01-22",
-        updatedAt: "09:58",
-      },
-      {
-        id: "t-150",
-        title: "تنظيف دوّار",
-        workerName: "نعيم",
-        zoneName: "المنطقة 3",
-        status: "Approved",
-        priority: "Medium",
-        dueDate: "2026-01-18",
-        updatedAt: "09:20",
-      },
-      {
-        id: "t-151",
-        title: "إصلاح إنارة",
-        workerName: "سامر",
-        zoneName: "المنطقة 5",
-        status: "Rejected",
-        priority: "High",
-        dueDate: "2026-01-18",
-        updatedAt: "09:10",
-      },
-    ],
-    []
-  );
-
-  const [items, setItems] = useState<TaskRow[]>(mockData);
+  const [items, setItems] = useState<TaskRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [q, setQ] = useState("");
+
+  // Fetch tasks from backend
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const tasks = await getTasks();
+        const rows = tasks.map(mapTaskToRow);
+        setItems(rows);
+      } catch (err) {
+        console.error("Failed to fetch tasks:", err);
+        setError("فشل تحميل المهام");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTasks();
+  }, []);
 
   const stats = useMemo(() => {
     const total = items.length;
@@ -150,9 +154,21 @@ export default function TasksList() {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <MiniStat title="إجمالي المهام" value={String(stats.total)} />
-            <MiniStat title="بانتظار اعتماد" value={String(stats.submitted)} />
+          {loading && (
+            <div className="mt-8 text-center text-[#2F2F2F] font-sans">جاري التحميل...</div>
+          )}
+
+          {error && (
+            <div className="mt-4 p-4 rounded-[12px] bg-red-100 text-red-700 text-right font-sans">
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && (
+            <>
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <MiniStat title="إجمالي المهام" value={String(stats.total)} />
+                <MiniStat title="بانتظار اعتماد" value={String(stats.submitted)} />
             <MiniStat title="قيد التنفيذ" value={String(stats.inProgress)} />
           </div>
 
@@ -246,6 +262,8 @@ export default function TasksList() {
           <div className="mt-6 text-right text-[12px] text-[#6B7280]">
             {/* TODO: backend should provide tasks list with filters, pagination, and sorting */}
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

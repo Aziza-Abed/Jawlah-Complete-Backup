@@ -58,4 +58,3 @@ extension AppExceptionFactory on AppException {
     }
   }
 }
-
