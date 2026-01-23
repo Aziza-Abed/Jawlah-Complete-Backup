@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import logo from "../assets/logo.png";
+import { useMunicipality } from "../contexts/MunicipalityContext";
 
 export default function ResetPassword() {
   const location = useLocation();
+  const { municipalityName } = useMunicipality();
   const phone = (location.state as any)?.phone as string | undefined;
 
   const [code, setCode] = useState("");
@@ -59,7 +61,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen w-full bg-[#D9D9D9] grid place-items-center p-4">
+    <div dir="rtl" className="min-h-screen w-full bg-background grid place-items-center p-4">
       <div className="w-full max-w-[520px] bg-[#F3F1ED] rounded-[18px] p-6 sm:p-8 shadow-[0_10px_25px_rgba(0,0,0,0.08)] border border-black/10">
         <div className="flex items-center justify-between">
           <div className="text-right">
@@ -75,7 +77,7 @@ export default function ResetPassword() {
               </div>
             )}
           </div>
-          <img src={logo} alt="بلدية البيرة" className="w-[56px] h-[56px] object-contain" />
+          <img src={logo} alt={municipalityName} className="w-[56px] h-[56px] object-contain" />
         </div>
 
         {error && (

@@ -39,9 +39,15 @@ class SyncManager extends BaseController {
       (List<ConnectivityResult> results) async {
         _updateConnectionStatus(results);
 
-        // if we get internet back try to sync automaticly
+        // FIXED: if we get internet back try to sync automatically
+        // Use unawaited to prevent blocking the listener
         if (_isOnline && waitingItems > 0 && !isSyncingNow) {
-          await startSync();
+          // Don't await - fire and forget to prevent race conditions
+          startSync().then((_) {
+            if (kDebugMode) debugPrint('Auto-sync completed');
+          }).catchError((e) {
+            if (kDebugMode) debugPrint('Auto-sync failed: $e');
+          });
         }
       },
     );
@@ -68,7 +74,9 @@ class SyncManager extends BaseController {
 
   // start syncing data to server
   Future<SyncResult> startSync() async {
+    // FIXED: Atomic check-and-set to prevent race condition
     if (isSyncingNow) {
+      if (kDebugMode) debugPrint('Sync already in progress, skipping');
       return lastResult ?? SyncResult();
     }
 
@@ -80,6 +88,7 @@ class SyncManager extends BaseController {
       return result;
     }
 
+    // Set flag immediately to prevent concurrent calls
     isSyncingNow = true;
     notifyListeners();
 

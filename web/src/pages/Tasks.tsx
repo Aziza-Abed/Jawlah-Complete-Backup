@@ -127,7 +127,7 @@ export default function TasksList() {
   };
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-background overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-center justify-between gap-3">
@@ -159,8 +159,21 @@ export default function TasksList() {
           )}
 
           {error && (
-            <div className="mt-4 p-4 rounded-[12px] bg-red-100 text-red-700 text-right font-sans">
-              {error}
+            <div className="mt-4 p-4 rounded-[12px] bg-red-100 text-red-700 text-right font-sans flex items-center justify-between">
+              <button
+                onClick={() => {
+                  setError("");
+                  setLoading(true);
+                  getTasks()
+                    .then((tasks) => setItems(tasks.map(mapTaskToRow)))
+                    .catch(() => setError("فشل تحميل المهام"))
+                    .finally(() => setLoading(false));
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-[8px] text-[13px] font-semibold hover:bg-red-700"
+              >
+                إعادة المحاولة
+              </button>
+              <span>{error}</span>
             </div>
           )}
 
@@ -260,7 +273,7 @@ export default function TasksList() {
           </div>
 
           <div className="mt-6 text-right text-[12px] text-[#6B7280]">
-            {/* TODO: backend should provide tasks list with filters, pagination, and sorting */}
+            {/* Displaying client-side filtered results */}
           </div>
             </>
           )}

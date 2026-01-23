@@ -101,14 +101,22 @@ class TaskModel {
       if (value is String) return value;
       if (value is int) {
         switch (value) {
-          case 0: return 'GarbageCollection';
-          case 1: return 'StreetSweeping';
-          case 2: return 'ContainerMaintenance';
-          case 3: return 'RepairMaintenance';
-          case 4: return 'PublicSpaceCleaning';
-          case 5: return 'Inspection';
-          case 99: return 'Other';
-          default: return null;
+          case 0:
+            return 'GarbageCollection';
+          case 1:
+            return 'StreetSweeping';
+          case 2:
+            return 'ContainerMaintenance';
+          case 3:
+            return 'RepairMaintenance';
+          case 4:
+            return 'PublicSpaceCleaning';
+          case 5:
+            return 'Inspection';
+          case 99:
+            return 'Other';
+          default:
+            return null;
         }
       }
       return null;
@@ -117,8 +125,9 @@ class TaskModel {
     return TaskModel(
       taskId: json['taskId'] as int? ?? json['TaskId'] as int? ?? 0,
       title: json['title'] as String? ?? json['Title'] as String? ?? '',
-      description:
-          json['description'] as String? ?? json['Description'] as String? ?? '',
+      description: json['description'] as String? ??
+          json['Description'] as String? ??
+          '',
       status:
           json['status'] as String? ?? json['Status'] as String? ?? 'Pending',
       priority: json['priority'] as String? ??
@@ -136,8 +145,7 @@ class TaskModel {
           json['assignedToUserId'] as int? ?? json['AssignedToUserId'] as int?,
       zoneId: json['zoneId'] as int? ?? json['ZoneId'] as int?,
       zoneName: json['zoneName'] as String? ?? json['ZoneName'] as String?,
-      location:
-          json['location'] as String? ??
+      location: json['location'] as String? ??
           json['locationDescription'] as String? ??
           json['LocationDescription'] as String?,
       latitude: (json['latitude'] ?? json['Latitude']) != null
@@ -147,39 +155,44 @@ class TaskModel {
           ? ((json['longitude'] ?? json['Longitude']) as num).toDouble()
           : null,
       dueDate: _safeParseDateTimeUtc(json['dueDate'] ?? json['DueDate']),
-      completedAt: _safeParseDateTimeUtc(json['completedAt'] ?? json['CompletedAt']),
+      completedAt:
+          _safeParseDateTimeUtc(json['completedAt'] ?? json['CompletedAt']),
       completionNotes: json['completionNotes'] as String? ??
           json['CompletionNotes'] as String?,
       photoUrl: json['photoUrl'] as String? ?? json['PhotoUrl'] as String?,
-      photos: (json['photos'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList(),
-      createdAt: _safeParseDateTimeUtc(json['createdAt'] ?? json['CreatedAt']) ??
-          DateTime.now().toUtc(),
+      photos:
+          (json['photos'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+      createdAt:
+          _safeParseDateTimeUtc(json['createdAt'] ?? json['CreatedAt']) ??
+              DateTime.now().toUtc(),
       updatedAt: _safeParseDateTimeUtc(json['updatedAt'] ?? json['SyncTime']) ??
           DateTime.now().toUtc(),
       syncVersion:
           json['syncVersion'] as int? ?? json['SyncVersion'] as int? ?? 1,
-      maxDistanceMeters:
-          json['maxDistanceMeters'] as int? ?? json['MaxDistanceMeters'] as int? ?? 100,
-      completionDistanceMeters:
-          json['completionDistanceMeters'] as int? ?? json['CompletionDistanceMeters'] as int?,
-      isDistanceWarning:
-          json['isDistanceWarning'] as bool? ?? json['IsDistanceWarning'] as bool? ?? false,
-      progressPercentage:
-          json['progressPercentage'] as int? ?? json['ProgressPercentage'] as int? ?? 0,
+      maxDistanceMeters: json['maxDistanceMeters'] as int? ??
+          json['MaxDistanceMeters'] as int? ??
+          100,
+      completionDistanceMeters: json['completionDistanceMeters'] as int? ??
+          json['CompletionDistanceMeters'] as int?,
+      isDistanceWarning: json['isDistanceWarning'] as bool? ??
+          json['IsDistanceWarning'] as bool? ??
+          false,
+      progressPercentage: json['progressPercentage'] as int? ??
+          json['ProgressPercentage'] as int? ??
+          0,
       progressNotes:
           json['progressNotes'] as String? ?? json['ProgressNotes'] as String?,
-      extendedDeadline:
-          _safeParseDateTimeUtc(json['extendedDeadline'] ?? json['ExtendedDeadline']),
-      isAutoRejected:
-          json['isAutoRejected'] as bool? ?? json['IsAutoRejected'] as bool? ?? false,
-      rejectionReason:
-          json['rejectionReason'] as String? ?? json['RejectionReason'] as String?,
+      extendedDeadline: _safeParseDateTimeUtc(
+          json['extendedDeadline'] ?? json['ExtendedDeadline']),
+      isAutoRejected: json['isAutoRejected'] as bool? ??
+          json['IsAutoRejected'] as bool? ??
+          false,
+      rejectionReason: json['rejectionReason'] as String? ??
+          json['RejectionReason'] as String?,
       rejectedAt:
           _safeParseDateTimeUtc(json['rejectedAt'] ?? json['RejectedAt']),
-      rejectionDistanceMeters:
-          json['rejectionDistanceMeters'] as int? ?? json['RejectionDistanceMeters'] as int?,
+      rejectionDistanceMeters: json['rejectionDistanceMeters'] as int? ??
+          json['RejectionDistanceMeters'] as int?,
     );
   }
 
@@ -209,6 +222,8 @@ class TaskModel {
       createdAt: local.updatedAt, // Use updatedAt as createdAt fallback
       updatedAt: local.updatedAt,
       syncVersion: local.syncVersion,
+      progressPercentage: local.progressPercentage,
+      progressNotes: local.progressNotes,
     );
   }
 
@@ -236,6 +251,9 @@ class TaskModel {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'syncVersion': syncVersion,
+      'progressPercentage': progressPercentage,
+      'progressNotes': progressNotes,
+      'extendedDeadline': extendedDeadline?.toIso8601String(),
     };
   }
 
@@ -265,6 +283,13 @@ class TaskModel {
     int? maxDistanceMeters,
     int? completionDistanceMeters,
     bool? isDistanceWarning,
+    int? progressPercentage,
+    String? progressNotes,
+    DateTime? extendedDeadline,
+    bool? isAutoRejected,
+    String? rejectionReason,
+    DateTime? rejectedAt,
+    int? rejectionDistanceMeters,
   }) {
     return TaskModel(
       taskId: taskId ?? this.taskId,
@@ -274,7 +299,8 @@ class TaskModel {
       priority: priority ?? this.priority,
       taskType: taskType ?? this.taskType,
       requiresPhotoProof: requiresPhotoProof ?? this.requiresPhotoProof,
-      estimatedDurationMinutes: estimatedDurationMinutes ?? this.estimatedDurationMinutes,
+      estimatedDurationMinutes:
+          estimatedDurationMinutes ?? this.estimatedDurationMinutes,
       assignedTo: assignedTo ?? this.assignedTo,
       assignedToUserId: assignedToUserId ?? this.assignedToUserId,
       zoneId: zoneId ?? this.zoneId,
@@ -290,8 +316,17 @@ class TaskModel {
       updatedAt: updatedAt ?? this.updatedAt,
       syncVersion: syncVersion ?? this.syncVersion,
       maxDistanceMeters: maxDistanceMeters ?? this.maxDistanceMeters,
-      completionDistanceMeters: completionDistanceMeters ?? this.completionDistanceMeters,
+      completionDistanceMeters:
+          completionDistanceMeters ?? this.completionDistanceMeters,
       isDistanceWarning: isDistanceWarning ?? this.isDistanceWarning,
+      progressPercentage: progressPercentage ?? this.progressPercentage,
+      progressNotes: progressNotes ?? this.progressNotes,
+      extendedDeadline: extendedDeadline ?? this.extendedDeadline,
+      isAutoRejected: isAutoRejected ?? this.isAutoRejected,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      rejectedAt: rejectedAt ?? this.rejectedAt,
+      rejectionDistanceMeters:
+          rejectionDistanceMeters ?? this.rejectionDistanceMeters,
     );
   }
 
@@ -313,7 +348,8 @@ class TaskModel {
 
   bool get hasLocation => latitude != null && longitude != null;
 
-  bool get hasPhoto => photos.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
+  bool get hasPhoto =>
+      photos.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
 
   String get statusArabic {
     switch (status.toLowerCase()) {
@@ -409,6 +445,8 @@ class TaskModel {
       locationDescription: location,
       isSynced: true, // Default to true if converting from API model
       syncVersion: syncVersion,
+      progressPercentage: progressPercentage,
+      progressNotes: progressNotes,
     );
   }
 }

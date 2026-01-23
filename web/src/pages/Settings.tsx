@@ -40,7 +40,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-background overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[600px] mx-auto">
           <h1 className="text-right font-sans font-semibold text-[24px] text-[#2F2F2F] mb-6">

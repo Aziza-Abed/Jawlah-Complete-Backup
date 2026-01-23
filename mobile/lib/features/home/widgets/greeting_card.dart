@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../providers/auth_manager.dart';
+import 'battery_widget.dart';
 
 class GreetingCard extends StatelessWidget {
   const GreetingCard({super.key});
@@ -96,6 +97,9 @@ class GreetingCard extends StatelessWidget {
                           fontFamily: 'Cairo',
                         ),
                       ),
+                      const SizedBox(height: 10),
+                      // Battery indicator
+                      const BatteryWidget(),
                     ],
                   ),
                 ),

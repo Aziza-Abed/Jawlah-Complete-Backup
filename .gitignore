@@ -24,5 +24,15 @@ logs/
 .env
 .env.local
 .env.*.local
-backend/Jawlah.API/jawlah-2945f-firebase-adminsdk-fbsvc-6fb8c52dfa.json
+backend/FollowUp.API/*firebase-adminsdk*.json
 .claude/
+
+# Documentation/notes (not for repo)
+COMPREHENSIVE_CODE_AUDIT_REPORT.md
+CRITICAL_FIXES_SUMMARY.md
+EdgeCasesAndConstraints.md
+IMPLEMENTATION_ASSESSMENT.md
+adminWebNextWorkForTeammate.txt
+supervisorWebNextWorkForteamamte.txt
+ملاحظات مراد.md
+chapters/

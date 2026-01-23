@@ -12,7 +12,6 @@ import '../../providers/task_manager.dart';
 import '../../providers/sync_manager.dart';
 import '../../providers/notice_manager.dart';
 import '../../core/routing/app_router.dart';
-import '../../data/services/battery_service.dart';
 import 'widgets/greeting_card.dart';
 import 'widgets/sync_status_card.dart';
 import 'widgets/attendance_card.dart';
@@ -46,8 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<NoticeManager>().loadNotices();
     });
 
-    // start battery monitoring for low battery alerts
-    BatteryService().startMonitoring();
+    // progress tracking and other services already initialized in providers
 
     // update work time every minute
     _workDurationTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
@@ -60,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _workDurationTimer?.cancel();
-    BatteryService().stopMonitoring();
+    // cleanup
     super.dispose();
   }
 

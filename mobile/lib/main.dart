@@ -25,6 +25,8 @@ import 'providers/attendance_manager.dart';
 import 'providers/issue_manager.dart';
 import 'providers/notice_manager.dart';
 import 'providers/sync_manager.dart';
+import 'providers/battery_provider.dart';
+import 'providers/appeal_manager.dart';
 
 // global navigator key for deep linking from notifications
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -52,7 +54,7 @@ void main() async {
   ]);
 
   // start app
-  runApp(const JawlahApp());
+  runApp(const FollowUpApp());
 }
 
 Future<void> _initializeServices() async {
@@ -86,8 +88,8 @@ Future<void> _initializeServices() async {
   }
 }
 
-class JawlahApp extends StatelessWidget {
-  const JawlahApp({super.key});
+class FollowUpApp extends StatelessWidget {
+  const FollowUpApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -137,12 +139,18 @@ class JawlahApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => NoticeManager(),
         ),
+        ChangeNotifierProvider(
+          create: (_) => BatteryProvider()..initialize(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AppealManager(),
+        ),
       ],
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: MaterialApp(
           navigatorKey: navigatorKey,
-          title: 'جولة - Jawlah',
+          title: 'FollowUp',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.theme,
           locale: const Locale('ar'),

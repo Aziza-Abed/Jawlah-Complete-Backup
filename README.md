@@ -1,4 +1,4 @@
-# نظام جولة - Jawlah System
+# نظام متابعة - FollowUp System
 
 مشروع تخرج لإدارة عمال البلدية.
 
@@ -9,7 +9,7 @@
 ## مكونات المشروع
 
 ```
-Jawlah-Repo/
+FollowUp-Repo/
 ├── backend/          # ASP.NET Core 9 API
 ├── mobile/           # Flutter تطبيق الموبايل
 ├── web/              # React لوحة تحكم المشرفين
@@ -21,10 +21,10 @@ Jawlah-Repo/
 ### 1. Backend (السيرفر)
 
 ```bash
-cd backend/Jawlah.API
+cd backend/FollowUp.API
 
 # تعيين connection string
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Database=JawlahDB;..."
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Database=FollowUpDB;..."
 
 # تعيين JWT secret
 dotnet user-secrets set "JwtSettings:SecretKey" "your-secret-key-32-characters-min"
@@ -69,7 +69,7 @@ npm run dev
 
 ضع ملف الـ shapefile في:
 ```
-backend/Jawlah.API/GisData/your-shapefile.shp
+backend/FollowUp.API/GisData/your-shapefile.shp
 ```
 
 المناطق تُستورد تلقائياً عند بدء التشغيل إذا كانت الجداول فارغة.

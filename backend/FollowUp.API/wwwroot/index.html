@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>جولة - لوحة التحكم</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+      /* Page-specific overrides */
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        grid-template-rows: auto 1fr;
+        gap: 20px;
+        padding: 0 32px 32px;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      .section-card {
+        background: white;
+        border-radius: var(--radius);
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .section-header {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        color: var(--text-dark);
+      }
+
+      /* Task Status Boxes */
+      .tasks-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .status-box {
+        flex: 1;
+        padding: 16px;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .status-box .val {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      .status-box .lbl {
+        font-size: 0.9rem;
+        font-weight: 500;
+      }
+
+      .status-blue {
+        background: #7895b2;
+      }
+      .status-green {
+        background: #a3b18a;
+      }
+      .status-red {
+        background: #c97a63;
+      }
+
+      .tasks-info {
+        text-align: left;
+        min-width: 140px;
+      }
+
+      .tasks-info h3 {
+        font-size: 1.1rem;
+        margin-bottom: 4px;
+      }
+      .tasks-info p {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+      }
+
+      /* Worker Donut */
+      .worker-stats {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .donut-mini {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: conic-gradient(
+          var(--secondary) 0% 85%,
+          var(--primary-dark) 85% 100%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+
+      .donut-mini::after {
+        content: "";
+        width: 50px;
+        height: 50px;
+        background: white;
+        border-radius: 50%;
+        position: absolute;
+      }
+
+      .worker-count {
+        text-align: center;
+      }
+
+      .worker-count .total {
+        font-size: 1.25rem;
+        font-weight: 700;
+        display: block;
+      }
+
+      .pills {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .pill {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        color: white;
+      }
+
+      /* Map Section */
+      .map-section {
+        height: 100%;
+      }
+
+      #map {
+        border-radius: 15px;
+        flex: 1;
+      }
+
+      /* Activity List */
+      .activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .activity-item {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .activity-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--bg-main);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+        flex-shrink: 0;
+        font-size: 0.8rem;
+      }
+
+      .activity-body h4 {
+        font-size: 0.85rem;
+        margin-bottom: 2px;
+      }
+      .activity-body h4 span {
+        color: var(--text-dark);
+        font-weight: 700;
+      }
+      .activity-body .time {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+
+      .footer-bar {
+        padding: 10px 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <div class="logo-inner">
+            <i class="fas fa-city" style="font-size: 2rem"></i>
+          </div>
+          <h1>جولة</h1>
+        </div>
+
+        <nav class="sidebar-nav">
+          <a href="index.html" class="nav-item active">
+            <i class="fas fa-th-large"></i>
+            <span>لوحة التحكم</span>
+          </a>
+          <a href="map.html" class="nav-item">
+            <i class="fas fa-map-marked-alt"></i>
+            <span>الخريطة الحية</span>
+          </a>
+          <a href="workers.html" class="nav-item">
+            <i class="fas fa-users"></i>
+            <span>إدارة العمال</span>
+          </a>
+          <a href="tasks.html" class="nav-item">
+            <i class="fas fa-plus-square"></i>
+            <span>تعيين مهمة</span>
+          </a>
+          <a href="all-tasks.html" class="nav-item">
+            <i class="fas fa-tasks"></i>
+            <span>جميع المهام</span>
+          </a>
+          <a href="issues.html" class="nav-item">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>البلاغات</span>
+          </a>
+          <a href="attendance.html" class="nav-item">
+            <i class="fas fa-user-clock"></i>
+            <span>الحضور</span>
+          </a>
+          <a href="reports.html" class="nav-item">
+            <i class="fas fa-chart-line"></i>
+            <span>التقارير</span>
+          </a>
+          <a href="notifications.html" class="nav-item">
+            <i class="fas fa-bell"></i>
+            <span>الإشعارات</span>
+          </a>
+          <a href="profile.html" class="nav-item">
+            <i class="fas fa-user"></i>
+            <span>الملف الشخصي</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="logout-btn" onclick="logout()">
+            <span>تسجيل الخروج</span>
+            <i class="fas fa-sign-out-alt"></i>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <header class="top-header">
+          <div class="header-left">
+            <div class="header-icons">
+              <div class="icon-btn"><i class="fas fa-cog"></i></div>
+              <a
+                href="profile.html"
+                class="icon-btn"
+                style="text-decoration: none"
+                ><i class="fas fa-user"></i
+              ></a>
+              <a
+                href="notifications.html"
+                class="icon-btn"
+                style="position: relative; text-decoration: none"
+              >
+                <i class="fas fa-bell"></i>
+                <span
+                  id="notifBadge"
+                  style="
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    width: 8px;
+                    height: 8px;
+                    background: var(--accent);
+                    border-radius: 50%;
+                    display: none;
+                  "
+                ></span>
+              </a>
+            </div>
+            <div class="search-container">
+              <input type="text" placeholder="ابحث" id="globalSearch" />
+              <i class="fas fa-search"></i>
+            </div>
+          </div>
+
+          <div class="header-right">
+            <div class="page-info">
+              <h2>لوحة التحكم</h2>
+              <p>رؤية شاملة ومباشرة للحالة الميدانية</p>
+            </div>
+            <div class="icon-btn" style="font-size: 1.5rem">
+              <i class="fas fa-th-list"></i>
+            </div>
+          </div>
+        </header>
+
+        <div class="dashboard-grid">
+          <!-- Task Summary Box -->
+          <section class="section-card">
+            <div class="tasks-summary">
+              <div class="tasks-info">
+                <p>المهام الحالية :</p>
+                <h3 id="totalTasksCount">0 مهمة</h3>
+              </div>
+              <div class="status-box status-blue">
+                <span class="val" id="inProgressTasks">0</span>
+                <span class="lbl">قيد التنفيذ</span>
+              </div>
+              <div class="status-box status-green">
+                <span class="val" id="completedTasks">0</span>
+                <span class="lbl">مكتملة</span>
+              </div>
+              <div class="status-box status-red">
+                <span class="val" id="cancelledTasks">0</span>
+                <span class="lbl">ملغاة</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Worker Stats Box -->
+          <section class="section-card">
+            <h4 class="section-header">إجمالي العمال:</h4>
+            <div class="worker-stats">
+              <div class="donut-mini"></div>
+              <div class="worker-count">
+                <span class="total" id="totalWorkers">0</span>
+              </div>
+              <div class="pills">
+                <div class="pill" style="background: var(--secondary)">
+                  <span id="activeWorkers">0</span> حضور
+                </div>
+                <div class="pill" style="background: var(--primary-dark)">
+                  <span id="offlineWorkers">0</span> غياب
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Map Section -->
+          <section class="section-card map-section">
+            <h4 class="section-header">مواقع العمال والمهام:</h4>
+            <div id="map"></div>
+          </section>
+
+          <!-- Recent Activities Section -->
+          <section class="section-card">
+            <h4 class="section-header">آخر الأنشطة:</h4>
+            <div class="activity-list" id="activityList">
+              <!-- Loading Activity -->
+            </div>
+          </section>
+        </div>
+
+        <footer class="footer-bar">
+          <div class="time-ref">
+            <i class="far fa-clock"></i>
+            <span>آخر تحديث: <span id="updateTime">--:--</span></span>
+          </div>
+          <div class="copyright">FollowUp © 2025</div>
+        </footer>
+      </main>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+      let map;
+      let markersGroup;
+
+      document.addEventListener("DOMContentLoaded", () => {
+        if (!api.isAuthenticated()) {
+          window.location.href = "login.html";
+          return;
+        }
+        initMap();
+        loadDashboardData();
+        loadNotificationCount();
+
+        // Refresh every 30s
+        setInterval(() => {
+          loadDashboardData();
+          loadNotificationCount();
+        }, 30000);
+      });
+
+      async function initMap() {
+        const center = await municipalityApi.getMapCenter();
+        map = L.map("map", { zoomControl: false }).setView(
+          [center.lat, center.lng],
+          center.zoom
+        );
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(
+          map
+        );
+        L.control.zoom({ position: "bottomleft" }).addTo(map);
+        markersGroup = L.layerGroup().addTo(map);
+      }
+
+      async function loadDashboardData() {
+        try {
+          const response = await dashboardApi.getOverview();
+          if (response.data) {
+            const data = response.data;
+            // Map backend response structure (nested objects)
+            const totalTasks = (data.tasks?.pending || 0) + (data.tasks?.inProgress || 0);
+            const inProgressTasks = data.tasks?.inProgress || 0;
+            const completedTasks = data.tasks?.completedToday || 0;
+            const pendingTasks = data.tasks?.pending || 0;
+
+            const totalWorkers = data.workers?.total || 0;
+            const activeWorkers = data.workers?.checkedIn || 0;
+            const offlineWorkers = data.workers?.notCheckedIn || 0;
+
+            document.getElementById("totalTasksCount").textContent = `${totalTasks} مهمة`;
+            document.getElementById("inProgressTasks").textContent = inProgressTasks;
+            document.getElementById("completedTasks").textContent = completedTasks;
+            document.getElementById("cancelledTasks").textContent = pendingTasks;
+
+            document.getElementById("totalWorkers").textContent = totalWorkers;
+            document.getElementById("activeWorkers").textContent = activeWorkers;
+            document.getElementById("offlineWorkers").textContent = offlineWorkers;
+
+            // Load recent notifications as activities
+            loadRecentActivities();
+          }
+
+          // Load worker locations
+          const locationResponse = await trackingApi.getWorkerLocations();
+          if (locationResponse.data) {
+            updateMapMarkers(locationResponse.data);
+          }
+
+          document.getElementById("updateTime").textContent =
+            new Date().toLocaleTimeString("ar-SA", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+        } catch (error) {
+          console.error("Error loading dashboard:", error);
+        }
+      }
+
+      async function loadRecentActivities() {
+        try {
+          const response = await notificationsApi.getAll();
+          const list = document.getElementById("activityList");
+
+          if (!response.data || response.data.length === 0) {
+            list.innerHTML = '<p style="text-align:center;color:var(--text-light)">لا يوجد أنشطة حالياً</p>';
+            return;
+          }
+
+          // Show latest 3 notifications as activities (XSS safe)
+          list.innerHTML = response.data
+            .slice(0, 3)
+            .map(notif => `
+              <div class="activity-item">
+                <div class="activity-icon">
+                  <i class="fas ${getActivityIcon(notif.type)}"></i>
+                </div>
+                <div class="activity-body">
+                  <h4><span>${escapeHtml(notif.title)}</span></h4>
+                  <div class="time">${formatTimeAgo(notif.createdAt)}</div>
+                </div>
+              </div>
+            `).join("");
+        } catch (e) {
+          document.getElementById("activityList").innerHTML =
+            '<p style="text-align:center;color:var(--text-light)">لا يوجد أنشطة حالياً</p>';
+        }
+      }
+
+      function getActivityIcon(type) {
+        if (type && type.includes("Task")) return "fa-tasks";
+        if (type && type.includes("Attendance")) return "fa-user-check";
+        if (type && type.includes("Issue")) return "fa-exclamation-triangle";
+        return "fa-bell";
+      }
+
+      function formatTimeAgo(dateStr) {
+        const date = new Date(dateStr);
+        return date.toLocaleTimeString("ar-SA", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      }
+
+      function updateMapMarkers(workers) {
+        markersGroup.clearLayers();
+        workers.forEach((w) => {
+          if (w.latitude && w.longitude) {
+            const color = w.isOnline ? "#A3B18A" : "#7895B2";
+            const icon = L.divIcon({
+              className: "custom-marker",
+              html: `<div style="width:12px; height:12px; background:${color}; border:2px solid white; border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>`,
+              iconSize: [12, 12],
+            });
+            L.marker([w.latitude, w.longitude], { icon }).addTo(markersGroup);
+          }
+        });
+      }
+
+      // logout() and loadNotificationCount() are in api.js
+    </script>
+  </body>
+</html>

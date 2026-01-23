@@ -205,14 +205,14 @@ export default function IssueDetails() {
 
   if (!issue) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] grid place-items-center">
+      <div className="h-full w-full bg-background grid place-items-center">
         <div className="text-[#C86E5D] font-sans font-semibold">فشل في تحميل البيانات</div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-background overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1100px] mx-auto">
           {/* Header: title on RIGHT, no back button */}

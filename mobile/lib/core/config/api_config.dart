@@ -4,20 +4,33 @@ class ApiConfig {
   // override with env variable API_BASE_URL if set
   static String get baseUrl {
     const envUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
-    if (envUrl.isNotEmpty) return envUrl;
-
-    if (const bool.fromEnvironment('dart.vm.product')) {
-      return 'https://api.jawlah.ps/api/';
+    // FIX: Enforce HTTPS for production environment overrides
+    if (envUrl.isNotEmpty) {
+      // In production, reject HTTP URLs for security
+      if (const bool.fromEnvironment('dart.vm.product') &&
+          envUrl.startsWith('http://')) {
+        throw StateError('SECURITY: Production builds must use HTTPS URLs');
+      }
+      return envUrl;
     }
 
-    // local IP for development
-    return 'http://192.168.1.3:5000/api/';
+    // Production builds MUST use HTTPS
+    if (const bool.fromEnvironment('dart.vm.product')) {
+      return 'https://api.followup.ps/api/';
+    }
+
+    // Development fallback - use localhost (10.0.2.2 for Android emulator)
+    // Override with API_BASE_URL environment variable for physical devices
+    // Example: flutter run --dart-define=API_BASE_URL=http://192.168.1.X:5000/api/
+    return 'http://10.0.2.2:5000/api/';
   }
 
   // authentication endpoints
   static const String loginWithPin = 'auth/login-pin';
   static const String loginWithGPS =
       'auth/login-gps'; // legacy: login + auto check-in
+  static const String verifyOtp = 'auth/verify-otp';
+  static const String resendOtp = 'auth/resend-otp';
   static const String profile = 'auth/profile';
   static const String logout = 'auth/logout';
   static const String registerFcmToken = 'auth/register-fcm-token';
@@ -27,6 +40,7 @@ class ApiConfig {
   static const String taskDetails = 'tasks';
   static const String updateTaskStatus = 'tasks';
   static const String completeTask = 'tasks';
+  static const String updateTaskProgress = 'tasks'; // /{id}/progress
 
   // attendance endpoints
   static const String checkIn = 'attendance/checkin';
@@ -55,6 +69,12 @@ class ApiConfig {
       bool.fromEnvironment('API_LOGGING', defaultValue: false);
 
   static const int maxImageSize = 5 * 1024 * 1024;
+
+  // Task location verification thresholds (must match backend AppConstants)
+  // Used to warn workers before submitting task completion
+  static const int warningDistanceMeters = 100;      // Show warning if > 100m
+  static const int hardRejectDistanceMeters = 500;   // Auto-reject if > 500m
+  static const int onlineThresholdMinutes = 15;      // Consider worker online
 
   static String getHubUrl(String endpoint) {
     // hubs are mapped at root level, not under /api

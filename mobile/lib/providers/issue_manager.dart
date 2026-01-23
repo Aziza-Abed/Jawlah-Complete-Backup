@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../data/models/issue_model.dart';
 import '../data/models/local/issue_local.dart';
@@ -119,6 +120,130 @@ class IssueManager extends BaseController {
       }
 
       // save to local db
+      final issueLocal = IssueLocal(
+        title: title,
+        description: description,
+        type: type,
+        severity: severity,
+        reportedByUserId: user.userId,
+        latitude: lat,
+        longitude: lng,
+        locationDescription: locationDescription ?? '',
+        photoUrl: permanentPaths.join(';'),
+        reportedAt: DateTime.now(),
+        createdAt: DateTime.now(),
+        isSynced: false,
+      );
+
+      await _issueLocalRepo.addIssue(issueLocal);
+      await _syncManager?.newDataAdded();
+
+      // add temp item to list so user can see it
+      final tempIssue = IssueModel(
+        issueId: -1 * DateTime.now().millisecondsSinceEpoch,
+        title: issueLocal.title,
+        description: issueLocal.description,
+        type: issueLocal.type,
+        severity: issueLocal.severity,
+        status: 'Reported',
+        reportedByUserId: issueLocal.reportedByUserId,
+        latitude: issueLocal.latitude,
+        longitude: issueLocal.longitude,
+        photoUrl: photo1.path,
+        createdAt: issueLocal.createdAt,
+        updatedAt: issueLocal.createdAt,
+      );
+
+      myIssues.insert(0, tempIssue);
+      notifyListeners();
+      clearError();
+      return true;
+    } catch (e) {
+      setError('فشل حفظ البلاغ: ${e.toString()}');
+      return false;
+    }
+  }
+
+  // send issue report with a precise position from map picker
+  Future<bool> sendIssueReportWithPosition({
+    required String title,
+    required String description,
+    required String type,
+    required String severity,
+    String? locationDescription,
+    required File photo1,
+    File? photo2,
+    File? photo3,
+    required Position position,
+  }) async {
+    // use the precise position from the map picker
+    final lat = position.latitude;
+    final lng = position.longitude;
+
+    // try to send to server
+    final success = await executeVoidWithErrorHandling(() async {
+      final issue = await _issuesService.reportIssue(
+        title: title,
+        description: description,
+        type: type,
+        severity: severity,
+        locationDescription: locationDescription,
+        photo1: photo1,
+        photo2: photo2,
+        photo3: photo3,
+        latitude: lat,
+        longitude: lng,
+      );
+
+      myIssues.insert(0, issue);
+    });
+
+    if (success) return true;
+
+    // if online failed save it localy on phone
+    try {
+      final user = await StorageHelper.takeUser();
+      if (user == null) {
+        setError('يجب تسجيل الدخول أولاً');
+        return false;
+      }
+
+      // save photos to permanent location
+      List<String> permanentPaths = [];
+      try {
+        final appDir = await getApplicationDocumentsDirectory();
+        final photoDir = Directory(p.join(appDir.path, 'issue_photos'));
+        if (!await photoDir.exists()) {
+          await photoDir.create(recursive: true);
+        }
+
+        // copy photo1
+        final fileName1 = '${const Uuid().v4()}.jpg';
+        final permanentPath1 = p.join(photoDir.path, fileName1);
+        await photo1.copy(permanentPath1);
+        permanentPaths.add(permanentPath1);
+
+        // copy extra photos if there
+        if (photo2 != null) {
+          final fileName2 = '${const Uuid().v4()}.jpg';
+          final permanentPath2 = p.join(photoDir.path, fileName2);
+          await photo2.copy(permanentPath2);
+          permanentPaths.add(permanentPath2);
+        }
+        if (photo3 != null) {
+          final fileName3 = '${const Uuid().v4()}.jpg';
+          final permanentPath3 = p.join(photoDir.path, fileName3);
+          await photo3.copy(permanentPath3);
+          permanentPaths.add(permanentPath3);
+        }
+      } catch (e) {
+        // fallback: use original path (may fail on sync if temp file deleted)
+        if (permanentPaths.isEmpty) {
+          permanentPaths = [photo1.path];
+        }
+      }
+
+      // save to local db with precise location
       final issueLocal = IssueLocal(
         title: title,
         description: description,

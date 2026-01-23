@@ -46,7 +46,60 @@ export async function getZonesReport(filters: ReportFilters): Promise<ZonesRepor
   return response.data.data;
 }
 
-// Download attendance report as file
+// ========== ADMIN SUPERVISOR MONITORING ==========
+
+export interface SupervisorMonitoringItem {
+    userId: number;
+    fullName: string;
+    username: string;
+    phoneNumber?: string;
+    status: string;
+    lastLoginAt?: string;
+    workersCount: number;
+    activeWorkersToday: number;
+    tasksAssignedThisMonth: number;
+    tasksCompletedThisMonth: number;
+    tasksPendingReview: number;
+    tasksDelayed: number;
+    completionRate: number;
+    avgResponseTimeHours: number;
+    issuesReportedByWorkers: number;
+    issuesResolved: number;
+    issuesPending: number;
+    performanceStatus: "Good" | "Warning" | "Critical";
+}
+
+export interface AdminAlert {
+    id: number;
+    type: "TooManyWorkers" | "PerformanceDrop" | "HighDelayRate" | "LowActivity";
+    severity: "Info" | "Warning" | "Critical";
+    message: string;
+    supervisorId?: number;
+    supervisorName?: string;
+    createdAt: string;
+}
+
+export interface AdminSummary {
+    totalSupervisors: number;
+    activeSupervisors: number;
+    totalWorkers: number;
+    activeWorkersToday: number;
+    totalTasksThisMonth: number;
+    completedTasksThisMonth: number;
+    overallCompletionRate: number;
+    totalPendingIssues: number;
+}
+
+export interface AdminSupervisorMonitoringData {
+    supervisors: SupervisorMonitoringItem[];
+    alerts: AdminAlert[];
+    summary: AdminSummary;
+}
+
+export async function getAdminSupervisorsMonitoring(): Promise<AdminSupervisorMonitoringData> {
+    const response = await apiClient.get<{ data: AdminSupervisorMonitoringData }>("/reports/admin/supervisors-monitoring");
+    return response.data.data;
+}
 export function getAttendanceReportUrl(
   format: "excel" | "csv" | "pdf",
   filters?: { period?: string; startDate?: string; endDate?: string }

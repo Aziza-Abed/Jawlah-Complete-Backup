@@ -72,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Image.asset(
-                    'assets/images/albireh_logo.png',
+                    'assets/images/logo.png',
                     width: 140,
                     height: 140,
                     errorBuilder: (context, error, stackTrace) => const Icon(
@@ -84,7 +84,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ),
                 const SizedBox(height: 32),
                 const Text(
-                  'جولة',
+                  'FollowUp',
                   style: TextStyle(
                     fontSize: 42,
                     fontWeight: FontWeight.bold,
@@ -95,7 +95,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'نظام جولات بلدية البيرة',
+                  'نظام متابعة العمل الميداني',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18,
