@@ -6,6 +6,20 @@ import type {
   ZonesReportData,
   ReportPeriod,
 } from "../types/report";
+import GlassCard from "../components/UI/GlassCard";
+import {
+    Download,
+    Calendar,
+    Filter,
+    CheckCircle,
+    AlertCircle,
+    Users,
+    Activity,
+    BarChart3,
+    PieChart,
+    ChevronDown,
+    Printer
+} from "lucide-react";
 
 type TabKey = "tasks" | "workers" | "zones";
 type PeriodPreset = "daily" | "weekly" | "monthly" | "yearly" | "custom";
@@ -22,8 +36,7 @@ type KPI = {
   title: string;
   value: string;
   icon: "check" | "users" | "speed" | "alert";
-  bg: string;
-  text?: string;
+  color: string;
 };
 
 type SeriesPoint = { label: string; a: number; b: number; c?: number };
@@ -205,7 +218,6 @@ export default function Reports() {
     if (tab === "zones" && zonesData) {
       return buildViewFromZonesApi(zonesData, applied, lastUpdated);
     }
-    // Fallback to mock while loading
     return buildMockView(tab, applied, lastUpdated);
   }, [tab, applied, lastUpdated, tasksData, workersData, zonesData]);
 
@@ -238,303 +250,342 @@ export default function Reports() {
   const showStatusFilter = tab === "tasks";
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
-      <div className="p-4 sm:p-6 md:p-8">
-        <div className="max-w-[1100px] mx-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F]">
-              التقارير
-            </h1>
-            <div className="flex items-center gap-3">
-              {loading && <div className="text-[12px] text-[#6B7280]">جاري التحميل...</div>}
-              <div className="text-right text-[12px] text-[#6B7280]">آخر تحديث: {view.lastUpdated}</div>
+    <div className="space-y-8 pb-10 motion-safe:scroll-smooth will-change-transform">
+      <div className="max-w-[1400px] mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 animate-fade-in mb-8">
+            <div className="flex flex-col items-start">
+                <h1 className="text-3xl font-extrabold text-text-primary text-right">
+                    التقارير والإحصائيات
+                </h1>
+                <p className="text-right text-text-secondary mt-2 font-medium">تحليل شامل لأداء النظام والعمال والمناطق</p>
+            </div>
+            
+            <GlassCard variant="panel" className="!p-0 !bg-background-paper !border-primary/5 flex items-center overflow-hidden shadow-sm !backdrop-blur-none">
+                <div className="px-5 py-3 border-l border-primary/5 flex flex-col items-center">
+                    <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-0.5">آخر تحديث</span>
+                    <span className="text-text-primary font-mono font-bold">{view.lastUpdated}</span>
+                </div>
+                {loading && (
+                    <div className="px-4 py-3 bg-primary/5 animate-pulse">
+                        <Activity size={20} className="text-primary" />
+                    </div>
+                )}
+            </GlassCard>
+        </div>
+
+        {error && (
+            <GlassCard className="mb-6 !bg-red-500/10 !border-red-500/20 text-red-300 flex items-center gap-3">
+                <AlertCircle size={20} />
+                <span>{error}</span>
+            </GlassCard>
+        )}
+
+        {/* Tabs */}
+        <div className="mb-8">
+          <Tabs
+            value={tab}
+            onChange={(v) => setTab(v)}
+            items={[
+              { key: "tasks", label: "تقرير المهام", icon: <CheckCircle size={16}/> },
+              { key: "workers", label: "تقرير العمال", icon: <Users size={16}/> },
+              { key: "zones", label: "تقرير المناطق", icon: <Activity size={16}/> },
+            ]}
+          />
+        </div>
+
+        {/* Filters */}
+        <GlassCard className="mb-8 p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Select
+                label="الفترة الزمنية"
+                value={draft.period}
+                onChange={(v) => setDraft((p) => ({ ...p, period: v as PeriodPreset }))}
+                options={[
+                  { value: "daily", label: "يومي" },
+                  { value: "weekly", label: "أسبوعي" },
+                  { value: "monthly", label: "شهري" },
+                  { value: "yearly", label: "سنوي" },
+                  { value: "custom", label: "مخصص" },
+                ]}
+              />
+
+              <Select
+                label="نوع التقرير"
+                value={tab}
+                onChange={(v) => setTab(v as TabKey)}
+                options={[
+                  { value: "tasks", label: "تقرير المهام" },
+                  { value: "workers", label: "تقرير العمال" },
+                  { value: "zones", label: "تقرير المناطق" },
+                ]}
+              />
+
+              <Select
+                label="حالة المهمة"
+                value={draft.status}
+                onChange={(v) => setDraft((p) => ({ ...p, status: v as TaskStatus }))}
+                options={[
+                  { value: "all", label: "الكل" },
+                  { value: "open", label: "مفتوحة" },
+                  { value: "in_progress", label: "قيد التنفيذ" },
+                  { value: "pending", label: "معلقة" },
+                  { value: "closed", label: "مغلقة" },
+                ]}
+                disabled={!showStatusFilter}
+                helper={!showStatusFilter ? "متاح فقط في تقرير المهام" : undefined}
+              />
+            </div>
+
+            <div className="flex items-center gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={onReset}
+                className="h-12 px-6 rounded-xl border border-primary/10 text-text-secondary hover:bg-primary/5 transition-all font-bold"
+              >
+                إعادة تعيين
+              </button>
+              <button
+                type="button"
+                onClick={onApply}
+                className="h-12 px-8 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Filter size={18} />
+                تطبيق
+              </button>
             </div>
           </div>
 
-          {error && (
-            <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-[10px] text-right">
-              {error}
+          {draft.period === "custom" && (
+            <div className="mt-6 pt-6 border-t border-primary/10 grid grid-cols-1 sm:grid-cols-2 gap-6 animate-fade-in">
+              <DateField
+                label="من تاريخ"
+                value={draft.from}
+                onChange={(v) => setDraft((p) => ({ ...p, from: v }))}
+              />
+              <DateField
+                label="إلى تاريخ"
+                value={draft.to}
+                onChange={(v) => setDraft((p) => ({ ...p, to: v }))}
+              />
             </div>
           )}
+        </GlassCard>
 
-          {/* Tabs */}
-          <div className="mt-4">
-            <Tabs
-              value={tab}
-              onChange={(v) => setTab(v)}
-              items={[
-                { key: "tasks", label: "تقرير المهام" },
-                { key: "workers", label: "تقرير العمال" },
-                { key: "zones", label: "تقرير المناطق" },
-              ]}
-            />
-          </div>
-
-          {/* Filters */}
-          <div className="mt-4 bg-[#F3F1ED] rounded-[14px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.08)] p-4 sm:p-5">
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-end">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <Select
-                  label="الفترة الزمنية:"
-                  value={draft.period}
-                  onChange={(v) => setDraft((p) => ({ ...p, period: v as PeriodPreset }))}
-                  options={[
-                    { value: "daily", label: "يومي" },
-                    { value: "weekly", label: "أسبوعي" },
-                    { value: "monthly", label: "شهري" },
-                    { value: "yearly", label: "سنوي" },
-                    { value: "custom", label: "مخصص" },
-                  ]}
-                />
-
-                <Select
-                  label="نوع التقرير:"
-                  value={tab}
-                  onChange={(v) => setTab(v as TabKey)}
-                  options={[
-                    { value: "tasks", label: "تقرير المهام" },
-                    { value: "workers", label: "تقرير العمال" },
-                    { value: "zones", label: "تقرير المناطق" },
-                  ]}
-                />
-
-                <Select
-                  label="حالة المهمة:"
-                  value={draft.status}
-                  onChange={(v) => setDraft((p) => ({ ...p, status: v as TaskStatus }))}
-                  options={[
-                    { value: "all", label: "الكل" },
-                    { value: "open", label: "مفتوحة" },
-                    { value: "in_progress", label: "قيد التنفيذ" },
-                    { value: "pending", label: "معلقة" },
-                    { value: "closed", label: "مغلقة" },
-                  ]}
-                  disabled={!showStatusFilter}
-                  helper={!showStatusFilter ? "متاح فقط في تقرير المهام" : undefined}
-                />
-              </div>
-
-              <div className="flex items-center gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={onReset}
-                  className="h-[44px] px-4 rounded-[10px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[14px] hover:opacity-95"
-                >
-                  إعادة تعيين
-                </button>
-                <button
-                  type="button"
-                  onClick={onApply}
-                  className="h-[44px] px-6 rounded-[10px] bg-[#60778E] text-white font-sans font-semibold text-[14px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95"
-                >
-                  تطبيق
-                </button>
-              </div>
-            </div>
-
-            {draft.period === "custom" && (
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <DateField
-                  label="من:"
-                  value={draft.from}
-                  onChange={(v) => setDraft((p) => ({ ...p, from: v }))}
-                />
-                <DateField
-                  label="إلى:"
-                  value={draft.to}
-                  onChange={(v) => setDraft((p) => ({ ...p, to: v }))}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Layout */}
-          <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
-            {/* Left */}
-            <div className="space-y-5">
-              {/* Chart 1 */}
-              <Card>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-right font-sans font-semibold text-[16px] sm:text-[18px] text-[#2F2F2F]">
+        {/* Layout */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8">
+          {/* Left - Charts & Table */}
+          <div className="space-y-8">
+            {/* Chart 1 */}
+            <GlassCard>
+              <div className="flex items-center justify-between gap-3 mb-6">
+                <div className="flex items-center gap-2">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                        <BarChart3 size={20} />
+                    </div>
+                    <h3 className="text-xl font-bold text-text-primary">
                     {view.tab === "tasks" || view.tab === "workers" ? view.chart1.title : view.chart1.title}
-                  </div>
-
-                  {view.tab === "tasks" && <Legend items={view.chart1.legend} />}
-                  {view.tab === "workers" && <Legend items={view.chart1.legend} />}
+                    </h3>
                 </div>
 
-                <div className="mt-3">
-                  {view.tab === "tasks" && (
-                    <BarChartGrouped
-                      points={view.chart1.points}
-                      colors={{
-                        a: view.chart1.legend[0].color,
-                        b: view.chart1.legend[1].color,
-                        c: view.chart1.legend[2]?.color,
-                      }}
-                    />
-                  )}
-
-                  {view.tab === "workers" && (
-                    <BarChartGrouped
-                      points={view.chart1.points}
-                      colors={{
-                        a: view.chart1.legend[0].color,
-                        b: view.chart1.legend[1].color,
-                      }}
-                    />
-                  )}
-
-                  {view.tab === "zones" && <HorizontalBars items={view.chart1.items} />}
-                </div>
-              </Card>
-
-              {/* Table + Export */}
-              <Card>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="text-right font-sans font-semibold text-[16px] sm:text-[18px] text-[#2F2F2F]">
-                    {view.table.title}
-                  </div>
-
-                  <div className="flex items-center gap-2 justify-end">
-                    <button
-                      type="button"
-                      onClick={exportExcel}
-                      className="h-[36px] px-3 rounded-[8px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[13px] hover:opacity-95"
-                    >
-                      Excel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={exportPdf}
-                      className="h-[36px] px-3 rounded-[8px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[13px] hover:opacity-95"
-                    >
-                      PDF
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-2 text-right text-[12px] text-[#6B7280]">{view.filtersNote}</div>
-
-                <div className="mt-4 overflow-auto rounded-[12px] border border-black/10 bg-white">
-                  {view.tab === "tasks" && (
-                    <table className="min-w-[980px] w-full text-right">
-                      <thead className="bg-[#E9E6E0]">
-                        <tr className="text-[12px] text-[#2F2F2F]">
-                          {view.table.columns.map((c) => (
-                            <th key={c} className="px-3 py-3 font-sans font-semibold whitespace-nowrap">
-                              {c}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {view.table.rows.map((r) => (
-                          <tr key={r.id} className="border-t border-black/5 text-[12px] text-[#2F2F2F]">
-                            <td className="px-3 py-3 whitespace-nowrap">{r.id}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.title}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.worker}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.zone}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.status}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.priority}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.dueDate}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.time}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-
-                  {view.tab === "workers" && (
-                    <table className="min-w-[820px] w-full text-right">
-                      <thead className="bg-[#E9E6E0]">
-                        <tr className="text-[12px] text-[#2F2F2F]">
-                          {view.table.columns.map((c) => (
-                            <th key={c} className="px-3 py-3 font-sans font-semibold whitespace-nowrap">
-                              {c}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {view.table.rows.map((r) => (
-                          <tr key={r.id} className="border-t border-black/5 text-[12px] text-[#2F2F2F]">
-                            <td className="px-3 py-3 whitespace-nowrap">{r.name}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.presence}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.lastSeen}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.activeTasks}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.doneTasks}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-
-                  {view.tab === "zones" && (
-                    <table className="min-w-[900px] w-full text-right">
-                      <thead className="bg-[#E9E6E0]">
-                        <tr className="text-[12px] text-[#2F2F2F]">
-                          {view.table.columns.map((c) => (
-                            <th key={c} className="px-3 py-3 font-sans font-semibold whitespace-nowrap">
-                              {c}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {view.table.rows.map((r) => (
-                          <tr key={r.id} className="border-t border-black/5 text-[12px] text-[#2F2F2F]">
-                            <td className="px-3 py-3 whitespace-nowrap">{r.zone}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.total}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.done}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.inProgress}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.delayed}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.rate}</td>
-                            <td className="px-3 py-3 whitespace-nowrap">{r.updatedAt}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </Card>
-            </div>
-
-            {/* Right */}
-            <div className="space-y-5">
-              {/* KPIs */}
-              <div className="grid grid-cols-2 gap-4">
-                {view.kpis.map((k) => (
-                  <KpiCard key={k.title} kpi={k} />
-                ))}
+                {view.tab === "tasks" && <Legend items={view.chart1.legend} />}
+                {view.tab === "workers" && <Legend items={view.chart1.legend} />}
               </div>
 
-              {/* Chart 2 */}
-              <Card>
-                <div className="text-right font-sans font-semibold text-[14px] text-[#2F2F2F]">
+              <div className="mt-3">
+                {view.tab === "tasks" && (
+                  <BarChartGrouped
+                    points={view.chart1.points}
+                    colors={{
+                      a: view.chart1.legend[0].color,
+                      b: view.chart1.legend[1].color,
+                      c: view.chart1.legend[2]?.color,
+                    }}
+                  />
+                )}
+
+                {view.tab === "workers" && (
+                  <BarChartGrouped
+                    points={view.chart1.points}
+                    colors={{
+                      a: view.chart1.legend[0].color,
+                      b: view.chart1.legend[1].color,
+                    }}
+                  />
+                )}
+
+                {view.tab === "zones" && <HorizontalBars items={view.chart1.items} />}
+              </div>
+            </GlassCard>
+
+            {/* Table + Export */}
+            <GlassCard noPadding className="overflow-hidden !backdrop-blur-none bg-white/80">
+                <div className="p-6 border-b border-primary/5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                         <div className="p-2 bg-secondary/10 rounded-lg text-secondary">
+                             <CheckCircle size={20} />
+                         </div>
+                         <h3 className="text-xl font-bold text-text-primary">
+                             {view.table.title}
+                         </h3>
+                    </div>
+
+                    <div className="flex items-center gap-3 justify-end">
+                      <button
+                        type="button"
+                        onClick={exportExcel}
+                        className="h-10 px-4 rounded-xl border border-primary/10 text-text-primary hover:bg-primary/5 transition-colors font-bold text-sm flex items-center gap-2"
+                      >
+                        Excel
+                        <Download size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={exportPdf}
+                        className="h-10 px-4 rounded-xl border border-primary/10 text-text-primary hover:bg-primary/5 transition-colors font-bold text-sm flex items-center gap-2"
+                      >
+                        PDF
+                        <Printer size={16} />
+                      </button>
+                    </div>
+                </div>
+
+              <div className="overflow-x-auto">
+                {view.tab === "tasks" && (
+                  <table className="min-w-[980px] w-full text-right">
+                    <thead className="bg-primary/5 text-text-muted text-xs font-bold uppercase tracking-wider">
+                      <tr>
+                        {view.table.columns.map((c) => (
+                          <th key={c} className="px-6 py-4 whitespace-nowrap">
+                            {c}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-primary/5">
+                      {view.table.rows.map((r) => (
+                        <tr key={r.id} className="hover:bg-primary/5 transition-colors text-sm text-text-secondary">
+                          <td className="px-6 py-4 whitespace-nowrap font-mono">{r.id}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-text-primary">{r.title}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{r.worker}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{r.zone}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
+                                  r.status === 'مكتملة' ? 'bg-secondary/20 text-secondary' :
+                                  r.status === 'قيد التنفيذ' ? 'bg-primary/20 text-primary' :
+                                  r.status === 'معلقة' ? 'bg-accent/20 text-accent' :
+                                  r.status === 'مرفوضة' ? 'bg-red-500/20 text-red-600' : 'bg-primary/5 text-text-muted'
+                              }`}>
+                                {r.status}
+                              </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">{r.priority}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono">{r.dueDate}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono">{r.time}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {view.tab === "workers" && (
+                  <table className="min-w-[820px] w-full text-right">
+                    <thead className="bg-primary/5 text-text-muted text-xs font-bold uppercase tracking-wider">
+                      <tr>
+                        {view.table.columns.map((c) => (
+                          <th key={c} className="px-6 py-4 whitespace-nowrap">
+                            {c}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-primary/5">
+                      {view.table.rows.map((r) => (
+                        <tr key={r.id} className="hover:bg-primary/5 transition-colors text-sm text-text-secondary">
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-text-primary">{r.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${r.presence === 'حضور' ? 'bg-secondary/20 text-secondary' : 'bg-accent/20 text-accent'}`}>
+                                  {r.presence}
+                              </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono">{r.lastSeen}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono">{r.activeTasks}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono">{r.doneTasks}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {view.tab === "zones" && (
+                  <table className="min-w-[900px] w-full text-right">
+                    <thead className="bg-primary/5 text-text-muted text-xs font-bold uppercase tracking-wider">
+                      <tr>
+                        {view.table.columns.map((c) => (
+                          <th key={c} className="px-6 py-4 whitespace-nowrap">
+                            {c}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-primary/5">
+                      {view.table.rows.map((r) => (
+                        <tr key={r.id} className="hover:bg-primary/5 transition-colors text-sm text-text-secondary">
+                          <td className="px-6 py-4 whitespace-nowrap font-bold text-text-primary">{r.zone}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono">{r.total}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono text-secondary">{r.done}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono text-primary">{r.inProgress}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono text-accent">{r.delayed}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-bold">{r.rate}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono">{r.updatedAt}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </GlassCard>
+            
+            <div className="text-right text-xs text-text-muted px-2">
+                 {view.filtersNote}
+            </div>
+          </div>
+
+          {/* Right - KPIs & Donut */}
+          <div className="space-y-6">
+            {/* KPIs */}
+            <div className="grid grid-cols-2 gap-4">
+              {view.kpis.map((k, idx) => (
+                <KpiCard key={k.title} kpi={k} delay={idx * 50} />
+              ))}
+            </div>
+
+            {/* Chart 2 */}
+            <GlassCard>
+              <div className="flex items-center gap-2 mb-6">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <PieChart size={20} />
+                </div>
+                <h3 className="text-lg font-bold text-text-primary">
                   {view.tab === "tasks" ? view.chart2.title : view.tab === "workers" ? view.chart2.title : view.chart2.title}
-                </div>
-
-                <div className="mt-4">
-                  {view.tab === "tasks" && (
-                    <DonutWithLegend parts={view.chart2.parts} />
-                  )}
-
-                  {view.tab === "workers" && (
-                    <HorizontalBars items={view.chart2.items} />
-                  )}
-
-                  {view.tab === "zones" && (
-                    <DonutWithLegend parts={view.chart2.parts} />
-                  )}
-                </div>
-              </Card>
-
-              <div className="text-right text-[12px] text-[#6B7280]">
-                {/* TODO: Backend should return summary KPIs, chart series, and table rows based on applied filters and active tab. */}
+                </h3>
               </div>
-            </div>
+
+              <div>
+                {view.tab === "tasks" && (
+                  <DonutWithLegend parts={view.chart2.parts} />
+                )}
+
+                {view.tab === "workers" && (
+                  <HorizontalBars items={view.chart2.items} />
+                )}
+
+                {view.tab === "zones" && (
+                  <DonutWithLegend parts={view.chart2.parts} />
+                )}
+              </div>
+            </GlassCard>
           </div>
         </div>
       </div>
@@ -544,14 +595,6 @@ export default function Reports() {
 
 /* ---------- UI ---------- */
 
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="bg-[#F3F1ED] rounded-[16px] shadow-[0_2px_0_rgba(0,0,0,0.08)] border border-black/10 p-4 sm:p-5">
-      {children}
-    </div>
-  );
-}
-
 function Tabs({
   value,
   onChange,
@@ -559,10 +602,10 @@ function Tabs({
 }: {
   value: TabKey;
   onChange: (v: TabKey) => void;
-  items: { key: TabKey; label: string }[];
+  items: { key: TabKey; label: string, icon?: React.ReactNode }[];
 }) {
   return (
-    <div className="flex items-center justify-end gap-2 flex-wrap">
+    <GlassCard noPadding className="inline-flex p-1 gap-1">
       {items.map((it) => {
         const active = value === it.key;
         return (
@@ -571,17 +614,18 @@ function Tabs({
             type="button"
             onClick={() => onChange(it.key)}
             className={[
-              "h-[40px] px-4 rounded-[10px] font-sans font-semibold text-[14px] border",
+              "h-10 px-5 rounded-lg font-bold text-sm transition-all flex items-center gap-2",
               active
-                ? "bg-[#60778E] text-white border-black/10"
-                : "bg-white text-[#2F2F2F] border-black/10 hover:opacity-95",
+                ? "bg-primary text-white shadow-md shadow-primary/30"
+                : "text-text-muted hover:bg-primary/5 hover:text-primary",
             ].join(" ")}
           >
+            {it.icon}
             {it.label}
           </button>
         );
       })}
-    </div>
+    </GlassCard>
   );
 }
 
@@ -601,8 +645,8 @@ function Select({
   helper?: string;
 }) {
   return (
-    <div className="w-full">
-      <div className="text-right text-[12px] text-[#2F2F2F] font-sans font-semibold mb-2">
+    <div className="w-full relative group">
+      <div className="text-right text-xs text-text-muted font-bold mb-2 uppercase tracking-wide">
         {label}
       </div>
       <div className="relative">
@@ -611,9 +655,9 @@ function Select({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           className={[
-            "w-full h-[40px] rounded-[10px] bg-white border border-black/10 px-4 text-right outline-none appearance-none",
-            "focus:ring-2 focus:ring-black/10",
-            disabled ? "opacity-60 cursor-not-allowed" : "",
+            "glass-input w-full h-[48px] px-4 text-right appearance-none cursor-pointer",
+            "focus:bg-primary/5 text-text-primary [&>option]:text-black",
+            disabled ? "opacity-50 cursor-not-allowed" : "",
           ].join(" ")}
         >
           {options.map((o) => (
@@ -623,12 +667,12 @@ function Select({
           ))}
         </select>
 
-        <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#60778E]">
-          <ChevronDown />
+        <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
+          <ChevronDown size={16} />
         </div>
       </div>
 
-      {helper && <div className="mt-1 text-right text-[11px] text-[#6B7280]">{helper}</div>}
+      {helper && <div className="mt-1 text-right text-[10px] text-text-muted opacity-60">{helper}</div>}
     </div>
   );
 }
@@ -644,46 +688,59 @@ function DateField({
 }) {
   return (
     <div className="w-full">
-      <div className="text-right text-[12px] text-[#2F2F2F] font-sans font-semibold mb-2">
+      <div className="text-right text-xs text-text-muted font-bold mb-2 uppercase tracking-wide">
         {label}
       </div>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full h-[40px] rounded-[10px] bg-white border border-black/10 px-4 text-right outline-none focus:ring-2 focus:ring-black/10"
-      />
+      <div className="relative">
+        <input
+            type="date"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="glass-input w-full h-[48px] px-4 text-right focus:bg-primary/5 text-text-primary"
+        />
+        <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+      </div>
     </div>
   );
 }
 
-function KpiCard({ kpi }: { kpi: KPI }) {
-  const textColor = kpi.text ?? "#FFFFFF";
+function KpiCard({ kpi, delay = 0 }: { kpi: KPI; delay?: number }) {
+  // Map internal icon names to Lucide icons
+  const IconMap = {
+      check: <CheckCircle size={24} />,
+      users: <Users size={24} />,
+      speed: <Activity size={24} />,
+      alert: <AlertCircle size={24} />
+  };
+
   return (
-    <div
-      className="rounded-[16px] shadow-[0_2px_0_rgba(0,0,0,0.08)] border border-black/10 p-4 flex flex-col gap-3"
-      style={{ backgroundColor: kpi.bg }}
+    <GlassCard 
+        className="flex flex-col gap-1 !p-5 relative overflow-hidden group animate-slide-up !backdrop-blur-none bg-white/80"
+        style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="flex items-start justify-between gap-3" style={{ color: textColor }}>
-        <div className="opacity-95">
-          <KpiIcon kind={kpi.icon} />
+      {/* Decorative gradient blob */}
+      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white/5 to-transparent rounded-bl-[50%] opacity-50"></div>
+      
+      <div className="flex items-start justify-between gap-3 relative z-10 w-full">
+         <div className="p-2.5 rounded-xl bg-primary/10" style={{ color: kpi.color }}>
+            {IconMap[kpi.icon]}
         </div>
-        <div className="text-right">
-          <div className="text-[12px] font-sans font-semibold opacity-90">{kpi.title}</div>
-          <div className="text-[18px] sm:text-[20px] font-sans font-bold mt-1">{kpi.value}</div>
+        <div className="flex-1 text-right">
+          <div className="text-xs text-text-secondary font-bold mb-1 opacity-80">{kpi.title}</div>
+          <div className="text-xl sm:text-2xl font-extrabold text-text-primary tracking-tight">{kpi.value}</div>
         </div>
       </div>
-    </div>
+    </GlassCard>
   );
 }
 
 function Legend({ items }: { items: LegendItem[] }) {
   return (
-    <div className="flex items-center gap-3 flex-wrap justify-end">
+    <div className="flex items-center gap-4 flex-wrap justify-end">
       {items.map((it) => (
-        <div key={it.label} className="flex items-center gap-2">
-          <div className="text-[12px] text-[#2F2F2F]">{it.label}</div>
-          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: it.color }} />
+        <div key={it.label} className="flex items-center gap-1.5">
+          <div className="text-[10px] font-bold text-text-secondary uppercase">{it.label}</div>
+          <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: it.color }} />
         </div>
       ))}
     </div>
@@ -702,23 +759,24 @@ function BarChartGrouped({
   const maxY = Math.max(1, ...points.flatMap((p) => [p.a, p.b, p.c ?? 0]));
 
   return (
-    <div className="w-full bg-white rounded-[12px] border border-black/10 p-3 overflow-hidden">
-      <div className="h-[200px] sm:h-[240px] w-full flex items-end gap-3">
+    <div className="w-full bg-primary/5 rounded-xl border border-primary/5 p-4 overflow-hidden relative">
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
+      <div className="h-[200px] sm:h-[240px] w-full flex items-end gap-3 relative z-10">
         {points.map((p) => {
           const aH = (p.a / maxY) * 100;
           const bH = (p.b / maxY) * 100;
           const cH = p.c != null ? (p.c / maxY) * 100 : 0;
 
           return (
-            <div key={p.label} className="flex-1 min-w-[18px] h-full flex flex-col justify-end items-center">
-              <div className="h-full w-full flex items-end justify-center gap-1.5">
-                <div className="w-[10px] sm:w-[12px] rounded-t-[5px]" style={{ height: `${aH}%`, backgroundColor: colors.a }} />
-                <div className="w-[10px] sm:w-[12px] rounded-t-[5px]" style={{ height: `${bH}%`, backgroundColor: colors.b }} />
+            <div key={p.label} className="flex-1 min-w-[24px] h-full flex flex-col justify-end items-center group">
+              <div className="h-full w-full flex items-end justify-center gap-1">
+                <div className="w-[8px] sm:w-[10px] rounded-t-full transition-all duration-500 group-hover:scale-y-110 opacity-90" style={{ height: `${aH}%`, backgroundColor: colors.a }} />
+                <div className="w-[8px] sm:w-[10px] rounded-t-full transition-all duration-500 group-hover:scale-y-110 opacity-90" style={{ height: `${bH}%`, backgroundColor: colors.b }} />
                 {p.c != null && (
-                  <div className="w-[10px] sm:w-[12px] rounded-t-[5px]" style={{ height: `${cH}%`, backgroundColor: colors.c }} />
+                  <div className="w-[8px] sm:w-[10px] rounded-t-full transition-all duration-500 group-hover:scale-y-110 opacity-90" style={{ height: `${cH}%`, backgroundColor: colors.c }} />
                 )}
               </div>
-              <div className="mt-2 text-[11px] text-[#6B7280]">{p.label}</div>
+              <div className="mt-3 text-[10px] font-bold text-text-muted group-hover:text-white transition-colors">{p.label}</div>
             </div>
           );
         })}
@@ -735,17 +793,17 @@ function HorizontalBars({
   const max = Math.max(1, ...items.map((x) => x.value));
 
   return (
-    <div className="w-full bg-white rounded-[12px] border border-black/10 p-4">
-      <div className="space-y-3">
+    <div className="w-full bg-primary/5 rounded-xl border border-primary/5 p-5">
+      <div className="space-y-4">
         {items.map((it) => {
           const w = Math.round((it.value / max) * 100);
           return (
-            <div key={it.label} className="flex items-center gap-3">
-              <div className="w-[48px] text-left text-[12px] text-[#2F2F2F]">{it.value}</div>
-              <div className="flex-1 h-[10px] bg-[#E5E7EB] rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${w}%`, backgroundColor: it.color }} />
+            <div key={it.label} className="flex items-center gap-4">
+              <div className="w-[32px] text-right text-xs font-bold font-mono text-text-primary">{it.value}</div>
+              <div className="flex-1 h-[6px] bg-primary/10 rounded-full overflow-hidden">
+                <div className="h-full rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)]" style={{ width: `${w}%`, backgroundColor: it.color }} />
               </div>
-              <div className="w-[130px] text-right text-[12px] text-[#2F2F2F] truncate">{it.label}</div>
+              <div className="w-[100px] text-right text-xs font-bold text-text-secondary truncate">{it.label}</div>
             </div>
           );
         })}
@@ -757,17 +815,20 @@ function HorizontalBars({
 function DonutWithLegend({ parts }: { parts: DonutPart[] }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <div className="shrink-0">
-        <Donut size={92} stroke={14} parts={parts} background="#E5E7EB" />
+      <div className="shrink-0 relative">
+        <Donut size={100} stroke={12} parts={parts} background="rgba(255,255,255,0.05)" />
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-xs font-bold text-white/20">KPI</span>
+        </div>
       </div>
 
-      <div className="flex-1 space-y-2">
+      <div className="flex-1 space-y-3">
         {parts.map((p) => (
-          <div key={p.label} className="flex items-center justify-between gap-2">
-            <div className="text-[12px] text-[#2F2F2F]">{p.value}%</div>
+          <div key={p.label} className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 last:border-0 last:pb-0">
+            <div className="text-xs font-mono font-bold text-text-muted">{p.value}%</div>
             <div className="flex items-center gap-2">
-              <div className="text-[12px] text-[#2F2F2F]">{p.label}</div>
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+              <div className="text-xs font-bold text-text-secondary">{p.label}</div>
+              <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: p.color }} />
             </div>
           </div>
         ))}
@@ -812,75 +873,50 @@ function Donut({
             fill="none"
             stroke={p.color}
             strokeWidth={stroke}
-            strokeLinecap="butt"
+            strokeLinecap="round"
             strokeDasharray={dashArray}
             strokeDashoffset={dashOffset}
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            className="transition-all duration-1000 ease-out"
           />
         );
       })}
-      <circle cx={size / 2} cy={size / 2} r={r - stroke / 2} fill="#F3F1ED" />
     </svg>
   );
 }
-
-/* ---------- Icons ---------- */
-
-function KpiIcon({ kind }: { kind: KPI["icon"] }) {
-  if (kind === "check") {
-    return (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  if (kind === "users") {
-    return (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <path d="M11.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" strokeWidth="2" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <path d="M17 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (kind === "speed") {
-    return (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M20 13a8 8 0 1 1-16 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <path d="M12 13 16 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <path d="M12 3v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    );
-  }
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 9v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M12 17h.01" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M10.3 4.5h3.4L21 20H3L10.3 4.5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ChevronDown() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/* ---------- Export Helpers ---------- */
-
 
 /* ---------- API to ViewModel Builders ---------- */
 
+// Translation helpers for English -> Arabic
+function translateStatus(status: string): string {
+  const map: Record<string, string> = {
+    'Pending': 'معلقة',
+    'InProgress': 'قيد التنفيذ',
+    'Completed': 'مكتملة',
+    'Rejected': 'مرفوضة',
+    'Open': 'مفتوحة',
+    'Closed': 'مغلقة',
+  };
+  return map[status] || status;
+}
+
+function translatePriority(priority: string): string {
+  const map: Record<string, string> = {
+    'High': 'عالية',
+    'Medium': 'متوسطة',
+    'Low': 'منخفضة',
+    'Urgent': 'عاجلة',
+  };
+  return map[priority] || priority;
+}
+
 const palette = {
-  blue: "#60778E",
-  green: "#8FA36A",
-  red: "#C86E5D",
-  gray: "#6B7280",
-  light: "#E5E7EB",
+  blue: "#60A5FA", // brighter blue for dark mode
+  green: "#34D399", // emerald
+  red: "#F87171", // soft red
+  gray: "#94A3B8", // slate 400
+  light: "#F1F5F9",
+  purple: "#A78BFA"
 };
 
 function buildViewFromTasksApi(data: TasksReportData, f: FiltersDraft, lastUpdated: string): ViewModel {
@@ -897,27 +933,13 @@ function buildViewFromTasksApi(data: TasksReportData, f: FiltersDraft, lastUpdat
     c: p.pending,
   }));
 
-  // Map tasks to table rows
-  const statusMap: Record<string, string> = {
-    Pending: "معلقة",
-    InProgress: "نشطة",
-    Completed: "مكتملة",
-    Cancelled: "ملغاة",
-  };
-  const priorityMap: Record<string, string> = {
-    Low: "منخفضة",
-    Medium: "متوسطة",
-    High: "عالية",
-    Urgent: "عاجلة",
-  };
-
   const rows: TaskRow[] = data.tasks.map((t) => ({
     id: t.id.toString(),
     title: t.title,
     worker: t.worker,
     zone: t.zone,
-    status: statusMap[t.status] || t.status,
-    priority: priorityMap[t.priority] || t.priority,
+    status: translateStatus(t.status),
+    priority: translatePriority(t.priority),
     dueDate: t.dueDate ? new Date(t.dueDate).toLocaleDateString("ar-EG") : "—",
     time: t.createdAt ? new Date(t.createdAt).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "—",
   }));
@@ -928,13 +950,13 @@ function buildViewFromTasksApi(data: TasksReportData, f: FiltersDraft, lastUpdat
     lastUpdated,
     filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
     kpis: [
-      { title: "إجمالي المهام", value: data.total.toString(), icon: "check", bg: palette.blue },
-      { title: "معدل الإنجاز", value: `${completedPct}%`, icon: "speed", bg: palette.gray },
-      { title: "مهام معلقة", value: data.pending.toString(), icon: "alert", bg: palette.light, text: "#2F2F2F" },
-      { title: "العمال النشطين", value: `${data.activeWorkers} / ${data.totalWorkers}`, icon: "users", bg: palette.green },
+      { title: "إجمالي المهام", value: data.total.toString(), icon: "check", color: palette.blue },
+      { title: "معدل الإنجاز", value: `${completedPct}%`, icon: "speed", color: palette.green },
+      { title: "مهام معلقة", value: data.pending.toString(), icon: "alert", color: palette.red },
+      { title: "العمال النشطين", value: `${data.activeWorkers} / ${data.totalWorkers}`, icon: "users", color: palette.purple },
     ],
     chart1: {
-      title: "تقرير المهام حسب الفترة",
+      title: "أداء المهام حسب الفترة",
       legend: [
         { label: "مكتملة", color: palette.green },
         { label: "نشطة", color: palette.blue },
@@ -951,7 +973,7 @@ function buildViewFromTasksApi(data: TasksReportData, f: FiltersDraft, lastUpdat
       ],
     },
     table: {
-      title: "تقرير المهام التفصيلي:",
+      title: "جدول المهام التفصيلي",
       columns: ["#", "المهمة", "العامل", "المنطقة", "الحالة", "الأولوية", "الموعد", "الوقت"],
       rows,
     },
@@ -989,10 +1011,10 @@ function buildViewFromWorkersApi(data: WorkersReportData, f: FiltersDraft, lastU
     lastUpdated,
     filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
     kpis: [
-      { title: "إجمالي العمال", value: data.totalWorkers.toString(), icon: "users", bg: palette.green },
-      { title: "الحضور", value: data.checkedIn.toString(), icon: "check", bg: palette.blue },
-      { title: "الغياب", value: data.absent.toString(), icon: "alert", bg: palette.gray },
-      { title: "الالتزام", value: `${data.compliancePercent}%`, icon: "speed", bg: palette.light, text: "#2F2F2F" },
+      { title: "إجمالي العمال", value: data.totalWorkers.toString(), icon: "users", color: palette.blue },
+      { title: "الحضور", value: data.checkedIn.toString(), icon: "check", color: palette.green },
+      { title: "الغياب", value: data.absent.toString(), icon: "alert", color: palette.red },
+      { title: "الالتزام", value: `${data.compliancePercent}%`, icon: "speed", color: palette.purple },
     ],
     chart1: {
       title: "حضور / غياب العمال حسب الفترة",
@@ -1003,11 +1025,11 @@ function buildViewFromWorkersApi(data: WorkersReportData, f: FiltersDraft, lastU
       points: points.length > 0 ? points : buildLabelsForPeriod(f.period).map((label) => ({ label, a: 0, b: 0 })),
     },
     chart2: {
-      title: "أعلى 5 عمّال من حيث الضغط (مهام فعالة)",
+      title: "أعلى 5 عمّال إنتاجية",
       items: topWorkload.length > 0 ? topWorkload : [{ label: "—", value: 0, color: palette.blue }],
     },
     table: {
-      title: "تقرير العمال التفصيلي:",
+      title: "سجل دوام وأداء العمال",
       columns: ["العامل", "الحالة", "آخر ظهور", "مهام فعّالة", "مهام منجزة"],
       rows,
     },
@@ -1049,17 +1071,17 @@ function buildViewFromZonesApi(data: ZonesReportData, _f: FiltersDraft, lastUpda
     lastUpdated,
     filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
     kpis: [
-      { title: "عدد المناطق", value: data.totalZones.toString(), icon: "users", bg: palette.blue },
-      { title: "أعلى ضغط", value: data.highestPressureZone || "—", icon: "alert", bg: palette.gray },
-      { title: "معدل الإنجاز", value: `${completedPct}%`, icon: "speed", bg: palette.light, text: "#2F2F2F" },
-      { title: "بلاغات/تأخير", value: data.totalDelayed.toString(), icon: "check", bg: palette.green },
+      { title: "عدد المناطق", value: data.totalZones.toString(), icon: "users", color: palette.blue },
+      { title: "أعلى منطقة ضغطاً", value: data.highestPressureZone || "—", icon: "alert", color: palette.red },
+      { title: "معدل الإنجاز العام", value: `${completedPct}%`, icon: "speed", color: palette.green },
+      { title: "بلاغات/تأخير", value: data.totalDelayed.toString(), icon: "check", color: palette.purple },
     ],
     chart1: {
-      title: "أكثر 5 مناطق من حيث عدد المهام خلال الفترة",
+      title: "المناطق الأكثر نشاطاً",
       items: topZones.length > 0 ? topZones : [{ label: "—", value: 0, color: palette.blue }],
     },
     chart2: {
-      title: "توزيع حالة المناطق",
+      title: "حالة العمل في المناطق",
       parts: [
         { label: "منجزة", value: completedPct, color: palette.green },
         { label: "قيد التنفيذ", value: inProgressPct, color: palette.blue },
@@ -1067,7 +1089,7 @@ function buildViewFromZonesApi(data: ZonesReportData, _f: FiltersDraft, lastUpda
       ],
     },
     table: {
-      title: "تقرير المناطق التفصيلي:",
+      title: "أداء المناطق التفصيلي",
       columns: ["المنطقة", "الإجمالي", "منجزة", "قيد التنفيذ", "متأخرة", "الإنجاز", "آخر تحديث"],
       rows,
     },
@@ -1077,14 +1099,6 @@ function buildViewFromZonesApi(data: ZonesReportData, _f: FiltersDraft, lastUpda
 /* ---------- Mock Builder ---------- */
 
 function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewModel {
-  const palette = {
-    blue: "#60778E",
-    green: "#8FA36A",
-    red: "#C86E5D",
-    gray: "#6B7280",
-    light: "#E5E7EB",
-  };
-
   const labels = buildLabelsForPeriod(f.period);
 
   if (tab === "tasks") {
@@ -1116,13 +1130,13 @@ function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewM
       lastUpdated,
       filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
       kpis: [
-        { title: "إجمالي المهام", value: "33", icon: "check", bg: palette.blue },
-        { title: "معدل الإنجاز", value: "78%", icon: "speed", bg: palette.gray },
-        { title: "مهام معلقة", value: "3", icon: "alert", bg: palette.light, text: "#2F2F2F" },
-        { title: "العمال النشطين", value: "28 / 35", icon: "users", bg: palette.green },
+        { title: "إجمالي المهام", value: "33", icon: "check", color: palette.blue },
+        { title: "معدل الإنجاز", value: "78%", icon: "speed", color: palette.green },
+        { title: "مهام معلقة", value: "3", icon: "alert", color: palette.red },
+        { title: "العمال النشطين", value: "28 / 35", icon: "users", color: palette.purple },
       ],
       chart1: {
-        title: "تقرير المهام حسب الفترة",
+        title: "أداء المهام حسب الفترة",
         legend: [
           { label: "مكتملة", color: palette.green },
           { label: "نشطة", color: palette.blue },
@@ -1139,7 +1153,7 @@ function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewM
         ],
       },
       table: {
-        title: "تقرير المهام التفصيلي:",
+        title: "جدول المهام التفصيلي",
         columns: ["#", "المهمة", "العامل", "المنطقة", "الحالة", "الأولوية", "الموعد", "الوقت"],
         rows,
       },
@@ -1175,10 +1189,10 @@ function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewM
       lastUpdated,
       filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
       kpis: [
-        { title: "إجمالي العمال", value: "35", icon: "users", bg: palette.green },
-        { title: "الحضور", value: "28", icon: "check", bg: palette.blue },
-        { title: "الغياب", value: "7", icon: "alert", bg: palette.gray },
-        { title: "الالتزام", value: "80%", icon: "speed", bg: palette.light, text: "#2F2F2F" },
+        { title: "إجمالي العمال", value: "35", icon: "users", color: palette.blue },
+        { title: "الحضور", value: "28", icon: "check", color: palette.green },
+        { title: "الغياب", value: "7", icon: "alert", color: palette.red },
+        { title: "الالتزام", value: "80%", icon: "speed", color: palette.purple },
       ],
       chart1: {
         title: "حضور / غياب العمال حسب الفترة",
@@ -1189,11 +1203,11 @@ function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewM
         points: points.map((p) => ({ label: p.label, a: p.a, b: p.b })),
       },
       chart2: {
-        title: "أعلى 5 عمّال من حيث الضغط (مهام فعالة)",
+        title: "أعلى 5 عمّال إنتاجية",
         items: topWorkload,
       },
       table: {
-        title: "تقرير العمال التفصيلي:",
+        title: "سجل دوام وأداء العمال",
         columns: ["العامل", "الحالة", "آخر ظهور", "مهام فعّالة", "مهام منجزة"],
         rows,
       },
@@ -1222,13 +1236,13 @@ function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewM
     lastUpdated,
     filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
     kpis: [
-      { title: "عدد المناطق", value: "12", icon: "users", bg: palette.blue },
-      { title: "أعلى ضغط", value: "المنطقة 4", icon: "alert", bg: palette.gray },
-      { title: "معدل الإنجاز", value: "61%", icon: "speed", bg: palette.light, text: "#2F2F2F" },
-      { title: "بلاغات/تأخير", value: "7", icon: "check", bg: palette.green },
+      { title: "عدد المناطق", value: "12", icon: "users", color: palette.blue },
+      { title: "أعلى ضغط", value: "المنطقة 4", icon: "alert", color: palette.gray },
+      { title: "معدل الإنجاز", value: "61%", icon: "speed", color: palette.green },
+      { title: "بلاغات/تأخير", value: "7", icon: "check", color: palette.purple },
     ],
     chart1: {
-      title: "أكثر 5 مناطق من حيث عدد المهام خلال الفترة",
+      title: "المناطق الأكثر نشاطاً",
       items: topZones,
     },
     chart2: {
@@ -1240,7 +1254,7 @@ function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewM
       ],
     },
     table: {
-      title: "تقرير المناطق التفصيلي:",
+      title: "أداء المناطق التفصيلي",
       columns: ["المنطقة", "الإجمالي", "منجزة", "قيد التنفيذ", "متأخرة", "الإنجاز", "آخر تحديث"],
       rows,
     },

@@ -5,14 +5,26 @@ import { getZones } from "../api/zones";
 import { createTask } from "../api/tasks";
 import type { UserResponse } from "../types/user";
 import type { ZoneResponse } from "../types/zone";
-import type { TaskPriority } from "../types/task";
+import type { TaskPriority, TaskType } from "../types/task";
+import LocationPicker from "../components/UI/LocationPicker";
 
 type PriorityOption = { value: TaskPriority; label: string };
+type TaskTypeOption = { value: TaskType; label: string };
 
 const priorityOptions: PriorityOption[] = [
   { value: "Low", label: "منخفضة" },
   { value: "Medium", label: "متوسطة" },
   { value: "High", label: "عالية" },
+];
+
+const taskTypeOptions: TaskTypeOption[] = [
+  { value: "GarbageCollection", label: "جمع النفايات" },
+  { value: "StreetSweeping", label: "كنس الشوارع" },
+  { value: "ContainerMaintenance", label: "صيانة الحاويات" },
+  { value: "RepairMaintenance", label: "إصلاح وصيانة" },
+  { value: "PublicSpaceCleaning", label: "تنظيف الأماكن العامة" },
+  { value: "Inspection", label: "تفتيش" },
+  { value: "Other", label: "أخرى" },
 ];
 
 // ✅ NEW: shape coming from IssueDetails navigate state
@@ -46,6 +58,13 @@ export default function CreateTask() {
   const [priority, setPriority] = useState<TaskPriority | "">("");
   const [employeeId, setEmployeeId] = useState("");
   const [zoneId, setZoneId] = useState("");
+  // New fields for mobile consistency
+  const [taskType, setTaskType] = useState<TaskType | "">("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationDescription, setLocationDescription] = useState("");
+  const [estimatedDuration, setEstimatedDuration] = useState<string>("");
+  const [requiresPhotoProof, setRequiresPhotoProof] = useState(true);
 
   // ✅ NEW: helper to map severity -> priority
   const mapSeverityToPriority = (sev?: FromIssue["severity"]): TaskPriority | "" => {
@@ -96,6 +115,17 @@ export default function CreateTask() {
     if (fromIssue.zoneId !== undefined && fromIssue.zoneId !== null && String(fromIssue.zoneId).trim() !== "") {
       setZoneId(String(fromIssue.zoneId));
     }
+
+    // GPS coordinates from issue
+    if (fromIssue.gps?.lat !== undefined && fromIssue.gps?.lng !== undefined) {
+      setLatitude(fromIssue.gps.lat);
+      setLongitude(fromIssue.gps.lng);
+    }
+
+    // Location description from issue
+    if (fromIssue.locationText) {
+      setLocationDescription(fromIssue.locationText);
+    }
   }, [fromIssue]);
 
   // ✅ NEW: If we only received zone name, match it after zones are loaded
@@ -133,6 +163,13 @@ export default function CreateTask() {
         zoneId: zoneId ? parseInt(zoneId) : undefined,
         priority: priority as TaskPriority,
         dueDate: dueDate || undefined,
+        // New fields for mobile consistency
+        taskType: taskType ? (taskType as TaskType) : undefined,
+        latitude: latitude || undefined,
+        longitude: longitude || undefined,
+        locationDescription: locationDescription || undefined,
+        estimatedDurationMinutes: estimatedDuration ? parseInt(estimatedDuration) : undefined,
+        requiresPhotoProof,
       });
 
       setSuccess("تم إنشاء المهمة بنجاح");
@@ -144,6 +181,12 @@ export default function CreateTask() {
       setPriority("");
       setEmployeeId("");
       setZoneId("");
+      setTaskType("");
+      setLatitude(null);
+      setLongitude(null);
+      setLocationDescription("");
+      setEstimatedDuration("");
+      setRequiresPhotoProof(true);
     } catch (err) {
       setError("فشل في إنشاء المهمة");
     } finally {
@@ -153,14 +196,14 @@ export default function CreateTask() {
 
   if (loading) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] flex items-center justify-center">
+      <div className="h-full w-full bg-background flex items-center justify-center">
         <div className="text-[#2F2F2F]">جاري التحميل...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-background overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[980px] mx-auto">
           <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F] mb-6">
@@ -236,17 +279,92 @@ export default function CreateTask() {
                 />
               </FieldRow>
 
-              <FieldRow label="الموقع">
+              <FieldRow label="المنطقة">
                 <Select
                   value={zoneId}
                   onChange={setZoneId}
-                  placeholder="حدد موقع المهمة"
+                  placeholder="حدد منطقة المهمة"
                   options={zones.map((z) => ({
                     value: z.zoneId.toString(),
                     label: z.zoneName,
                   }))}
                   disabled={submitting}
                 />
+              </FieldRow>
+
+              <FieldRow label="نوع المهمة">
+                <Select
+                  value={taskType}
+                  onChange={(v) => setTaskType(v as TaskType)}
+                  placeholder="اختر نوع المهمة..."
+                  options={taskTypeOptions.map((t) => ({ value: t.value, label: t.label }))}
+                  disabled={submitting}
+                />
+              </FieldRow>
+
+              {/* Map Location Picker - Full Width */}
+              <div className="space-y-2">
+                <div className="text-right font-sans font-semibold text-[#2F2F2F] text-[16px] sm:text-[17px] md:text-[18px]">
+                  موقع المهمة على الخريطة
+                </div>
+                <LocationPicker
+                  latitude={latitude}
+                  longitude={longitude}
+                  onLocationChange={(lat, lng) => {
+                    if (lat === 0 && lng === 0) {
+                      setLatitude(null);
+                      setLongitude(null);
+                    } else {
+                      setLatitude(lat);
+                      setLongitude(lng);
+                    }
+                  }}
+                  onLocationNameChange={(name) => {
+                    // Auto-fill location description when selecting from search
+                    setLocationDescription(name);
+                  }}
+                  disabled={submitting}
+                />
+                <p className="text-xs text-[#6B7280] text-right">
+                  ابحث عن الموقع أو انقر على الخريطة لتحديد موقع المهمة (مسافة التحذير: 100م، الرفض التلقائي: 500م)
+                </p>
+              </div>
+
+              <FieldRow label="وصف الموقع">
+                <Input
+                  value={locationDescription}
+                  onChange={(e) => setLocationDescription(e.target.value)}
+                  placeholder="مثال: بجانب مسجد الحي، شارع الملك فهد..."
+                  disabled={submitting}
+                />
+              </FieldRow>
+
+              <FieldRow label="المدة المتوقعة (دقائق)">
+                <input
+                  type="number"
+                  min="1"
+                  max="1440"
+                  value={estimatedDuration}
+                  onChange={(e) => setEstimatedDuration(e.target.value)}
+                  placeholder="مثال: 60"
+                  disabled={submitting}
+                  className="w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
+                />
+              </FieldRow>
+
+              <FieldRow label="يتطلب صورة إثبات">
+                <label className="flex items-center gap-3 cursor-pointer justify-end">
+                  <span className="text-[#2F2F2F]">
+                    {requiresPhotoProof ? "نعم، يجب إرفاق صورة" : "لا، غير مطلوب"}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={requiresPhotoProof}
+                    onChange={(e) => setRequiresPhotoProof(e.target.checked)}
+                    disabled={submitting}
+                    className="w-5 h-5 rounded border-black/10 text-[#60778E] focus:ring-[#60778E]"
+                  />
+                </label>
               </FieldRow>
             </div>
 

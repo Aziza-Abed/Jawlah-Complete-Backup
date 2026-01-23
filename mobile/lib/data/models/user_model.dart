@@ -97,19 +97,25 @@ class UserModel {
     if (workerType == null || workerType!.isEmpty) return '';
 
     // Handle both enum names and numeric values
+    // Standard municipality department worker types
     switch (workerType!.toLowerCase()) {
       case 'sanitation':
       case '0':
-        return 'عامل نظافة';
-      case 'inspector':
+        return 'صحة/نظافة';
+      case 'publicworks':
       case '1':
-        return 'مفتش';
-      case 'emergency':
+        return 'أشغال';
+      case 'agriculture':
       case '2':
-        return 'طوارئ';
+        return 'زراعة';
       case 'maintenance':
       case '3':
-        return 'عامل صيانة';
+        return 'صيانة';
+      // Legacy support for old values
+      case 'inspector':
+        return 'مفتش';
+      case 'emergency':
+        return 'طوارئ';
       default:
         return workerType!;
     }

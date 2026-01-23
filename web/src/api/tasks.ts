@@ -82,3 +82,51 @@ export async function getPendingTasksCount(): Promise<number> {
   const response = await apiClient.get<{ data: number }>("/tasks/pending-count");
   return response.data.data;
 }
+
+// Reassign task to another worker
+export async function reassignTask(id: number, data: { newAssignedToUserId: number, reassignmentReason?: string }): Promise<TaskResponse> {
+  const response = await apiClient.put<{ data: TaskResponse }>(`/tasks/${id}/reassign`, data);
+  return response.data.data;
+}
+
+// Approve auto-rejected task (override)
+export async function approveOverride(id: number, notes?: string): Promise<TaskResponse> {
+  const response = await apiClient.put<{ data: TaskResponse }>(`/tasks/${id}/approve-override`, { supervisorNotes: notes });
+  return response.data.data;
+}
+
+// --- Task Templates ---
+
+export interface TaskTemplate {
+    id: number;
+    title: string;
+    description: string;
+    zoneId: number | null;
+    zoneName: string;
+    freqeuncy: string; // Typo in backend? No, backend has Frequency.
+    frequency: string;
+    time: string; // HH:mm
+    isActive: boolean;
+}
+
+export interface CreateTaskTemplateRequest {
+    title: string;
+    description: string;
+    zoneId: number | null;
+    frequency: string;
+    time: string;
+}
+
+export async function getTaskTemplates(): Promise<TaskTemplate[]> {
+    const response = await apiClient.get<TaskTemplate[]>("/task-templates");
+    return response.data;
+}
+
+export async function createTaskTemplate(data: CreateTaskTemplateRequest): Promise<TaskTemplate> {
+    const response = await apiClient.post<TaskTemplate>("/task-templates", data);
+    return response.data;
+}
+
+export async function deleteTaskTemplate(id: number): Promise<void> {
+    await apiClient.delete(`/task-templates/${id}`);
+}

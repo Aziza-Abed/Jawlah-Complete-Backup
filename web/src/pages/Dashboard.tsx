@@ -1,15 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { MapPin, User, Pin } from "lucide-react";
-import { getDashboardOverview } from "../api/dashboard";
-import type { DashboardOverview } from "../types/dashboard";
+import { useNavigate } from "react-router-dom";
+import { Users, ClipboardList, MapPin, Activity, PlusCircle, ArrowRight } from "lucide-react";
+import { getDashboardOverview, getWorkerStatuses } from "../api/dashboard";
+import type { DashboardOverview, WorkerStatus } from "../types/dashboard";
 import { apiClient } from "../api/client";
+import GlassCard from "../components/UI/GlassCard";
 
-type StatChip = {
-  label: string;
-  value: number;
-  bg: string;
-  text: string;
-};
 
 type ActivityItem = {
   id: string;
@@ -19,341 +15,225 @@ type ActivityItem = {
 };
 
 const Dashboard: React.FC = () => {
-  const [overview, setOverview] = useState<DashboardOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+    const navigate = useNavigate();
+    const [overview, setOverview] = useState<DashboardOverview | null>(null);
+    const [activities, setActivities] = useState<ActivityItem[]>([]);
+    const [workerStatuses, setWorkerStatuses] = useState<WorkerStatus[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [userName, setUserName] = useState("مشرف");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await getDashboardOverview();
-        setOverview(data);
-
-        // Fetch recent activities from audit logs
+    useEffect(() => {
         try {
-          const auditResponse = await apiClient.get('/audit?count=3');
-          const logs = auditResponse.data.data || [];
-          const mappedActivities: ActivityItem[] = logs.map((log: any) => {
-            const date = new Date(log.createdAt);
-            const hours = date.getHours();
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            const period = hours >= 12 ? 'م' : 'ص';
-            const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-            const time = `${displayHours}:${minutes} ${period}`;
+            const userStr = localStorage.getItem("followup_user");
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                setUserName(user.fullName?.split(' ')[0] || "مشرف");
+            }
+        } catch (e) {}
 
-            let icon: "pin" | "user" | "map" = "user";
-            let text = log.details || log.action;
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [overviewData, workersData, auditResponse] = await Promise.all([
+                    getDashboardOverview(),
+                    getWorkerStatuses(),
+                    apiClient.get('/audit?count=15')
+                ]);
 
-            if (log.action?.includes('Task')) icon = "pin";
-            else if (log.action?.includes('Zone')) icon = "map";
+                setOverview(overviewData);
+                setWorkerStatuses(workersData);
 
-            return {
-              id: log.auditLogId.toString(),
-              time,
-              text: text || `${log.userFullName || log.username} - ${log.action}`,
-              icon
-            };
-          });
-          setActivities(mappedActivities);
-        } catch (auditErr) {
-          // Fallback to empty activities if audit logs fail
-          console.warn("Could not load activities:", auditErr);
-          setActivities([]);
-        }
-      } catch (err) {
-        setError("فشل في تحميل البيانات");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+                // Map and clean up activities
+                const logs = auditResponse.data.data || [];
+                const mappedActivities: ActivityItem[] = logs
+                    .filter((log: any) => !log.action.includes("Login") && !log.action.includes("Logout"))
+                    .slice(0, 5)
+                    .map((log: any) => {
+                        const date = new Date(log.createdAt);
+                        const time = date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+                        
+                        let icon: "pin" | "user" | "map" = "user";
+                        if (log.action?.includes('Task')) icon = "pin";
+                        else if (log.action?.includes('Zone')) icon = "map";
 
-  // Calculate values from API data or use defaults
-  const workersTotal = overview?.workers.total ?? 0;
-  const workersChips: StatChip[] = [
-    { label: "غياب", value: overview?.workers.notCheckedIn ?? 0, bg: "#C86E5D", text: "#FFFFFF" },
-    { label: "حضور", value: overview?.workers.checkedIn ?? 0, bg: "#8FA36A", text: "#FFFFFF" },
-  ];
+                        return {
+                            id: log.auditLogId.toString(),
+                            time,
+                            text: log.details || log.action,
+                            icon
+                        };
+                    });
+                setActivities(mappedActivities);
+            } catch (err) {
+                console.error("Failed to fetch dashboard data", err);
+                setError("فشل في تحميل بيانات المركز");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
 
   const tasksTotal = (overview?.tasks.pending ?? 0) + (overview?.tasks.inProgress ?? 0) + (overview?.tasks.completedToday ?? 0);
-  const tasksChips: StatChip[] = [
-    { label: "قيد التنفيذ", value: overview?.tasks.inProgress ?? 0, bg: "#F5B300", text: "#1F2937" },
-    { label: "مكتملة", value: overview?.tasks.completedToday ?? 0, bg: "#C86E5D", text: "#FFFFFF" },
-    { label: "معلقة", value: overview?.tasks.pending ?? 0, bg: "#8FA36A", text: "#FFFFFF" },
-  ];
 
   // Activities now loaded from audit logs in useEffect above
 
   if (loading) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] flex items-center justify-center">
-        <div className="text-[#2F2F2F]">جاري التحميل...</div>
+      <div className="h-full w-full bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
+            <div className="flex flex-col items-center gap-1">
+                <h2 className="text-xl font-black text-primary tracking-tight">FollowUp</h2>
+                <p className="text-text-secondary text-sm font-medium">نظام متابعة العمل الميداني</p>
+            </div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] flex items-center justify-center">
-        <div className="text-red-500">{error}</div>
+      <div className="h-full w-full bg-background flex items-center justify-center">
+        <div className="text-accent font-bold">{error}</div>
       </div>
     );
   }
 
-  return (
-    <div className="h-full w-full bg-gradient-to-br from-[#E2E8F0] to-[#D9D9D9] overflow-auto">
-      <div className="p-4 sm:p-6 md:p-8">
-        <div className="max-w-[1100px] mx-auto">
-          <h1 className="text-right font-sans font-bold text-[22px] sm:text-[24px] text-[#2F2F2F] mb-6">
-            لوحة التحكم
-          </h1>
+    return (
+        <div className="space-y-6 pb-10">
+            {/* Simple Header */}
+            <div className="text-right">
+                <h1 className="text-2xl md:text-3xl font-bold text-text-primary">أهلاً بك، {userName}</h1>
+                <p className="text-text-secondary mt-1">نظام متابعة العمل الميداني للبث الميداني</p>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <StatCard
-              title="إجمالي العمال"
-              total={workersTotal}
-              donut={{
-                parts: [
-                  { value: workersChips[0].value, color: workersChips[0].bg },
-                  { value: workersChips[1].value, color: workersChips[1].bg },
-                ],
-              }}
-              chips={workersChips}
-            />
+            {/* Basic Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <GlassCard className="flex items-center gap-4 bg-white/50 border border-primary/10">
+                    <div className="p-3 rounded-full bg-primary/10 text-primary">
+                        <Users size={24} />
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-text-muted font-bold">إجمالي الفريق</p>
+                        <h3 className="text-2xl font-black text-text-primary">{overview?.workers.total}</h3>
+                    </div>
+                </GlassCard>
 
-            <StatCard
-              title="المهام الحالية"
-              total={tasksTotal}
-              donut={{
-                parts: [
-                  { value: tasksChips[0].value, color: tasksChips[0].bg },
-                  { value: tasksChips[1].value, color: tasksChips[1].bg },
-                  { value: tasksChips[2].value, color: tasksChips[2].bg },
-                ],
-              }}
-              chips={tasksChips}
-            />
-          </div>
+                <GlassCard className="flex items-center gap-4 bg-white/50 border border-primary/10">
+                    <div className="p-3 rounded-full bg-secondary/10 text-secondary">
+                        <Activity size={24} />
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-text-muted font-bold">المتواجدون الآن</p>
+                        <h3 className="text-2xl font-black text-text-primary text-secondary">{overview?.workers.checkedIn}</h3>
+                    </div>
+                </GlassCard>
 
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <CardShell>
-              <div className="flex items-center gap-2">
-                <Pin size={18} className="text-[#7895B2]" />
-                <h2 className="text-right font-sans font-semibold text-[18px] text-[#2F2F2F]">
-                    آخر الأنشطة:
-                </h2>
-              </div>
+                <GlassCard className="flex items-center gap-4 bg-white/50 border border-primary/10">
+                    <div className="p-3 rounded-full bg-accent/10 text-accent">
+                        <ClipboardList size={24} />
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-text-muted font-bold">مهام اليوم</p>
+                        <h3 className="text-2xl font-black text-text-primary text-secondary">{tasksTotal}</h3>
+                    </div>
+                </GlassCard>
 
-              <div className="mt-4 space-y-5">
-                {activities.map((a) => (
-                  <div key={a.id} className="flex items-start gap-3">
-                    <div className="mt-1 shrink-0">
-                      {a.icon === "pin" && (
-                        <PinIcon className="text-[#7895B2]" />
-                      )}
-                      {a.icon === "user" && (
-                        <User size={18} className="text-[#7895B2]" />
-                      )}
-                      {a.icon === "map" && (
-                        <MapPin size={18} className="text-[#7895B2]" />
-                      )}
+                <GlassCard className="flex items-center gap-4 bg-white/50 border border-primary/10">
+                    <div className="p-3 rounded-full bg-secondary/10 text-secondary">
+                        <ArrowRight size={24} className="-rotate-45" />
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-text-muted font-bold">أنجزت اليوم</p>
+                        <h3 className="text-2xl font-black text-text-primary text-secondary">{overview?.tasks.completedToday}</h3>
+                    </div>
+                </GlassCard>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Team Status Table - Simpler */}
+                {/* Team Status Table */}
+                <GlassCard className="overflow-hidden min-h-[300px]">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-bold text-text-primary">حالة الفريق</h2>
+                        {workerStatuses.length > 5 && (
+                          <button onClick={() => navigate('/supervisors')} className="text-xs text-primary font-bold hover:underline">عرض الكل</button>
+                        )}
+                    </div>
+                    {workerStatuses.length > 0 ? (
+                        <div className="divide-y divide-primary/5">
+                            {workerStatuses.slice(0, 8).map((worker) => (
+                                <div key={worker.userId} className="py-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-2 h-2 rounded-full ${worker.status === 'CheckedIn' ? 'bg-secondary' : 'bg-text-muted/30'}`} />
+                                        <span className="text-xs font-bold text-text-muted">
+                                            {worker.status === 'CheckedIn' ? 'نشط' : 'غائب'}
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-bold text-sm text-text-primary">{worker.fullName}</p>
+                                        <p className="text-[10px] text-text-muted">{worker.zoneName || 'لا توجد منطقة'}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-center opacity-50 pb-10">
+                            <Users size={32} className="mb-2 text-text-muted" />
+                            <p className="text-sm font-medium">لا يوجد عمال متاحين</p>
+                        </div>
+                    )}
+                </GlassCard>
+
+                {/* Quick Actions & Activity */}
+                <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                        <button 
+                            onClick={() => navigate('/tasks/new')}
+                            className="p-6 rounded-2xl bg-primary text-white text-right hover:shadow-lg transition-all active:scale-95 group"
+                        >
+                            <PlusCircle size={24} className="mb-4 opacity-70 group-hover:opacity-100" />
+                            <h3 className="font-bold">إسناد مهمة</h3>
+                            <p className="text-[10px] opacity-70">إضافة عمل جديد لعامل</p>
+                        </button>
+                        <button 
+                            onClick={() => navigate('/zones')}
+                            className="p-6 rounded-2xl bg-[#83c5be] text-white text-right hover:shadow-lg transition-all active:scale-95 group"
+                        >
+                            <MapPin size={24} className="mb-4 opacity-70 group-hover:opacity-100" />
+                            <h3 className="font-bold">الخريطة</h3>
+                            <p className="text-[10px] opacity-70">توزيع المهام مكانياً</p>
+                        </button>
                     </div>
 
-                    <div className="flex-1">
-                      <div className="text-right text-[12px] text-[#9CA3AF]">
-                        {a.time}
-                      </div>
-                      <div className="text-right text-[14px] sm:text-[15px] text-[#2F2F2F]">
-                        {a.text}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardShell>
-
-            <CardShell>
-              <h2 className="text-right font-sans font-semibold text-[18px] text-[#2F2F2F]">
-                مواقع العمال والمهام:
-              </h2>
-
-              <div className="mt-4 rounded-[14px] overflow-hidden bg-white border border-black/10">
-                <iframe
-                  title="map"
-                  className="w-full h-[290px] sm:h-[320px] md:h-[360px]"
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=35.1799%2C31.8850%2C35.2600%2C31.9400&layer=mapnik"
-                />
-              </div>
-            </CardShell>
-          </div>
+                    <GlassCard className="min-h-[200px]">
+                        <h2 className="text-lg font-bold text-text-primary mb-4">آخر التحديثات</h2>
+                        {activities.length > 0 ? (
+                            <div className="space-y-4">
+                                {activities.slice(0, 4).map((a) => (
+                                    <div key={a.id} className="flex items-start gap-3 text-right">
+                                        <div className="flex-1">
+                                            <p className="text-sm text-text-primary font-medium">{a.text}</p>
+                                            <p className="text-[10px] text-text-muted">{a.time}</p>
+                                        </div>
+                                        <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary/40" />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-center opacity-50 pb-6">
+                                <Activity size={24} className="mb-2 text-text-muted" />
+                                <p className="text-sm font-medium">لا توجد تحديثات حديثة</p>
+                            </div>
+                        )}
+                    </GlassCard>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default Dashboard;
-
-/* ---------- Components ---------- */
-
-function CardShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="bg-white/60 backdrop-blur-sm rounded-[24px] shadow-[0_10px_25px_rgba(0,0,0,0.03)] border border-white/50 p-6 sm:p-8 transition-all duration-300">
-      {children}
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  total,
-  donut,
-  chips,
-}: {
-  title: string;
-  total: number;
-  donut: { parts: { value: number; color: string }[] };
-  chips: StatChip[];
-}) {
-  return (
-    <CardShell>
-      <div className="flex items-center justify-between gap-4">
-        {/* Text on the right */}
-        <div className="flex-1">
-          <div className="text-right text-[14px] sm:text-[15px] text-[#2F2F2F]">
-            {title} :{" "}
-            <span className="font-semibold text-[#2F2F2F]">{total}</span>
-          </div>
-
-          <div className="mt-3 flex items-center justify-end gap-3 flex-wrap">
-            {chips.map((c) => (
-              <Chip
-                key={c.label}
-                value={c.value}
-                label={c.label}
-                bg={c.bg}
-                text={c.text}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Donut on the left */}
-        <div className="shrink-0">
-          <Donut
-            size={54}
-            stroke={10}
-            parts={donut.parts}
-            background="#E5E7EB"
-          />
-        </div>
-      </div>
-    </CardShell>
-  );
-}
-
-function Chip({
-  value,
-  label,
-  bg,
-  text,
-}: {
-  value: number;
-  label: string;
-  bg: string;
-  text: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center">
-      <div
-        className="min-w-[44px] px-3 py-1 rounded-full text-center text-[12px] font-semibold"
-        style={{ backgroundColor: bg, color: text }}
-      >
-        {value}
-      </div>
-      <div className="mt-1 text-[11px] text-[#2F2F2F]">{label}</div>
-    </div>
-  );
-}
-
-function Donut({
-  size,
-  stroke,
-  parts,
-  background,
-}: {
-  size: number;
-  stroke: number;
-  parts: { value: number; color: string }[];
-  background: string;
-}) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const total = parts.reduce((acc, p) => acc + p.value, 0) || 1;
-
-  let offset = 0;
-
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke={background}
-        strokeWidth={stroke}
-      />
-      {parts.map((p, idx) => {
-        const frac = p.value / total;
-        const dash = c * frac;
-        const dashArray = `${dash} ${c - dash}`;
-        const dashOffset = c * (1 - offset);
-
-        offset += frac;
-
-        return (
-          <circle
-            key={idx}
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={p.color}
-            strokeWidth={stroke}
-            strokeLinecap="butt"
-            strokeDasharray={dashArray}
-            strokeDashoffset={dashOffset}
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        );
-      })}
-      <circle cx={size / 2} cy={size / 2} r={r - stroke / 2} fill="#F3F1ED" />
-    </svg>
-  );
-}
-
-function PinIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M12 22s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-      <path
-        d="M12 13.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-    </svg>
-  );
-}

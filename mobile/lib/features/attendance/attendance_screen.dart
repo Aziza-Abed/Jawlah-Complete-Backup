@@ -6,6 +6,7 @@ import '../../presentation/widgets/base_screen.dart';
 import '../../core/routing/app_router.dart';
 import '../../providers/attendance_manager.dart';
 import '../../providers/auth_manager.dart';
+import '../../core/utils/date_formatter.dart';
 import 'widgets/live_work_duration.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -145,7 +146,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       child: Column(
         children: [
           Text(
-              'اليوم: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+              'اليوم: ${DateFormatter.formatDate(DateTime.now())}',
               style: const TextStyle(
                   color: AppColors.textSecondary, fontFamily: 'Cairo')),
           const SizedBox(height: 16),
@@ -249,6 +250,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _handleAction(AttendanceManager provider, bool isCheckIn) async {
     HapticFeedback.heavyImpact();
+
+    // Use automatic GPS location (no map picker for attendance)
     final success =
         isCheckIn ? await provider.doCheckIn() : await provider.doCheckOut();
     if (mounted) {

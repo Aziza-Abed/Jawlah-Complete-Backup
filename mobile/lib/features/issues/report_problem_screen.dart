@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/gps_notice_widget.dart';
+import '../../presentation/widgets/location_picker_map.dart';
 import '../../presentation/widgets/offline_banner.dart';
 import '../../providers/issue_manager.dart';
 import '../../providers/sync_manager.dart';
@@ -584,10 +586,23 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     // guard against double submission and null photo
     if (_isSubmitting || _photo1 == null) return;
 
+    // Show map picker to confirm/adjust location for issue reporting
+    final Position? confirmedPosition = await Navigator.of(context).push<Position>(
+      MaterialPageRoute(
+        builder: (context) => LocationPickerMap(
+          title: 'تأكيد موقع المشكلة',
+          description: 'حدد الموقع الدقيق للمشكلة المبلغ عنها. اسحب العلامة للتعديل إذا لزم الأمر.',
+        ),
+      ),
+    );
+
+    // User cancelled the map picker
+    if (confirmedPosition == null || !mounted) return;
+
     setState(() => _isSubmitting = true);
 
-    // send the report
-    final success = await context.read<IssueManager>().sendIssueReport(
+    // send the report with precise location
+    final success = await context.read<IssueManager>().sendIssueReportWithPosition(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           type: _selectedProblemType,
@@ -596,6 +611,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           photo1: _photo1!,
           photo2: _photo2,
           photo3: _photo3,
+          position: confirmedPosition,
         );
 
     setState(() => _isSubmitting = false);

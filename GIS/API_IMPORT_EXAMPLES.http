@@ -1,0 +1,123 @@
+###############################################################################
+# GIS Import API Examples - FollowUp Municipality Management System
+# Use this file with REST Client extension in VS Code, or copy to Postman
+###############################################################################
+
+### 1. Login as Admin (Get Token)
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Admin@123"
+}
+
+# Copy the token from response and replace YOUR_TOKEN_HERE below
+
+###############################################################################
+# RECOMMENDED IMPORT ORDER
+###############################################################################
+
+### 2. Import Quarters/Neighborhoods (REQUIRED - 36 zones)
+# This is the MAIN file for worker zone assignments
+POST http://localhost:5000/api/gis/import-blocks
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "geoJsonFilePath": "C:\\Users\\hp\\Documents\\FollowUp\\FollowUp-Repo\\GIS\\Quarters(Neighborhoods)_WGS84_CORRECT.geojson"
+}
+
+### 3. Import Blocks (OPTIONAL - 192 city blocks)
+# Only needed if you want finer-grained zones
+POST http://localhost:5000/api/gis/import-blocks
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "geoJsonFilePath": "C:\\Users\\hp\\Documents\\FollowUp\\FollowUp-Repo\\GIS\\Blocks_WGS84.geojson"
+}
+
+### 4. Import Urban Master Plan (OPTIONAL - municipal boundary)
+# Only needed for administrative boundary display
+POST http://localhost:5000/api/gis/import-geojson
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "filePath": "C:\\Users\\hp\\Documents\\FollowUp\\FollowUp-Repo\\GIS\\Urban_Master_Plan_Borders_1_WGS84_CORRECT.geojson"
+}
+
+###############################################################################
+# VERIFICATION
+###############################################################################
+
+### 5. List All Zones (Verify Import Worked)
+GET http://localhost:5000/api/zones
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### 6. Get Zone by ID
+GET http://localhost:5000/api/zones/1
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### 7. Test Geofencing (Check if coordinates work)
+# Replace userId and coordinates with actual values
+POST http://localhost:5000/api/gis/validate-location
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "latitude": 31.897848,
+  "longitude": 35.209212,
+  "userId": 1,
+  "accuracy": 10.0
+}
+
+###############################################################################
+# EXPECTED RESPONSES
+###############################################################################
+
+# ✅ Success Response:
+# {
+#   "success": true,
+#   "message": "Blocks imported successfully"
+# }
+
+# ✅ Zones Response (sample):
+# {
+#   "success": true,
+#   "data": [
+#     {
+#       "id": 1,
+#       "zoneName": "(19) البصبوص",
+#       "zoneCode": "19",
+#       "centerLatitude": 31.897848,
+#       "centerLongitude": 35.209212,
+#       "district": "البيرة",
+#       "isActive": true
+#     }
+#   ]
+# }
+
+# ❌ Error Response (file not found):
+# {
+#   "success": false,
+#   "message": "GeoJSON file not found at: C:\\Users\\..."
+# }
+
+# ❌ Error Response (unauthorized):
+# {
+#   "type": "https://tools.ietf.org/html/rfc7235#section-3.1",
+#   "title": "Unauthorized",
+#   "status": 401
+# }
+
+###############################################################################
+# NOTES
+###############################################################################
+
+# 1. Update YOUR_TOKEN_HERE with actual token from login response
+# 2. Change file paths if GIS directory is in a different location
+# 3. Only Admin and Supervisor roles can import GIS data
+# 4. Importing the same file twice will UPDATE existing zones (no duplicates)
+# 5. Coordinates should be around 35.2°E, 31.9°N for Al-Bireh

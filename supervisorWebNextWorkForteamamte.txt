@@ -1,0 +1,845 @@
+===========================================
+SUPERVISOR WEB DASHBOARD - NEXT WORK FOR TEAMMATE
+===========================================
+
+This file tracks new features and updates needed for the Supervisor Web Dashboard.
+Update this file whenever backend adds features that need supervisor web UI.
+
+===========================================
+CURRENT PENDING WORK
+===========================================
+
+PRIORITY: All features below are HIGH PRIORITY for graduation project demo
+
+-------------------------------------------
+[NEW] 1. "MY WORKERS" PAGE
+-------------------------------------------
+Priority: HIGH - Teacher specifically mentioned this
+Status: Backend Complete ✅ - Web UI Needed
+
+WHAT IT DOES:
+Shows supervisor's assigned workers with their details, performance, and tasks.
+Allows supervisor to manage workers and reassign tasks between them.
+
+WHAT TO BUILD:
+--------------
+
+A. CREATE "MY WORKERS" PAGE
+
+Location: New page in Supervisor Dashboard
+
+Display List Showing:
+□ Worker cards (expandable/collapsible)
+□ Worker Name + Department + Zone
+□ Current Status (Active/Checked In or Offline)
+□ Current Tasks count (e.g., "3 active, 12 completed this week")
+□ When expanded, show:
+  - Worker's profile info (what supervisor should see)
+  - List of current tasks assigned to this worker
+  - Performance metrics (completion rate, avg time per task)
+  - Button: "View Full Profile"
+  - Button: "Reassign Task" for each task
+
+B. IMPLEMENT TASK REASSIGNMENT
+
+When Supervisor Clicks "Reassign Task":
+1. Show dialog with:
+   - Current task details
+   - Dropdown to select new worker (from supervisor's workers)
+   - Optional text field: "Reason for reassignment"
+   - Confirm/Cancel buttons
+
+2. On Confirm:
+   - Call API: PUT /api/tasks/{id}/reassign
+   - Request body:
+     {
+       "newAssignedToUserId": 123,
+       "reassignmentReason": "string (optional)"
+     }
+
+3. On Success:
+   - Show success message
+   - Refresh worker's task list
+
+C. BACKEND API (✅ Already Implemented!)
+
+1. ✅ GET /api/users/my-workers
+   - Returns list of workers assigned to current supervisor
+   - Response:
+     [
+       {
+         "userId": 1,
+         "fullName": "محمد أحمد",
+         "department": "النظافة",
+         "workerType": "Cleaner",
+         "isActive": true,
+         "lastCheckIn": "2026-01-19T08:00:00Z",
+         "activeTasksCount": 3,
+         "completedTasksThisWeek": 12,
+         "completionRate": 95.5,
+         "warningCount": 0,
+         "lastBatteryLevel": 85,
+         "isLowBattery": false
+       }
+     ]
+
+2. ✅ GET /api/users/{id}/profile
+   - Returns detailed worker profile
+   - Includes: personal info, assigned zones, current tasks, performance stats,
+     recent attendance (last 7 days), recent tasks (last 10)
+
+3. ✅ PUT /api/tasks/{id}/reassign
+   - Reassigns task to different worker
+   - Request body:
+     {
+       "newAssignedToUserId": 123,
+       "reassignmentReason": "optional"
+     }
+   - Sends notifications to both old and new workers
+
+D. UI/UX GUIDELINES
+
+Layout:
+- Use expandable cards (collapsed by default)
+- Show worker status with colored indicator (green=active, gray=offline)
+- Display task count prominently
+
+Arabic Text:
+- Page Title: "عمالي" or "العمال التابعين لي"
+- Status: "نشط" / "غير متصل"
+- Button: "إعادة تعيين المهمة"
+- Button: "عرض الملف الكامل"
+
+E. IMPORTANT NOTES
+
+1. **Filtering:**
+   - Must show only workers assigned to current supervisor
+   - Use SupervisorId relationship in User table
+
+2. **Real-time Status:**
+   - Worker is "active" if checked in today
+   - Consider showing last check-in time
+
+3. **Performance Metrics:**
+   - Calculate completion rate, avg time per task
+   - Can be computed on-demand or cached
+
+-------------------------------------------
+[NEW] 2. CREATE TASK WITH MAP (PIN SELECTION)
+-------------------------------------------
+Priority: HIGH - Teacher specifically mentioned this
+Status: Partially Done - Backend fields exist, Web UI Needed
+
+WHAT IT DOES:
+When creating a task, supervisor selects precise location by placing a pin on a map.
+This pin location will be used for GPS validation when worker completes the task.
+
+WHAT TO BUILD:
+--------------
+
+A. ENHANCE "CREATE TASK" PAGE
+
+Current State:
+✅ Form with title, description, due date
+✅ Zone selection dropdown
+❌ No map for precise location
+❌ No shared task support
+
+Add To Form:
+□ Interactive map (after zone selection)
+□ Map centers on selected zone
+□ Search box on map (e.g., "سوبر ماركت سالم")
+□ Click on map to place pin
+□ Display selected coordinates (latitude, longitude)
+□ Radio buttons: "فردية" (Individual) or "مشتركة" (Shared)
+□ If shared: Multi-select dropdown for workers
+
+B. MAP IMPLEMENTATION
+
+Use React Leaflet or similar library:
+
+1. When supervisor selects zone:
+   - Map centers on zone coordinates
+   - Zoom level: 15
+
+2. Search functionality:
+   - Use Nominatim API for geocoding
+   - Restrict search to selected zone bounds
+   - When result found, move map to that location
+
+3. Pin placement:
+   - Click anywhere on map to place pin
+   - Only one pin at a time (clicking again moves pin)
+   - Show pin marker clearly
+
+4. Coordinates display:
+   - Show latitude/longitude below map
+   - Format: "31.905, 35.215"
+
+C. BACKEND API UPDATES NEEDED
+
+1. Modify POST /api/tasks
+   - Already accepts latitude/longitude (✅ Backend fields exist)
+   - Add support for:
+     {
+       "title": "...",
+       "description": "...",
+       "assignedToUserId": 123,  // if individual
+       "assignedUserIds": [1, 2, 3],  // if shared (NEEDS IMPLEMENTATION)
+       "isShared": true/false,  // NEEDS IMPLEMENTATION
+       "latitude": 31.905,  // ✅ Already exists
+       "longitude": 35.215,  // ✅ Already exists
+       "zoneId": 1,
+       "dueDate": "..."
+     }
+
+2. For shared tasks:
+   - Need to support multiple workers on same task
+   - This is COMPLEX - may need new TaskAssignment table
+   - OPTIONAL for now, focus on individual tasks first
+
+D. UI/UX GUIDELINES
+
+Form Layout:
+1. Basic Info (title, description, priority)
+2. Zone Selection
+3. Map Section (appears after zone selected)
+   - Search box above map
+   - Interactive map (400px height)
+   - Coordinates display below map
+4. Assignment (individual/shared radio buttons)
+5. Due Date
+6. Submit button
+
+Arabic Text:
+- Section: "تحديد الموقع الدقيق"
+- Search: "ابحث عن موقع..."
+- Coordinates: "الإحداثيات"
+- Individual: "مهمة فردية"
+- Shared: "مهمة مشتركة"
+
+E. IMPORTANT NOTES
+
+1. **Zone First, Then Pin:**
+   - Zone narrows down the area
+   - Pin gives exact location within zone
+
+2. **Backend Fields Ready:**
+   - Task.Latitude and Task.Longitude already exist (✅)
+   - Just need to send from frontend
+
+3. **Shared Tasks (Optional):**
+   - Complex feature requiring database changes
+   - Can postpone if time limited
+   - Focus on individual tasks first
+
+-------------------------------------------
+[NEW] 3. TASK DETAILS PAGE ENHANCEMENT
+-------------------------------------------
+Priority: HIGH - Important for demo
+Status: Basic page exists - Needs enhancements
+
+WHAT IT DOES:
+When supervisor clicks on a task, show complete details including:
+- Map with pin showing exact location
+- Progress bar
+- Uploaded photos (if completed)
+- Distance from task location (if rejected)
+- Appeal status (if rejected)
+
+WHAT TO BUILD:
+--------------
+
+A. ENHANCE EXISTING TaskDetails.tsx
+
+Current State:
+✅ Basic task info displayed
+❌ No map
+❌ No progress display
+❌ No photos display
+❌ No location verification details
+
+Add to Page:
+□ Map showing task pin location (not editable, just display)
+□ Progress bar with percentage
+□ Photos section (shows photos if task completed)
+□ If task rejected:
+  - Show rejection reason
+  - Show distance from location
+  - Show appeal status
+  - Button to approve override (if auto-rejected)
+
+B. LAYOUT DESIGN
+
+┌─────────────────────────────────────┐
+│ ← Back  |  📋 Task Details          │
+├─────────────────────────────────────┤
+│ Title: تنظيف شارع السلام             │
+│ Description: ...                    │
+│                                     │
+│ 👤 Worker: محمد أحمد               │
+│ 📍 Zone: جبل الطويل                │
+│                                     │
+│ 🗺️ Precise Location:               │
+│ ┌─────────────────┐                 │
+│ │  [Map Display]  │                 │
+│ │      📍        │                 │
+│ └─────────────────┘                 │
+│                                     │
+│ ⏱️ Progress: 80%                    │
+│ ████████░░░░░░░                     │
+│                                     │
+│ 📅 Created: Jan 16                  │
+│ 📅 Due: Jan 17                      │
+│ 📊 Status: In Progress              │
+│                                     │
+│ 📷 Photos: (if completed)           │
+│ [Thumbnails clickable to enlarge]   │
+│                                     │
+│ [Edit Task] [Reassign] [Cancel]     │
+└─────────────────────────────────────┘
+
+C. BACKEND API (Already Exists)
+
+GET /api/tasks/{id}
+- Returns complete task details
+- Already includes:
+  ✅ Latitude/Longitude
+  ✅ ProgressPercentage
+  ✅ Photos array
+  ✅ Status
+  ✅ IsAutoRejected, RejectionReason
+
+No backend changes needed - just display the data!
+
+D. UI/UX GUIDELINES
+
+Map Display:
+- Read-only (supervisor can't move pin)
+- Center on task location
+- Zoom level: 16
+- Single marker at task location
+
+Progress Display:
+- Show percentage number
+- Visual progress bar
+- Use color: green if >70%, yellow if 30-70%, red if <30%
+
+Photos Display:
+- Grid layout (2-3 columns)
+- Thumbnails clickable to view full size
+- Show "No photos yet" if task not completed
+
+Arabic Text:
+- Section: "الموقع الدقيق"
+- Progress: "التقدم"
+- Photos: "الصور المرفقة"
+
+-------------------------------------------
+[NEW] 4. LOCATION HISTORY PAGE
+-------------------------------------------
+Priority: HIGH - Teacher specifically mentioned this for presentation
+Status: Backend exists - Web UI Needed
+
+WHAT IT DOES:
+Shows worker's movement history on a map as a polyline (path).
+Supervisor can select worker and date to see where they went during that day.
+Important for demos and presentations to committee!
+
+WHAT TO BUILD:
+--------------
+
+A. CREATE "LOCATION HISTORY" PAGE
+
+Location: New page in Supervisor Dashboard
+
+Display Components:
+□ Worker selection dropdown (supervisor's workers only)
+□ Date picker
+□ "Show" button
+□ Map showing:
+  - Polyline connecting location points
+  - Small markers at each point
+  - Different colors for different time periods (morning/afternoon/evening)
+□ Statistics section:
+  - Total distance traveled
+  - Active time
+  - Number of location points recorded
+
+B. MAP VISUALIZATION
+
+┌─────────────────────────────────────┐
+│ 📍 Location History                 │
+├─────────────────────────────────────┤
+│ Worker: [▼ محمد أحمد]              │
+│ Date: [📅 18/01/2026]               │
+│ [Show Button]                       │
+├─────────────────────────────────────┤
+│ 🗺️ Map:                             │
+│ ┌───────────────────────────────┐   │
+│ │                               │   │
+│ │    08:00 ●────●────●          │   │
+│ │          │    │    │          │   │
+│ │         09:00 │   10:00       │   │
+│ │              11:00            │   │
+│ │                               │   │
+│ │  Blue polyline shows path     │   │
+│ │  Small circles are GPS points │   │
+│ └───────────────────────────────┘   │
+│                                     │
+│ 📊 Statistics:                      │
+│ • Distance: 12.5 km                 │
+│ • Active Time: 7 hours              │
+│ • Points Recorded: 840              │
+└─────────────────────────────────────┘
+
+C. BACKEND API (Already Exists!)
+
+GET /api/tracking/history
+Query Parameters:
+  - userId (required)
+  - date (required) - format: YYYY-MM-DD
+
+Response:
+[
+  {
+    "latitude": 31.905,
+    "longitude": 35.215,
+    "recordedAt": "2026-01-18T08:00:00Z"
+  },
+  {
+    "latitude": 31.906,
+    "longitude": 35.216,
+    "recordedAt": "2026-01-18T08:00:30Z"
+  }
+  // ... every 30 seconds
+]
+
+✅ API already exists in TrackingController
+✅ LocationHistory table already stores data
+No backend changes needed!
+
+D. IMPLEMENTATION DETAILS
+
+Use React Leaflet:
+- Polyline component to connect points
+- CircleMarker for each location point
+- Different polyline colors for time of day:
+  - Morning (6am-12pm): Blue
+  - Afternoon (12pm-6pm): Orange
+  - Evening (6pm-12am): Purple
+
+Calculate statistics:
+- Distance: Sum of distances between consecutive points using Haversine formula
+- Active time: Time between first and last point
+- Points: Array length
+
+E. UI/UX GUIDELINES
+
+Worker Dropdown:
+- Shows only supervisor's workers
+- Sorted alphabetically
+
+Date Picker:
+- Default to today
+- Disable future dates
+- Show calendar widget
+
+Map:
+- Height: 500px
+- Zoom to fit all points (auto-bounds)
+- Make polyline thick (3-4px) and colored
+
+Arabic Text:
+- Page: "سجل المواقع" or "تتبع الحركة"
+- Worker: "العامل"
+- Date: "التاريخ"
+- Statistics: "الإحصائيات"
+- Distance: "المسافة المقطوعة"
+- Active Time: "الوقت النشط"
+
+F. IMPORTANT NOTES
+
+1. **For Committee Presentation:**
+   - This feature impresses evaluators!
+   - Shows technical sophistication
+   - Teacher mentioned this specifically
+
+2. **Data Already Stored:**
+   - GPS tracking runs every 30 seconds
+   - All data saved in LocationHistory table
+   - Just need to display it!
+
+3. **Performance:**
+   - One day typically = ~1000 points (if 8 hours × 120 points/hour)
+   - Should load fast enough
+   - If slow, add loading indicator
+
+-------------------------------------------
+[NEW] 5. PROGRESS BARS IN TASK LISTS
+-------------------------------------------
+Priority: MEDIUM - Visual enhancement
+Status: Backend field exists - Frontend display needed
+
+WHAT IT DOES:
+Shows progress bar for each task in task lists (dashboard and tasks page).
+Visual indicator of how much work is done on each task.
+
+WHAT TO BUILD:
+--------------
+
+A. ADD TO TASK CARDS/ROWS
+
+Current Display:
+✅ Task title
+✅ Worker name
+✅ Due date
+✅ Status badge
+❌ No progress indicator
+
+Add:
+□ Progress bar below task title
+□ Percentage text (e.g., "80%")
+□ Color coding:
+  - Green: >70%
+  - Yellow: 30-70%
+  - Red: <30%
+  - Gray: Not started (0%)
+
+B. VISUAL DESIGN
+
+Task Card Before:
+┌─────────────────────────────────┐
+│ 🔴 تنظيف شارع السلام            │
+│ Worker: محمد أحمد               │
+│ Due: Jan 17 (Delayed!)          │
+└─────────────────────────────────┘
+
+Task Card After:
+┌─────────────────────────────────┐
+│ 🔴 تنظيف شارع السلام            │
+│ Progress: ████████░░ 80%         │
+│ Worker: محمد أحمد               │
+│ Due: Jan 17 (Delayed!)          │
+└─────────────────────────────────┘
+
+C. IMPLEMENTATION
+
+Backend:
+✅ Task.ProgressPercentage field already exists
+No backend changes needed!
+
+Frontend:
+- Read progressPercentage from task object
+- Display using <progress> element or CSS bar
+- Show percentage text next to bar
+
+Example React Code:
+```tsx
+<div className="progress-bar">
+  <div
+    className="progress-fill"
+    style={{
+      width: `${task.progressPercentage}%`,
+      backgroundColor: getProgressColor(task.progressPercentage)
+    }}
+  />
+  <span>{task.progressPercentage}%</span>
+</div>
+```
+
+D. IMPORTANT NOTES
+
+1. **Simple Enhancement:**
+   - Backend ready
+   - Just display existing data
+
+2. **Where to Show:**
+   - Dashboard task list
+   - Main tasks page
+   - My Workers page (in worker's task list)
+
+-------------------------------------------
+[NEW] 6. APPROVE REJECTED TASKS FEATURE
+-------------------------------------------
+Priority: HIGH
+Status: Backend Complete - Web UI Needed
+Backend Endpoint: PUT /api/tasks/{id}/approve-override
+
+WHAT IT DOES:
+When workers complete tasks but have GPS problems (distance > 500m), tasks get
+auto-rejected after 2 failed attempts. This feature lets supervisors review the
+photo evidence and approve the task if the worker actually did the work.
+
+WHAT TO BUILD:
+--------------
+
+A. ADD "AUTO-REJECTED TASKS" SECTION TO DASHBOARD
+
+Location: Supervisor Dashboard / Rejected Tasks Tab
+
+Display List Showing:
+□ Task ID & Title
+□ Worker Name
+□ Rejection Date & Time
+□ Rejection Reason (with distance)
+□ Task Location (coordinates)
+□ Photo Evidence (thumbnail - clickable to view full size)
+□ Worker's Completion Notes
+□ Action Button: "Approve Override" (Arabic: "الموافقة على الإنجاز")
+
+Filter Options:
+□ Show only Auto-Rejected tasks (IsAutoRejected = true)
+□ Sort by rejection date (newest first)
+□ Search by worker name or task title
+
+B. IMPLEMENT "APPROVE OVERRIDE" FUNCTIONALITY
+
+When Supervisor Clicks "Approve Override":
+1. Show confirmation dialog with:
+   - Task details
+   - Photo preview
+   - Distance from location
+   - Optional text field: "Supervisor Notes" (ملاحظات المشرف)
+   - Confirm/Cancel buttons
+
+2. On Confirm:
+   - Call API: PUT /api/tasks/{id}/approve-override
+   - Request body (optional):
+     {
+       "supervisorNotes": "string (optional)"
+     }
+
+3. On Success:
+   - Show success message: "تمت الموافقة على المهمة"
+   - Remove task from rejected list
+   - Refresh dashboard
+
+4. On Error:
+   - Show error message from API
+
+C. API INTEGRATION DETAILS
+
+Endpoint: PUT /api/tasks/{id}/approve-override
+Authorization: Bearer Token (Supervisor or Admin role)
+Headers:
+  - Authorization: Bearer {token}
+  - Content-Type: application/json
+
+Request Body (optional):
+{
+  "supervisorNotes": "العامل أنجز المهمة فعلياً، المشكلة كانت في دقة GPS"
+}
+
+Success Response (200 OK):
+{
+  "success": true,
+  "data": {
+    // TaskResponse object (task now shows as Completed)
+  },
+  "message": "تمت الموافقة على المهمة. تم تقليل عدد التحذيرات للعامل."
+}
+
+Error Responses:
+- 404: Task not found
+- 400: Task is not rejected
+- 400: Task was manually rejected (use reset instead)
+- 401: Unauthorized
+
+D. UI/UX GUIDELINES
+
+Colors:
+- Use green/success color for approve button
+- Show photo in modal/lightbox when clicked
+- Highlight distance in red if > 500m
+
+Arabic Text:
+- Section Title: "المهام المرفوضة تلقائياً"
+- Button: "الموافقة على الإنجاز"
+- Confirmation: "هل أنت متأكد من الموافقة على هذه المهمة؟"
+- Success: "تمت الموافقة على المهمة بنجاح"
+- Notes Field: "ملاحظات المشرف (اختياري)"
+
+E. IMPORTANT NOTES
+
+1. **Only Auto-Rejected Tasks:**
+   - Filter: IsAutoRejected = true
+   - Manual rejections should use the existing "Reset" feature
+
+2. **Photo Evidence is Key:**
+   - Photos are now saved even on rejection (new backend fix)
+   - Make photo prominent in UI so supervisor can make informed decision
+
+3. **Fair Process:**
+   - This feature supports fairness to workers
+   - System rejects automatically, but supervisor is the final judge
+   - Emphasize in UI that this is for GPS issues, not cheating
+
+4. **Warning Count Reduction:**
+   - Backend automatically reduces worker's warning count when approved
+   - No need to show this explicitly, but good to know
+
+-------------------------------------------
+[NEW] 7. APPEALS MANAGEMENT (SUPERVISOR VIEW)
+-------------------------------------------
+Priority: MEDIUM
+Status: Backend Complete ✅ - Web UI Needed
+
+WHAT IT DOES:
+Workers can submit appeals against auto-rejected tasks. Supervisors can
+review these appeals and approve/reject them.
+
+WHAT TO BUILD:
+--------------
+
+A. CREATE "APPEALS" SECTION/PAGE
+
+Location: Supervisor Dashboard or separate page
+
+Display List Showing:
+□ Appeal ID
+□ Worker Name
+□ Task Title
+□ Appeal Date
+□ Worker's Explanation
+□ Evidence Photo (if provided)
+□ Status (Pending/Approved/Rejected)
+□ Action Buttons: "Approve" / "Reject"
+
+B. BACKEND API (✅ Already Implemented!)
+
+1. ✅ GET /api/appeals/pending
+   - Returns list of pending appeals for supervisor's workers
+   - Response includes: appealId, workerName, taskTitle, explanation, evidencePhotoUrl
+
+2. ✅ POST /api/appeals/{id}/review
+   - Approve or reject an appeal
+   - Request body:
+     {
+       "approved": true/false,
+       "reviewNotes": "optional notes"
+     }
+
+C. UI/UX GUIDELINES
+
+Arabic Text:
+- Page Title: "الطعون" or "طلبات المراجعة"
+- Approve: "قبول الطعن"
+- Reject: "رفض الطعن"
+- Notes: "ملاحظات المراجعة"
+
+-------------------------------------------
+FUTURE ENHANCEMENTS (Lower Priority - Can Postpone)
+-------------------------------------------
+
+□ APPROVE REJECTED TASKS - Additional Features:
+  - Statistics: Show count of auto-rejected tasks awaiting review
+  - Batch Operations: Approve multiple tasks at once
+  - Notifications: Notify supervisor when task gets auto-rejected
+
+□ SHARED TASKS:
+  - Support multiple workers on same task
+  - Requires database changes (TaskAssignment table)
+  - Complex feature - postpone if time limited
+
+□ ROUTINE TASKS SYSTEM:
+  - Create task templates
+  - Auto-assign daily/weekly tasks
+  - Requires backend cron job
+  - Lower priority for graduation demo
+
+□ BATTERY ALERTS PAGE:
+  - Display low battery alerts from workers
+  - Backend endpoint exists: POST /api/users/battery-report ✅
+  - Shows workers with battery < 20%
+  - Can add to My Workers page or separate section
+
+===========================================
+COMPLETED WORK
+===========================================
+
+When features are completed, move them here with completion date.
+
+Example:
+[✅ DONE - Jan 19, 2026] Feature Name
+- Brief description of what was implemented
+- Link to PR or commit if applicable
+
+-------------------------------------------
+[✅ PARTIAL] Basic Supervisor Pages
+-------------------------------------------
+Date: Already exists
+
+Completed:
+✅ Dashboard.tsx - Basic overview stats
+✅ Tasks.tsx - Task list (no progress bars yet)
+✅ TaskDetails.tsx - Basic details with approve/reject
+✅ CreateTask.tsx - Form works (no map yet)
+✅ Issues.tsx - Full functionality
+✅ IssueDetails.tsx - Convert to task works
+
+Still Needed:
+❌ My Workers page
+❌ Location History page
+❌ Map in CreateTask
+❌ Progress bars in task lists
+❌ Photos display in TaskDetails
+
+===========================================
+HOW TO UPDATE THIS FILE
+===========================================
+
+When backend adds new features for supervisor web:
+1. Add new section under "CURRENT PENDING WORK"
+2. Include: Description, API endpoints, UI requirements
+3. When teammate completes it, move to "COMPLETED WORK" section
+
+===========================================
+QUESTIONS?
+===========================================
+
+If anything is unclear about the requirements or API:
+- Check teacher's requirements: ملاحظات مراد.md
+- Check implementation assessment: IMPLEMENTATION_ASSESSMENT.md
+- Check requirements checklist: REQUIREMENTS_CHECKLIST.md
+- Check backend documentation: TWO_ATTEMPT_SYSTEM.md
+- Check backend code: backend/FollowUp.API/Controllers/
+- Ask for clarification!
+
+===========================================
+SUMMARY - WHAT NEEDS TO BE BUILT
+===========================================
+
+BACKEND APIS STATUS:
+1. ✅ GET /api/users/my-workers (for My Workers page) - DONE!
+2. ✅ GET /api/users/{id}/profile (for worker details) - DONE!
+3. ✅ PUT /api/tasks/{id}/reassign (for task reassignment) - DONE!
+4. ✅ PUT /api/tasks/{id}/approve-override - DONE!
+5. ✅ GET /api/tracking/history - DONE!
+6. ✅ GET /api/appeals/pending - DONE!
+7. ✅ POST /api/appeals/{id}/review - DONE!
+8. ✅ POST /api/users/battery-report - DONE!
+
+ALL BACKEND APIs ARE READY! Just need frontend implementation.
+
+FRONTEND PAGES NEEDED:
+1. My Workers Page (NEW - most important!)
+2. Location History Page (NEW - impressive for demo!)
+3. Enhance: Create Task page (add map with pin selection)
+4. Enhance: Task Details page (add map, progress, photos display)
+5. Enhance: Task Lists (add progress bars)
+6. Enhance: Dashboard (add auto-rejected tasks section)
+7. Appeals Management (NEW or integrate with dashboard)
+
+PRIORITY ORDER FOR IMPLEMENTATION:
+1. My Workers Page (HIGH - teacher mentioned specifically)
+2. Create Task with Map (HIGH - needed for GPS validation)
+3. Task Details Enhancement (HIGH - for demo)
+4. Location History Page (HIGH - impressive for committee)
+5. Progress Bars (MEDIUM - visual enhancement)
+6. Approve Override UI (MEDIUM - backend ready)
+7. Appeals Management (MEDIUM - backend ready)
+
+===========================================
+LAST UPDATED: 2026-01-20
+===========================================

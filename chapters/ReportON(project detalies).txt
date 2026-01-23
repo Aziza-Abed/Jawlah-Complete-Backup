@@ -1,0 +1,1726 @@
+
+
+Faculty of Information Technology
+
+Department of Computer Science
+COMP4300  -Graduation Project
+
+FollowUp
+Smart Field Management System
+A Case Study from Al-Bireh Municipality
+
+Authors
+Munawwar Qamar ID: 1211959
+Aziza Abed ID: 1211577
+Fatema IreqatID: 1212950
+
+Supervisor: Dr. Murad Njoum
+
+Jan 2026
+
+
+
+
+
+
+
+
+
+
+Abstract
+
+This report presents FollowUp, a smart mobile-based field management system developed for Al-Bireh Municipality. The system aims to improve the monitoring and management of municipal field workers such as sanitation staff, inspectors, and maintenance teams.
+Traditionally, field worker supervision in municipalities relies on manual attendance records, verbal task assignment, and paper-based reporting. These methods are often inefficient, time-consuming, and prone to errors, especially when managing a distributed workforce operating across different geographic zones.
+FollowUp provides a digital solution that integrates GPS tracking, geofencing, task management, and field issue reporting within a single mobile application. Attendance is automatically recorded when workers enter or exit predefined work zones, while supervisors are able to assign tasks, monitor progress, and receive completion evidence through photos and location data. The system also supports offline operation, allowing workers to continue using the application in areas with limited internet connectivity and synchronizing data automatically once a connection becomes available.
+The system is implemented using a mobile application supported by backend services and is integrated with the municipality s Geographic Information System (GIS) to define and validate official work zones. An Arabic-first user interface with right-to-left support is provided to ensure usability for non-technical users.
+The proposed system enhances transparency, accountability, and operational efficiency in municipal field operations. It also provides a scalable foundation for future enhancements such as advanced reporting, dashboard analytics, and integration with additional municipal systems.
+
+
+
+
+
+
+
+
+
+Acknowledgements
+
+We would like to express our sincere gratitude to everyone who supported us throughout the journey of this project. 
+We extend special thanks to Al-Bireh Municipality, represented by Ms. Fidaa Mousa, for her generous collaboration and for providing valuable data and practical insights that served as the foundation for our system design. Her responsiveness and facilitation of communication with the administrative and technical staff were essential in aligning real-world needs with digital solutions. 
+We are deeply thankful to our academic supervisor, Dr. Murad Njoum, whose guid ance and constructive feedback helped shape the technical vision of the system and kept our efforts on track throughout the semester. 
+We also wish to acknowledge the faculty of the Faculty of Information Technology at Birzeit University for their continuous support and academic direction. In particular, we thank Dr. Ruba, the senior project coordinator, for her organizational follow-up and valuable input, which contributed significantly to the structure and progress of our work. 
+We highly appreciate the evaluation committee for their time, attention, and scientific insight in reviewing and assessing our work. We look forward to their valuable feedback during the final presentation. 
+This project was proudly conducted under the  Build Your Country  initiative, launched by Birzeit University in collaboration with various municipalities and supervised by Eng. Younes Hammoudeh. The initiative encouraged students to contribute innovative digital solutions that support municipal development and strengthen community services. Being part of this initiative gave our work a deeper social and national dimension, reinforcing our commitment to using technology for the public good. 
+The spirit of collaboration and mutual trust was at the heart of this project. Our team functioned as a cohesive unit, and we are genuinely proud of the harmony and friendship that carried us through this semester. Each member contributed a unique touch whether in technical analysis, documentation, or coordination which gave the project depth and diversity. We recognize and deeply value each other s dedication, effort, and professionalism.
+ We are equally grateful to our families and friends, whose emotional support and quiet encouragement provided the stability and motivation we needed throughout the project. Their presence was a source of balance and strength during times of stress, and we pray for their continued well-being and support. 
+Lastly, while we were engaged in this academic endeavor, we remained aware of the tragic circumstances affecting our homeland. The ongoing aggression against our people in Gaza left a profound mark on our hearts. We raise our hands in prayer, asking for justice, peace, and freedom for all Palestinians. 
+We thank God for giving us the strength and ability to complete this work, and we hope it will serve as a meaningful step toward improving our communities and inspiring future efforts.
+
+
+
+Table of Contents
+Chapter 1: Introduction	4
+1.1 General Overview	4
+1.2 Motivation	4
+1.3 Method	4
+1.4 Aim and Objectives	5
+1.4.2 Objectives	5
+1.5 Overview of the Technical Area	5
+1.6 Overview of the Report	6
+Chapter 2:  Background	7
+2.1 Details of Relevant Theory	7
+2.1.2 Mobile-Based Systems	7
+2.1.3 Geographic Information Systems (GIS)	7
+2.1.4 Role-Based Access Control (RBAC)	8
+2.1.5 Offline-First Architecture and Synchronization	8
+2.2 Review of Past and Existing Systems	8
+2.2.1	Workyard	8
+2.2.2	Timesheet Mobile	9
+2.2.3	Hellotracks	9
+2.2.4	Connecteam	10
+2.2.5	QuickBooks Time	10
+2.2.6	Where s My Staff	11
+2.2.7	Hubstaff	12
+2.3 Tools and Technologies	13
+2.3.1 Mobile Application Framework - Flutter	13
+2.3.2 Backend and API Layer - ASP.NET Core 9	13
+2.3.3 Database Layer - SQL Server	13
+2.3.4 Location and Geofencing	13
+2.3.5 Offline Functionality and Synchronization	14
+2.3.6 GIS-Based Work Zone Integration	14
+2.3.7 Web Dashboard Interface   React	14
+2.3.8 Prototyping and UI Design   Figma	14
+2.3.9 Project Coordination and Version Control	14
+3.1 System Model and Architecture	15
+3.1.1 Product Description	15
+3.1.2 System Objectives	15
+3.1.3 System Main Features	16
+3.1.4 Operating Environments	16
+3.1.5 Constraints	17
+3.1.6 Functional Requirements	17
+User Requirements	17
+System Requirements	18
+3.1.7 Non-Functional Requirements	30
+6.1 Project Summary	91
+6.2 Achievements	91
+7.3 Limitations	92
+7.4 Future Work	92
+7.5 Final Remarks	93
+Bibliography	94
+Appendices	98
+A.1 Use Case Specifications	98
+Appendix B: Additional Screenshotssss	117
+Appendix C: Similarity Report	117
+
+
+Chapter 1: Introduction
+
+1.1 General Overview
+The project introduces a smart, mobile-based system designed to digitally monitor and manage field workers for Al-Bireh Municipality. The municipality s daily operations, such as sanitation, inspection, and emergency response, depend on a distributed workforce performing tasks across various zones. However, traditional supervision methods, including manual attendance and paper-based reporting, lack efficiency and transparency.
+This system offers a modern solution by using mobile and GPS technologies to automate attendance, track worker locations, manage task workflows, and report field issues. It supports Arabic language interfaces and offline mode to meet the needs of all users, including non-technical field workers. The system also integrates with existing GIS data provided by the municipality in the form of shapefiles to define geofenced work zones.
+By improving visibility into field operations, this solution enables better planning, accountability, and resource allocation, forming a practical step toward digital transformation in public service delivery.
+
+1.2 Motivation
+Municipalities rely heavily on field workers to perform essential tasks such as cleaning public areas, enforcing regulations, and responding to emergencies. Despite the importance of these roles, many municipalities, including Al-Bireh, still use outdated methods to supervise and track field operations. These methods include physical attendance logs, verbal task delegation, and delayed paper-based reporting, which are prone to errors, inefficiencies, and manipulation.
+This lack of digital oversight creates significant challenges in workforce accountability, operational planning, and service quality. Supervisors often struggle to confirm worker presence, verify task completion, or identify issues encountered in the field. Employees are also required to visit the municipality headquarters to record attendance, resulting in wasted time and resources.
+The motivation for this project arises from the need to modernize and streamline these daily operations. By introducing a mobile and web-based system that automates attendance, tracks tasks, and integrates GIS data provided by the municipality as shapefiles, the project delivers a reliable, scalable, and user-friendly solution. The system reduces administrative workload, improves transparency, and supports informed decision-making, ultimately enhancing municipal service delivery and worker accountability.
+
+1.3 Method
+To achieve the objectives of this project, a structured and research-driven approach was adopted, beginning with identifying real challenges faced by Al-Bireh Municipality in managing its field workforce. This was accomplished through direct discussions with municipal staff and an analysis of their current operational practices, including manual attendance tracking, verbal task assignments, and delayed reporting.
+After clearly defining the problem, related systems and existing solutions were reviewed to identify 
+best practices and limitations. Based on these findings, a system design was proposed that addresses the municipality s specific needs. The design emphasizes usability, Arabic language support, offline functionality, and seamless integration with GIS data provided by the municipality as shapefiles.
+The development phase followed an agile methodology. Core components such as attendance tracking, task workflows, GPS monitoring, and issue reporting were implemented and tested in iterative cycles. The system integrates a mobile application developed using Flutter, a backend implemented using ASP.NET Core 9 with a SQL Server database, and a web dashboard built with React for supervisory functions.
+This method ensures that the solution is based on real operational needs, technically feasible, and flexible enough to support future enhancements.
+
+1.4 Aim and Objectives
+1.4.1 Aim 
+To design and develop a mobile-first intelligent system that enables Al-Bireh Municipality to digitally monitor and manage its field workforce through automated attendance logging, GPS-based tracking, task assignment, incident reporting, and performance analysis. The system is delivered through an Arabic-first interface with full offline capability.
+1.4.2 Objectives
+* Automate worker attendance using GPS-based geofencing and track real-time movement within assigned work zones.
+* Enable supervisors to assign and monitor tasks and receive completion proof through text or photo evidence.
+* Allow workers to report field issues using GPS-tagged photos and predefined issue types.
+* Integrate GIS data provided by the municipality as shapefiles to define, manage, and validate work zones.
+* Ensure system reliability through offline functionality, secure data storage, authenticated access, and a simple Arabic interface to support non-technical users.
+* Provide supervisors with basic monitoring and reporting capabilities to review attendance records, task status, and field activities through a centralized dashboard.
+
+1.5 Overview of the Technical Area
+The technical scope of this project spans several key areas in mobile computing, location-based services, and cloud-connected data management. At its core, the system is implemented using a cross-platform mobile framework, Flutter, to ensure compatibility with a wide range of Android and iOS devices used by field employees.
+A central component of the system is GPS tracking and geofencing, which enable automated attendance logging and route monitoring. These technologies allow the system to detect when a worker enters or exits a designated work zone and to validate movement within official municipal boundaries.
+Task assignment, incident reporting, and performance tracking are managed through a unified backend implemented using ASP.NET Core 9 with a SQL Server database. This backend provides authentication, data storage, and secure communication between mobile and web users. Offline functionality is supported through local data persistence using Hive, ensuring uninterrupted operation in areas with limited connectivity.
+Additionally, the system integrates GIS data provided by the municipality in the form of shapefiles to define and update operational zones. Other technical aspects include an Arabic-first user interface, role-based access control, encrypted data handling, and synchronized data exchange once connectivity is restored.
+Together, these technologies create a scalable and user-friendly platform for digitally managing field operations in the public sector.
+
+1.6 Overview of the Report
+This report is organized into several chapters, each focusing on a specific aspect of the project. Chapter 1 introduces the project by presenting a general overview, the motivation behind the work, the adopted methodology, and the system s aims and objectives.
+Chapter 2 provides the background and theoretical context, including a review of related work and technologies that inspired the system s design. It also outlines the tools and platforms used in the implementation.
+Chapter 3 covers the system analysis and design in detail. It describes the system architecture, functional and non-functional requirements, use case scenarios, diagrams, and the overall data model.
+Chapter 4 presents the system implementation, while Chapter 5 discusses testing and validation activities. Chapter 6 provides evaluation and discussion of the results, and Chapter 7 concludes the project and outlines future work.
+The appendices include detailed use case specifications, a glossary of key terms, and other supporting materials. This structured layout aims to present both the theoretical foundation and the practical implementation of the system in a coherent and comprehensive manner.
+
+
+
+
+
+
+
+
+
+
+
+
+
+Chapter 2:  Background
+
+This chapter provides the foundational knowledge necessary to understand the design choices and implementation of the FollowUp field worker management system. It is divided into three main sections:
+* The first section presents the relevant theoretical and technical concepts that the system is built upon, such as GPS, GIS, role-based access control, and offline-first architecture.
+* The second section reviews existing commercial systems, analyzing their strengths, limitations, and relevance to municipal field operations. 
+* The final section describes the tools and technologies used in the implementation of the system, along with justification for each choice based on performance, scalability, and localization requirements.
+Together, these sections form the conceptual and technical basis for the system s architecture and implemented features.
+
+2.1 Details of Relevant Theory
+ 2.1.1 GPS and Geofencing
+Global Positioning System (GPS) is a satellite-based navigation technology that enables the system to determine the real-time geographic location of a user. Geofencing builds upon GPS by defining virtual boundaries around physical areas. When a user enters or exits a defined geofence, the system can automatically trigger context-aware actions such as attendance logging or movement alerts.
+These mechanisms are widely used in employee monitoring systems to reduce manual reporting and improve accuracy [1]. Research also supports combining GPS and geofencing for workforce tracking, showing strong results in terms of precision, automation, and scalability [2].
+In the implemented system, GPS and geofencing are used to validate worker presence within official municipal work zones during attendance and task execution.
+2.1.2 Mobile-Based Systems
+Mobile-based systems allow users to access services anytime and anywhere using portable devices such as smartphones and tablets. These systems are particularly valuable for field workers who require lightweight and easy-to-use tools for task management and reporting.
+The adoption of cross-platform frameworks such as Flutter has significantly improved the efficiency of developing mobile applications that run on both Android and iOS devices, which is suitable for diverse field environments.
+2.1.3 Geographic Information Systems (GIS)
+Geographic Information Systems (GIS) enable the management, analysis, and visualization of spatial data. In municipal environments, GIS plays a key role in defining operational zones and supporting location-based decision-making.
+In this project, GIS is used to define municipal work zones and support location-aware validation for attendance and task tracking. The GIS data is provided by Al-Bireh Municipality in the form of shapefiles rather than APIs, ensuring accurate representation of real municipal boundaries.
+
+
+
+2.1.4 Role-Based Access Control (RBAC)
+Role-Based Access Control (RBAC) is a security approach in which system access is granted based on the user s assigned role, such as worker, supervisor, or administrator. RBAC ensures that users can only access data and functionalities relevant to their responsibilities.
+This approach improves data security and prevents unauthorized access to sensitive municipal information.
+2.1.5 Offline-First Architecture and Synchronization
+Due to weak internet connectivity in some field areas, adopting an offline-first architecture is essential. This design allows users to continue performing core operations such as attendance logging, task updates, and issue reporting even when temporarily disconnected from the network.
+In the implemented system, data is stored locally using Hive and automatically synchronized with the central SQL Server database once connectivity is restored. The synchronization mechanism preserves the original event timestamps, ensuring that recorded data reflects the actual work time rather than the upload time.
+Recent studies identify offline-first architectures as a fault-tolerant design pattern for mobile and field-based systems deployed in unreliable network environments [3].
+
+2.2 Review of Past and Existing Systems
+Several commercial systems provide partial solutions for tracking field workers, managing tasks, and generating reports. This section reviews selected systems and evaluates their suitability for municipal field operations.
+2.2.1	Workyard
+Workyard is a GPS-enabled employee time clock app tailored primarily to the construc- tion and field service industries. It excels in providing precise GPS tracking, real-time visibility of employee locations, automatic trip detection, and geofence-based reminders.
+Its powerful reporting includes entry/exit times and mileage for each employee. However, Workyard lacks Arabic language support, is not designed for public sector workflows, and offers no offline functionality, which limits its applicability in infrastructure-limited mu- nicipalities [4] .
+
+ 	 	 	 
+(a)	Clock-in and time summary
+(b)	Checklist	with photo log
+(c)	Time card details and breaks
+(d)	GPS route track- ing
+Figure 2.1: Screenshots from Workyard app illustrating core functionalities
+2.2.2	Timesheet Mobile
+Timesheet Mobile provides a geofencing-enabled time tracking solution that is ideal for automating clock-in/out based on employee location. It integrates well with payroll plat- forms and features an admin dashboard for real-time location views. Other capabilities include employee scheduling, timesheet editing, and project checklists. However, it lacks Arabic support, does not function offline, and was developed for corporate/enterprise environments rather than municipalities[5].
+
+(a)	Checklist at end of shift
+(b)	Schedule punch reminder
+(c)	Geofence-based punch-in screen
+(d)	Web dashboard with location map
+Figure 2.2: Screenshots from Timesheet Mobile illustrating time tracking, scheduling, and location monitoring
+
+2.2.3	Hellotracks
+Hellotracks delivers real-time location tracking, automatic check-in/out with geofenc- ing, route optimization, and job scheduling. Its strong mobile interface makes it ideal for dispatch-based field teams. Nonetheless, Hellotracks lacks Arabic support, offline functionality, and GIS integration, making it less adaptable to public sector teams in Arabic-speaking regions [6].
+
+(a)	All-in-one track- ing map
+(b)	Live location and job dispatch
+(c)	Optimized daily route planning
+(d)	Real-time team lo- cation tracking
+Figure 2.3: Screenshots from Hellotracks illustrating team tracking, job routing, and dispatch automation
+
+2.2.4	Connecteam
+Connecteam is a feature-rich platform for mobile team management. It offers GPS-based time clocks, employee scheduling, communication tools, task checklists, and even em- ployee training and internal help desk features. Despite its capabilities, it lacks Arabic localization, GIS-based zone tracking, and is mainly designed for businesses and fran- chises, not municipalities [7].
+	
+Figure 2.4: Screenshots from Connecteam app showcasing daily checklists, task manage- ment, time tracking, scheduling, and internal communication
+
+2.2.5	QuickBooks Time
+QuickBooks Time (formerly TSheets) integrates with payroll and accounting systems and supports GPS-based time tracking. It offers offline time capture, project-based time
+cards, and geofencing notifications. However, it lacks Arabic language support, task as- signment features, and GIS integration, which limits its use in Arabic-speaking municipal environments [8].
+
+ 	 	 	 
+(a)	Daily job schedule view
+(b)	Project tracking overview
+(c)	Map-based team location
+(d)	Clock-in with task and note
+Figure 2.5: Screenshots from QuickBooks Time showing scheduling, project management, and GPS-based time tracking
+
+2.2.6	Where s My Staff
+Where s My Staff is a dual NFC and GPS-based attendance tracking application. It offers Arabic language support and works in offline mode, making it highly accessible in Arabic-speaking regions. It replaces traditional punch-in systems using low-cost NFC tags and stores attendance logs in the cloud. While privacy controls are strong, the system lacks route tracking, task assignment, and GIS-based zone analysis, which are essential for comprehensive municipal field operations [9].
+
+Figure 2.6: Screenshot from Where s My Staff dashboard showing GPS tracking, NFC check-ins, and attendance analytics
+
+2.2.7	Hubstaff
+Hubstaff is a workforce management tool built primarily for digital and remote teams. It features location-aware time tracking, project/task assignment, real-time maps, and productivity analytics. However, it does not support Arabic, lacks offline functionality, and was not designed with field operations in mind, making it less suitable for municipal use cases [10].
+
+   
+ 	 	 	 
+ 
+(a)	Time tracking in- terface
+(b)	Route tracking on map
+(c)	Team productivity dashboard
+(d)	Shift and time-off calendar
+Figure 2.7: Screenshots from Hubstaff app demonstrating time tracking, GPS monitoring, and team analytics
+
+This comparative analysis highlights that while many tools provide partial solutions, none of them meet the linguistic, operational, and technical requirements of Al-Bireh Municipality in a holistic manner.
+In contrast, the proposed system integrates Arabic support, offline functionality, GIS-based validation, and task management within a single unified platform.
+
+Table 2.1: Comparison of Existing Systems
+System
+Attendance
+GPS
+Tasks
+Arabic
+Offline
+GIS
+Similarity
+Workyard
+Yes
+Yes
+No
+No
+No
+No
+90%
+Timesheet Mobile
+Yes
+Yes
+No
+No
+No
+No
+85%
+Hellotracks
+Yes
+Yes
+Yes
+No
+No
+No
+80%
+Connecteam
+Yes
+Yes
+Yes
+No
+No
+No
+75%
+QuickBooks Time
+Yes
+Yes
+No
+No
+Yes
+No
+65%
+Where s My Staff
+Yes
+Yes
+No
+Yes
+Yes
+No
+50%
+Hubstaff
+Yes
+Yes
+No
+No
+No
+No
+25%
+Proposed System
+Yes
+Yes
+Yes
+Yes
+Yes
+Yes
+100%
+
+
+
+2.3 Tools and Technologies
+The FollowUp system follows a mobile-first, client server architecture designed specifically for municipal field operations. This section presents the technologies used in the actual implementation of the system.
+ 2.3.1 Mobile Application Framework - Flutter
+The mobile application is developed using Flutter, a cross-platform UI framework that enables development from a single codebase [11]. Flutter supports Android and iOS natively and performs efficiently on low-end devices, making it suitable for public-sector field workers.
+Flutter also supports right-to-left (RTL) text rendering and Material Design, simplifying Arabic localization. In this system, Flutter is used to implement attendance logging, task updates, and issue reporting with offline support through local storage.
+2.3.2 Backend and API Layer - ASP.NET Core 9
+The backend is implemented using ASP.NET Core 9, a high-performance framework for building secure APIs and web applications. It provides features such as asynchronous processing, authentication mechanisms, and efficient integration with SQL Server databases.
+The backend handles user authentication, authorization, data processing, and synchronization between the mobile application and the web dashboard. This architecture replaces Firebase with a self-hosted and controlled backend environment suitable for municipal deployment.
+2.3.3 Database Layer - SQL Server
+Microsoft SQL Server is used as the primary database for persistent data storage. It ensures data consistency, relational integrity, and ACID compliance, which are essential for government systems.
+SQL Server stores structured data such as users, departments, tasks, attendance logs, and reports. Integration with Entity Framework Core enables secure and efficient data access.
+2.3.4 Location and Geofencing
+The system uses device-native GPS sensors combined with Flutter location packages to track worker location and detect entry or exit from predefined work zones. This enables automated attendance logging and location validation without manual user input.
+
+
+
+
+2.3.5 Offline Functionality and Synchronization
+Offline functionality is implemented using Hive, a lightweight NoSQL database optimized for Flutter. All attendance records, task updates, and issue reports are stored locally and synchronized with the backend once connectivity is restored.
+The synchronization logic ensures that original timestamps are preserved, maintaining accurate historical records.
+2.3.6 GIS-Based Work Zone Integration
+The system integrates GIS data provided by Al-Bireh Municipality in the form of shapefiles. These files define operational boundaries and enable zone-based validation for attendance and task execution.
+2.3.7 Web Dashboard Interface   React
+A web dashboard for supervisors and administrators is implemented using React. The dashboard provides tools for task management, monitoring, reporting, and visualization of GIS-based data.
+2.3.8 Prototyping and UI Design   Figma
+User interfaces and workflows were prototyped using Figma before development. This enabled early validation of Arabic layouts, usability, and feature flow prior to implementation.
+2.3.9 Project Coordination and Version Control
+Project coordination was managed using Notion for documentation, Discord and WhatsApp for communication, and GitHub for version control. GitHub ensures traceability, collaboration, and integrity of the project source code.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Chapter 3:  
+System Analysis and Design
+This chapter presents the analysis and design of the proposed mobile-based system for tracking and managing field workers in Al-Bireh Municipality. It describes the system from a technical perspective, including its objectives, main features, operating environment, and constraints. In addition, the chapter defines the functional and non-functional requirements that govern system behavior and performance. These elements collectively form the foundation for the system s implementation and evaluation in later chapters.
+
+3.1 System Model and Architecture
+3.1.1 Product Description
+The proposed system is a mobile-first digital platform designed to improve the monitoring and management of field workers operating under Al-Bireh Municipality. The system consists of three main components:
+1. A mobile application developed using Flutter for field workers
+2. A web-based dashboard developed using React for supervisors and administrators
+3. A backend system built using ASP.NET Core 9 with a SQL Server database, integrated with municipal GIS data
+Field workers use the mobile application to automatically record attendance through GPS-based geofencing, receive and manage assigned tasks, and submit field issue reports with location-tagged photos. Supervisors use the web dashboard to monitor worker locations in real time, assign tasks, review attendance records, and analyze performance reports.
+The system is designed to operate effectively in Arabic-speaking environments and in areas with limited internet connectivity. It supports offline data storage using Hive on the mobile device and automatically synchronizes data with the backend once connectivity is restored. Role-based access control is enforced across the system to ensure data security and operational integrity.
+Overall, the system aims to modernize municipal field operations, reduce administrative delays, and support data-driven decision-making.
+
+3.1.2 System Objectives
+The main objective of the system is to provide an intelligent digital solution for supervising and managing municipal field workers. The specific objectives are:
+* Automate attendance logging using GPS-based geofencing to reduce manual input and errors
+* Enable real-time location tracking of field workers during working hours
+* Allow supervisors to assign tasks to individual workers or teams and monitor task progress
+* Support submission of task completion evidence such as photos and notes
+* Enable field workers to report issues with GPS-tagged information
+* Provide reliable offline functionality with automatic data synchronization
+* Integrate with municipal GIS shapefiles to define and validate work zones
+* Support an Arabic-first user interface suitable for non-technical users
+* Enforce role-based access control for workers, supervisors, and administrators
+* Apply basic security practices such as authenticated access and encrypted communication
+
+3.1.3 System Main Features
+* User Authentication and Account Management:
+Users log in using secure credentials. Role-based access control ensures that workers, supervisors, and administrators access only relevant features. Account creation and role assignment are managed through the backend.
+* Geofencing-Based Attendance:
+Attendance is automatically recorded when workers enter or exit predefined work zones using GPS and GIS shapefile validation.
+* Real-Time GPS Tracking:
+Supervisors can view the real-time location of active field workers on a live map through the web dashboard.
+* Task Assignment and Status Tracking:
+Supervisors assign tasks with location, priority, and deadlines. Workers update task status and submit completion evidence.
+* Field Issue Reporting:
+Workers report issues encountered in the field using photos, descriptions, timestamps, and GPS location.
+* Offline Functionality and Auto-Synchronization:
+Attendance, tasks, and reports can be recorded offline and are synchronized automatically when connectivity is restored.
+* Arabic Interface with RTL Support:
+The system supports a fully Arabic interface with right-to-left layout and simplified navigation.
+* Push Notifications:
+Workers receive notifications for new tasks, updates, and supervisor messages.
+* Supervisor Dashboard:
+A centralized web dashboard provides attendance history, task status, location tracking, and reporting tools.
+* GIS Integration:
+Work zones are defined using municipal shapefiles, ensuring accurate zone-based validation.
+
+3.1.4 Operating Environments
+The system operates in the following environments:
+* Mobile Devices:
+Android and iOS smartphones with GPS capability, optimized for mid-range devices.
+* Development Framework:
+Flutter is used for cross-platform mobile development.
+* Backend Environment:
+ASP.NET Core 9 with SQL Server provides secure and scalable data handling through REST APIs.
+* Supervisor Interface:
+A React-based web dashboard accessed via modern web browsers.
+* Network Conditions:
+Designed for intermittent connectivity with offline-first support.
+
+3.1.5 Constraints
+The system design considers the following constraints:
+* Limited or unstable internet connectivity in some field areas
+* GPS accuracy variations in dense urban environments
+* Limited technical skills of some field workers
+* Hardware limitations of mid-range mobile devices
+* Battery and data consumption constraints
+* Privacy and data protection requirements imposed by municipal regulations
+
+3.1.6 Functional Requirements
+The functional requirements listed below define the specific behaviors and capabilities of the proposed system from a technical perspective. These requirements have been derived through an iterative process involving system analysis, stakeholder input (including field workers and supervisors), and prototype feedback.
+Given the nature of the system and its deployment in a public-sector environment, an incremental development model was adopted. This model supports progressive en- hancement of features, allowing early validation and refinement of core functionalities. Each functional requirement is specified in a clear and testable format to ensure accurate implementation and verification.
+
+User Requirements
+     UR0: New users shall be able to register an account with role-based approval from the administrator or supervisor.
+UR1: Workers shall be able to securely log in using their credentials.
+   UR2: Upon login, users shall be directed to a personalized dashboard with access limited to features relevant to their assigned role (worker, supervisor, admin).
+   UR3: The system interface shall be fully translated into Arabic, with right-to-left layout and a simplified design to support ease of use for non-technical users.
+   UR4: The mobile application should run smoothly on commonly used field devices with moderate specifications, such as phones with at least 3GB of RAM and Android 8 or iOS 12 and above.
+   UR5: The system shall define and manage work zones based on digital maps and area boundaries provided by the municipality.
+   UR6: Workers shall only be able to record attendance and perform tasks within their assigned geographic work zones.
+   UR7: The system shall automatically log attendance when workers enter or exit designated zones.
+   UR8: The system should allow manual attendance check-in if geofencing is unavail- able, subject to supervisor approval.
+   UR9: Supervisors shall be able to create and assign tasks to specific workers or teams, including details such as location, priority, and deadlines.
+   UR10: Workers shall receive assigned tasks through the mobile application, along with all relevant information.
+   UR11: Workers shall be able to update the status of their tasks (e.g., Pending, In Progress, Completed, Rejected, Under Review).
+   UR12: Workers shall be able to submit task completion evidence, such as notes, photos, and GPS location.
+   UR13: Workers shall be able to report issues encountered in the field, including photo attachments, descriptions, and GPS location.
+UR14: Supervisors shall be notified in real time of new field issue reports.
+   UR15: The system should allow supervisors to forward issue reports to the appro- priate municipal departments.
+   UR16: Workers shall receive push notifications for new tasks, task updates, and supervisor messages.
+   UR17: Supervisors shall be able to track the real-time location of active workers on a live map.
+   UR18: Supervisors shall be able to view and filter performance reports for individual workers.
+   UR19: The system should allow exporting attendance and task data in PDF or Excel formats.
+   UR20: The application shall support offline functionality for attendance, task up- dates, and issue reporting.
+   UR21: The system shall automatically synchronize offline data once the device is reconnected to the internet.
+   UR22: Administrators should be able to manage user accounts and assign or modify user roles.
+   UR23: The system should log critical user actions (e.g., logins, check-ins, task sub- missions) for audit and review.
+   UR24: The system should be designed for future expandability, allowing connections to other systems such as vehicle monitoring tools or external reporting platforms.
+   
+
+System Requirements
+UR0: New users shall be able to register an account with role-based approval from the administrator or supervisor.
+SR0.1: The system shall provide a registration form for new users including fields for full name, email, phone number, and requested role.
+SR0.2: The system shall validate that all required fields are filled and meet for- matting requirements before submission.
+SR0.3: The system shall store the registration request in a pending state until reviewed by an administrator or supervisor.
+SR0.4: The system shall allow administrators or supervisors to approve or reject pending registration requests.
+SR0.5: The system shall notify users via email or in-app message about the ap- proval or rejection of their account.
+SR0.6: The system should allow administrators to assign or change user roles during or after the registration approval process.
+
+
+SR0.7: The system shall prevent login attempts for accounts that have not been approved.
+
+UR1: Workers shall be able to securely log in using their credentials.
+SR1.1: The system shall provide a login screen that accepts a registered email or username and a password.
+SR1.2: The system shall verify the entered credentials using a secure authentication mechanism that stores user data in a protected manner.
+SR1.3: The system shall ensure that login information is transmitted in a secure manner, protected from unauthorized access.
+SR1.4: The system shall display appropriate error messages for invalid or missing credentials without revealing sensitive information.
+SR1.5: The system shall allow a maximum of five consecutive failed login attempts before temporarily disabling access for security.
+SR1.6: The system should allow users to reset their password via a secure password recovery process using email verification.
+SR1.7: The system should keep a log entry for each successful or failed login attempt, including timestamp and user identifier, for auditing purposes.
+UR2: Upon login, users shall be directed to a personalized dashboard with access limited to features relevant to their assigned role (worker, supervisor, admin).
+  SR2.1: The system shall determine the user s role immediately after successful login.
+  SR2.2: The system shall redirect each user to a dashboard that matches their assigned role.
+  SR2.3: Workers shall see only their assigned tasks, attendance logs, and reporting tools.
+  SR2.4: Supervisors shall see team-wide task management, location tracking, and performance reports.
+  SR2.5: Administrators shall have access to user management, global settings, and system logs.
+  SR2.6: The system shall prevent users from accessing dashboards or functionalities not authorized for their role.
+  SR2.7: The interface of each dashboard shall use role-specific icons, labels, and layout for clarity and usability.
+
+
+UR3: The system interface shall be fully translated into Arabic, with a layout ar- ranged from right to left, and a simple design to support non-technical users.
+
+
+
+SR3.1: The system shall support full Arabic language translation across all screens, labels, notifications, and messages.
+SR3.2: The user interface shall follow a layout that displays content from right to left, consistent with the Arabic language reading direction.
+SR3.3: The interface shall use intuitive icons and terminology to support users with limited technical literacy.
+SR3.4: The system should allow switching between Arabic and English to accom- modate multilingual supervisors or admins.
+SR3.5: All forms and data entry fields shall be properly aligned and formatted to maintain readability and accessibility in RTL layout.
+UR4: The mobile application should run smoothly on commonly used field devices with moderate specifications, such as those with at least 3GB of RAM and Android 8 or iOS 12 and above.
+SR4.1: The mobile application shall be compatible with Android 8.0 (Oreo) and iOS 12 or higher.
+SR4.2: The application shall maintain a launch time under 3 seconds on mid-range devices.
+SR4.3: The system shall minimize resource consumption to avoid performance issues when used in the field for extended periods.
+SR4.4: The application shall dynamically adjust UI scaling and resolution based on screen size and orientation.
+SR4.5: The system should degrade gracefully on low-spec devices by disabling non-essential visual effects or animations.
+UR5: The system shall define and display work zones based on maps and boundary information provided by the municipality.
+SR5.1: The system shall retrieve geographic boundary data from municipal files to define the limits of work zones.
+SR5.2: The system shall display work zones on a digital map within the applica- tion.
+SR5.3: The system shall store zone definitions locally to enable offline access for field validation.
+SR5.4: The system shall support updating zone data at least once per month or whenever changes are issued by the municipality.
+SR5.5: The system shall restrict task creation and attendance logging to locations that fall within defined zones.
+UR6: Workers shall only be able to record attendance and perform tasks within their assigned geographic work zones.
+
+
+SR6.1: The system shall verify the worker s current location on the map before allowing attendance check-in.
+SR6.2: The system shall compare the worker s current position with the predefined work area assigned to them.
+SR6.3: If the worker is outside their assigned zone, the system shall prevent at- tendance or task submission.
+SR6.4: The system shall notify the worker if an action is blocked due to being outside the valid area.
+SR6.5: The system should allow supervisors to override the restriction manually in exceptional cases.
+UR7: The system shall automatically log attendance when workers enter or exit designated zones.
+SR7.1: The system shall monitor the worker s location and detect automatically when they enter or exit their assigned work area on the map.
+SR7.2: Upon entry, the system shall automatically record the time and mark the worker as "checked in."
+SR7.3: Upon exit, the system shall automatically record the time and mark the worker as "checked out."
+SR7.4: The system shall prevent duplicate check-ins or check-outs within a con- figurable time interval.
+SR7.5: The system should allow supervisors to view a log of automated attendance records, including timestamps and zone information.
+SR7.6: The system should notify the worker with a confirmation message upon each successful check-in or check-out.
+UR8: The system should allow manual attendance check-in when automatic location detection fails, with supervisor approval.
+SR8.1: The system shall provide a manual check-in option if location detection fails due to connection or positioning problems.
+SR8.2: Manual check-in requests shall include the date and time, the worker s current location if available, and a brief reason.
+SR8.3: The system shall submit the manual request to the assigned supervisor for review and approval.
+SR8.4: The system shall prevent duplicate manual check-ins within the same shift.
+SR8.5: The system should notify the worker upon approval or rejection of the manual check-in.
+
+
+SR8.6: All manual check-in records shall be flagged and included in the attendance audit log for transparency.
+UR9: Supervisors shall be able to create and assign tasks to specific work- ers or teams, including details such as location, priority, and deadlines.
+SR9.1: The system shall provide supervisors with a task creation form including fields for title, description, location, priority level, and deadline.
+SR9.2: The system shall allow supervisors to assign tasks to individual workers or predefined teams.
+SR9.3: The system shall validate that all required task fields are completed before submission.
+SR9.4: The assigned workers shall receive immediate notification upon task as- signment.
+SR9.5: The system shall log each task creation and assignment event for audit purposes.
+SR9.6: The system should allow supervisors to edit or cancel tasks before they are marked as completed.
+UR10: Workers shall receive assigned tasks through the mobile application, along with all relevant information.
+SR10.1: The mobile application shall display newly assigned tasks immediately upon assignment.
+SR10.2: Each task shall include title, description, priority, due date, assigned location, and assigning supervisor.
+SR10.3: The application shall categorize tasks by status (Pending, In Progress, Completed, Rejected).
+SR10.4: The application shall allow workers to view task details even without internet access, provided the task was previously loaded on the device.
+SR10.5: The system should display overdue indicators for tasks past their due date.
+UR11: Workers shall be able to update the status of their tasks (e.g., Pending, In Progress, Completed, Rejected, Under Review).
+SR11.1: The mobile application shall allow workers to change the status of each assigned task.
+SR11.2: Available statuses shall include: Pending, In Progress, Completed, Re- jected, and Under Review.
+SR11.3: The system shall log each status change with the date and time and the worker s ID.
+
+
+SR11.4: The application shall prevent status updates for tasks already marked as Completed or Rejected.
+SR11.5: The system shall notify the assigning supervisor whenever a task status is updated.
+UR12: Workers shall be able to submit task completion evidence, such as notes, photos, and GPS location.
+SR12.1: The application shall provide an interface for uploading completion evi- dence including text notes and photo attachments.
+SR12.2: The system shall attach the worker s current location to the task evidence automatically.
+SR12.3: The application shall check that uploaded files are of the correct type and within the allowed size before submission.
+SR12.4: The submitted evidence shall be linked to the corresponding task record in the system database.
+SR12.5: The system shall notify the supervisor upon successful evidence submis- sion for review.
+UR13: Workers shall be able to report issues encountered in the field, including photo attachments, descriptions, and GPS location.
+SR13.1: The mobile application shall allow workers to initiate an issue report with required fields including description and issue type.
+SR13.2: The system shall automatically add the worker s current location to the issue report along with any attached photos.
+SR13.3: The system shall record the date and time of each issue report and link it to the reporting worker.
+SR13.4: The system shall notify the supervisor immediately upon issue submission.
+SR13.5: The issue report shall be stored in the database with a status (e.g., New, Forwarded, Resolved).
+UR14: Supervisors shall be notified in real time of new field issue reports.
+SR14.1: The system shall trigger a push notification to the assigned supervisor upon submission of a new issue report.
+SR14.2: The notification shall include summary details such as issue type, report- ing worker, and location.
+SR14.3: The system shall provide a direct link in the notification to open the full issue report.
+SR14.4: The supervisor dashboard shall display all new issue reports in a priori- tized queue.
+
+
+SR14.5: The system should allow marking issue notifications as acknowledged or resolved.
+UR15: The system should allow supervisors to forward issue reports to the appropriate municipal departments.
+SR15.1: The supervisor interface shall include a forward option for each submitted issue report.
+SR15.2: The system shall allow selection of the relevant municipal department from a predefined list.
+SR15.3: The forwarded report shall retain all original data (description, photos, location).
+SR15.4: The system shall timestamp and log each forwarded action for auditing.
+SR15.5: The receiving department should be notified via email or in-system mes- sage.
+UR16: Workers shall receive push notifications for new tasks, updates, and supervisor messages.
+SR16.1: The system shall send push notifications to workers using a secure noti- fication service.
+SR16.2: Notifications shall be triggered by task assignments, status updates, or supervisor comments.
+SR16.3: The notification content shall include relevant details (e.g., task title, deadline, sender).
+SR16.4: The application shall maintain a notification center for workers to review recent messages.
+SR16.5: Workers should be able to configure notification preferences (e.g., mute, vibration, sound).
+UR17: Supervisors shall be able to track the real-time location of active workers on a live map.
+SR17.1: The system shall display the real-time GPS location of each on-duty worker on a map interface.
+SR17.2: The supervisor dashboard shall include a live map with zoom and filtering capabilities by worker or team.
+SR17.3: The system shall update worker locations at regular intervals (e.g., every 5 mins) during active shifts.
+SR17.4: The system shall distinguish workers visually using icons, colors, or labels.
+SR17.5: The system should pause tracking for workers marked as off-duty or outside working hours.
+
+
+UR18: Supervisors shall be able to view and filter performance reports for individual workers.
+SR18.1: The system shall generate performance reports summarizing task com- pletion rates, attendance, and punctuality for each worker.
+SR18.2: Supervisors shall be able to filter reports by date range, zone, worker, or task type.
+SR18.3: The report interface shall present information using simple formats such as tables, visual summaries, or brief indicators.
+SR18.4: The system shall allow supervisors to export performance reports in PDF and Excel formats.
+SR18.5: Each report shall include the creation time and the name of the supervisor who accessed it.
+UR19: The system should allow exporting attendance and task data in PDF or Excel formats.
+SR19.1: The system shall provide an export option for attendance and task records within the supervisor dashboard.
+SR19.2: Supervisors shall be able to select the desired format (PDF or Excel) before exporting.
+SR19.3: Exported files shall include information such as the selected date range, names of workers, and time of report generation.
+SR19.4: The system should automatically generate file names that include the report type and the date and time.
+SR19.5: Exported reports should preserve table formatting and column alignment for readability.
+UR20: The application shall support offline functionality for attendance, task updates, and issue reporting.
+SR20.1: The mobile application shall allow users to perform attendance check- in/out, task status updates, and issue reporting while offline.
+SR20.2: All offline actions shall be temporarily stored locally on the device.
+SR20.3: The system shall store actions made while offline and automatically send them when an internet connection becomes available.
+SR20.4: The application shall show indicators for any information that has not yet been sent.
+SR20.5: The system shall ensure that the sent information is accurate and com- plete, and that it is not duplicated.
+
+
+UR21: The system shall automatically synchronize offline data once the device is reconnected to the internet.
+SR21.1: The system shall detect when an internet connection becomes available on the user s device.
+SR21.2: When internet access becomes available, the system shall automatically send all data that was recorded while offline.
+SR21.3: The system shall notify the user once all offline data has been successfully sent.
+SR21.4: In case of failure, the system shall retry automatically or allow the user to try again manually.
+SR21.5: The system shall check that the sent data is correct before removing the offline copy from the device.
+UR22: Administrators should be able to manage user accounts and assign or modify user roles.
+SR22.1: The system shall provide an administrative interface for managing user accounts.
+SR22.2: Administrators shall be able to view, edit, activate, or deactivate user accounts.
+SR22.3: The system shall allow administrators to assign roles (worker, supervisor, admin) during account creation or later.
+SR22.4: The system shall record all changes to user roles or account status, in- cluding the name of the administrator and the time of the change.
+SR22.5: The system should support assigning roles to multiple users at once to simplify management.
+UR23: The system should log critical user actions (e.g., logins, check-ins, task submissions) for audit and review.
+SR23.1: The system shall record important actions such as login, attendance check-in/out, and task status updates.
+SR23.2: Each record shall include the time, user s name, and type of action per- formed.
+SR23.3: These records shall be saved in a secure area of the system with limited access.
+SR23.4: Administrators shall be able to view and search these records through a special review screen.
+SR23.5: The system shall keep these records for a period defined by municipal policies.
+
+
+UR24: The system should support integration with external dashboards and vehicle tracking services in future development phases.
+SR24.1: The system shall be designed to allow future connections with other municipal systems.
+SR24.2: These connections may include reporting platforms or vehicle tracking systems.
+SR24.3: Any connection with external systems shall follow a secure method ap- proved by the municipality.
+SR24.4: Users must have proper permission to access or send data to these systems.
+SR24.5: The system s design shall allow adding such features without affecting current functions.
+
+
+  3.1.7 Non-Functional Requirements
+The following non-functional requirements define the system s expected quality attributes, including performance, usability, security, and maintainability. These requirements are based on the implemented system and are aligned with real-world municipal field operations. Some requirements reflect current system capabilities, while others describe architectural support or expected behavior that may require validation through testing or deployment.
+1. Performance
+* The system is designed to load user dashboards and assigned tasks within approximately 3 seconds under normal network conditions.
+* Attendance check-in and check-out operations are designed to be processed with minimal delay, subject to network conditions and server response time.
+* Push notifications are delivered using Firebase Cloud Messaging, with delivery time depending on network latency and device state.
+2. Availability and Reliability
+* The system architecture supports high availability during official working hours, depending on server hosting and deployment configuration.
+* The system is designed to recover from temporary connectivity loss without losing offline data and to resume synchronization automatically once connectivity is restored.
+3. Usability
+* The mobile application supports Arabic as the primary language and follows a simplified interface suitable for users with limited technical experience.
+* Core actions such as attendance logging, task updates, and issue reporting are designed to be completed using a small number of simple steps.
+* Usability was validated through iterative testing during development.
+4. Security
+* All login credentials and sensitive data are transmitted using secure communication protocols (HTTPS).
+* User passwords are stored securely using hashing mechanisms.
+* Role-based access control is enforced to prevent unauthorized access to system resources.
+* Authentication-related events such as login attempts are logged for basic auditing purposes.
+5. Data Size and Storage
+* The mobile application is designed to maintain a reasonable installation size suitable for public-sector mobile devices.
+* Offline data is stored locally on the mobile device using Hive and synchronized with the backend when connectivity becomes available.
+* The backend system is implemented using SQL Server with Entity Framework Core and supports scalable data storage based on infrastructure configuration.
+6. Maintainability and Support
+* The system source code and configurations are documented to support maintenance and future updates.
+* The modular architecture allows updates to be applied with minimal impact on system availability.
+* Administrators can manage work zones, user roles, and report formats through the system without requiring direct code changes.
+7. Compatibility and Scalability
+* The mobile application is compatible with devices running Android 8 or iOS 12 and above.
+* The system architecture supports scaling to accommodate additional users and departments, subject to server resources and deployment configuration.
+* New features can be added without affecting existing system modules due to the layered design.
+8. Localization
+* The system supports full Arabic localization, including Arabic text, right-to-left (RTL) layout, date formats, and number formatting.
+* Localization ensures clarity and accessibility for Arabic-speaking municipal field workers and supervisors.
+
+3.2 Functional Decomposition
+3.2.1 Actors
+The system involves multiple types of users and external systems that interact with its core functionalities. Each actor plays a specific role in operating, managing, or receiving outputs from the system. The main actors are:
+3.2.1.1 Field Worker: A municipal employee who works in the field and interacts with the mobile application. Field workers are responsible for recording attendance, receiving assigned tasks, submitting task updates and evidence, and reporting on-site issues.
+3.2.1.2 Supervisor: A senior staff member responsible for managing field workers. Supervisors use the system to assign tasks, monitor worker locations, view reports, review incidents, and approve manual attendance.
+3.2.1.3 Administrator: A system-level user who oversees configuration, manages user accounts, assigns roles, and controls access permissions. Administrators are also responsible for audit logs and global settings.
+3.2.1.4 Municipality GIS System: An external system that provides digital maps and geographical boundary data. The system integrates with GIS data to define work zones and validate worker locations.
+
+3.2.2 Use Cases
+Table 3.1: Use Case Table
+Use Case ID
+Use Case Name
+UC1
+User Registration
+UC2
+User Login
+UC3
+View Role-Based Dashboard
+UC4
+GPS-Based Attendance Logging
+UC5
+Manual Attendance Request
+UC6
+Task Assignment by Supervisor
+UC7
+Receive and View Assigned Tasks
+UC8
+Update Task Status
+UC9
+Submit Task Completion Evidence
+UC10
+Report Field Issue
+UC11
+Receive Notifications
+UC12
+Supervisor Tracking of Worker Locations
+UC13
+View Performance Reports
+UC14
+Export Attendance and Task Reports
+UC15
+Offline Task Execution and Sync
+UC16
+Admin Manage User Accounts
+UC17
+Log System Activities (Audit Trail)
+UC18
+Switch App Language (Arabic // English)
+3.2.3 Use Cases Diagram
+The UML Use Case Diagram illustrates the main functional interactions of the Field Workforce Management System. It visualizes how different actors including field workers, supervisors, administrators, external systems like the municipality GIS, and internal automated system components interact with the system's features. These use cases cover various operational processes such as logging attendance, managing tasks, monitoring performance, and ensuring data synchronization. The diagram also highlights automated behaviors such as logging activities and syncing offline data. All actors and interactions presented in the diagram correspond directly to the functional requirements listed in Section 3.2.2 and are detailed in Appendix A. For a full-resolution version of the diagram, please refer to the following link: View Full Diagram.
+Figure 3.1: Use Case Diagram of the Field Workforce Management System
+
+3.3 System Models
+This section introduces the main system models used to visualize how our application works. These diagrams represent the system's structure, user interactions, and internal workflows. Each model highlights a different layer of the system such as class structures, task flows, user actions, and system states to give a clear picture of how everything fits together.
+
+3.3.1 Class Diagram
+This class diagram shows the main components of the Field Workforce Management System and how they are connected. It includes key entities like users, tasks, attendance records, and issue reports, along with the relationships between them. Roles such as worker, supervisor, and admin are represented through inheritance. This diagram provides a clear structural overview that guides both the database design and system logic.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.2: Class Diagram of the Field Workforce Management System
+
+3.3.2 Sequence Diagram
+Sequence Diagram for UC4 & UC5: GPS-Based and Manual Attendance Logging
+This sequence diagram shows how the system handles attendance logging, either automatically via GPS or manually when location detection fails. It starts with GPS-based check-in and geofence validation, and covers edge cases like missing signal or no internet. When needed, the system guides the user to submit a manual check-in request and stores it locally. Once connectivity returns, the data is synced and logged.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.3: Sequence Diagram - UC4 & UC5: GPS-Based & Manual Attendance Logging
+
+Sequence Diagram for UC6: Task Assignment by Supervisor
+This diagram shows how a supervisor assigns a new task to a field worker. The process begins with entering task details and validating the location using the GIS map. The task is then created in the backend and synced to the worker's device. It also shows what happens if the device is offline, with task data being stored locally and pushed later. The diagram also covers task updates and deletion when needed.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.4: Sequence Diagram - UC6: Task Assignment by Supervisor
+
+Sequence Diagram for UC9: Submit Task Completion Evidence
+This diagram shows how a field worker submits evidence after completing a task. The process includes adding a note, attaching a photo, and capturing the current GPS location. The system handles offline mode, validates the inputs, and stores the data either locally or in the cloud. Once submitted, the supervisor is notified to review the evidence.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.5: Sequence Diagram - UC9: Submit Task Completion Evidence
+
+Sequence Diagram for UC10: Report Field Issue
+This diagram illustrates how a field worker reports an issue during a task. The user captures a photo, writes a short description, and the system attaches the GPS location. If the device is offline, the report is saved locally and synced later. The supervisor is notified, and if needed, the issue is forwarded to the responsible department for review and response. The diagram also shows error handling for invalid inputs and rejected reports.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.6: Sequence Diagram - UC10: Report Field Issue
+
+3.3.3 Activity Diagram
+System-Level Activity Diagram
+This activity diagram gives an overall view of the main user workflows within the Field Workforce Management System. It combines five core flows: authentication, task assignment, attendance tracking, issue reporting, and notifications/reporting. The diagram highlights both online and offline behaviors, including syncing, validation, and error handling. It helps visualize how the user moves through the system from login to logout in different real-world conditions.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.7: System-Level Activity Diagram for FWMS
+
+Activity Diagram for UC6: Task Assignment by Supervisor
+This activity diagram illustrates the workflow a supervisor follows when creating a new task. It includes steps such as opening the task interface, filling in details, validating location within the assigned work zone, and handling both online and offline cases. The diagram also covers error handling for invalid inputs and fallback actions when GIS validation fails. Once the task is validated, it is either stored directly or queued for syncing depending on connectivity.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.8: Activity Diagram - UC6: Task Assignment by Supervisor
+
+Activity Diagram for UC10: Report Field Issue
+This diagram describes the steps a field worker follows to submit a field issue report. It covers GPS location retrieval, manual pinning if needed, selecting issue type, and attaching a photo. The flow handles image compression for large files, validates the input, and either submits or stores the report based on network status. Once submitted, the supervisor reviews the report and forwards it to the appropriate department.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.9: Activity Diagram - UC10: Report Field Issue
+
+3.3.4 State Chart Diagram
+This state chart diagram shows the full lifecycle of a task within the Field Workforce Management System. It starts from task creation, through assignment, acceptance, progress, submission, and review. The flow also includes alternate paths such as task cancellation, rejection, and sync failure. The diagram highlights how tasks transition between states depending on both user actions and system conditions.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.10: State Chart Diagram - Task Lifecycle
+
+
+3.4 System Architecture
+3.4.1 Sub-System
+Authentication and Role Management Subsystem
+This subsystem manages the secure access of users to the system and enforces role-based restrictions across the application. It is responsible for authenticating users at login, handling new account registrations, and ensuring that each user interacts only with the features relevant to their assigned role whether as a field worker, supervisor, or administrator. The subsystem is designed to support Arabic and English interfaces, with RTL layout for Arabic users, and includes mechanisms for session security.
+Services Provided:
+* User login and secure authentication.
+* Account creation by administrators.
+* Role-based redirection to the appropriate dashboard (worker, supervisor, admin).
+* Role assignment and access enforcement.
+* Logging of login/logout actions for audit purposes.
+Interactions:
+* Provides verified user identity to the Task Management, Attendance, and Reporting subsystems.
+* Interacts with custom JWT-based authentication to store hashed credentials and manage secure authentication tokens.
+* Ensures role-level access control is respected throughout all user interfaces and system modules.
+
+Attendance Tracking Subsystem
+This subsystem handles the automatic and manual logging of attendance for field workers using geolocation and geofencing technologies. It ensures that all attendance records are tied to predefined municipal work zones, improving both accuracy and accountability. The subsystem also includes fallback mechanisms for manual check-ins in case GPS data is unavailable and ensures that all attendance logs are securely recorded with timestamps and geographic coordinates.
+Services Provided:
+* Automatic check-in and check-out based on GPS and geofencing.
+* Manual attendance request submission when automatic logging fails.
+* Local storage of attendance records for offline operation.
+* Automatic synchronization of offline records when connectivity is restored.
+* Validation of user presence within designated work zones.
+Interactions:
+* Receives authenticated user identity from the Authentication Subsystem.
+* Stores attendance data in the central database through the ASP.NET Core API.
+* Integrates with the Offline Sync Subsystem to queue and synchronize records.
+* Interacts with GIS-defined zones provided by the municipality.
+
+Task Management Subsystem
+This subsystem is responsible for the complete lifecycle of task assignment and monitoring within the system. It enables supervisors to create and assign tasks to field workers or teams, set priorities and deadlines, and monitor progress. Field workers can view assigned tasks, update their status, and submit completion evidence such as photos, notes, and location data. This subsystem plays a central role in ensuring work accountability and transparency across municipal operations.
+Services Provided:
+* Task creation by supervisors with location, priority, and deadline.
+* Assignment of tasks to individual workers or teams.
+* Real-time push notifications upon task assignment or update.
+* Status updates by workers: Pending, In Progress, Completed, etc.
+* Submission of task completion evidence (photos, notes, GPS).
+* Task filtering and overview dashboard for supervisors.
+Interactions:
+* Validates user roles via the Authentication Subsystem.
+* Stores task data and updates in the SQL Server database via the ASP.NET Core API.
+* Triggers alerts using the Notification Subsystem.
+* Supports offline operation through the Offline Sync Subsystem.
+
+Issue Reporting Subsystem
+This subsystem enables field workers to report unexpected issues encountered during their tasks. It ensures that each report includes essential information such as issue type, location, timestamp, and photo evidence. Reports are immediately routed to supervisors, who can acknowledge them and forward them to the appropriate municipal departments for resolution. This process improves responsiveness and communication between field teams and management.
+Services Provided:
+* In-app issue reporting with predefined issue categories.
+* Automatic GPS tagging and timestamping of reported issues.
+* Photo attachments for visual clarification.
+* Real-time notifications to supervisors upon report submission.
+* Forwarding of reports to relevant municipal departments (planned).
+* Status tracking for submitted issues.
+Interactions:
+* Verifies reporter identity via the Authentication Subsystem.
+* Stores report data in the central SQL Server database through the ASP.NET Core API.
+* Triggers supervisor alerts using the Notification Subsystem.
+* Relies on the Offline Sync Subsystem for operation in disconnected environments.
+
+Offline Sync Subsystem
+This subsystem ensures the reliability of the application in areas with poor or no internet connectivity. It allows field workers to continue performing essential operations such as logging attendance, updating task statuses, and reporting issues while offline. All offline actions are stored locally and automatically synchronized with the backend once the device reconnects to the internet, ensuring a seamless user experience without data loss.
+Services Provided:
+* Local caching of attendance, tasks, and issue reports using the Hive database.
+* Detection of internet availability and sync readiness.
+* Automatic synchronization of offline data to the ASP.NET Core API and SQL Server backend upon reconnection.
+* Conflict handling and error recovery mechanisms.
+* User feedback on pending and completed sync operations.
+Interactions:
+* Integrates with the Attendance Tracking, Task Management, and Issue Reporting subsystems.
+* Syncs all local records to the central database through the ASP.NET Core API upon reconnection.
+* Provides status indicators to the UI to reflect unsynced data.
+
+Monitoring and Reporting Subsystem
+This subsystem provides supervisors and administrators with the tools to monitor field operations in real time and generate performance reports. It enables supervisors to view the current GPS location of all on-duty workers on a live map, analyze attendance patterns, track task completion rates, and export data for review or documentation. This subsystem is critical for maintaining accountability and supporting evidence-based decision-making within the municipality.
+Services Provided:
+* Real-time location tracking of field workers on an interactive map.
+* Filtering and viewing of worker-specific performance data.
+* Generation of attendance and task completion reports.
+* Export of reports in PDF and Excel formats.
+* Historical analytics for performance review and auditing.
+Interactions:
+* Retrieves attendance logs from the Attendance Tracking Subsystem.
+* Accesses task data and statuses from the Task Management Subsystem.
+* Displays live location data captured by workers' mobile devices.
+* Uses the ASP.NET Core backend with SQL Server as the central data source for real-time and historical data.
+
+3.4.2 Software Architecture
+This software architecture diagram presents the high-level structure of the Field Workforce Management System. It highlights the core layers and subsystems deployed across the mobile application (Flutter) used by field workers, the web dashboard (React) used by supervisors and administrators, and the ASP.NET Core 9 backend with SQL Server database.
+The architecture is divided into three layers on both client sides (mobile and web): the User Interface Layer, Application Logic Layer, and Data Access Layer. Each layer encapsulates specific responsibilities from rendering UI components to handling business logic, secure data storage, and API communication.
+On the backend, ASP.NET Core 9 services provide authentication, REST APIs, data storage, and file handling, while Firebase Cloud Messaging (depending on final decision) manages push notifications. The backend communicates with the SQL Server database for persistent storage and interacts with the municipality's GIS shapefiles for zone validation and visualization.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.11: Software Architecture Diagram - System Layers and Component Distribution
+
+
+
+3.4.3 Component Diagram
+This component diagram outlines the major software components of the Field Workforce Management System and how they interact across different architectural layers. It emphasizes the separation of concerns among the three main layers:
+Application Layer: Includes front-end components such as Task Management, Attendance Logging, GIS Zone Validation, and Field Reporting. These components serve as entry points for user interactions.
+Domain Layer: Contains key interfaces and logic modules that bridge user-facing components with the underlying infrastructure. This includes services such as AuthService, TaskService, AttendanceService, and GeoValidationService.
+Infrastructure & Integration Layer: Represents backend and integration services such as ASP.NET Core API Endpoints, SQL Server Database, Notification Service, and the GIS Validation Engine that processes shapefiles for zone verification.
+The diagram visualizes how components are modularized, how they communicate through interfaces, and how they depend on backend APIs and external GIS data for storage, authentication, and validation.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.12: Component Diagram - Logical Software Modules and Interfaces
+
+3.4.4 Deployment Diagram
+Figure 3.13 illustrates the deployment architecture of the Field Workforce Management System. The system is structured into four main deployment zones: Mobile Frontend, Web Frontend, Backend Server, and External Services. Each device hosts specific software artifacts that encapsulate functional components responsible for system operation.
+Mobile Device (Android / iOS): Hosts the deployed FlutterApp.apk artifact, containing components such as Login UI, Sync Engine, Notification Listener, Attendance UI, and Tasks UI.
+Web Browser: Loads the SupervisorPortal.html (React) artifact, which includes components such as Reports UI, Map View, Task Management UI, and User Management.
+Application Server (ASP.NET Core 9 + SQL Server): Hosts the main backend services encapsulated in BackendService, containing core modules such as Identity & Authentication, REST API Controllers, Database Access Layer (EF Core), File Storage Handler, and Notification Engine (FCM).
+External GIS Server: An external service that hosts the GIS Validation Engine, which provides geolocation zone verification using shapefiles supplied by the municipality. Secure communication is enforced via HTTPS + TLS between mobile/web clients and the backend.
+Runtime communication paths are illustrated, showing direct interactions between key components for example, the Sync Engine exchanges data with the backend API, while the Login UI interacts with the Authentication Controller as part of the login flow.
+To view the full-resolution version of the diagram, visit: View Full Diagram.
+Figure 3.13: Deployment Diagram - System Devices, Artifacts, and Runtime Communication
+
+3.5 Data Management and ERD
+This section outlines how data is structured, stored, and manipulated throughout the Field Workforce Management System.
+The system relies on a relational SQL Server database managed through the ASP.NET Core 9 backend, with tables and relationships designed around key business entities such as users, tasks, attendance logs, reports, and notifications.
+All operations follow secure, authenticated access and support offline storage and synchronization mechanisms via local caching and sync queues implemented using Hive on the mobile side.
+To view the full-resolution version of the diagram, visit: View Full ERD Diagram.
+Figure 3.14: Entity-Relationship Diagram - Logical Data Model of the System
+The data is centered around a generalized User entity, which is extended by three specialized roles: Admin, Supervisor, and Worker.
+Workers are assigned to geographic Zones managed by supervisors and receive Tasks, which may require submitting Field Reports, logging Attendance, or triggering system Notifications.
+Offline operations are handled by a dedicated OfflineSync entity, which stores task, attendance, or report data during disconnection and pushes them to the central database upon reconnection through the ASP.NET Core API.
+Notifications are modeled as a separate entity that stores system-generated or user-directed messages, with metadata such as status, timestamps, and recipient references.
+All data operations support timestamping (created/updated), foreign key relationships, and normalized subtypes (e.g issue_type, status, priority).
+
+3.5.1 Synchronization Mechanism
+The system implements an offline-first synchronization mechanism to address the operational challenges of municipal fieldwork environments where network connectivity is often weak or intermittent. The mechanism ensures uninterrupted field operation while maintaining data consistency between mobile devices and the central database.
+Local Data Capture and Storage
+Field activities such as attendance registration, task updates, and issue reporting are initially recorded in the local Hive database on the user's mobile device.
+Each record includes two timestamps:
+* Event Time: the exact moment when the action occurred on the device.
+* Sync Time: the moment when the record was successfully transmitted to the server.
+This dual-timestamp model preserves the chronological order of events even when synchronization is delayed and facilitates accurate auditing after data transmission.
+Synchronization and Communication
+Once connectivity is re-established, the Flutter application automatically synchronizes pending records with the ASP.NET Core API.
+Data are transmitted in small batches to minimize bandwidth and battery consumption.
+Each record carries a unique identifier to prevent duplication and ensure idempotent processing on the server.
+The backend writes the synchronized data to the SQL Server database and returns acknowledgment messages containing any computed or updated attributes.
+Conflict Resolution
+If multiple users update the same record, the ASP.NET Core API resolves conflicts deterministically by retaining the version with the most recent valid event time while archiving the previous version in an audit log.
+This process guarantees both operational continuity and data accountability.
+Performance and Power Optimization
+To enhance performance and conserve resources, media files are compressed before upload, non-critical synchronization tasks are deferred to idle periods, and location tracking frequency is reduced when the device is stationary.
+These optimizations ensure compliance with the system's non-functional requirements for efficiency and reliability.
+User Interface Feedback
+The mobile interface displays synchronization states such as Pending, Syncing, and Synced to provide users with clear operational feedback.
+Network interruptions do not block user actions, and any failed synchronization triggers a visible notification allowing manual retry.
+This design promotes usability for non-technical users and supports an intuitive Arabic-language interface.
+The offline-first approach was selected for the following reasons:
+* Functional reliability: guarantees continuous operation in areas without network coverage.
+* Performance: enables near-instant local data writes with lightweight synchronization.
+* User experience: eliminates delays or interface freezes during connectivity loss.
+* Device suitability: optimized for mid-range municipal devices with limited resources.
+* Data integrity: preserves both event and synchronization timestamps for accurate auditing.
+This synchronization mechanism provides robust, fault-tolerant communication between mobile clients and the central server, ensuring consistent data integrity and operational stability in real-world field conditions.
+
+3.5.2 GIS Integration Clarification
+The system integrates with the municipality's Geographic Information System (GIS) using official shapefile datasets supplied by the GIS department.
+Each shapefile defines operational work zones as polygonal boundaries identified by a unique Zone ID.
+This file-based approach was selected for its reliability, offline capability, and alignment with municipal data management practices.
+Zone data and validation process:
+Shapefile data are processed to extract zone boundaries and identifiers. Both the mobile application and the backend utilize this data to perform point-in-polygon validation. During attendance check-in/out, the system verifies that a worker's GPS coordinates fall within the assigned zone, while during task creation or completion, the corresponding Zone ID is attached to the record to ensure spatial accuracy. When operating offline, validation is executed locally using preloaded shapefiles; once connectivity is restored, validation is re-confirmed server-side through the ASP.NET Core API before the record is stored in SQL Server.
+Version control and updates:
+Whenever the municipality updates its zoning maps, the GIS department provides new shapefiles labeled with a ZoneVersion identifier. The system automatically applies these updates when connectivity allows, while preserving historical definitions for accurate reporting and auditing.
+Performance and scalability:
+To maintain responsiveness, shapefiles are optimized by simplifying polygon geometry and applying spatial indexing. This ensures efficient validation even on mid-range devices with limited processing power, meeting the system's non-functional performance requirements.
+Advantages of the shapefile-based approach:
+This method enables accurate offline validation without reliance on live GIS APIs. It ensures spatial precision using official municipal data, provides instant boundary display without latency, supports internal updates without third-party dependency, eliminates ongoing subscription costs, and protects privacy by processing all location data locally.
+Impact on workflow:
+Each attendance record, task entry, and issue report is permanently linked to its Zone ID. This allows supervisors to filter and analyze data by geographic area through the web dashboard, supporting precise spatial analytics and alignment with official municipal zones.
+
+
+
+
+
+
+
+
+
+
+Chapter 4: System Implementation
+[See separate document: CHAPTER_4.md]
+
+
+
+Chapter 5: 
+[See separate document: CHAPTER_5.md]
+
+
+Chapter 6: 
+[See separate document: CHAPTER_6.md]
+
+
+
+
+Chapter 7: Conclusion and Future Work
+
+7.1 Project Summary
+
+This project developed the FollowUp Smart Field Management System for Al-Bireh Municipality, transforming traditional paper-based field operations into a digital mobile-first solution. The system addresses the core challenges of unreliable attendance tracking, inefficient task communication, delayed issue reporting, and lack of real-time visibility.
+
+The implementation delivered a three-platform architecture: a Flutter mobile application for field workers, an ASP.NET Core 9 backend API, and a React web dashboard for supervisors and administrators. The system supports full Arabic language interface with right-to-left rendering and operates reliably in areas with limited connectivity through offline-first architecture.
+
+Comprehensive testing validated all functionality through 11 test cases covering authentication, task management, attendance, issue reporting, and offline synchronization. Detailed performance measurements and comparative analysis with commercial alternatives are documented in Chapter 6.
+
+7.2 Key Achievements
+
+The project achieved all stated objectives:
+
+- **Functional Completeness**: 24/24 user requirements implemented and validated
+- **Testing Success**: 11/11 test cases passed (100%)
+- **GPS-Based Attendance**: Automatic check-in/out with zone validation
+- **Task Management**: Full lifecycle with progress tracking and photo evidence
+- **Offline Support**: Dual-timestamp model preserves accurate event times
+- **GIS Integration**: Municipal shapefile import for zone boundaries
+- **Enhanced Features**: Location validation with appeals, battery monitoring alerts
+
+The system offers unique capabilities not found in commercial alternatives: native Arabic RTL interface, GIS shapefile integration, location-based task validation, and proactive battery monitoring (see Chapter 6, Section 6.4 for detailed comparison).
+
+7.3 Limitations
+
+- **GPS Accuracy**: Reduced precision indoors; mitigated through manual check-in option and appeals system
+- **Web Dashboard**: Core features functional; advanced analytics planned for future phase
+- **Automated Testing**: Manual testing only; automated test infrastructure recommended
+- **Measurement Scope**: Operational impact and user satisfaction require production deployment to measure (see Chapter 6, Section 6.5)
+
+7.4 Future Work
+
+**High Priority:**
+1. Pilot deployment with Al-Bireh Municipality field workers
+2. User satisfaction survey with real users
+3. Advanced analytics and dashboard charts
+
+**Medium Priority:**
+4. Automated testing infrastructure (xUnit, flutter_test)
+5. Routine task automation using TaskTemplates
+6. Biometric authentication (fingerprint/Face ID)
+
+**Low Priority:**
+7. Multi-municipality support
+8. Integration with HR and maintenance systems
+9. English language support
+
+7.5 Final Remarks
+
+The FollowUp Smart Field Management System demonstrates the feasibility of replacing manual municipal processes with a mobile-first digital solution. The system ensures accountability through GPS validation while supporting practical field work realities through offline capability.
+
+The modular architecture positions the system for continued enhancement. With all requirements implemented, all tests passing, and performance validated (Chapter 6), the system is ready for pilot deployment at Al-Bireh Municipality.
+
+This project contributes to the digital transformation of Palestinian municipalities under the "Build Your Country" initiative, providing a foundation for improved public service delivery.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Bibliography
+
+[1] M. A. Shaikh, N. S. Rathod, S. A. More, and S. M. Kale,  Geolocation-Based Employee Attendance and Tracking System,  International Research Journal of Modernization in Engineering, Technology and Science (IRJMETS), vol. 6, no. 11, 2024. [Online]. Available: https://www.irjmets.com/uploadedfiles/paper/issue_11_november_2024/63241/final/fin_irjmets1730650696.pdf
+[2] C. Ganesh and D. Kumar,  GPS-Based Location Monitoring System with Geo-Fencing Capabilities,  AIP Conference Proceedings, 2019. [Online]. Available: https://www.researchgate.net/publication/337194171_GPS_based_location_monitoring_system_with_geo-fencing_capabilities
+[3] T. Nurkiewicz,  Offline-First Design for Fault Tolerant Applications,  2018. [Online]. Available: https://www.researchgate.net/publication/327624337_Offline-First_Design_for_Fault_Tolerant_Applications
+[4] Workyard,  Time Clock App with GPS,  2025. [Online]. Available: https://www.workyard.com/time-clock-app-with-gps
+[5] Timesheet Mobile,  Geofenced Time Tracking App,  2024. [Online]. Available: https://play.google.com/store/apps/details?id=com.timesheetmobile
+[6] Hellotracks,  Real-Time Location and Route Tracking App,  2025. [Online]. Available: https://play.google.com/store/apps/details?id=com.hellotracks
+[7] Connecteam,  All-in-One Workforce Management App,  2025. [Online]. Available: https://play.google.com/store/apps/details?id=com.connecteamco.Connecteam.app
+[8] QuickBooks Time,  Time Tracking and Scheduling App,  2025. [Online]. Available: https://play.google.com/store/apps/details?id=com.tsheets.android.hammerhead
+[9] Where s My Staff,  Attendance and Tracking App with NFC and GPS,  2025. [Online]. Available: https://www.whereismystaff.com
+[10] Hubstaff,  Time Tracking and Productivity Monitoring,  2025. [Online]. Available: https://play.google.com/store/apps/details?id=com.hubstaff
+[11] Google Developers,  Flutter   Build Apps for Any Screen,  2025. [Online]. Available: https://flutter.dev
+[12] Google Firebase,  Firebase   Build and Run Successful Apps,  2025. [Online]. Available: https://firebase.google.com
+[13] Baseflow,  Geolocator for Flutter,  2025. [Online]. Available: https://pub.dev/packages/geolocator
+[14] S. Leier,  Hive: Lightweight and Blazing Fast Key-Value Database,  2025. [Online]. Available: https://pub.dev/packages/hive
+[15] Firebase,  Firebase Cloud Messaging (FCM),  2025. [Online]. Available: https://firebase.google.com/products/cloud-messaging
+[16] Figma Inc.,  Figma   Collaborative Interface Design Tool,  2025. [Online]. Available: https://www.figma.com
+[17] GitHub Inc.,  GitHub   Where the World Builds Software,  2025. [Online]. Available: https://github.com
+[18] Microsoft,  ASP.NET Core 9 Documentation   Build Modern Web APIs,  2025. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core
+[19] Microsoft,  SQL Server 2022   Intelligent Relational Database Engine,  2025. [Online]. Available: https://learn.microsoft.com/en-us/sql
+[20] Microsoft,  SignalR for ASP.NET Core   Real-Time Web Communication,  2025. [Online]. Available: https://learn.microsoft.com/en-us/aspnet/core/signalr
+[21] ESRI,  Shapefile Technical Description   Environmental Systems Research Institute,  Redlands, CA, 1998. [Online]. Available: https://www.esri.com/library/whitepapers/pdfs/shapefile.pdf
+[22] Flutter Community,  Offline-First Synchronization Patterns in Flutter,  2025. [Online]. Available: https://docs.flutter.dev/development/data-and-backend/offline
+[23] Microsoft Learn,  Spatial Data (Geometry and Geography Types) in SQL Server,  2025. [Online]. Available: https://learn.microsoft.com/en-us/sql/relational-databases/spatial/spatial-data-sql-server
+[24] K. Hormann and A. Agathos, "The Point in Polygon Problem for Arbitrary Polygons," Computational Geometry: Theory and Applications, vol. 20, no. 3, pp. 131-144, 2001. [Online]. Available: https://www.researchgate.net/publication/222526759_The_Point_in_Polygon_Problem_for_Arbitrary_Polygons
+[25] M. L ffler and J. Snoeyink, "A Cell-Based Point-in-Polygon Algorithm Suitable for Large Sets of Points," Geographia Technica, 2010. [Online]. Available: https://www.researchgate.net/publication/250730131_A_cell-based_point-in-polygon_algorithm_suitable_for_large_sets_of_points
+[26] IRJET, "Implementation of Geo-fencing to Monitor a Specific Target Using Point in Polygon Algorithm," International Research Journal of Engineering and Technology, vol. 9, no. 12, 2022. [Online]. Available: https://www.irjet.net/archives/V9/i12/IRJET-V9I12167.pdf
+[27] NetTopologySuite Contributors, "NetTopologySuite   A .NET GIS Solution," 2025. [Online]. Available: https://github.com/NetTopologySuite/NetTopologySuite
+[28] Microsoft, "Spatial Data in Entity Framework Core," 2025. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/modeling/spatial
+[29] S. Aloul, E. Zahidi, and W. El-Hajj, "Development and Evaluation of an Attendance Tracking System Using Smartphones with GPS and NFC," Applied Artificial Intelligence, vol. 36, no. 1, 2022. [Online]. Available: https://www.tandfonline.com/doi/full/10.1080/08839514.2022.2083796
+[30] IEEE, "Design and Implementation of an Accurate Real Time GPS Tracking System," IEEE Conference Publication, 2014. [Online]. Available: https://ieeexplore.ieee.org/document/6991376/
+[31] H. S. Khan and M. A. Rahman, "Offline-First Mobile Architecture: Enhancing Usability and Resilience in Mobile Systems," Journal of Artificial Intelligence General Science (JAIGS), vol. 5, 2024. [Online]. Available: https://www.researchgate.net/publication/393910615_Offline-First_Mobile_Architecture_Enhancing_Usability_and_Resilience_in_Mobile_Systems
+[32] S. S. Yau, D. Huang, and H. Gong, "A Review of Data Synchronization and Consistency Frameworks for Mobile Cloud Applications," IEEE Transactions on Services Computing, 2018. [Online]. Available: https://www.researchgate.net/publication/330078558_A_Review_of_Data_Synchronization_and_Consistency_Frameworks_for_Mobile_Cloud_Applications
+[33] M. K. Denko and T. Zheng, "Mobile Databases   Synchronization and Conflict Resolution Strategies Using SQL Server," 2011. [Online]. Available: https://www.researchgate.net/publication/220713102_Mobile_databases_-_Synchronization_conflict_resolution_strategies_using_SQL_server
+[34] Google Developers, "Build an Offline-First App   Android Architecture," 2025. [Online]. Available: https://developer.android.com/topic/architecture/data-layer/offline-first
+[35] N. Provos and D. Mazi res, "A Future-Adaptable Password Scheme (bcrypt)," USENIX Annual Technical Conference, 1999. [Online]. Available: https://www.usenix.org/legacy/events/usenix99/provos/provos.pdf
+[36] D. Mazi res, "Bcrypt at 25: A Retrospective on Password Security," USENIX ;login:, 2024. [Online]. Available: https://www.usenix.org/publications/loginonline/bcrypt-25-retrospective-password-security
+[37] IEEE, "Secure Hashing using BCrypt for Cryptographic Applications," IEEE Conference Publication, 2023. [Online]. Available: https://ieeexplore.ieee.org/document/10126956/
+[38] M. Jones, J. Bradley, and N. Sakimura, "JSON Web Token (JWT)," RFC 7519, IETF, 2015. [Online]. Available: https://datatracker.ietf.org/doc/html/rfc7519
+[39] Y. Sheffer, D. Hardt, and M. Jones, "JSON Web Token Best Current Practices," RFC 8725, IETF, 2020. [Online]. Available: https://datatracker.ietf.org/doc/html/rfc8725
+[40] OWASP Foundation, "Password Storage Cheat Sheet," OWASP Cheat Sheet Series, 2025. [Online].Available: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+ [41] Microsoft, "Entity Framework Core Documentation," 2025. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/
+[42] Microsoft, "Optimistic Concurrency in Entity Framework Core," 2025. [Online]. Available: https://learn.microsoft.com/en-us/ef/core/saving/concurrency
+[43] ISTQB, "Standard Glossary of Terms Used in Software Testing," International Software Testing Qualifications Board, 2025. [Online]. Available: https://glossary.istqb.org/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Appendices
+
+Appendix A: Appendices
+
+A.1 Use Case Specifications
+UC1 - User Registration
+1.1 Brief Description
+This use case allows a new user (worker, supervisor, or admin) to register for an account through the mobile application. The registration form collects personal and role information and submits a request for approval.
+Actor: Unregistered User
+1.2 Flow of Events
+1.2.1 Normal Flow - Submitting a New Registration Request:
+* The user opens the mobile application and selects the "Register" option.
+* The system displays a registration form with fields for full name, email, phone number, and role selection.
+* The user fills in the required fields and submits the form.
+* The system validates the input and stores the request in a pending state.
+* A notification is sent to the supervisor or admin for review.
+* The user is notified that their request is under review.
+1.2.2 Alternative Flow - Input Validation Errors:
+* If the user submits the form with missing or incorrectly formatted fields: 
+o The system highlights the errors and prevents submission.
+o The user must correct the input and resubmit the form.
+1.2.3 Error Flow - Network or Server Failure:
+* If the registration request cannot be submitted due to connectivity issues: 
+o The system displays an error message and stores the request locally.
+o The request is automatically submitted once the internet connection is restored.
+1.3 Special Requirements
+* The system must ensure secure handling of user input (e.g., via HTTPS).
+* The role selection must be restricted to predefined roles: Worker, Supervisor, Admin.
+* Duplicate email or phone numbers must be rejected.
+1.4 Entry Conditions
+* The user must not be logged in or registered.
+* The application must be online or capable of queuing requests for submission.
+1.5 Exit Conditions
+* The registration request is successfully submitted and marked as pending.
+* If submission fails, the request is stored locally and flagged for resubmission.
+
+UC2 - User Login
+2.1 Brief Description
+This use case allows registered users (workers, supervisors, or admins) to securely log into the mobile application using their credentials. Upon successful login, users are redirected to their role-specific dashboard.
+Actor: Registered User (Worker / Supervisor / Admin)
+2.2 Flow of Events
+2.2.1 Normal Flow - Logging into the System:
+* The user opens the mobile application and selects the "Login" option.
+* The system displays a login screen with email/username and password fields.
+* The user enters valid credentials and submits the form.
+* The system authenticates the credentials securely.
+* Upon success, the system determines the user's role and redirects them to the appropriate dashboard.
+2.2.2 Alternative Flow - Invalid Credentials:
+* If the entered credentials are incorrect: 
+o The system displays an error message indicating invalid login.
+o The user is prompted to retry with correct information.
+2.2.3 Error Flow - Excessive Failed Attempts or Server Issues:
+* If the user exceeds the maximum number of allowed failed login attempts: 
+o The system temporarily disables login for a short duration.
+o An optional notification may be sent to the admin for review.
+* If the system fails to authenticate due to connectivity/server error: 
+o The system displays a message indicating temporary service unavailability.
+o The user is asked to try again later.
+2.3 Special Requirements
+* The system must use encrypted channels (e.g., HTTPS) for login communication.
+* Passwords must be securely stored and verified using hashed values.
+* The login screen must support both Arabic and English language layouts.
+2.4 Entry Conditions
+* The user must have a registered and approved account.
+* The system must be online to perform authentication.
+2.5 Exit Conditions
+* The user is successfully logged in and redirected to their role-based dashboard.
+* If login fails, the user is returned to the login screen with appropriate error messages.
+
+UC3 - View Role-Based Dashboard
+3.1 Brief Description
+This use case allows a logged-in user to access a personalized dashboard based on their role (Worker, Supervisor, or Admin). Each dashboard provides access only to the features relevant to the user's responsibilities.
+Actor: Logged-in User
+3.2 Flow of Events
+3.2.1 Normal Flow - Displaying the Role-Specific Dashboard:
+* After successful login, the system detects the user's assigned role.
+* The system loads the corresponding dashboard: 
+o Workers see: assigned tasks, attendance logs, and reporting tools.
+o Supervisors see: task assignment tools, live location map, and performance reports.
+o Admins see: user management, global settings, and audit logs.
+* The dashboard layout and functionalities are adjusted to the user's role.
+3.2.2 Alternative Flow - No Role Assigned:
+* If the user account has no assigned role: 
+o The system displays an error message.
+o The user is prompted to contact an administrator.
+3.2.3 Error Flow - Role-Based Redirect Failure:
+* If the system fails to redirect due to a server or client error: 
+o A fallback screen is shown indicating a dashboard load failure.
+o The user is given the option to retry or logout.
+3.3 Special Requirements
+* Dashboards must be visually distinct and clearly labeled per role.
+* Only authorized features must be visible based on the logged-in role.
+* RTL layout and Arabic labels must be enabled by default for workers and supervisors.
+3.4 Entry Conditions
+* The user must be logged in.
+* The user must have a valid assigned role.
+3.5 Exit Conditions
+* The user successfully views and navigates within their personalized dashboard.
+* In case of error, the user is notified and redirected appropriately.
+
+UC4 - GPS-Based Attendance Logging
+4.1 Brief Description
+This use case enables workers to automatically log their attendance when entering or exiting predefined work zones using GPS and geofencing technology. The process is silent and requires no manual input.
+Actor: Field Worker
+4.2 Flow of Events
+4.2.1 Normal Flow - Automatic Check-In and Check-Out:
+* The worker enters a designated geographic work zone.
+* The system detects the GPS location and confirms the worker's presence within the zone.
+* The system logs a check-in timestamp and displays a confirmation notification.
+* At the end of the shift, the worker exits the zone.
+* The system detects the exit and logs a check-out timestamp.
+4.2.2 Alternative Flow - Duplicate Entries:
+* If the worker re-enters the zone within a short time: 
+o The system checks for recent attendance logs and avoids duplicate check-ins.
+o A message is displayed stating the current session is still active.
+4.2.3 Error Flow - Location Detection Failure:
+* If the system fails to detect the worker's GPS location: 
+o No attendance is recorded.
+o The worker is informed and advised to retry or switch to manual attendance (see UC5).
+4.3 Special Requirements
+* The system must support real-time GPS tracking and geofence boundary validation.
+* Location data must be processed locally for speed and synchronized later through the ASP.NET Core API to the SQL Server database.
+* Attendance events must be logged with timestamps and associated zone ID.
+4.4 Entry Conditions
+* The worker must be logged in and assigned to a work zone.
+* GPS must be enabled on the device.
+4.5 Exit Conditions
+* Attendance check-in and check-out are successfully logged and synced to the system.
+* If detection fails, no attendance is recorded and fallback options are available.
+
+UC5 - Manual Attendance Request
+5.1 Brief Description
+This use case allows a field worker to submit a manual attendance request if GPS-based detection fails. The request is sent to the assigned supervisor for approval.
+Actor: Field Worker
+5.2 Flow of Events
+5.2.1 Normal Flow - Submitting a Manual Request:
+* The worker attempts to log attendance, but GPS detection fails.
+* The system displays an option for manual attendance request.
+* The worker selects this option and fills in the required fields (e.g., time, location, reason).
+* The system submits the request to the supervisor for review.
+* The worker receives a confirmation that the request has been submitted.
+5.2.2 Alternative Flow - Missing Fields:
+* If the worker submits the request with missing data: 
+o The system displays validation errors and prevents submission.
+o The worker must complete all required fields before proceeding.
+5.2.3 Error Flow - Request Not Sent:
+* If the device is offline or the request fails: 
+o The system stores the request locally in Hive until it can sync to the backend.
+o It is automatically submitted once the device reconnects to the internet.
+5.3 Special Requirements
+* Manual requests must include a timestamp, zone, and a brief explanation.
+* Requests should be flagged for supervisor review in the system dashboard.
+* Duplicate manual requests within the same shift must be prevented.
+5.4 Entry Conditions
+* GPS attendance has failed, and the user chooses to submit a manual request.
+* The worker is logged in and assigned to a zone.
+5.5 Exit Conditions
+* Manual attendance request is sent (or queued) and pending supervisor approval.
+* Worker is notified of request status after supervisor action.
+
+UC6 - Task Assignment by Supervisor
+6.1 Brief Description
+This use case allows supervisors to assign tasks to individual field workers or teams. Each task includes details such as description, location, priority, and deadline.
+Actor: Supervisor
+6.2 Flow of Events
+6.2.1 Normal Flow - Creating and Assigning a Task:
+* The supervisor opens the task management interface.
+* The supervisor clicks on "Create Task" and fills in the task form (title, description, location, due date, priority).
+* The supervisor selects the target worker(s) or team.
+* The system validates the input and stores the task in the database.
+* The assigned worker(s) receive an immediate notification.
+6.2.2 Alternative Flow - Editing or Canceling a Task:
+* The supervisor may edit or cancel a task before it is marked as completed.
+* Changes are reflected in real time and workers receive updated notifications.
+6.2.3 Error Flow - Failed Assignment:
+* If the system fails to save the task due to a network or server error: 
+o The system displays an error message and retains the input locally.
+o The task is retried automatically upon connection recovery.
+6.3 Special Requirements
+* Tasks must be linked to a geographic location (via GPS or map selection).
+* Each task must have a unique ID and audit log for traceability.
+* Priority levels must follow a standardized set (e.g., Low, Medium, High).
+6.4 Entry Conditions
+* The supervisor is logged in and has access to the task management interface.
+6.5 Exit Conditions
+* The task is created successfully and visible to the assigned worker(s).
+* If failed, the task is stored locally and queued for retry.
+
+UC7 - Receive and View Assigned Tasks
+7.1 Brief Description
+This use case allows field workers to receive task assignments and view task details, such as title, location, due date, and instructions. Workers are notified immediately when a task is assigned or updated.
+Actor: Field Worker
+7.2 Flow of Events
+7.2.1 Normal Flow - Viewing Assigned Tasks:
+* The worker logs into the mobile application.
+* The system checks for new or updated tasks assigned to the worker.
+* A push notification is sent for each new task.
+* The worker opens the "Tasks" section and views the list of assigned tasks.
+* The worker can click on any task to see its details: title, description, location, priority, and due date.
+7.2.2 Alternative Flow - Offline Mode:
+* If the worker is offline: 
+o Previously loaded tasks remain accessible in read-only mode.
+o New tasks will be fetched and synced once the device reconnects.
+7.2.3 Error Flow - Task Data Missing or Corrupted:
+* If task data fails to load: 
+o The system shows an error message and offers a retry option.
+o The issue is logged for review.
+7.3 Special Requirements
+* The task list should be grouped by status (e.g., Pending, In Progress, Completed).
+* Tasks must remain accessible in offline mode if already fetched.
+* Overdue tasks should be clearly marked with visual indicators.
+7.4 Entry Conditions
+* The worker is logged in and has at least one assigned task.
+7.5 Exit Conditions
+* The worker successfully views all current assigned tasks and their full details.
+
+UC8 - Update Task Status
+8.1 Brief Description
+This use case allows a field worker to update the status of any assigned task based on progress. Available statuses include: Pending, In Progress, Completed, Rejected, and Under Review.
+Actor: Field Worker
+8.2 Flow of Events
+8.2.1 Normal Flow - Updating Task Status:
+* The worker opens the mobile application and navigates to the "Tasks" section.
+* The worker selects an active task from the list.
+* The system displays the current task status and allows selection of a new status.
+* The worker chooses a new status (e.g., In Progress or Completed).
+* The system updates the task in the database and sends a notification to the supervisor.
+8.2.2 Alternative Flow - Invalid Status Transition:
+* If the worker attempts to change the status of a task that is already marked as Completed or Rejected: 
+o The system blocks the update and shows an error message.
+8.2.3 Error Flow - Update Failure:
+* If the update fails due to connectivity issues: 
+o The system stores the status update locally.
+o The update is synced automatically once the internet is available.
+8.3 Special Requirements
+* All status changes must be timestamped and logged.
+* Only allowed transitions should be enabled (e.g., Pending ? In Progress ? Completed).
+* A confirmation prompt should be shown before changing status to Completed or Rejected.
+8.4 Entry Conditions
+* The worker is logged in and has at least one active task assigned.
+8.5 Exit Conditions
+* The task status is successfully updated and stored locally until synchronized with the central database.
+
+UC9 - Submit Task Completion Evidence
+9.1 Brief Description
+This use case allows field workers to submit evidence (e.g., notes, photos, and GPS location) upon completing a task. This ensures that supervisors can verify the quality and location of the work done.
+Actor: Field Worker
+9.2 Flow of Events
+9.2.1 Normal Flow - Submitting Evidence:
+* The worker selects a task marked as Completed.
+* The system prompts the worker to add evidence of completion.
+* The worker attaches photos, writes a note, and confirms the location (auto-fetched via GPS).
+* The system validates the data and submits the evidence via the ASP.NET Core API to the SQL Server database.
+* The supervisor receives a notification for review.
+9.2.2 Alternative Flow - Missing Evidence:
+* If the worker submits without attaching required files or details: 
+o The system prevents submission and highlights missing fields.
+9.2.3 Error Flow - Submission Failure:
+* If the submission fails due to network issues: 
+o The system stores the evidence locally in the Hive database.
+o It is automatically synchronized with the ASP.NET Core API once the internet connection is restored.
+9.3 Special Requirements
+* Images must be compressed to reduce upload size before submission.
+* Each evidence record must be linked to a unique task ID and timestamp.
+* GPS location must be included to verify the worker's presence at the task site.
+9.4 Entry Conditions
+* The worker is logged in and has a task marked as Completed.
+9.5 Exit Conditions
+* Evidence is submitted successfully or queued locally for offline submission.
+* The supervisor is notified and the task moves to "Under Review" status.
+
+UC10 - Report Field Issue
+10.1 Brief Description
+This use case allows field workers to report issues encountered during task execution. Each issue report includes a description, category/type, GPS location, and optional photo evidence. Reports are sent to supervisors for review and forwarding.
+Actor: Field Worker
+10.2 Flow of Events
+10.2.1 Normal Flow - Submitting a New Issue Report:
+* The worker opens the "Report Issue" section in the mobile app.
+* The worker selects the issue type from a predefined list and writes a short description.
+* The worker optionally attaches photos showing the issue.
+* The system automatically captures the current GPS location and timestamp.
+* The report is submitted to the ASP.NET Core API and stored in SQL Server.
+* The supervisor is notified in near real time.
+10.2.2 Alternative Flow - Incomplete Report:
+* If required fields are missing (e.g., issue type or description): 
+o The system highlights missing information and prevents submission.
+10.2.3 Error Flow - Offline Reporting:
+* If the worker is offline: 
+o The report is saved locally in Hive with a status of "Pending Upload."
+o Once connected, the system automatically submits it in the background.
+10.3 Special Requirements
+* Issue reports must be geotagged and time-stamped.
+* Each report should be assigned a unique reference number.
+* Supervisors must be able to view, acknowledge, and forward the report to relevant departments.
+* Image attachments are compressed on-device before upload.
+10.4 Entry Conditions
+* The worker is logged in and actively performing a task.
+10.5 Exit Conditions
+* The issue report is successfully sent or queued locally.
+* The supervisor receives the report and can take appropriate action.
+
+UC11 - Receive Notifications
+11.1 Brief Description
+This use case allows users (workers or supervisors) to receive push notifications about new task assignments, task status updates, supervisor messages, issue reports, and system alerts.
+Actor: Worker, Supervisor
+11.2 Flow of Events
+11.2.1 Normal Flow - Receiving a Notification:
+* A new event occurs (e.g., task assigned, message received, issue reported).
+* The system triggers a push notification to the concerned user.
+* The notification appears on the mobile device with relevant summary info.
+* The user taps the notification to open the corresponding screen in the app.
+11.2.2 Alternative Flow - Notification Center:
+* If the user missed or dismissed a notification: 
+o They can view all recent notifications in the in-app "Notification Center."
+o Unread notifications are marked clearly.
+11.2.3 Error Flow - Notification Not Delivered:
+* If the user is offline: 
+o Notifications are queued and delivered once internet connectivity is restored.
+11.3 Special Requirements
+* Notifications must support Arabic and English content.
+* The app must allow users to configure notification preferences (sound, vibration, mute).
+* Notifications must be delivered in near real time via Firebase Cloud Messaging (FCM), depending on configuration.
+11.4 Entry Conditions
+* The user is logged into the system and has enabled notifications.
+11.5 Exit Conditions
+* The user receives and optionally interacts with the notification.
+
+UC12 - Supervisor Tracking of Worker Locations
+12.1 Brief Description
+This use case allows supervisors to track the real-time geographic location of field workers during working hours using the live map interface. Tracking is based on GPS updates from workers' mobile devices.
+Actor: Supervisor
+12.2 Flow of Events
+12.2.1 Normal Flow - Viewing Real-Time Locations:
+* The supervisor logs into the dashboard and navigates to the "Live Map" section.
+* The system fetches the latest GPS positions of all on-duty workers.
+* The map displays each worker as a marker with their name and status.
+* The supervisor can zoom, filter by zone/team, and click on a marker to view more details.
+* Zone overlays are rendered from official shapefiles to show the worker's position within the correct municipal zone.
+12.2.2 Alternative Flow - No Active Workers:
+* If no workers are currently on duty: 
+o The map displays a message indicating no active users.
+o The supervisor can still view previous positions from attendance logs.
+12.2.3 Error Flow - Incomplete GPS Data:
+* If a worker's location has not been updated: 
+o The marker is shown as "stale" or grayed out.
+o The supervisor is informed of the last known location and timestamp.
+12.3 Special Requirements
+* Location data must update every few minutes during active shifts.
+* Workers must be visually distinguished (color, icon, or label).
+* The system must respect user privacy by disabling tracking outside working hours.
+* When offline, the dashboard displays last-synced positions and cached shapefile zones.
+12.4 Entry Conditions
+* The supervisor is logged in and has access to the tracking interface.
+12.5 Exit Conditions
+* The supervisor successfully views current locations of active field workers.
+
+UC13 - View Performance Reports
+13.1 Brief Description
+This use case allows supervisors to access and analyze performance reports for individual workers, including metrics like attendance regularity, task completion rate, and punctuality. Reports can be filtered, visualized, and exported.
+Actor: Supervisor
+13.2 Flow of Events
+13.2.1 Normal Flow - Viewing Reports:
+* The supervisor opens the "Reports" section from the dashboard.
+* The system loads a summary report of all workers by default.
+* The supervisor selects a specific worker or team to view detailed performance data.
+* The system retrieves relevant data from the SQL Server database through the ASP.NET Core API and displays metrics in tables, charts, and visual indicators.
+* The supervisor may apply filters (date, zone, status) and export the report.
+13.2.2 Alternative Flow - No Data Available:
+* If the selected time period or worker has no records: 
+o The system shows a message like "No data available for this selection."
+13.2.3 Error Flow - Report Load Failure:
+* If the report fails to load due to a server error: 
+o The system displays an error and offers a retry option.
+13.3 Special Requirements
+* Reports must include timestamps, user identifiers, and Zone IDs for spatial context.
+* Charts should be responsive, printable, and support both light/dark themes.
+* Exports must support PDF and Excel formats.
+13.4 Entry Conditions
+* The supervisor is logged in and has at least one worker under supervision.
+13.5 Exit Conditions
+* The supervisor successfully views, filters, or exports the desired performance report.
+
+UC14 - Export Attendance and Task Reports
+14.1 Brief Description
+This use case allows supervisors to export detailed reports related to attendance and task performance for documentation, auditing, or sharing with other departments. Supported formats include PDF and Excel.
+Actor: Supervisor
+14.2 Flow of Events
+14.2.1 Normal Flow - Exporting a Report:
+* The supervisor opens the "Reports" section in the dashboard.
+* The supervisor selects the report type: Attendance or Tasks.
+* A date range and any filters (e.g., worker, zone, task status) are applied.
+* The supervisor chooses the export format (PDF or Excel).
+* The system queries the ASP.NET Core API, generates the report from SQL Server, and provides the file for download or email.
+14.2.2 Alternative Flow - No Records to Export:
+* If the selected filters return no data: 
+o The system shows a message like "No records found for this selection."
+14.2.3 Error Flow - Export Failure:
+* If export fails due to a system or network error: 
+o The system displays an error message.
+o The supervisor is offered to retry or modify the parameters.
+14.3 Special Requirements
+* Exported files must include metadata: generation date, supervisor name, and applied filters.
+* PDF exports must preserve layout and RTL formatting; Excel exports must maintain column structure.
+* Large exports should be processed asynchronously and notify the user upon completion.
+14.4 Entry Conditions
+* The supervisor is logged in and authorized to access reports.
+14.5 Exit Conditions
+* The report is successfully exported, downloaded, or shared via email.
+
+UC15 - Offline Task Execution and Sync
+15.1 Brief Description
+This use case allows field workers to continue working in offline mode viewing tasks, updating statuses, submitting evidence, and reporting issues. Once internet connectivity is restored, all offline actions are automatically synchronized with the backend.
+Actor: Field Worker
+15.2 Flow of Events
+15.2.1 Normal Flow - Working Offline:
+* The worker loses internet connection while on duty.
+* The application notifies the worker that offline mode is active.
+* The worker continues to view preloaded tasks and perform actions such as: 
+o Update task status
+o Submit task evidence
+o Report a field issue
+* All actions are stored locally in the Hive database.
+15.2.2 Normal Flow - Syncing After Reconnection:
+* Once connectivity is restored: 
+o The system detects the internet connection.
+o All pending offline actions are automatically synchronized with the ASP.NET Core API, which writes data to the SQL Server database.
+o The worker receives confirmation that synchronization was successful.
+15.2.3 Error Flow - Sync Failure:
+* If synchronization fails: 
+o The system retries automatically in the background.
+o The user is notified and can retry manually if needed.
+15.3 Special Requirements
+* Offline data must be encrypted and stored securely on the device.
+* Sync status must be clearly indicated (e.g., Pending, Syncing, Completed).
+* Conflicts (e.g., multiple updates to the same record) must be handled deterministically using event timestamps.
+15.4 Entry Conditions
+* The device has no internet connection.
+* The user is already logged in with preloaded data.
+15.5 Exit Conditions
+* All offline actions are successfully synchronized with the central database once connectivity is restored.
+
+UC16 - Admin Manage User Accounts
+16.1 Brief Description
+This use case allows the system administrator to manage user accounts, including approving new registrations, assigning or modifying roles, deactivating accounts, and updating user information.
+Actor: Administrator
+16.2 Flow of Events
+16.2.1 Normal Flow - Managing User Accounts:
+* The admin logs into the system and opens the "User Management" panel.
+* The system displays a list of registered users with their current roles and statuses.
+* The admin can: 
+o Approve or reject pending registration requests
+o Assign or change user roles (Worker, Supervisor, Admin)
+o Edit user details (e.g., phone, email)
+o Activate or deactivate accounts
+* The system saves all changes to the SQL Server database through the ASP.NET Core API and records them in the audit log.
+16.2.2 Alternative Flow - Bulk Updates:
+* The admin may select multiple users to: 
+o Assign the same role
+o Activate or deactivate accounts in batch
+16.2.3 Error Flow - Role Conflict or Action Denied:
+* If the admin attempts an invalid operation (e.g., removing their own admin access): 
+o The system blocks the action and displays an appropriate error message.
+16.3 Special Requirements
+* All account changes must be logged with timestamps and admin identifiers in the audit trail.
+* Only administrators may access the user management interface.
+* Role options must be limited to predefined values.
+16.4 Entry Conditions
+* The user is logged in as an administrator.
+16.5 Exit Conditions
+* User accounts are updated successfully.
+* All changes are reflected in the system and audit log.
+
+UC17 - Log System Activities (Audit Trail)
+17.1 Brief Description
+This use case ensures that the system automatically logs critical actions performed by users (e.g., login, task updates, attendance submissions) for auditing, security, and accountability purposes.
+Actor: System (automated)
+17.2 Flow of Events
+17.2.1 Normal Flow - Logging System Activities:
+* A user performs a system action (e.g., logs in, submits a task, checks in/out).
+* The system captures the following metadata: 
+o User ID
+o Timestamp
+o Action type
+o Additional data (e.g., GPS location for attendance or zone ID)
+* The record is written to the AuditLog table in the SQL Server database via the ASP.NET Core API.
+* Administrators can later retrieve and review these logs through the dashboard.
+17.2.2 Alternative Flow - Filtering Logs:
+* Admins can apply filters by: 
+o User
+o Action type
+o Date range
+17.2.3 Error Flow - Log Write Failure:
+* If the system fails to log an action: 
+o The failure is recorded in a separate error log.
+o A notification is sent to the admin depending on severity.
+17.3 Special Requirements
+* Audit logs must be write-only (immutable) and protected from unauthorized access.
+* Logs should be retained for a configurable period (e.g., one year).
+* The audit interface must be restricted to authorized administrators only.
+17.4 Entry Conditions
+* A user performs any action defined as auditable.
+17.5 Exit Conditions
+* The action is successfully logged and securely stored in the database.
+
+UC18 - Switch App Language (Arabic)
+18.1 Brief Description
+This use case defines how the system maintains its Arabic interface across the entire application. Although future versions may support English, the current implementation is fully Arabic, ensuring consistency in layout, messages, and labels.
+Actor: Any Logged-in User
+18.2 Flow of Events
+18.2.1 Normal Flow - Arabic Interface Display:
+* The user launches the application or logs in.
+* The system automatically loads the Arabic interface with right-to-left (RTL) layout.
+* All forms, buttons, and messages are displayed in Arabic.
+* The language preference is stored by default and applied automatically in every session.
+18.2.2 Alternative Flow - Future Multilingual Option:
+* In future updates, users may be able to select an additional language (e.g., English) through the "Settings" page.
+* The change would apply dynamically without restarting the app.
+18.2.3 Error Flow - Missing Translations:
+* If a label or message is missing in Arabic: 
+o The system displays a fallback placeholder.
+o The issue is logged for correction in the next release.
+18.3 Special Requirements
+* The interface must fully support RTL alignment for Arabic.
+* All messages, notifications, and labels must be verified for linguistic and contextual accuracy.
+* Multilingual options are disabled by default in this version.
+18.4 Entry Conditions
+* The user is logged in or launching the app for the first time.
+18.5 Exit Conditions
+* The Arabic interface loads correctly and remains consistent throughout the application.
+This appendix presented detailed specifications for all 18 use cases identified in the system analysis phase. Each use case is directly aligned with the functional requirements outlined in Section 3.1.6 and collectively represents the full functional coverage of the proposed mobile-based field workforce management system.
+
+Glossary (Data Dictionary)
+Table A.1: Glossary of Key Terms and Enum Values
+Term
+Description
+Example / Type
+RoleType
+Defines the type of system user
+FieldWorker, Supervisor, Admin
+TaskStatus
+Indicates current task state
+Pending, InProgress, Completed
+IssueType
+Classification of reported issue
+Technical, Security, Other
+AttendanceType
+Method and direction of attendance logging
+Auto (GPS Check-In/Out), Manual Check-In/Out
+AttendanceStatus
+Indicates the attendance action being recorded
+Check-In, Check-Out
+triggeredByEvent
+Event that triggered a notification
+TaskAssigned, IssueReported
+NotificationType
+Specifies the category of the notification
+TaskAssigned, TaskCompleted, NewIssue
+OfflineAction
+Actions done offline to be synced later
+SubmitTask, LogAttendance
+GeoPoint
+Represents geographic location
+lat: float, lon: float
+DepartmentName
+Name of department to which issues may be forwarded
+Maintenance, Security, IT
+
+Appendix B: Additional Screenshotssss
+
+Appendix C: Similarity Report
+
+
+

@@ -21,7 +21,8 @@ type IssueListItem = {
 type FilterKey = "all" | "new" | "reviewing" | "converted" | "closed";
 
 // Map backend severity to frontend severity
-const mapSeverity = (severity: string): Severity => {
+const mapSeverity = (severity: string | null | undefined): Severity => {
+  if (!severity) return "medium";
   switch (severity.toLowerCase()) {
     case "minor": return "low";
     case "medium": return "medium";
@@ -32,7 +33,8 @@ const mapSeverity = (severity: string): Severity => {
 };
 
 // Map backend status to frontend status
-const mapStatus = (status: string): IssueStatus => {
+const mapStatus = (status: string | null | undefined): IssueStatus => {
+  if (!status) return "new";
   switch (status) {
     case "Reported": return "new";
     case "UnderReview": return "reviewing";
@@ -56,8 +58,10 @@ const mapTypeToArabic = (type: string): string => {
 
 // Convert backend IssueResponse to frontend IssueListItem
 const mapIssueToListItem = (issue: IssueResponse): IssueListItem => {
-  const date = new Date(issue.reportedAt);
-  const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  const date = issue.reportedAt ? new Date(issue.reportedAt) : new Date();
+  const formattedDate = isNaN(date.getTime()) 
+    ? "تاريخ غير صالح" 
+    : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 
   return {
     id: `i-${issue.issueId}`,
@@ -136,7 +140,7 @@ export default function Issues() {
   };
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-background overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-center justify-between gap-3">

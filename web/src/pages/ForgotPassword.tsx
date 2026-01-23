@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import logo from "../assets/logo.png";
+import { useMunicipality } from "../contexts/MunicipalityContext";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
+  const { municipalityName } = useMunicipality();
 
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen w-full bg-[#D9D9D9] grid place-items-center p-4">
+    <div dir="rtl" className="min-h-screen w-full bg-background grid place-items-center p-4">
       <div className="w-full max-w-[520px] bg-[#F3F1ED] rounded-[18px] p-6 sm:p-8 shadow-[0_10px_25px_rgba(0,0,0,0.08)] border border-black/10">
         <div className="flex items-center justify-between">
           <div className="text-right">
@@ -42,7 +44,7 @@ export default function ForgotPassword() {
               أدخل رقم الهاتف لإرسال رمز التحقق
             </div>
           </div>
-          <img src={logo} alt="بلدية البيرة" className="w-[56px] h-[56px] object-contain" />
+          <img src={logo} alt={municipalityName} className="w-[56px] h-[56px] object-contain" />
         </div>
 
         {error && (

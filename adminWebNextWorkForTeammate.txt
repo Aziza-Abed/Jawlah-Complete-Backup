@@ -1,0 +1,2170 @@
+================================================================================
+                 ADMIN WEB DASHBOARD - COMPLETE SPECIFICATION
+                         For Web Frontend Developer
+================================================================================
+
+PROJECT: FollowUp Municipality Management System
+DOCUMENT: Admin Web Dashboard Requirements
+BACKEND STATUS: ✅ Backend APIs Complete - Ready for Frontend Implementation
+LAST UPDATED: 2026-01-19
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. OVERVIEW AND PURPOSE
+2. ADMIN ROLE RESPONSIBILITIES
+3. BACKEND API STATUS - COMPLETE AND READY ✅
+4. FRONTEND TECHNOLOGY STACK
+5. ADMIN DASHBOARD FEATURES
+   5.1 User Management
+   5.2 Supervisor Assignment
+   5.3 System Monitoring Dashboard
+   5.4 Municipality & Zone Management (Includes GIS File Import)
+   5.5 Task Management & Oversight (Includes Recurring/Daily Tasks)
+   5.6 Supervisor Performance Tracking (New)
+   5.7 Reports & Analytics
+   5.8 System Configuration
+6. DETAILED FEATURE SPECIFICATIONS
+7. UI/UX GUIDELINES
+8. TESTING CHECKLIST
+9. DEPLOYMENT NOTES
+
+================================================================================
+1. OVERVIEW AND PURPOSE
+================================================================================
+
+The Admin Web Dashboard is the highest-level administrative interface for the
+FollowUp Municipality Management System. Admins have complete system control and
+oversight capabilities.
+
+KEY RESPONSIBILITIES:
+- User Management (Create/Edit/Delete Users)
+- Supervisor Assignment (Assign workers to supervisors)
+- Municipality & Zone Configuration
+- System-Wide Monitoring
+- Access to All Reports
+- Task Oversight (View/Edit/Reassign all tasks)
+- System Configuration
+- Audit Trail Review
+
+TARGET USERS:
+- Municipality IT Administrators
+- System Administrators
+- Municipality Management
+- Technical Support Staff
+
+================================================================================
+2. ADMIN ROLE RESPONSIBILITIES
+================================================================================
+
+FULL SYSTEM ACCESS:
+✅ Create, edit, and deactivate user accounts (Workers, Supervisors, Admins)
+✅ Assign workers to supervisors
+✅ Configure municipalities, districts, and zones
+✅ View and manage all tasks across the system
+✅ Access all reports and analytics
+✅ Monitor system health and user activity
+✅ Reset user passwords and device bindings
+✅ Configure system-wide settings
+✅ Review audit logs
+
+DIFFERENCES FROM SUPERVISOR:
+- Admins: Full system access, multiple municipalities, create users
+- Supervisors: Limited to assigned workers, cannot create users
+
+================================================================================
+3. BACKEND API STATUS - COMPLETE AND READY ✅
+================================================================================
+
+ALL BACKEND APIs ARE IMPLEMENTED AND TESTED!
+You can start building the frontend immediately.
+
+Base URL: http://localhost:5000/api (or your configured backend URL)
+
+Authentication: All admin endpoints require:
+  Authorization: Bearer {JWT_TOKEN}
+  User must have role: "Admin"
+
+─────────────────────────────────────────────────────────────────────────────
+3.1 USER MANAGEMENT APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ CREATE NEW USER (Worker/Supervisor/Admin)                                │
+├──────────────────────────────────────────────────────────────────────────┤
+│ POST /api/auth/register                                                  │
+│ Authorization: Bearer {token}                                            │
+│ NOTE: Currently [AllowAnonymous] for first admin - re-enable [Authorize]│
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "username": "emp001",              // Unique employee ID              │
+│   "fullName": "أحمد محمد",           // Full Arabic name               │
+│   "email": "admin@example.com",      // Required for Admin/Supervisor   │
+│   "phoneNumber": "0599123456",       // Required                        │
+│   "password": "SecurePass123!",      // Strong password required        │
+│   "role": "Worker",                  // Worker/Supervisor/Admin         │
+│   "workerType": "Cleaning",          // If role=Worker: Cleaning/       │
+│                                      //   Maintenance/Inspection/Other  │
+│   "department": "نظافة",             // Department name                 │
+│   "municipalityId": 1                // Municipality ID                 │
+│ }                                                                        │
+│                                                                          │
+│ Response (201 Created):                                                  │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "message": "تم تسجيل المستخدم بنجاح",                                  │
+│   "data": {                                                              │
+│     "userId": 123,                                                       │
+│     "username": "emp001",                                                │
+│     "fullName": "أحمد محمد",                                             │
+│     "role": "Worker",                                                    │
+│     "status": "Active",                                                  │
+│     "createdAt": "2026-01-19T10:30:00Z"                                  │
+│   }                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET ALL USERS (with pagination and filtering)                            │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/users?status=Active&page=1&pageSize=50                         │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Query Parameters:                                                        │
+│   status: Active/Inactive/Suspended (optional)                          │
+│   page: Page number (default: 1)                                        │
+│   pageSize: Items per page (default: 50, max: 100)                      │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": {                                                              │
+│     "items": [                                                           │
+│       {                                                                  │
+│         "userId": 123,                                                   │
+│         "username": "emp001",                                            │
+│         "fullName": "أحمد محمد",                                         │
+│         "role": "Worker",                                                │
+│         "workerType": "Cleaning",                                        │
+│         "department": "نظافة",                                           │
+│         "status": "Active",                                              │
+│         "phoneNumber": "0599123456",                                     │
+│         "email": null,                                                   │
+│         "supervisorId": 45,              // null if no supervisor        │
+│         "lastLoginAt": "2026-01-19T08:00:00Z",                           │
+│         "createdAt": "2026-01-10T10:00:00Z",                             │
+│         "lastBatteryLevel": 85,          // Battery percentage           │
+│         "isLowBattery": false,                                           │
+│         "warningCount": 0                                                │
+│       }                                                                  │
+│     ],                                                                   │
+│     "totalCount": 150,                                                   │
+│     "page": 1,                                                           │
+│     "pageSize": 50                                                       │
+│   }                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET USERS BY ROLE                                                         │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/users/by-role/{role}                                           │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Path Parameters:                                                         │
+│   role: Worker/Supervisor/Admin                                         │
+│                                                                          │
+│ Example: GET /api/users/by-role/Supervisor                              │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": [                                                              │
+│     {                                                                    │
+│       "userId": 45,                                                      │
+│       "username": "super001",                                            │
+│       "fullName": "محمد علي",                                            │
+│       "role": "Supervisor",                                              │
+│       "department": "العمليات",                                          │
+│       "status": "Active",                                                │
+│       "phoneNumber": "0598111222",                                       │
+│       "email": "supervisor@example.com",                                 │
+│       "supervisorId": null,                                              │
+│       "lastLoginAt": "2026-01-19T07:30:00Z"                              │
+│     }                                                                    │
+│   ]                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET SINGLE USER BY ID                                                     │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/users/{id}                                                      │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": {                                                              │
+│     "userId": 123,                                                       │
+│     "username": "emp001",                                                │
+│     "fullName": "أحمد محمد",                                             │
+│     "role": "Worker",                                                    │
+│     "workerType": "Cleaning",                                            │
+│     "department": "نظافة",                                               │
+│     "status": "Active",                                                  │
+│     "phoneNumber": "0599123456",                                         │
+│     "supervisorId": 45,                                                  │
+│     "municipalityId": 1,                                                 │
+│     "createdAt": "2026-01-10T10:00:00Z",                                 │
+│     "lastLoginAt": "2026-01-19T08:00:00Z",                               │
+│     "warningCount": 0,                                                   │
+│     "lastBatteryLevel": 85,                                              │
+│     "isLowBattery": false,                                               │
+│     "registeredDeviceId": "device123abc"                                 │
+│   }                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET DETAILED USER PROFILE (for viewing worker performance)               │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/users/{id}/profile                                             │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Returns comprehensive user profile with:                                │
+│   - Basic user info                                                      │
+│   - Performance stats (completion rate, avg completion time)            │
+│   - Assigned zones                                                       │
+│   - Recent tasks (last 10)                                               │
+│   - Recent attendance (last 7 days)                                      │
+│   - Work schedule                                                        │
+│   - Warning history                                                      │
+│   - Battery status                                                       │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": {                                                              │
+│     "userId": 123,                                                       │
+│     "fullName": "أحمد محمد",                                             │
+│     "username": "emp001",                                                │
+│     "email": null,                                                       │
+│     "phoneNumber": "0599123456",                                         │
+│     "role": "Worker",                                                    │
+│     "workerType": "Cleaning",                                            │
+│     "department": "نظافة",                                               │
+│     "status": "Active",                                                  │
+│     "createdAt": "2026-01-10T10:00:00Z",                                 │
+│     "lastLoginAt": "2026-01-19T08:00:00Z",                               │
+│     "supervisorId": 45,                                                  │
+│                                                                          │
+│     "expectedStartTime": "07:00",                                        │
+│     "expectedEndTime": "15:00",                                          │
+│     "graceMinutes": 15,                                                  │
+│                                                                          │
+│     "warningCount": 0,                                                   │
+│     "lastWarningAt": null,                                               │
+│     "lastWarningReason": null,                                           │
+│     "lastBatteryLevel": 85,                                              │
+│     "lastBatteryReportTime": "2026-01-19T09:00:00Z",                     │
+│     "isLowBattery": false,                                               │
+│                                                                          │
+│     "assignedZones": [                                                   │
+│       {                                                                  │
+│         "zoneId": 10,                                                    │
+│         "zoneName": "منطقة المركز",                                      │
+│         "assignedAt": "2026-01-10T10:00:00Z"                             │
+│       }                                                                  │
+│     ],                                                                   │
+│                                                                          │
+│     "completionRate": 87.5,             // % (last 30 days)             │
+│     "avgCompletionTimeHours": 2.3,      // Average hours to complete    │
+│     "totalTasksLast30Days": 40,                                          │
+│     "completedTasksLast30Days": 35,                                      │
+│                                                                          │
+│     "recentTasks": [                                                     │
+│       {                                                                  │
+│         "taskId": 456,                                                   │
+│         "title": "تنظيف الحديقة الرئيسية",                               │
+│         "status": "Completed",                                           │
+│         "priority": "High",                                              │
+│         "createdAt": "2026-01-18T10:00:00Z",                             │
+│         "dueDate": "2026-01-18T16:00:00Z",                               │
+│         "completedAt": "2026-01-18T14:30:00Z",                           │
+│         "progressPercentage": 100                                        │
+│       }                                                                  │
+│     ],                                                                   │
+│                                                                          │
+│     "recentAttendance": [                                                │
+│       {                                                                  │
+│         "attendanceId": 789,                                             │
+│         "checkInTime": "2026-01-19T07:05:00Z",                           │
+│         "checkOutTime": null,                                            │
+│         "status": "CheckedIn",                                           │
+│         "lateMinutes": 5,                                                │
+│         "isValidated": true,                                             │
+│         "validationMessage": "في الوقت المحدد (مع فترة السماح)"          │
+│       }                                                                  │
+│     ]                                                                    │
+│   }                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ UPDATE USER STATUS (Activate/Deactivate/Suspend)                         │
+├──────────────────────────────────────────────────────────────────────────┤
+│ PUT /api/users/{id}/status                                              │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "status": "Active"      // Active/Inactive/Suspended                  │
+│ }                                                                        │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": { /* updated user object */ }                                 │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ SOFT DELETE USER (Set to Inactive)                                       │
+├──────────────────────────────────────────────────────────────────────────┤
+│ DELETE /api/users/{id}                                                   │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+│                                                                          │
+│ NOTE: This doesn't actually delete the user, just sets status=Inactive  │
+│                                                                          │
+│ Response (204 No Content)                                                │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ RESET USER PASSWORD (Admin Reset)                                        │
+├──────────────────────────────────────────────────────────────────────────┤
+│ POST /api/users/{id}/reset-password                                     │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "newPassword": "NewSecurePass123!"  // Must meet strength requirements│
+│ }                                                                        │
+│                                                                          │
+│ Password Requirements:                                                   │
+│   - At least 8 characters                                                │
+│   - Contains uppercase and lowercase letters                            │
+│   - Contains at least one number                                         │
+│   - Contains at least one special character                              │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "message": "تم إعادة تعيين كلمة المرور بنجاح",                         │
+│   "data": null                                                           │
+│ }                                                                        │
+│                                                                          │
+│ NOTE: This also resets any account lockout                               │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ RESET DEVICE BINDING (when worker gets new phone)                        │
+├──────────────────────────────────────────────────────────────────────────┤
+│ POST /api/users/{id}/reset-device                                       │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Use Case: Worker got a new phone and can't login because device is      │
+│           bound to old phone. This clears the device binding.           │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": {                                                              │
+│     "message": "تم إعادة تعيين ربط الجهاز بنجاح..."                     │
+│   }                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────────────────
+3.2 SUPERVISOR ASSIGNMENT APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+IMPORTANT: To assign a worker to a supervisor, you need to update the worker's
+SupervisorId field. This is done by creating a user update endpoint or by
+modifying the user during creation.
+
+Currently, supervisor assignment can be done by:
+1. Setting supervisorId when creating a new worker via POST /api/auth/register
+2. Updating the User entity directly (need to add PUT /api/users/{id} endpoint)
+
+RECOMMENDED NEW ENDPOINT (needs to be added to backend):
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ASSIGN WORKER TO SUPERVISOR                                              │
+├──────────────────────────────────────────────────────────────────────────┤
+│ PUT /api/users/{workerId}/supervisor                                    │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "supervisorId": 45     // Set to null to unassign                     │
+│ }                                                                        │
+│                                                                          │
+│ STATUS: ⚠️ NEEDS TO BE ADDED TO BACKEND                                 │
+│                                                                          │
+│ ALTERNATIVE: For now, you can update SupervisorId when creating the     │
+│              worker account via POST /api/auth/register by including    │
+│              "supervisorId": 45 in the request body                     │
+└──────────────────────────────────────────────────────────────────────────┘
+
+To check supervisor's workers:
+GET /api/users/my-workers (from supervisor's perspective - already implemented)
+
+─────────────────────────────────────────────────────────────────────────────
+3.3 ZONE MANAGEMENT APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET USER'S ASSIGNED ZONES                                                │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/users/{id}/zones                                               │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": [                                                              │
+│     {                                                                    │
+│       "zoneId": 10,                                                      │
+│       "zoneName": "منطقة المركز",                                        │
+│       "zoneCode": "Z-001",                                               │
+│       "assignedAt": "2026-01-10T10:00:00Z"                               │
+│     }                                                                    │
+│   ]                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ASSIGN ZONES TO WORKER                                                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ POST /api/users/{id}/zones                                              │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ NOTE: This replaces ALL zone assignments for the worker                 │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "zoneIds": [10, 11, 15]    // Array of zone IDs to assign            │
+│ }                                                                        │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": {                                                              │
+│     "message": "تم تعيين المناطق بنجاح",                                 │
+│     "assignedZones": 3                                                   │
+│   }                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ REMOVE SINGLE ZONE FROM WORKER                                           │
+├──────────────────────────────────────────────────────────────────────────┤
+│ DELETE /api/users/{id}/zones/{zoneId}                                   │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ NOTE: Cannot remove the last zone - worker must have at least one zone  │
+│                                                                          │
+│ Response (204 No Content)                                                │
+└──────────────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────────────────
+3.4 MUNICIPALITY & ZONE CRUD APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET ALL MUNICIPALITIES                                                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/municipality                                                    │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+│                                                                          │
+│ Response includes zone count and user count for each municipality       │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET MUNICIPALITY BY ID                                                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/municipality/{id}                                              │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ CREATE NEW MUNICIPALITY                                                  │
+├──────────────────────────────────────────────────────────────────────────┤
+│ POST /api/municipality                                                   │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "code": "RAMALLAH",                      // Unique code               │
+│   "name": "بلدية رام الله",                // Arabic name               │
+│   "nameEnglish": "Ramallah Municipality",  // English name              │
+│   "country": "Palestine",                                                │
+│   "region": "West Bank",                                                 │
+│   "contactEmail": "info@ramallah.ps",                                    │
+│   "contactPhone": "022987654",                                           │
+│   "address": "شارع الرئيسي، رام الله",                                  │
+│   "minLatitude": 31.88,                    // Bounding box              │
+│   "maxLatitude": 31.92,                                                  │
+│   "minLongitude": 35.18,                                                 │
+│   "maxLongitude": 35.22,                                                 │
+│   "defaultStartTime": "07:00",             // Work schedule defaults    │
+│   "defaultEndTime": "15:00",                                             │
+│   "defaultGraceMinutes": 15,               // Late arrival grace        │
+│   "maxAcceptableAccuracyMeters": 100,      // GPS accuracy requirement  │
+│   "licenseExpiresAt": "2027-01-01T00:00:00Z", // System license        │
+│   "gisFileUrl": "https://storage.../zones.shp" // NEW: Shapefile Upload │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GIS FILE UPLOAD (New Requirement)                                        │
+├──────────────────────────────────────────────────────────────────────────┤
+│ Admin must be able to upload GIS files (Shapefile/GeoJSON) to define     │
+│ the municipality's boundaries and zones efficiently.                     │
+│ - Upload UI in "My Municipality" settings                                │
+│ - Backend parses file and auto-creates/updates Zones                     │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ UPDATE MUNICIPALITY                                                      │
+├──────────────────────────────────────────────────────────────────────────┤
+│ PUT /api/municipality/{id}                                              │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+│                                                                          │
+│ Same request body as CREATE                                              │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ DELETE MUNICIPALITY                                                      │
+├──────────────────────────────────────────────────────────────────────────┤
+│ DELETE /api/municipality/{id}                                           │
+│ Authorization: Bearer {token}                                            │
+│ Admin Only                                                               │
+│                                                                          │
+│ NOTE: Soft delete - sets IsActive = false                               │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ZONE MANAGEMENT (Districts/Zones within Municipality)                    │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/zones                          - Get all zones (Admin only)    │
+│ GET /api/zones/{id}                     - Get zone by ID                │
+│ POST /api/zones                         - Create new zone (Admin only)  │
+│ PUT /api/zones/{id}                     - Update zone (Admin only)      │
+│ DELETE /api/zones/{id}                  - Delete zone (Admin only)      │
+│                                                                          │
+│ Zone includes: name, code, municipality, geometry (GeoJSON), area size  │
+└──────────────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────────────────
+3.5 TASK MANAGEMENT APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET ALL TASKS (with filtering)                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/tasks?status=Pending&priority=High&page=1&pageSize=50         │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Query Parameters:                                                        │
+│   status: Pending/InProgress/Completed/Approved/Rejected/Cancelled      │
+│   priority: Low/Normal/Medium/High/Urgent                               │
+│   assignedToUserId: Filter by worker                                    │
+│   zoneId: Filter by zone                                                │
+│   page: Page number                                                      │
+│   pageSize: Items per page                                               │
+│                                                                          │
+│ Admin sees ALL tasks in system                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ CREATE NEW TASK                                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│ POST /api/tasks                                                          │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "title": "تنظيف الحديقة المركزية",                                    │
+│   "description": "تنظيف شامل للحديقة وإزالة النفايات",                   │
+│   "taskType": "Cleaning",            // Cleaning/Maintenance/Inspection │
+│   "priority": "High",                // Low/Normal/Medium/High/Urgent   │
+│   "assignedToUserId": 123,           // Worker ID                       │
+│   "zoneId": 10,                      // Zone ID                         │
+│   "latitude": 31.9,                  // GPS coordinates                 │
+│   "longitude": 35.2,                                                     │
+│   "dueDate": "2026-01-20T16:00:00Z", // Deadline                        │
+│   "estimatedDurationHours": 2        // Expected time to complete       │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ RECURRING TASK TEMPLATES (Daily Tasks)                                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ NEW FEATURE REQUIRED:                                                    │
+│ Admin should be able to define "Daily Routes" or "Recurring Tasks".      │
+│ - Frequency: Daily/Weekly                                                │
+│ - Assignee: Specific Worker or "Open for Supervisor Assignment"          │
+│ - Zone: Linked to specific GIS zone                                      │
+└──────────────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────────────────
+3.6 SUPERVISOR OVERSEEING & TRACKING (New Section)
+─────────────────────────────────────────────────────────────────────────────
+Since Supervisors are office-based, Admin tracks their MANAGEMENT performance:
+1. Team Attendance Rate: Are their assigned workers showing up?
+2. Task Completion Rate: Is their zone being cleaned?
+3. Issue Resolution Time: How fast are they fixing reported problems?
+4. Complaints/Issues: View issues raised BY the Supervisor to Admin.
+
+Suggested UI: "Supervisor Performance Dashboard"
+- List of Supervisors card view
+- Sparkline charts for their team's performance
+- "Open Issues" counter for each supervisor
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ UPDATE TASK                                                              │
+├──────────────────────────────────────────────────────────────────────────┤
+│ PUT /api/tasks/{id}                                                      │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Same request body as CREATE                                              │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ REASSIGN TASK TO DIFFERENT WORKER                                        │
+├──────────────────────────────────────────────────────────────────────────┤
+│ PUT /api/tasks/{id}/reassign                                            │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "newAssignedToUserId": 124,                                            │
+│   "reassignmentReason": "العامل الأصلي في إجازة مرضية"                  │
+│ }                                                                        │
+│                                                                          │
+│ Admin can reassign ANY task to ANY worker                                │
+│ Supervisor can only reassign between their own workers                  │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ DELETE/CANCEL TASK                                                       │
+├──────────────────────────────────────────────────────────────────────────┤
+│ DELETE /api/tasks/{id}                                                   │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Sets task status to Cancelled                                            │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ REVIEW COMPLETED TASK (Approve/Reject)                                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ POST /api/tasks/{id}/review                                             │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "decision": "Approved",         // Approved/Rejected                  │
+│   "reviewNotes": "عمل ممتاز، تم إنجاز المهمة بشكل كامل"                 │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────────────────
+3.6 DASHBOARD & MONITORING APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET DASHBOARD OVERVIEW                                                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/dashboard/overview                                             │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Response (200 OK):                                                       │
+│ {                                                                        │
+│   "success": true,                                                       │
+│   "data": {                                                              │
+│     "workers": {                                                         │
+│       "total": 150,                 // Total active workers             │
+│       "checkedIn": 120,             // Currently checked in             │
+│       "checkedOut": 25,             // Checked out today                │
+│       "notCheckedIn": 5             // Didn't check in yet              │
+│     },                                                                   │
+│     "tasks": {                                                           │
+│       "createdToday": 45,           // New tasks created today          │
+│       "pending": 30,                // Pending tasks                    │
+│       "inProgress": 85,             // In progress tasks                │
+│       "completedToday": 40          // Completed today                  │
+│     },                                                                   │
+│     "issues": {                                                          │
+│       "reportedToday": 12,          // New issues reported today        │
+│       "unresolved": 25              // Total unresolved issues          │
+│     },                                                                   │
+│     "date": "2026-01-19T00:00:00Z"  // Today's date                     │
+│   }                                                                      │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET WORKER STATUS (Real-time worker activity)                            │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/dashboard/worker-status                                        │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Response shows current status of all active workers:                    │
+│   - Check-in status                                                      │
+│   - Current zone                                                         │
+│   - Task counts (pending/completed)                                      │
+│   - Real-time activity                                                   │
+│                                                                          │
+│ Perfect for live monitoring dashboard                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────────────────
+3.7 REPORTS & ANALYTICS APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET TASKS REPORT                                                         │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/reports/tasks/summary                                          │
+│    ?period=monthly&status=Completed&startDate=2026-01-01&endDate=2026-01-31│
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Query Parameters:                                                        │
+│   period: daily/weekly/monthly/yearly (default: monthly)                │
+│   status: Pending/InProgress/Completed (optional)                       │
+│   startDate: YYYY-MM-DD (optional)                                       │
+│   endDate: YYYY-MM-DD (optional)                                         │
+│                                                                          │
+│ Response includes:                                                       │
+│   - Total task count                                                     │
+│   - Breakdown by status                                                  │
+│   - Active/total workers                                                 │
+│   - Tasks grouped by time period                                         │
+│   - Top 50 recent tasks                                                  │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET WORKERS REPORT                                                       │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/reports/workers/summary                                        │
+│    ?period=monthly&startDate=2026-01-01&endDate=2026-01-31             │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Response includes:                                                       │
+│   - Total worker count                                                   │
+│   - Currently checked in/absent                                          │
+│   - Compliance percentage (attendance rate)                              │
+│   - Attendance grouped by time period                                    │
+│   - Top 5 workers by workload                                            │
+│   - Individual worker stats (tasks, attendance)                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET ATTENDANCE REPORT                                                    │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/reports/attendance/summary                                     │
+│    ?period=monthly&startDate=2026-01-01&endDate=2026-01-31             │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Response includes:                                                       │
+│   - Total attendance records                                             │
+│   - On-time vs late breakdown                                            │
+│   - Compliance percentage                                                │
+│   - Attendance trends by period                                          │
+│   - Individual attendance records                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ EXPORT REPORTS (Excel/PDF)                                               │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/reports/tasks/export-excel?period=monthly                      │
+│ GET /api/reports/tasks/export-pdf?period=monthly                        │
+│ GET /api/reports/workers/export-excel?period=monthly                    │
+│ GET /api/reports/workers/export-pdf?period=monthly                      │
+│ GET /api/reports/attendance/export-excel?period=monthly                 │
+│ GET /api/reports/attendance/export-pdf?period=monthly                   │
+│                                                                          │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Returns file download (application/vnd.openxmlformats or application/pdf)│
+└──────────────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────────────────
+3.8 AUDIT & TRACKING APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET AUDIT LOGS                                                           │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/audit?userId=123&action=UserCreated&startDate=2026-01-01      │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Query Parameters:                                                        │
+│   userId: Filter by user (optional)                                     │
+│   action: Filter by action type (optional)                              │
+│   startDate: From date (optional)                                       │
+│   endDate: To date (optional)                                           │
+│   page: Page number                                                      │
+│   pageSize: Items per page                                               │
+│                                                                          │
+│ Returns complete audit trail of system actions                           │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET WORKER LOCATION TRACKING                                             │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/tracking/worker/{workerId}/current                             │
+│ GET /api/tracking/worker/{workerId}/history                             │
+│    ?startDate=2026-01-19&endDate=2026-01-19                             │
+│                                                                          │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Returns GPS location history for worker tracking                         │
+└──────────────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────────────────
+3.9 ISSUES MANAGEMENT APIs - COMPLETE ✅
+─────────────────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ GET ALL ISSUES (reported by citizens/workers)                            │
+├──────────────────────────────────────────────────────────────────────────┤
+│ GET /api/issues?status=Reported&category=Cleaning&page=1               │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Admin can see ALL issues in the system                                   │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ASSIGN ISSUE TO WORKER / CONVERT TO TASK                                │
+├──────────────────────────────────────────────────────────────────────────┤
+│ POST /api/issues/{id}/assign                                            │
+│ POST /api/issues/{id}/create-task                                       │
+│                                                                          │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Allows admin to create tasks from citizen-reported issues                │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ UPDATE ISSUE STATUS                                                      │
+├──────────────────────────────────────────────────────────────────────────┤
+│ PUT /api/issues/{id}/status                                             │
+│ Authorization: Bearer {token}                                            │
+│                                                                          │
+│ Request Body:                                                            │
+│ {                                                                        │
+│   "status": "Resolved",           // Reported/Assigned/InProgress/      │
+│                                   // Resolved/Dismissed                 │
+│   "notes": "تم حل المشكلة بنجاح"                                         │
+│ }                                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+4. FRONTEND TECHNOLOGY STACK
+================================================================================
+
+FRAMEWORK: React 18 with TypeScript
+BUILD TOOL: Vite
+STATE MANAGEMENT: Redux Toolkit (or Context API for smaller state)
+UI LIBRARY: Material-UI (MUI) v5 or Ant Design
+ROUTING: React Router v6
+HTTP CLIENT: Axios
+MAPS: Leaflet with React-Leaflet (OpenStreetMap)
+CHARTS: Recharts or Chart.js
+FORMS: React Hook Form + Zod validation
+TABLES: TanStack Table (React Table v8)
+DATE/TIME: date-fns or Day.js
+ICONS: Material Icons or Ant Design Icons
+RTL SUPPORT: MUI RTL plugin (for Arabic interface)
+
+RECOMMENDED PROJECT STRUCTURE:
+```
+admin-web/
+├── src/
+│   ├── api/              # API client and endpoints
+│   │   ├── auth.ts
+│   │   ├── users.ts
+│   │   ├── tasks.ts
+│   │   ├── reports.ts
+│   │   └── municipalities.ts
+│   ├── components/       # Reusable components
+│   │   ├── common/       # Buttons, inputs, cards
+│   │   ├── layout/       # Header, sidebar, footer
+│   │   ├── charts/       # Chart components
+│   │   └── tables/       # Data table components
+│   ├── features/         # Feature-based modules
+│   │   ├── auth/         # Login, logout
+│   │   ├── users/        # User management pages
+│   │   ├── dashboard/    # Dashboard views
+│   │   ├── tasks/        # Task management
+│   │   ├── reports/      # Reports and analytics
+│   │   └── settings/     # System settings
+│   ├── hooks/            # Custom React hooks
+│   ├── store/            # Redux store (if using Redux)
+│   ├── types/            # TypeScript interfaces
+│   ├── utils/            # Helper functions
+│   ├── constants/        # Constants and enums
+│   └── App.tsx           # Main app component
+├── public/
+└── package.json
+```
+
+================================================================================
+5. ADMIN DASHBOARD FEATURES
+================================================================================
+
+5.1 USER MANAGEMENT
+─────────────────────────────────────────────────────────────────────────────
+
+PAGE: /users
+
+FUNCTIONALITY:
+✅ List all users (Workers, Supervisors, Admins)
+✅ Search and filter users
+   - By role (Worker/Supervisor/Admin)
+   - By status (Active/Inactive/Suspended)
+   - By department
+   - By supervisor
+   - By name/employee ID
+✅ Create new user accounts
+   - Form with all required fields
+   - Role selection
+   - Supervisor assignment (for workers)
+   - Zone assignment (for workers)
+   - Password generation or manual entry
+✅ Edit existing users
+   - Update profile information
+   - Change status (activate/deactivate/suspend)
+   - Reassign supervisor
+   - Reassign zones
+✅ View user details
+   - Full profile with performance stats
+   - Task history
+   - Attendance records
+   - Zone assignments
+   - Warning history
+   - Battery status
+✅ Reset user password
+✅ Reset device binding
+✅ Delete user (soft delete - set to inactive)
+
+UI COMPONENTS:
+- User list table with pagination
+- Advanced filter sidebar
+- Create/Edit user modal/form
+- User detail view/modal
+- Confirmation dialogs
+- Status badges
+- Action buttons (edit, delete, reset password, etc.)
+
+IMPORTANT FEATURES:
+- Show user's current status (online/offline/checked in)
+- Battery level indicator with warning for low battery
+- Warning count badge
+- Last login time
+- Completion rate percentage
+- Active tasks count
+
+5.2 SUPERVISOR ASSIGNMENT
+─────────────────────────────────────────────────────────────────────────────
+
+PAGE: /users/{workerId}/edit or /supervisors/assignments
+
+FUNCTIONALITY:
+✅ View all supervisors with their assigned workers
+✅ Assign workers to supervisors
+   - Drag-and-drop interface (optional)
+   - Dropdown selection
+   - Bulk assignment
+✅ Unassign workers from supervisors
+✅ View supervisor workload (number of workers)
+✅ Balance workload across supervisors
+
+UI COMPONENTS:
+- Supervisor cards showing:
+  - Supervisor name
+  - Number of assigned workers
+  - Department
+  - Status
+- Worker cards/list showing:
+  - Worker name
+  - Current supervisor
+  - Department
+  - Status
+- Assignment interface:
+  - Select worker(s)
+  - Choose supervisor
+  - Confirm assignment
+
+VISUALIZATION:
+- Organizational chart (supervisor → workers)
+- Workload distribution chart
+
+5.3 SYSTEM MONITORING DASHBOARD
+─────────────────────────────────────────────────────────────────────────────
+
+PAGE: /dashboard (home page)
+
+REAL-TIME OVERVIEW:
+✅ Worker Status
+   - Total active workers
+   - Currently checked in
+   - Checked out
+   - Not checked in yet
+   - List of workers with status indicators
+✅ Task Statistics
+   - Tasks created today
+   - Pending tasks
+   - In progress tasks
+   - Completed today
+   - Task completion rate
+✅ Issue Reports
+   - New issues today
+   - Unresolved issues
+   - Issues by category
+
+LIVE MONITORING FEATURES:
+✅ Worker location map (if tracking enabled)
+   - Show all active workers on map
+   - Different colors for status
+   - Click worker for details
+✅ Real-time notifications
+   - Low battery alerts
+   - Task completed notifications
+   - Late check-in alerts
+   - Issue reports
+✅ System alerts
+   - Workers not checked in
+   - Overdue tasks
+   - Unresolved high-priority issues
+
+CHARTS & VISUALIZATIONS:
+- Task completion trend (line chart)
+- Worker attendance rate (bar chart)
+- Task distribution by priority (pie chart)
+- Task distribution by zone (bar chart)
+- Performance metrics (gauges)
+
+5.4 MUNICIPALITY & ZONE MANAGEMENT
+─────────────────────────────────────────────────────────────────────────────
+
+PAGE: /settings/municipalities
+
+FUNCTIONALITY:
+✅ List all municipalities
+✅ Create new municipality
+   - Basic information (name, code, location)
+   - Contact information
+   - Geographic boundaries (bounding box)
+   - Work schedule defaults
+   - GPS accuracy settings
+   - License information
+✅ Edit municipality settings
+✅ Delete/deactivate municipality
+✅ View municipality statistics
+   - Number of zones
+   - Number of users
+   - Number of active tasks
+
+PAGE: /settings/zones
+
+FUNCTIONALITY:
+✅ List all zones within each municipality
+✅ Create new zone
+   - Zone name and code
+   - Municipality selection
+   - Geographic area (draw on map or import GeoJSON)
+   - Area size calculation
+✅ Edit zone
+✅ Delete zone
+✅ Assign workers to zones
+✅ View zone statistics
+   - Assigned workers count
+   - Active tasks in zone
+   - Completed tasks
+
+UI COMPONENTS:
+- Municipality list with cards/table
+- Zone list grouped by municipality
+- Interactive map for drawing zone boundaries
+- GeoJSON import/export functionality
+- Zone assignment interface
+
+5.5 TASK MANAGEMENT & OVERSIGHT
+─────────────────────────────────────────────────────────────────────────────
+
+PAGE: /tasks
+
+FUNCTIONALITY:
+✅ View ALL tasks in the system (admin sees everything)
+✅ Advanced filtering
+   - By status
+   - By priority
+   - By worker
+   - By supervisor
+   - By zone
+   - By date range
+   - By task type
+✅ Create new task
+   - Task details form
+   - Worker assignment
+   - Zone selection
+   - Location picker (map)
+   - Priority selection
+   - Due date
+   - Attachments
+✅ Edit task
+✅ Reassign task to different worker
+✅ Cancel/delete task
+✅ Review completed tasks
+   - View completion photos
+   - View completion notes
+   - View GPS location
+   - Approve or reject
+   - Add review notes
+✅ Track task progress
+   - Progress percentage
+   - Time tracking
+   - Status updates
+
+UI COMPONENTS:
+- Task list/kanban board
+- Task detail modal/page
+- Task creation form
+- Map view with task locations
+- Image gallery for completion photos
+- Timeline of task status changes
+- Review interface
+
+VIEWS:
+- List view (table)
+- Kanban board (columns for each status)
+- Calendar view (tasks by due date)
+- Map view (tasks plotted on map)
+
+5.6 REPORTS & ANALYTICS
+─────────────────────────────────────────────────────────────────────────────
+
+PAGE: /reports
+
+AVAILABLE REPORTS:
+✅ Tasks Report
+   - Total tasks by status
+   - Completion rate
+   - Tasks by worker
+   - Tasks by zone
+   - Tasks by priority
+   - Average completion time
+   - Overdue tasks
+✅ Workers Report
+   - Attendance rate
+   - Task completion rate by worker
+   - Top performers
+   - Workers needing attention
+   - Workload distribution
+✅ Attendance Report
+   - Daily attendance
+   - Late arrivals
+   - Absences
+   - Attendance trends
+✅ Performance Report
+   - Municipality-wide KPIs
+   - Department comparison
+   - Zone performance
+   - Supervisor performance
+
+FEATURES:
+✅ Date range selection
+✅ Export to Excel
+✅ Export to PDF
+✅ Schedule automated reports (future feature)
+✅ Email reports (future feature)
+✅ Interactive charts and graphs
+✅ Drill-down capability
+
+UI COMPONENTS:
+- Report selection sidebar
+- Date range picker
+- Filter controls
+- Charts and visualizations
+- Data tables
+- Export buttons
+
+5.7 SYSTEM CONFIGURATION
+─────────────────────────────────────────────────────────────────────────────
+
+PAGE: /settings
+
+CONFIGURATION SECTIONS:
+✅ General Settings
+   - System name
+   - Default language (Arabic/English)
+   - Time zone
+   - Date format
+✅ Work Schedule Defaults
+   - Start time
+   - End time
+   - Grace period minutes
+✅ GPS & Location Settings
+   - Maximum acceptable accuracy (meters)
+   - Location update interval
+   - Geofencing settings
+✅ Notification Settings
+   - Enable/disable notification types
+   - Notification recipients
+✅ Security Settings
+   - Password policy
+   - Session timeout
+   - Login attempt limits
+✅ Backup & Maintenance
+   - Database backup
+   - System logs
+   - Cleanup old data
+
+================================================================================
+6. DETAILED FEATURE SPECIFICATIONS
+================================================================================
+
+6.1 USER CREATION FORM
+─────────────────────────────────────────────────────────────────────────────
+
+FIELDS:
+□ Username (Employee ID) - required, unique, alphanumeric
+□ Full Name - required, Arabic preferred
+□ Phone Number - required, format validation
+□ Email - required for Admin/Supervisor, optional for Worker
+□ Password - required, strength validation
+  - Minimum 8 characters
+  - Must contain uppercase, lowercase, number, special character
+□ Role - required, radio/select (Worker/Supervisor/Admin)
+□ Worker Type - conditional (only if role=Worker)
+  - Options: Cleaning, Maintenance, Inspection, Other
+□ Department - required, text input
+□ Municipality - required, dropdown
+□ Supervisor - conditional (only if role=Worker)
+  - Dropdown of available supervisors
+  - Can be left unassigned
+□ Zones - conditional (only if role=Worker)
+  - Multi-select dropdown
+  - At least one zone required for workers
+□ Work Schedule - optional (defaults to municipality settings)
+  - Start time
+  - End time
+  - Grace minutes
+
+VALIDATION:
+- Check username uniqueness before submit
+- Phone number format: Palestinian mobile (0599123456)
+- Email validation
+- Password strength meter
+- At least one zone required for workers
+
+API CALLS:
+1. GET /api/users/by-role/Supervisor - to populate supervisor dropdown
+2. GET /api/zones - to populate zones multi-select
+3. POST /api/auth/register - to create user
+
+6.2 USER LIST / TABLE
+─────────────────────────────────────────────────────────────────────────────
+
+COLUMNS:
+□ Employee ID (username)
+□ Full Name
+□ Role (badge: Admin=red, Supervisor=blue, Worker=green)
+□ Department
+□ Status (badge: Active=green, Inactive=gray, Suspended=yellow)
+□ Supervisor (for workers)
+□ Phone Number
+□ Last Login
+□ Battery Level (progress bar, red if low)
+□ Active Tasks (count)
+□ Warning Count (badge if >0)
+□ Actions (edit, delete, reset password, view details)
+
+FEATURES:
+□ Sortable columns
+□ Search bar (searches name, username, phone)
+□ Filters sidebar:
+  - Role filter
+  - Status filter
+  - Department filter
+  - Supervisor filter (for workers)
+  - Low battery filter
+  - Has warnings filter
+□ Pagination (50 items per page)
+□ Bulk actions:
+  - Bulk activate/deactivate
+  - Bulk supervisor assignment
+  - Bulk zone assignment
+□ Export to Excel
+
+INTERACTIONS:
+- Click row to view user details
+- Click edit icon to edit user
+- Click delete icon to deactivate user (with confirmation)
+- Click "Reset Password" to show password reset dialog
+- Click "Reset Device" to reset device binding
+
+6.3 DASHBOARD LAYOUT
+─────────────────────────────────────────────────────────────────────────────
+
+HEADER:
+□ Logo
+□ Municipality name
+□ Notification bell (with count badge)
+□ User menu (profile, settings, logout)
+
+SIDEBAR:
+□ Dashboard (home)
+□ Users
+  - All Users
+  - Workers
+  - Supervisors
+  - Admins
+□ Tasks
+  - All Tasks
+  - Create Task
+  - Task Calendar
+  - Task Map
+□ Issues
+  - All Issues
+  - Unresolved Issues
+□ Reports
+  - Tasks Report
+  - Workers Report
+  - Attendance Report
+  - Performance Report
+□ Settings
+  - Municipalities
+  - Zones
+  - System Settings
+  - My Profile
+
+MAIN CONTENT AREA:
+□ Breadcrumb navigation
+□ Page title
+□ Page actions (buttons in top-right)
+□ Content area
+
+6.4 TASK CREATION FORM
+─────────────────────────────────────────────────────────────────────────────
+
+FIELDS:
+□ Task Title - required, text input
+□ Description - required, textarea
+□ Task Type - required, select
+  - Options: Cleaning, Maintenance, Inspection, Emergency, Other
+□ Priority - required, select with color coding
+  - Low (gray), Normal (blue), Medium (yellow), High (orange), Urgent (red)
+□ Assigned To - required, searchable dropdown
+  - List all active workers
+  - Show worker's current workload
+□ Zone - required, dropdown
+  - Filter zones by worker's assigned zones
+□ Location - required, map picker
+  - Click map to set location
+  - Or enter coordinates manually
+  - Show selected location marker
+□ Due Date - required, date-time picker
+  - Must be in future
+□ Estimated Duration - optional, number input (hours)
+□ Instructions - optional, rich text editor
+  - Can add formatting, lists, etc.
+□ Attachments - optional, file upload
+  - Max 5 files
+  - Max 10MB per file
+  - Supported: images, PDF, documents
+
+MAP COMPONENT:
+- Use Leaflet with OpenStreetMap
+- Show zone boundaries
+- Click to set task location
+- Display marker at selected location
+- Show worker's last known location (if available)
+
+API CALLS:
+1. GET /api/users/by-role/Worker - populate worker dropdown
+2. GET /api/zones - populate zone dropdown
+3. POST /api/tasks - create task
+
+6.5 TASK REASSIGNMENT
+─────────────────────────────────────────────────────────────────────────────
+
+DIALOG:
+□ Current worker (read-only, display name and photo)
+□ New worker (required, searchable dropdown)
+  - Show worker's current workload
+  - Show worker's assigned zones
+  - Highlight if worker is not assigned to task's zone
+□ Reason for reassignment (optional, textarea)
+  - Suggest common reasons: "في إجازة"، "مشغول بمهمة أخرى"، "غير متوفر"
+□ Reset task progress? (checkbox)
+  - If task is InProgress and has progress > 0, ask if should reset to 0
+
+VALIDATION:
+- New worker must be active
+- Warn if new worker is in different zone
+- Confirm if task will be reset
+
+API CALL:
+PUT /api/tasks/{id}/reassign
+
+6.6 REPORTS PAGE
+─────────────────────────────────────────────────────────────────────────────
+
+LAYOUT:
+LEFT SIDEBAR (Report Selection):
+□ Tasks Report
+□ Workers Report
+□ Attendance Report
+□ Performance Report
+
+MAIN AREA (Report Controls):
+□ Date range picker (From - To)
+□ Period selector (Daily/Weekly/Monthly/Yearly)
+□ Additional filters (based on report type)
+□ Generate Report button
+□ Export buttons (Excel, PDF)
+
+REPORT DISPLAY:
+□ Summary cards at top (KPIs)
+□ Charts and visualizations
+□ Detailed data table
+□ Pagination for large datasets
+
+TASKS REPORT EXAMPLE:
+- Summary cards:
+  - Total tasks
+  - Completed tasks (with %)
+  - Pending tasks
+  - In progress tasks
+  - Average completion time
+- Charts:
+  - Task completion trend (line chart)
+  - Tasks by priority (pie chart)
+  - Tasks by status (bar chart)
+  - Tasks by worker (horizontal bar chart - top 10)
+- Data table:
+  - List of all tasks in period
+  - Columns: ID, Title, Worker, Zone, Status, Priority, Created, Due, Completed
+  - Sortable, filterable
+
+6.7 MUNICIPALITY MANAGEMENT
+─────────────────────────────────────────────────────────────────────────────
+
+MUNICIPALITY LIST:
+Display as cards or table with:
+□ Municipality name (Arabic + English)
+□ Code
+□ Region/Country
+□ Active zones count
+□ Active users count
+□ License expiration date (warning if < 30 days)
+□ Status (Active/Inactive)
+□ Actions (edit, delete, view details)
+
+MUNICIPALITY FORM:
+BASIC INFO:
+□ Code - required, unique, uppercase
+□ Name (Arabic) - required
+□ Name (English) - required
+□ Country - required
+□ Region - required
+
+CONTACT:
+□ Contact Email
+□ Contact Phone
+□ Address
+
+GEOGRAPHIC BOUNDS:
+□ Min Latitude - required, decimal
+□ Max Latitude - required, decimal
+□ Min Longitude - required, decimal
+□ Max Longitude - required, decimal
+□ Map preview showing bounding box
+
+WORK SETTINGS:
+□ Default Start Time - time picker
+□ Default End Time - time picker
+□ Default Grace Minutes - number input
+□ Max Acceptable GPS Accuracy (meters) - number input
+
+LICENSE:
+□ License Expires At - date picker
+
+MAP COMPONENT:
+- Show rectangle representing bounding box
+- Allow dragging corners to adjust bounds
+- Display coordinates as you drag
+
+API CALLS:
+1. GET /api/municipality - list all
+2. POST /api/municipality - create
+3. PUT /api/municipality/{id} - update
+4. DELETE /api/municipality/{id} - delete
+
+6.8 ZONE MANAGEMENT
+─────────────────────────────────────────────────────────────────────────────
+
+ZONE LIST:
+Grouped by municipality, showing:
+□ Zone name
+□ Zone code
+□ Municipality
+□ Area size (km²)
+□ Assigned workers count
+□ Active tasks count
+□ Actions (edit, delete, view on map)
+
+ZONE FORM:
+□ Zone Name - required
+□ Zone Code - required, unique within municipality
+□ Municipality - required, dropdown
+□ Description - optional, textarea
+□ Geometry - required, GeoJSON
+  - Draw on map
+  - Or upload GeoJSON file
+
+MAP DRAWING:
+- Use Leaflet Draw plugin
+- Allow drawing polygon for zone boundary
+- Calculate area automatically
+- Show existing zones in background (different color)
+- Validate no overlap with existing zones (warning, not error)
+
+API CALLS:
+1. GET /api/zones - list all zones
+2. POST /api/zones - create zone
+3. PUT /api/zones/{id} - update zone
+4. DELETE /api/zones/{id} - delete zone
+
+================================================================================
+7. UI/UX GUIDELINES
+================================================================================
+
+7.1 DESIGN PRINCIPLES
+─────────────────────────────────────────────────────────────────────────────
+
+□ RTL (Right-to-Left) Support
+  - Interface primarily in Arabic
+  - English labels in secondary position
+  - Proper RTL layout for all components
+
+□ Color Scheme
+  - Primary: #2196F3 (Blue) - Municipality official color
+  - Success: #4CAF50 (Green)
+  - Warning: #FF9800 (Orange)
+  - Error: #F44336 (Red)
+  - Info: #00BCD4 (Cyan)
+  - Neutral: Grays
+
+□ Status Color Coding
+  - Active: Green
+  - Inactive: Gray
+  - Suspended: Yellow/Orange
+  - Deleted: Red
+
+□ Priority Color Coding
+  - Urgent: Dark Red
+  - High: Orange
+  - Medium: Yellow
+  - Normal: Blue
+  - Low: Gray
+
+□ Typography
+  - Arabic: Tajawal or Cairo (Google Fonts)
+  - English: Roboto or Inter
+  - Sizes: 12px (small), 14px (body), 16px (subheading), 20px (heading)
+
+□ Spacing
+  - Use 8px grid system
+  - Padding: 8, 16, 24, 32px
+  - Margins: 8, 16, 24, 32px
+
+□ Responsive Design
+  - Mobile: < 768px (tablet/phone)
+  - Desktop: >= 768px
+  - Large: >= 1200px
+
+7.2 COMPONENT GUIDELINES
+─────────────────────────────────────────────────────────────────────────────
+
+TABLES:
+□ Zebra striping (alternate row colors)
+□ Hover effect on rows
+□ Sticky header when scrolling
+□ Loading skeleton while fetching data
+□ Empty state with helpful message
+□ Sortable column headers (arrows)
+□ Filter icons in headers
+
+FORMS:
+□ Label above input (RTL aligned)
+□ Required field indicator (*)
+□ Validation messages below input
+□ Disabled state clearly visible
+□ Loading state on submit button
+□ Success message after submit
+□ Error summary at top of form
+
+BUTTONS:
+□ Primary actions: filled button (primary color)
+□ Secondary actions: outlined button
+□ Destructive actions: red button with confirmation
+□ Disabled: gray with reduced opacity
+□ Loading: spinner inside button
+
+DIALOGS/MODALS:
+□ Title at top
+□ Content area
+□ Actions at bottom (Cancel on right, Confirm on left in RTL)
+□ Close icon (X) in top-right
+□ Backdrop click to close (with confirmation if form dirty)
+
+NOTIFICATIONS:
+□ Toast/Snackbar for success messages
+□ Alert for errors
+□ Position: top-center or top-right
+□ Auto-dismiss after 5 seconds (except errors)
+
+7.3 ACCESSIBILITY
+─────────────────────────────────────────────────────────────────────────────
+
+□ Semantic HTML
+□ ARIA labels for icon buttons
+□ Keyboard navigation support
+□ Focus indicators
+□ Sufficient color contrast (WCAG AA)
+□ Screen reader support
+□ Alt text for images
+
+7.4 PERFORMANCE
+─────────────────────────────────────────────────────────────────────────────
+
+□ Code splitting (lazy load pages)
+□ Virtualized lists for large datasets
+□ Debounced search inputs
+□ Optimistic UI updates
+□ Caching API responses
+□ Image lazy loading
+□ Bundle size optimization
+
+================================================================================
+8. TESTING CHECKLIST
+================================================================================
+
+8.1 AUTHENTICATION & AUTHORIZATION
+─────────────────────────────────────────────────────────────────────────────
+
+□ Admin can login with valid credentials
+□ Invalid credentials show error
+□ Token is stored securely (httpOnly cookie or secure localStorage)
+□ Expired token redirects to login
+□ All admin endpoints require admin role
+□ Non-admin users cannot access admin dashboard
+□ Logout clears token and redirects to login
+
+8.2 USER MANAGEMENT
+─────────────────────────────────────────────────────────────────────────────
+
+□ List all users with pagination
+□ Search users by name/username/phone
+□ Filter users by role/status/department
+□ Create new worker account
+□ Create new supervisor account
+□ Create new admin account
+□ Assign supervisor to worker during creation
+□ Assign zones to worker during creation
+□ Edit existing user
+□ Change user status (activate/deactivate)
+□ Reset user password
+□ Reset device binding
+□ Delete user (soft delete)
+□ View user profile with all details
+□ View user's task history
+□ View user's attendance records
+
+8.3 TASK MANAGEMENT
+─────────────────────────────────────────────────────────────────────────────
+
+□ View all tasks in system
+□ Filter tasks by status/priority/worker/zone
+□ Create new task with all fields
+□ Pick task location on map
+□ Assign task to worker
+□ Edit existing task
+□ Reassign task to different worker
+□ Cancel task
+□ Review completed task (approve/reject)
+□ View task completion photo
+□ View task GPS location
+□ Track task progress
+
+8.4 MUNICIPALITY & ZONE MANAGEMENT
+─────────────────────────────────────────────────────────────────────────────
+
+□ List all municipalities
+□ Create new municipality
+□ Edit municipality
+□ Delete municipality
+□ View municipality details
+□ List all zones
+□ Create new zone
+□ Draw zone boundary on map
+□ Edit zone
+□ Delete zone
+□ Assign workers to zone
+
+8.5 DASHBOARD & MONITORING
+─────────────────────────────────────────────────────────────────────────────
+
+□ Dashboard shows correct statistics
+□ Worker status updates in real-time
+□ Charts display correctly
+□ Click chart to drill down
+□ Refresh data on page load
+□ Auto-refresh every X minutes
+□ Low battery alerts appear
+□ Late check-in alerts appear
+
+8.6 REPORTS
+─────────────────────────────────────────────────────────────────────────────
+
+□ Generate tasks report
+□ Generate workers report
+□ Generate attendance report
+□ Filter report by date range
+□ Filter report by period (daily/weekly/monthly)
+□ Export report to Excel
+□ Export report to PDF
+□ Report data is accurate
+□ Charts render correctly
+□ Data table is sortable
+
+8.7 RESPONSIVE DESIGN
+─────────────────────────────────────────────────────────────────────────────
+
+□ Works on desktop (1920x1080)
+□ Works on laptop (1366x768)
+□ Works on tablet (768x1024)
+□ Sidebar collapses on mobile
+□ Tables scroll horizontally on mobile
+□ Forms are usable on mobile
+□ Buttons are touch-friendly (min 44x44px)
+
+8.8 ERROR HANDLING
+─────────────────────────────────────────────────────────────────────────────
+
+□ API errors show user-friendly messages
+□ Network errors show retry option
+□ Form validation errors are clear
+□ 404 errors show "not found" page
+□ 403 errors show "unauthorized" message
+□ Server errors (500) show generic error
+□ Loading states prevent duplicate requests
+
+================================================================================
+9. DEPLOYMENT NOTES
+================================================================================
+
+9.1 ENVIRONMENT VARIABLES
+─────────────────────────────────────────────────────────────────────────────
+
+Create `.env` file:
+
+VITE_API_BASE_URL=http://localhost:5000/api
+VITE_APP_NAME=FollowUp Admin Dashboard
+VITE_MAP_TILES_URL=https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
+VITE_ENABLE_ANALYTICS=false
+
+9.2 BUILD & DEPLOYMENT
+─────────────────────────────────────────────────────────────────────────────
+
+Development:
+```bash
+npm install
+npm run dev
+```
+
+Production Build:
+```bash
+npm run build
+npm run preview  # Test production build locally
+```
+
+Deploy to Server:
+1. Build the project (`npm run build`)
+2. Upload `dist/` folder to web server
+3. Configure web server (nginx/apache) to serve SPA
+4. Set up SSL certificate
+5. Configure CORS on backend to allow frontend domain
+
+NGINX Configuration Example:
+```nginx
+server {
+    listen 80;
+    server_name admin.followup.ps;
+
+    root /var/www/admin-web/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+9.3 SECURITY CHECKLIST
+─────────────────────────────────────────────────────────────────────────────
+
+□ HTTPS enabled (SSL certificate)
+□ Secure token storage
+□ XSS protection (sanitize inputs)
+□ CSRF protection
+□ Content Security Policy headers
+□ Rate limiting on API
+□ Input validation on both frontend and backend
+□ Secure password transmission
+□ Session timeout implemented
+□ Logout on tab close (optional)
+
+================================================================================
+SUMMARY - WHAT YOU NEED TO BUILD
+================================================================================
+
+ALL BACKEND APIs ARE READY! ✅
+
+You need to build the React frontend that:
+
+1. ✅ Authenticates admin users (login/logout)
+2. ✅ Manages users (CRUD operations)
+3. ✅ Assigns supervisors to workers
+4. ✅ Assigns zones to workers
+5. ✅ Manages tasks (view all, create, edit, reassign, review)
+6. ✅ Manages municipalities and zones (CRUD)
+7. ✅ Displays dashboard with real-time statistics
+8. ✅ Generates and exports reports
+9. ✅ Shows system-wide monitoring and alerts
+10. ✅ Provides system configuration interface
+
+IMMEDIATE NEXT STEPS:
+1. Set up React project with Vite + TypeScript
+2. Install dependencies (MUI, Axios, React Router, etc.)
+3. Create API client with Axios interceptors for auth
+4. Build authentication flow (login page)
+5. Create main layout with sidebar and header
+6. Build user management pages
+7. Build dashboard with statistics and charts
+8. Build task management pages
+9. Build reports pages
+10. Build municipality/zone management pages
+
+The backend is complete and waiting for your frontend! 🚀
+
+For questions or clarifications, contact the backend developer.
+
+Good luck! 💪
+
+
+لو حابة، أقدر:
+
+✍️ أرتّب لك فقرة Admin Capabilities – Final Version جاهزة للريبورت
+
+✍️ أو أراجع النص اللي كتبتيه وأدمج النواقص بدون ما يطوّل
+
+✍️ أو أحوّلها Checklist للدكتور (تبهريه 😄)
+
+قولي كيف بدك نكمّل 👌
+
+  Document Created: EdgeCasesAndConstraints.md
+
+
+
+  What I Analyzed:
+
+
+
+  1. Task Progress Tracking (0-100%)
+
+
+
+  Critical Issues Found:
+
+  - ❌ No authorization check (any worker can update any task's progress)
+
+  - ❌ No status validation (can update completed/cancelled tasks)
+
+  - ❌ No rate limiting (slider spam → DB overload)
+
+  - ❌ Progress going backwards allowed
+
+  - ❌ 100% progress but status still InProgress
+
+  - ❌ Offline progress conflicts not handled
+
+
+
+  2. Battery Monitoring Service
+
+
+
+  Critical Issues Found:
+
+  - ❌ No rate limiting (can spam reports)
+
+  - ❌ Unrealistic battery changes accepted (100% → 0% in 1 min)
+
+  - ❌ No escalation when battery stays low for hours
+
+  - ❌ Offline reports will flood server when reconnected
+
+  - ❌ No handling for devices without battery API
+
+  - ❌ Multiple devices per worker not considered
+
+
+
+  3. Distance Calculation & Validation
+
+
+
+  Critical Issues Found:
+
+  - ❌ No GPS accuracy check (distance based on ±500m GPS)
+
+  - ❌ No timeout (UI freezes waiting for GPS)
+
+  - ❌ Indoor tasks have unreliable GPS
+
+  - ❌ Moving workers have stale GPS readings
+
+  - ❌ No handling for poor signal areas
+
+
+
+  4. Supervisor-Worker Relationship
+
+
+
+  Critical Issues Found:
+
+  - ❌ Supervisor deleted → workers orphaned
+
+  - ❌ No workload limits (1 supervisor can have 100 workers)
+
+  - ❌ Workers can exist without supervisors indefinitely
+
+  - ❌ No transfer workflow when supervisor leaves
+
+  - ❌ Cross-municipality supervision not validated
+
+
+
+  5. Task Reassignment
+
+
+
+  Critical Issues Found:
+
+  - ❌ Unlimited reassignments (task bouncing back and forth)
+
+  - ❌ No check if new worker is overloaded
+
+  - ❌ Worker might already be traveling to task
+
+  - ❌ Progress reset loses old worker's effort
+
+  - ❌ No assignment history tracking
+
+  - ❌ Notifications can fail silently
+
+
+
+  6. Worker Profile & Performance Stats
+
+
+
+  Critical Issues Found:
+
+  - ❌ Misleading stats for new workers (2 tasks = 100% completion)
+
+  - ❌ Unfair comparisons (hard tasks vs easy tasks)
+
+  - ❌ Fixed 30-day window not appropriate for all cases
+
+  - ❌ Outliers skew average completion time
+
+  - ❌ Slow queries on every profile view (no caching)
+
+
+
+  ---
+
+  Summary Tables
+
+
+
+  URGENT - Must Fix Before Production (7 critical issues):
+
+
+
+  1. Task progress authorization check
+
+  2. Battery report rate limiting
+
+  3. GPS accuracy validation
+
+  4. GPS timeout handling
+
+  5. Supervisor deletion prevention
+
+  6. Task progress rate limiting
+
+  7. Unrealistic battery change detection
+
+
+
+  IMPORTANT - Fix Soon (8 issues):
+
+
+
+  8. Progress/status mismatch handling
+
+  9. Offline progress conflict resolution
+
+  10. Battery escalation logic
+
+  11. Indoor task GPS handling
+
+  12. Supervisor workload limits
+
+  13. Task reassignment limits
+
+  14. Worker workload validation on reassignment
+
+  15. Performance stats reliability indicator
+
+
+
+  NICE TO HAVE - Enhancements (10 improvements):
+
+
+
+  16. Task-type specific progress intervals
+
+  17. Progress history tracking
+
+  18. Battery drain pattern detection
+
+  19. Multi-device battery support
+
+  20. Dynamic max distance by task type
+
+  21. Location confidence scoring
+
+  22. Supervisor workload balancing
+
+  23. Full task assignment history
+
+  24. Weighted performance metrics
+
+  25. Pre-calculated stats (caching)
+
+
+
+  ---
+
+  Key Recommendations:
+
+
+
+  Configuration Settings Needed:
+
+
+
+  {
+
+    "TaskSettings": {
+
+      "ProgressUpdateIntervalMinutes": 5,
+
+      "MaxTaskReassignments": 3
+
+    },
+
+    "BatterySettings": {
+
+      "MinReportIntervalMinutes": 2,
+
+      "MaxBatteryChangePerMinute": 10
+
+    },
+
+    "LocationSettings": {
+
+      "MaxGPSAccuracyMeters": 100,
+
+      "GPSTimeoutSeconds": 15
+
+    },
+
+    "SupervisorSettings": {
+
+      "MaxWorkersPerSupervisor": 20
+
+    }
+
+  }
+
+
+
+  Implementation Priority:
+
+
+
+  - Phase 1 (This Week): Fix 5 critical security/validation issues
+
+  - Phase 2 (Next Week): Add 5 important constraint validations
+
+  - Phase 3 (Next Month): Implement 10 enhancement features
+
+
+
+  The document includes detailed code examples for each fix, testing
+
+  checklists, and configuration recommendations. All issues are documented
+
+  with edge cases, recommended solutions, and implementation code samples.
+
+ChatGPT can make mistakes. Check important info.

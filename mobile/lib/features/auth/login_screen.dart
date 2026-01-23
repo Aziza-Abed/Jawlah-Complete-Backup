@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_manager.dart';
+import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,9 +15,11 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _employeeIdController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _rememberMe = false;
   bool _isLoading = false;
+  bool _obscurePassword = true;
   String _loadingMessage = 'جاري تسجيل الدخول...';
 
   @override
@@ -27,7 +30,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _employeeIdController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -36,10 +40,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final authProvider = context.read<AuthManager>();
       final rememberMe = await authProvider.getRememberMe();
       if (rememberMe) {
-        final savedEmployeeId = await authProvider.getSavedEmployeeId();
-        if (savedEmployeeId != null && savedEmployeeId.isNotEmpty) {
+        final savedUsername = await authProvider
+            .getSavedEmployeeId(); // Will rename this method later
+        if (savedUsername != null && savedUsername.isNotEmpty) {
           setState(() {
-            _employeeIdController.text = savedEmployeeId;
+            _usernameController.text = savedUsername;
             _rememberMe = true;
           });
         }
@@ -82,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Image.asset(
-                          'assets/images/albireh_logo.png',
+                          'assets/images/logo.png',
                           width: 100,
                           height: 100,
                           errorBuilder: (context, error, stackTrace) {
@@ -97,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      'أهلاً بك في جولة',
+                      'أهلاً بك في FollowUp',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -107,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'سجل دخولك للمتابعة مع بلدية البيرة',
+                      'سجل دخولك للمتابعة مع نظام FollowUp',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,
@@ -132,8 +137,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Username field
                           const Text(
-                            'رقم الموظف الخاص بك',
+                            'اسم المستخدم',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -141,27 +147,68 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontFamily: 'Cairo',
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           TextFormField(
-                            controller: _employeeIdController,
-                            keyboardType: TextInputType.number,
+                            controller: _usernameController,
+                            keyboardType: TextInputType.text,
                             textDirection: TextDirection.ltr,
                             textAlign: TextAlign.right,
-                            maxLength: 4,
-                            autofocus: _employeeIdController.text.isEmpty,
+                            autofocus: _usernameController.text.isEmpty,
                             style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 8,
-                              color: AppColors.primary,
+                              fontSize: 16,
+                              color: AppColors.mainText,
                               fontFamily: 'Cairo',
                             ),
                             decoration: InputDecoration(
-                              hintText: '0000',
-                              counterText: '',
+                              hintText: 'أدخل اسم المستخدم',
                               hintStyle: TextStyle(
-                                color: AppColors.secondaryText.withOpacity(0.2),
-                                letterSpacing: 8,
+                                color: AppColors.secondaryText.withOpacity(0.5),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF3F1ED),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.person_outline_rounded,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'يرجى إدخال اسم المستخدم';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          // Password field
+                          const Text(
+                            'كلمة المرور',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.secondaryText,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            keyboardType: TextInputType.text,
+                            textDirection: TextDirection.ltr,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: AppColors.mainText,
+                              fontFamily: 'Cairo',
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'أدخل كلمة المرور',
+                              hintStyle: TextStyle(
+                                color: AppColors.secondaryText.withOpacity(0.5),
                               ),
                               filled: true,
                               fillColor: const Color(0xFFF3F1ED),
@@ -173,13 +220,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Icons.lock_outline_rounded,
                                 color: AppColors.primary,
                               ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  color: AppColors.secondaryText,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'يرجى إدخال رقم الموظف';
-                              }
-                              if (value.length != 4) {
-                                return 'يجب أن يتكون الرقم من 4 خانات';
+                                return 'يرجى إدخال كلمة المرور';
                               }
                               return null;
                             },
@@ -356,7 +413,8 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final employeeId = _employeeIdController.text.trim();
+      final username = _usernameController.text.trim();
+      final password = _passwordController.text.trim();
       final authProvider = context.read<AuthManager>();
 
       // Try to get location for auto check-in
@@ -368,9 +426,10 @@ class _LoginScreenState extends State<LoginScreen> {
         _loadingMessage = 'جاري تسجيل الدخول...';
       });
 
-      // Try to login with location
+      // Try to login with location - Now passing username and password
       final success = await authProvider.doLogin(
-        employeeId,
+        username,
+        password: password, // NEW: password parameter
         latitude: position?.latitude,
         longitude: position?.longitude,
         accuracy: position?.accuracy,
@@ -379,9 +438,31 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (success) {
-        // save employee id if remember me checked
+        // Check if OTP is required (Two-Factor Authentication)
+        if (authProvider.requiresOtp) {
+          // Navigate to OTP verification screen
+          if (mounted) {
+            setState(() => _isLoading = false);
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => OtpVerificationScreen(
+                  sessionToken: authProvider.otpSessionToken!,
+                  maskedPhone: authProvider.otpMaskedPhone ?? '****',
+                  username: username,
+                  password: password,
+                  latitude: position?.latitude,
+                  longitude: position?.longitude,
+                  accuracy: position?.accuracy,
+                ),
+              ),
+            );
+          }
+          return;
+        }
+
+        // save username if remember me checked
         if (_rememberMe) {
-          await authProvider.saveEmployeeId(employeeId);
+          await authProvider.saveEmployeeId(username);
           await authProvider.setRememberMe(true);
         } else {
           await authProvider.clearSavedEmployeeId();
@@ -423,26 +504,30 @@ class _LoginScreenState extends State<LoginScreen> {
               });
 
               await authProvider.doLogin(
-                employeeId,
+                username,
+                password: password, // NEW: password parameter
                 allowManualCheckIn: true,
                 manualCheckInReason: shouldUseManual,
               );
 
               if (mounted) {
-                _showWarningMessage('تم تسجيل الدخول - الحضور بانتظار موافقة المشرف');
+                _showWarningMessage(
+                    'تم تسجيل الدخول - الحضور بانتظار موافقة المشرف');
                 Navigator.of(context).pushReplacementNamed(Routes.home);
               }
             } else {
               // User cancelled - still logged in but without check-in
               if (mounted) {
-                _showWarningMessage('تم تسجيل الدخول - يرجى تسجيل الحضور من الشاشة الرئيسية');
+                _showWarningMessage(
+                    'تم تسجيل الدخول - يرجى تسجيل الحضور من الشاشة الرئيسية');
                 Navigator.of(context).pushReplacementNamed(Routes.home);
               }
             }
           }
         } else {
           // No location provided - logged in but without check-in
-          _showWarningMessage('تم تسجيل الدخول - يرجى تسجيل الحضور للبدء بالعمل');
+          _showWarningMessage(
+              'تم تسجيل الدخول - يرجى تسجيل الحضور للبدء بالعمل');
           if (mounted) {
             Navigator.of(context).pushReplacementNamed(Routes.home);
           }

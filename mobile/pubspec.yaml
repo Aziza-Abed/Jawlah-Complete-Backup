@@ -1,5 +1,5 @@
-name: jawlah
-description: Smart Field Management System for Al-Bireh Municipality
+name: followup
+description: FollowUp Smart Field Management System for Al-Bireh Municipality
 publish_to: "none"
 version: 1.0.0+1
 
@@ -28,6 +28,8 @@ dependencies:
   # ============ GPS LOCATION ============
   geolocator: ^14.0.2
   permission_handler: ^12.0.1
+  flutter_map: ^7.0.2 # OSM map display (no API key needed)
+  latlong2: ^0.9.1 # Latitude/Longitude utilities for flutter_map
 
   # ============ BATTERY MONITORING ============
   battery_plus: ^6.0.3

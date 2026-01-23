@@ -43,7 +43,7 @@ class AppHeader extends StatelessWidget {
                   Opacity(
                     opacity: 0.35,
                     child: Image.asset(
-                      'assets/images/albireh_logo.png',
+                      'assets/images/logo.png',
                       width: 52,
                       height: 52,
                     ),

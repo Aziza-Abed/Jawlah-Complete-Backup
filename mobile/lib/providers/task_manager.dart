@@ -7,6 +7,7 @@ import '../data/models/task_model.dart';
 import '../data/services/tasks_service.dart';
 import '../data/services/location_service.dart';
 import '../data/repositories/local/task_local_repository.dart';
+import '../core/errors/app_exception.dart';
 
 import 'sync_manager.dart';
 import 'base_controller.dart';
@@ -139,7 +140,7 @@ class TaskManager extends BaseController {
     String? priority,
   }) async {
     final localTasks = await _taskLocalRepo.getAllTasks();
-    var tasks = localTasks.map((local) => TaskModel.fromLocal(local)).toList();
+    List<TaskModel> tasks = localTasks.map((local) => TaskModel.fromLocal(local)).toList();
     return _applyFilters(tasks, status, priority);
   }
 
@@ -265,7 +266,8 @@ class TaskManager extends BaseController {
   }
 
   // save task status change when offline
-  Future<bool> _saveTaskOffline(int taskId, String newStatus, {String? notes}) async {
+  Future<bool> _saveTaskOffline(int taskId, String newStatus,
+      {String? notes}) async {
     final task = getTaskById(taskId);
     if (task == null) return false;
 
@@ -309,7 +311,10 @@ class TaskManager extends BaseController {
     required String notes,
     File? proofPhoto,
   }) async {
-    final success = await executeVoidWithErrorHandling(() async {
+    try {
+      setLoading(true);
+      clearError();
+
       // get current gps location
       double? lat;
       double? lng;
@@ -333,14 +338,36 @@ class TaskManager extends BaseController {
       );
 
       updateMyTaskInList(updatedTask);
-    });
+      setLoading(false);
+      return true;
+    } on AppException catch (e) {
+      setLoading(false);
 
-    // offline fallback save localy
-    if (!success) {
+      // Check if this is a validation error (location mismatch)
+      // These errors should NOT use offline fallback
+      final isValidationError = e.message.contains('الموقع غير مطابق') ||
+          e.message.contains('تحذير') ||
+          e.message.contains('رفض') ||
+          e.message.contains('المسافة');
+
+      if (isValidationError) {
+        // Don't use offline fallback for validation errors
+        // Just set the error message and return false
+        setError(e.message);
+        return false;
+      } else {
+        // For network errors, use offline fallback
+        setError(e.message);
+        return await _saveCompletedTaskOffline(taskId, notes, proofPhoto);
+      }
+    } catch (e) {
+      setLoading(false);
+
+      // For unknown errors, try offline fallback
+      final errorMessage = e.toString().replaceAll('Exception: ', '');
+      setError(errorMessage);
       return await _saveCompletedTaskOffline(taskId, notes, proofPhoto);
     }
-
-    return success;
   }
 
   Future<bool> _saveCompletedTaskOffline(
@@ -460,5 +487,34 @@ class TaskManager extends BaseController {
   // simple method to refresh ui
   void refreshUI() {
     notifyListeners();
+  }
+
+  // update task progress (for multi-day tasks)
+  Future<void> updateTaskProgress(int taskId, int progressPercentage) async {
+    await executeWithErrorHandling(() async {
+      // call API to update progress
+      final updated = await _tasksService.updateTaskProgress(
+        taskId,
+        progressPercentage,
+      );
+
+      if (updated != null) {
+        // update in myTasks list
+        final index = myTasks.indexWhere((t) => t.taskId == taskId);
+        if (index != -1) {
+          myTasks[index] = updated;
+        }
+
+        // update currentTask if this is the current task
+        if (currentTask?.taskId == taskId) {
+          currentTask = updated;
+        }
+
+        notifyListeners();
+        return true;
+      }
+
+      throw ValidationException('فشل تحديث التقدم');
+    });
   }
 }

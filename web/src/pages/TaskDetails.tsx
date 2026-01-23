@@ -1,8 +1,27 @@
 // src/pages/TaskDetails.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
 import { getTask, approveTask, rejectTask } from "../api/tasks";
 import type { TaskResponse } from "../types/task";
+import "leaflet/dist/leaflet.css";
+
+// Fix Leaflet marker icons
+const TaskLocationIcon = L.divIcon({
+  className: "custom-marker",
+  html: `<div class="relative flex items-center justify-center w-10 h-10">
+    <div class="absolute w-full h-full bg-blue-500 rounded-full animate-ping opacity-30"></div>
+    <div class="relative w-6 h-6 bg-blue-600 rounded-full border-3 border-white shadow-lg flex items-center justify-center">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3" fill="white"></circle>
+      </svg>
+    </div>
+  </div>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 20]
+});
 
 type Priority = "Low" | "Medium" | "High";
 
@@ -127,7 +146,7 @@ export default function TaskDetails() {
 
   if (loading) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] grid place-items-center">
+      <div className="h-full w-full bg-background grid place-items-center">
         <div className="text-[#2F2F2F] font-sans font-semibold">
           جاري التحميل...
         </div>
@@ -137,7 +156,7 @@ export default function TaskDetails() {
 
   if (!task) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] grid place-items-center">
+      <div className="h-full w-full bg-background grid place-items-center">
         <div className="text-[#C86E5D] font-sans font-semibold">
           {err || "لا توجد بيانات"}
         </div>
@@ -146,7 +165,7 @@ export default function TaskDetails() {
   }
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-background overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-start justify-between gap-3">
@@ -211,12 +230,48 @@ export default function TaskDetails() {
               </div>
 
               <div className="bg-white rounded-[12px] border border-black/10 p-4">
-                <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold">
-                  خريطة (Placeholder)
+                <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold mb-2">
+                  موقع المهمة على الخريطة
                 </div>
-                <div className="mt-2 h-[140px] rounded-[10px] bg-[#E9E6E0] border border-black/5 grid place-items-center text-[#6B7280] text-[12px]">
-                  لاحقاً: خريطة + Marker من GPS آخر تحديث
-                </div>
+                {(latestUpdate?.gps || task.lastGps) ? (
+                  <div className="h-[180px] rounded-[10px] overflow-hidden border border-black/5">
+                    <MapContainer
+                      center={[(latestUpdate?.gps || task.lastGps)!.lat, (latestUpdate?.gps || task.lastGps)!.lng]}
+                      zoom={15}
+                      className="w-full h-full"
+                      zoomControl={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker
+                        position={[(latestUpdate?.gps || task.lastGps)!.lat, (latestUpdate?.gps || task.lastGps)!.lng]}
+                        icon={TaskLocationIcon}
+                      >
+                        <Popup>
+                          <div dir="rtl" className="text-right font-sans p-1">
+                            <div className="font-bold text-[#2F2F2F] text-sm mb-1">
+                              آخر موقع للعامل
+                            </div>
+                            <div className="text-[10px] text-[#6B7280]">
+                              {(latestUpdate?.gps || task.lastGps)!.lat.toFixed(5)}, {(latestUpdate?.gps || task.lastGps)!.lng.toFixed(5)}
+                            </div>
+                            {latestUpdate?.locationText || task.lastLocationText ? (
+                              <div className="text-[10px] text-[#6B7280] mt-1">
+                                {latestUpdate?.locationText || task.lastLocationText}
+                              </div>
+                            ) : null}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    </MapContainer>
+                  </div>
+                ) : (
+                  <div className="h-[140px] rounded-[10px] bg-[#E9E6E0] border border-black/5 grid place-items-center text-[#6B7280] text-[12px]">
+                    لا يوجد موقع GPS متاح حالياً
+                  </div>
+                )}
               </div>
             </div>
 
@@ -604,6 +659,21 @@ const mapBackendPriority = (priority: string): Priority => {
 
 // Convert backend TaskResponse to frontend TaskDTO
 const mapBackendTaskToDTO = (task: TaskResponse): TaskDTO => {
+  // Create updates array from task photos if available
+  const updates: TaskUpdate[] = [];
+  if (task.photos && task.photos.length > 0) {
+    updates.push({
+      id: "completion-" + task.taskId,
+      createdAt: task.completedAt || task.startedAt || task.createdAt,
+      statusSnapshot: task.status === "Completed" || task.status === "Approved" ? "completed" : "in_progress",
+      progressPercent: task.progressPercentage || (task.status === "Approved" ? 100 : task.status === "Completed" ? 100 : 50),
+      note: task.completionNotes || task.progressNotes,
+      images: task.photos,
+      locationText: task.locationDescription,
+      gps: task.latitude && task.longitude ? { lat: task.latitude, lng: task.longitude } : undefined,
+    });
+  }
+
   return {
     id: task.taskId.toString(),
     title: task.title,
@@ -615,8 +685,8 @@ const mapBackendTaskToDTO = (task: TaskResponse): TaskDTO => {
     zoneName: task.zoneName,
     lastLocationText: task.locationDescription,
     lastGps: task.latitude && task.longitude ? { lat: task.latitude, lng: task.longitude } : undefined,
-    updates: [], // Backend doesn't have task updates yet, keep empty
-    lastRejectReason: task.status === "Rejected" ? "تم الرفض" : undefined,
+    updates: updates,
+    lastRejectReason: task.rejectionReason || (task.status === "Rejected" ? "تم رفض المهمة" : undefined),
   };
 };
 

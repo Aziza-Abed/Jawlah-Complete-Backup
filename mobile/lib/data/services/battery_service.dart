@@ -3,83 +3,133 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 
-// service to monitor battery and report to server when low
 class BatteryService {
-  static final BatteryService instance = BatteryService._init();
-  factory BatteryService() => instance;
-  BatteryService._init();
+  static final BatteryService _instance = BatteryService._internal();
+  factory BatteryService() => _instance;
+  BatteryService._internal();
 
   final Battery _battery = Battery();
-  final ApiService _api = ApiService();
+  final ApiService _apiService = ApiService();
 
-  // battery threshold
+  Timer? _monitoringTimer;
+  StreamSubscription<BatteryState>? _batteryStateSubscription; // FIX: Store subscription
+  int? _lastReportedLevel;
+  DateTime? _lastReportTime;
+
   static const int lowBatteryThreshold = 20;
+  static const Duration reportInterval = Duration(minutes: 15);
 
-  // track if we already sent notification (dont spam)
-  bool _alreadyNotified = false;
-  int _lastReportedLevel = -1;
-
-  StreamSubscription<BatteryState>? _subscription;
-
-  // start monitoring battery
+  // Start monitoring battery level
   void startMonitoring() {
-    // check battery level now
-    _checkBattery();
+    // Cancel existing monitoring if any
+    stopMonitoring();
 
-    // listen to battery state changes
-    _subscription = _battery.onBatteryStateChanged.listen((state) {
-      _checkBattery();
+    // Check battery immediately
+    _checkAndReportBattery();
+
+    // Set up periodic checks every 5 minutes
+    _monitoringTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => _checkAndReportBattery(),
+    );
+
+    // FIX: Store the subscription so it can be cancelled
+    _batteryStateSubscription = _battery.onBatteryStateChanged.listen((BatteryState state) {
+      _checkAndReportBattery();
     });
   }
 
-  // stop monitoring
+  // Stop monitoring
   void stopMonitoring() {
-    _subscription?.cancel();
-    _subscription = null;
-    _alreadyNotified = false;
-    _lastReportedLevel = -1;
+    _monitoringTimer?.cancel();
+    _monitoringTimer = null;
+    // FIX: Cancel battery state subscription to prevent memory leak
+    _batteryStateSubscription?.cancel();
+    _batteryStateSubscription = null;
   }
 
-  // check battery level and report if low
-  Future<void> _checkBattery() async {
+  // Check battery and report to backend if needed
+  Future<void> _checkAndReportBattery() async {
     try {
       final level = await _battery.batteryLevel;
+      final state = await _battery.batteryState;
+      final isCharging = state == BatteryState.charging || state == BatteryState.full;
 
-      // only report if battery is low
-      if (level <= lowBatteryThreshold) {
-        // dont send again if we already notified at this level
-        if (_alreadyNotified && _lastReportedLevel == level) {
-          return;
-        }
+      // Determine if we should report
+      bool shouldReport = false;
 
-        // report to server
-        await _reportBatteryLevel(level);
-        _alreadyNotified = true;
-        _lastReportedLevel = level;
-      } else {
-        // battery is ok reset the flag
-        _alreadyNotified = false;
-        _lastReportedLevel = -1;
+      // Report if battery level changed significantly (by 10%)
+      if (_lastReportedLevel == null || (level - _lastReportedLevel!).abs() >= 10) {
+        shouldReport = true;
+      }
+
+      // Report if battery is low and not charging
+      if (level <= lowBatteryThreshold && !isCharging) {
+        shouldReport = true;
+      }
+
+      // Report if enough time has passed since last report (15 minutes)
+      if (_lastReportTime == null ||
+          DateTime.now().difference(_lastReportTime!) >= reportInterval) {
+        shouldReport = true;
+      }
+
+      if (shouldReport) {
+        await _reportToBackend(level, isCharging);
       }
     } catch (e) {
       debugPrint('Error checking battery: $e');
     }
   }
 
-  // send battery level to server
-  Future<void> _reportBatteryLevel(int level) async {
+  // Report battery status to backend
+  Future<void> _reportToBackend(int level, bool isCharging) async {
     try {
-      await _api.post('/users/battery', data: {
-        'batteryLevel': level,
-      });
-      debugPrint('Reported low battery to server: $level%');
+      await _apiService.post(
+        'users/battery-status',
+        data: {
+          'batteryLevel': level,
+          'isLowBattery': level <= lowBatteryThreshold,
+          'isCharging': isCharging,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+
+      _lastReportedLevel = level;
+      _lastReportTime = DateTime.now();
+
+      debugPrint('Battery status reported: $level% (charging: $isCharging)');
     } catch (e) {
-      debugPrint('Failed to report battery: $e');
+      debugPrint('Error reporting battery: $e');
     }
   }
 
-  // get current battery level
+  // Get current battery level (for UI display)
   Future<int> getBatteryLevel() async {
-    return await _battery.batteryLevel;
+    try {
+      return await _battery.batteryLevel;
+    } catch (e) {
+      debugPrint('Error getting battery level: $e');
+      return 100; // Default to 100 if error
+    }
+  }
+
+  // Get current battery state
+  Future<BatteryState> getBatteryState() async {
+    try {
+      return await _battery.batteryState;
+    } catch (e) {
+      debugPrint('Error getting battery state: $e');
+      return BatteryState.unknown;
+    }
+  }
+
+  // Check if battery is low
+  Future<bool> isLowBattery() async {
+    final level = await getBatteryLevel();
+    final state = await getBatteryState();
+    return level <= lowBatteryThreshold &&
+           state != BatteryState.charging &&
+           state != BatteryState.full;
   }
 }
