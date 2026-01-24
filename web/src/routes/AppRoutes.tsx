@@ -8,12 +8,13 @@ import Zones from "../pages/Zones";
 import CreateTask from "../pages/CreateTask";
 import Notifications from "../pages/Notifications";
 import TaskDetails from "../pages/TaskDetails";
-import IssueDetails from "../pages/IssueDetails"
-import TasksList from "../pages/Tasks";;
+import IssueDetails from "../pages/IssueDetails";
+import TasksList from "../pages/Tasks";
 import ProtectedRoute from "./ProtectedRoute";
 import Issues from "../pages/Issues";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
+import VerifyOtp from "../pages/VerifyOtp";
 import Profile from "../pages/Profile";
 import Settings from "../pages/Settings";
 import Accounts from "../pages/Accounts";
@@ -22,9 +23,10 @@ export default function AppRoutes() {
   return (
     <Routes>
       {/* Public */}
-<Route path="/login" element={<Login />} />
-  <Route path="/forgot-password" element={<ForgotPassword />} />
-  <Route path="/reset-password" element={<ResetPassword />} />      
+      <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/verify-otp" element={<VerifyOtp />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected */}
       <Route
@@ -55,6 +57,7 @@ export default function AppRoutes() {
 
         <Route path="issues/:id" element={<IssueDetails />} />
         <Route path="issues" element={<Issues />} />
+
         {/* Notifications */}
         <Route path="notifications" element={<Notifications />} />
 

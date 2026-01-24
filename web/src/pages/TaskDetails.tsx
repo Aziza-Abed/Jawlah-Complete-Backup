@@ -1,8 +1,10 @@
 // src/pages/TaskDetails.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getTask, approveTask, rejectTask } from "../api/tasks";
-import type { TaskResponse } from "../types/task";
+
+// ✅ TODO backend: re-enable APIs when backend is ready
+// import { getTask, approveTask, rejectTask } from "../api/tasks";
+// import type { TaskResponse } from "../types/task";
 
 type Priority = "Low" | "Medium" | "High";
 
@@ -58,6 +60,8 @@ export default function TaskDetails() {
       try {
         setLoading(true);
         setErr("");
+
+        // ✅ backend OFF: load mock details
         const data = await apiGetTaskDetails(String(id));
         setTask(data);
       } catch {
@@ -89,9 +93,12 @@ export default function TaskDetails() {
     try {
       setBusyAction("approve");
       setErr("");
+
+      // ✅ backend OFF: simulate approve
       await apiApproveTask(task.id);
-      const updated = await apiGetTaskDetails(task.id);
-      setTask(updated);
+
+      // update UI state
+      setTask((prev) => (prev ? { ...prev, status: "approved", lastRejectReason: undefined } : prev));
     } catch {
       setErr("فشل في اعتماد المهمة");
     } finally {
@@ -114,10 +121,22 @@ export default function TaskDetails() {
     try {
       setBusyAction("reject");
       setErr("");
+
+      // ✅ backend OFF: simulate reject
       await apiRejectTask(task.id, rejectReason.trim());
+
       setRejectOpen(false);
-      const updated = await apiGetTaskDetails(task.id);
-      setTask(updated);
+
+      // update UI state
+      setTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "rejected",
+              lastRejectReason: rejectReason.trim(),
+            }
+          : prev
+      );
     } catch {
       setErr("فشل في رفض المهمة");
     } finally {
@@ -146,7 +165,7 @@ export default function TaskDetails() {
   }
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-[#D9D9D9] overflow-auto" dir="rtl">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-start justify-between gap-3">
@@ -156,7 +175,9 @@ export default function TaskDetails() {
               </h1>
               <div className="mt-1 text-[12px] text-[#6B7280]">
                 #{task.id} •{" "}
-                {task.dueDate ? `موعد التنفيذ: ${formatDate(task.dueDate)}` : "بدون موعد محدد"}
+                {task.dueDate
+                  ? `موعد التنفيذ: ${formatDate(task.dueDate)}`
+                  : "بدون موعد محدد"}
               </div>
             </div>
 
@@ -187,7 +208,7 @@ export default function TaskDetails() {
               <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold">
                 وصف المهمة
               </div>
-              <div className="mt-2 bg-white rounded-[12px] border border-black/10 p-4 text-right text-[14px] text-[#2F2F2F] leading-relaxed">
+              <div className="mt-2 bg-white rounded-[12px] border border-black/10 p-4 text-right text-[14px] text-[#2F2F2F] leading-relaxed whitespace-pre-line">
                 {task.description}
               </div>
             </div>
@@ -439,6 +460,8 @@ export default function TaskDetails() {
   );
 }
 
+/* ---------- UI components ---------- */
+
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <div
@@ -552,12 +575,7 @@ function MiniProgressRing({ value }: { value: number }) {
 function CenterModal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        onClick={onClose}
-        aria-label="Close"
-      />
+      <button type="button" className="absolute inset-0 bg-black/40" onClick={onClose} aria-label="Close" />
       <div className="relative w-full max-w-[560px] bg-[#F3F1ED] rounded-[16px] shadow-2xl border border-black/10 p-5">
         {children}
       </div>
@@ -584,53 +602,62 @@ function formatDateTime(d: string) {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 }
 
-// Map backend status to frontend status
-const mapBackendStatus = (status: string): TaskStatus => {
-  switch (status) {
-    case "Pending": return "open";
-    case "InProgress": return "in_progress";
-    case "Completed": return "pending_approval";
-    case "Approved": return "approved";
-    case "Rejected": return "rejected";
-    default: return "open";
-  }
-};
-
-// Map backend priority
-const mapBackendPriority = (priority: string): Priority => {
-  if (priority === "Urgent") return "High";
-  return priority as Priority;
-};
-
-// Convert backend TaskResponse to frontend TaskDTO
-const mapBackendTaskToDTO = (task: TaskResponse): TaskDTO => {
-  return {
-    id: task.taskId.toString(),
-    title: task.title,
-    description: task.description,
-    dueDate: task.dueDate?.split("T")[0],
-    priority: mapBackendPriority(task.priority),
-    status: mapBackendStatus(task.status),
-    assignedWorkerName: task.assignedToUserName || "غير محدد",
-    zoneName: task.zoneName,
-    lastLocationText: task.locationDescription,
-    lastGps: task.latitude && task.longitude ? { lat: task.latitude, lng: task.longitude } : undefined,
-    updates: [], // Backend doesn't have task updates yet, keep empty
-    lastRejectReason: task.status === "Rejected" ? "تم الرفض" : undefined,
-  };
-};
+/* ---------- Mock "API" (backend OFF) ---------- */
 
 async function apiGetTaskDetails(taskId: string): Promise<TaskDTO> {
-  const task = await getTask(Number(taskId));
-  return mapBackendTaskToDTO(task);
+  // simulate network
+  await new Promise((r) => setTimeout(r, 250));
+
+  const base: TaskDTO = {
+    id: taskId,
+    title: "إصلاح حفرة قرب المدرسة",
+    description:
+      "يرجى معالجة الحفرة القريبة من المدرسة لتفادي الحوادث.\n\n- التأكد من سلامة المكان\n- تصوير قبل/بعد\n- إرسال تحديث بنسبة الإنجاز",
+    dueDate: "2026-01-22",
+    priority: "High",
+    status: "pending_approval",
+    assignedWorkerName: "محمد سليم",
+    zoneName: "المنطقة 2",
+    lastLocationText: "شارع المدرسة — قرب الإشارة",
+    lastGps: { lat: 31.9032, lng: 35.2091 },
+    updates: [
+      {
+        id: "u-1",
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+        statusSnapshot: "in_progress",
+        progressPercent: 40,
+        note: "تم تنظيف الموقع وتجهيز المواد.",
+        images: [
+          "https://images.unsplash.com/photo-1581092919535-7146a4a42b54?auto=format&fit=crop&w=800&q=60",
+          "https://images.unsplash.com/photo-1581093588401-22d1c4b49e62?auto=format&fit=crop&w=800&q=60",
+        ],
+        locationText: "قرب المدرسة — بداية الشارع",
+        gps: { lat: 31.9030, lng: 35.2094 },
+      },
+      {
+        id: "u-2",
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+        statusSnapshot: "completed",
+        progressPercent: 100,
+        note: "تمت المعالجة بالكامل وإغلاق الحفرة.",
+        images: [
+          "https://images.unsplash.com/photo-1581092334247-1c1d1e3a1a27?auto=format&fit=crop&w=800&q=60",
+        ],
+        locationText: "شارع المدرسة — قرب الإشارة",
+        gps: { lat: 31.9032, lng: 35.2091 },
+      },
+    ],
+  };
+
+  return base;
 }
 
-async function apiApproveTask(taskId: string) {
-  await approveTask(Number(taskId), "تمت الموافقة على المهمة");
+async function apiApproveTask(_taskId: string) {
+  await new Promise((r) => setTimeout(r, 350));
   return true;
 }
 
-async function apiRejectTask(taskId: string, reason: string) {
-  await rejectTask(Number(taskId), reason);
+async function apiRejectTask(_taskId: string, _reason: string) {
+  await new Promise((r) => setTimeout(r, 350));
   return true;
 }

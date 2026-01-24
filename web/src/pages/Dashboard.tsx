@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { MapPin, User, Pin } from "lucide-react";
-import { getDashboardOverview } from "../api/dashboard";
+import { MapPin, User, Pin, AlertTriangle, AlertCircle } from "lucide-react";
+// import { getDashboardOverview } from "../api/dashboard";
 import type { DashboardOverview } from "../types/dashboard";
-import { apiClient } from "../api/client";
+// import { apiClient } from "../api/client";
 
 type StatChip = {
   label: string;
@@ -18,8 +18,22 @@ type ActivityItem = {
   icon: "pin" | "user" | "map";
 };
 
+type IssuesSummary = {
+  new: number;
+  open: number;
+  closedToday: number;
+};
+
+type WarningItem = {
+  id: string;
+  text: string;
+  severity: "high" | "medium" | "low";
+};
+
 const Dashboard: React.FC = () => {
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [issuesSummary, setIssuesSummary] = useState<IssuesSummary | null>(null);
+  const [warnings, setWarnings] = useState<WarningItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -27,40 +41,45 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await getDashboardOverview();
-        setOverview(data);
+        // TODO backend: re-enable dashboard overview when backend is available
+        // const data = await getDashboardOverview();
+        // setOverview(data);
 
-        // Fetch recent activities from audit logs
-        try {
-          const auditResponse = await apiClient.get('/audit?count=3');
-          const logs = auditResponse.data.data || [];
-          const mappedActivities: ActivityItem[] = logs.map((log: any) => {
-            const date = new Date(log.createdAt);
-            const hours = date.getHours();
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            const period = hours >= 12 ? 'م' : 'ص';
-            const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-            const time = `${displayHours}:${minutes} ${period}`;
+        // TODO backend: load issues summary (new/open/closedToday)
+        // Suggested endpoint: GET /issues/summary?range=today
+        // setIssuesSummary(summary);
 
-            let icon: "pin" | "user" | "map" = "user";
-            let text = log.details || log.action;
+        // TODO backend: load warning signals (overdue tasks, no-checkin workers, stale issues)
+        // Suggested endpoint: GET /dashboard/warnings?range=today
+        // setWarnings(warningsFromApi);
 
-            if (log.action?.includes('Task')) icon = "pin";
-            else if (log.action?.includes('Zone')) icon = "map";
+        // TODO backend: re-enable audit logs when backend is available
+        // const auditResponse = await apiClient.get("/audit?count=3");
+        // map logs -> activities
 
-            return {
-              id: log.auditLogId.toString(),
-              time,
-              text: text || `${log.userFullName || log.username} - ${log.action}`,
-              icon
-            };
-          });
-          setActivities(mappedActivities);
-        } catch (auditErr) {
-          // Fallback to empty activities if audit logs fail
-          console.warn("Could not load activities:", auditErr);
-          setActivities([]);
-        }
+        // Temporary front-end placeholders (development only)
+        setOverview({
+          workers: { total: 24, checkedIn: 18, notCheckedIn: 6 },
+          tasks: { pending: 5, inProgress: 7, completedToday: 3 },
+        } as DashboardOverview);
+
+        setIssuesSummary({
+          new: 4,
+          open: 9,
+          closedToday: 2,
+        });
+
+        setWarnings([
+          { id: "w1", text: "5 مهام معلقة من أمس", severity: "high" },
+          { id: "w2", text: "3 عمال لم يسجلوا حضورهم", severity: "medium" },
+          { id: "w3", text: "بلاغ بدون معالجة منذ 4 ساعات", severity: "high" },
+        ]);
+
+        setActivities([
+          { id: "1", time: "10:15 ص", text: "تم تعيين مهمة جديدة", icon: "pin" },
+          { id: "2", time: "11:05 ص", text: "تم تسجيل دخول عامل", icon: "user" },
+          { id: "3", time: "12:20 م", text: "تم تحديث منطقة على الخريطة", icon: "map" },
+        ]);
       } catch (err) {
         setError("فشل في تحميل البيانات");
       } finally {
@@ -70,21 +89,22 @@ const Dashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  // Calculate values from API data or use defaults
   const workersTotal = overview?.workers.total ?? 0;
   const workersChips: StatChip[] = [
     { label: "غياب", value: overview?.workers.notCheckedIn ?? 0, bg: "#C86E5D", text: "#FFFFFF" },
     { label: "حضور", value: overview?.workers.checkedIn ?? 0, bg: "#8FA36A", text: "#FFFFFF" },
   ];
 
-  const tasksTotal = (overview?.tasks.pending ?? 0) + (overview?.tasks.inProgress ?? 0) + (overview?.tasks.completedToday ?? 0);
+  const tasksTotal =
+    (overview?.tasks.pending ?? 0) +
+    (overview?.tasks.inProgress ?? 0) +
+    (overview?.tasks.completedToday ?? 0);
+
   const tasksChips: StatChip[] = [
     { label: "قيد التنفيذ", value: overview?.tasks.inProgress ?? 0, bg: "#F5B300", text: "#1F2937" },
     { label: "مكتملة", value: overview?.tasks.completedToday ?? 0, bg: "#C86E5D", text: "#FFFFFF" },
     { label: "معلقة", value: overview?.tasks.pending ?? 0, bg: "#8FA36A", text: "#FFFFFF" },
   ];
-
-  // Activities now loaded from audit logs in useEffect above
 
   if (loading) {
     return (
@@ -110,6 +130,7 @@ const Dashboard: React.FC = () => {
             لوحة التحكم
           </h1>
 
+          {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <StatCard
               title="إجمالي العمال"
@@ -137,12 +158,58 @@ const Dashboard: React.FC = () => {
             />
           </div>
 
+          {/* Replaced Map with Issues + Warnings */}
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <CardShell>
+              <div className="flex items-center gap-2">
+                <AlertCircle size={18} className="text-[#7895B2]" />
+                <h2 className="text-right font-sans font-semibold text-[18px] text-[#2F2F2F]">
+                  ملخص البلاغات:
+                </h2>
+              </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                <SummaryBox label="جديدة" value={issuesSummary?.new ?? 0} bg="#F5B300" text="#1F2937" />
+                <SummaryBox label="مفتوحة" value={issuesSummary?.open ?? 0} bg="#C86E5D" text="#FFFFFF" />
+                <SummaryBox label="مغلقة اليوم" value={issuesSummary?.closedToday ?? 0} bg="#8FA36A" text="#FFFFFF" />
+              </div>
+
+              <div className="mt-4 text-right text-[12px] text-[#6B7280]">
+                {/* TODO backend: issues summary should reflect real-time counts */}
+              </div>
+            </CardShell>
+
+            <CardShell>
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={18} className="text-[#C86E5D]" />
+                <h2 className="text-right font-sans font-semibold text-[18px] text-[#2F2F2F]">
+                  تنبيهات اليوم:
+                </h2>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {warnings.length === 0 ? (
+                  <div className="text-right text-[14px] text-[#6B7280]">لا توجد تنبيهات حالياً.</div>
+                ) : (
+                  warnings.map((w) => (
+                    <WarningRow key={w.id} text={w.text} severity={w.severity} />
+                  ))
+                )}
+              </div>
+
+              <div className="mt-4 text-right text-[12px] text-[#6B7280]">
+                {/* TODO backend: compute warnings from overdue tasks, missing check-ins, and stale issues */}
+              </div>
+            </CardShell>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="mt-6">
             <CardShell>
               <div className="flex items-center gap-2">
                 <Pin size={18} className="text-[#7895B2]" />
                 <h2 className="text-right font-sans font-semibold text-[18px] text-[#2F2F2F]">
-                    آخر الأنشطة:
+                  آخر الأنشطة:
                 </h2>
               </div>
 
@@ -150,41 +217,19 @@ const Dashboard: React.FC = () => {
                 {activities.map((a) => (
                   <div key={a.id} className="flex items-start gap-3">
                     <div className="mt-1 shrink-0">
-                      {a.icon === "pin" && (
-                        <PinIcon className="text-[#7895B2]" />
-                      )}
-                      {a.icon === "user" && (
-                        <User size={18} className="text-[#7895B2]" />
-                      )}
-                      {a.icon === "map" && (
-                        <MapPin size={18} className="text-[#7895B2]" />
-                      )}
+                      {a.icon === "pin" && <PinIcon className="text-[#7895B2]" />}
+                      {a.icon === "user" && <User size={18} className="text-[#7895B2]" />}
+                      {a.icon === "map" && <MapPin size={18} className="text-[#7895B2]" />}
                     </div>
 
                     <div className="flex-1">
-                      <div className="text-right text-[12px] text-[#9CA3AF]">
-                        {a.time}
-                      </div>
+                      <div className="text-right text-[12px] text-[#9CA3AF]">{a.time}</div>
                       <div className="text-right text-[14px] sm:text-[15px] text-[#2F2F2F]">
                         {a.text}
                       </div>
                     </div>
                   </div>
                 ))}
-              </div>
-            </CardShell>
-
-            <CardShell>
-              <h2 className="text-right font-sans font-semibold text-[18px] text-[#2F2F2F]">
-                مواقع العمال والمهام:
-              </h2>
-
-              <div className="mt-4 rounded-[14px] overflow-hidden bg-white border border-black/10">
-                <iframe
-                  title="map"
-                  className="w-full h-[290px] sm:h-[320px] md:h-[360px]"
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=35.1799%2C31.8850%2C35.2600%2C31.9400&layer=mapnik"
-                />
               </div>
             </CardShell>
           </div>
@@ -206,6 +251,47 @@ function CardShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function SummaryBox({
+  label,
+  value,
+  bg,
+  text,
+}: {
+  label: string;
+  value: number;
+  bg: string;
+  text: string;
+}) {
+  return (
+    <div className="rounded-[16px] bg-white/70 border border-black/5 p-4">
+      <div className="flex flex-col items-center justify-center">
+        <div
+          className="min-w-[54px] px-3 py-1 rounded-full text-center text-[13px] font-semibold"
+          style={{ backgroundColor: bg, color: text }}
+        >
+          {value}
+        </div>
+        <div className="mt-2 text-[12px] text-[#2F2F2F] font-sans font-semibold">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function WarningRow({ text, severity }: { text: string; severity: "high" | "medium" | "low" }) {
+  const styles =
+    severity === "high"
+      ? "bg-red-50 border-red-200 text-red-700"
+      : severity === "medium"
+      ? "bg-amber-50 border-amber-200 text-amber-800"
+      : "bg-slate-50 border-slate-200 text-slate-700";
+
+  return (
+    <div className={["w-full rounded-[14px] border p-3", styles].join(" ")}>
+      <div className="text-right font-sans font-semibold text-[14px]">{text}</div>
+    </div>
+  );
+}
+
 function StatCard({
   title,
   total,
@@ -220,34 +306,20 @@ function StatCard({
   return (
     <CardShell>
       <div className="flex items-center justify-between gap-4">
-        {/* Text on the right */}
         <div className="flex-1">
           <div className="text-right text-[14px] sm:text-[15px] text-[#2F2F2F]">
-            {title} :{" "}
-            <span className="font-semibold text-[#2F2F2F]">{total}</span>
+            {title} : <span className="font-semibold text-[#2F2F2F]">{total}</span>
           </div>
 
           <div className="mt-3 flex items-center justify-end gap-3 flex-wrap">
             {chips.map((c) => (
-              <Chip
-                key={c.label}
-                value={c.value}
-                label={c.label}
-                bg={c.bg}
-                text={c.text}
-              />
+              <Chip key={c.label} value={c.value} label={c.label} bg={c.bg} text={c.text} />
             ))}
           </div>
         </div>
 
-        {/* Donut on the left */}
         <div className="shrink-0">
-          <Donut
-            size={54}
-            stroke={10}
-            parts={donut.parts}
-            background="#E5E7EB"
-          />
+          <Donut size={54} stroke={10} parts={donut.parts} background="#E5E7EB" />
         </div>
       </div>
     </CardShell>
@@ -297,14 +369,7 @@ function Donut({
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke={background}
-        strokeWidth={stroke}
-      />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={background} strokeWidth={stroke} />
       {parts.map((p, idx) => {
         const frac = p.value / total;
         const dash = c * frac;
@@ -336,14 +401,7 @@ function Donut({
 
 function PinIcon({ className }: { className?: string }) {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg width="18" height="18" viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
       <path
         d="M12 22s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11Z"
         stroke="currentColor"

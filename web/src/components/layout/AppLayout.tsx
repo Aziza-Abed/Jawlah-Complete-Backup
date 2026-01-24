@@ -1,56 +1,77 @@
-import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-import { X, User, Settings } from "lucide-react";
+import { X } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  AlertCircle,
+  PlusCircle,
+  Map,
+  BarChart3,
+  Users,
+  User,
+  Settings as SettingsIcon,
+  LogOut,
+} from "lucide-react";
 
 type UserRole = "manager" | "supervisor";
 
 type NavItem = {
   to: string;
   label: string;
+  icon: React.ElementType;
   end?: boolean;
 };
 
 const supervisorItems: NavItem[] = [
-  { to: "/dashboard", label: "لوحة التحكم", end: true },
-  { to: "/tasks", label: "المهام" },
-  { to: "/issues", label: "البلاغات" },
-  { to: "/tasks/new", label: "تعيين مهمة جديدة" },
-  { to: "/zones", label: "الخريطة الحية" },
-  { to: "/reports", label: "التقارير" },
+  { to: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, end: true },
+  { to: "/tasks", label: "المهام", icon: ClipboardList },
+  { to: "/issues", label: "البلاغات", icon: AlertCircle },
+  { to: "/tasks/new", label: "تعيين مهمة جديدة", icon: PlusCircle },
+  { to: "/zones", label: "الخريطة الحية", icon: Map },
+  { to: "/reports", label: "التقارير", icon: BarChart3 },
 ];
 
 const managerItems: NavItem[] = [
-  { to: "/dashboard", label: "لوحة التحكم", end: true },
-  { to: "/reports", label: "التقارير" },
-  { to: "/accounts", label: "إدارة الحسابات" },
+  { to: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, end: true },
+  { to: "/reports", label: "التقارير", icon: BarChart3 },
+  { to: "/accounts", label: "إدارة الحسابات", icon: Users },
 ];
 
 export default function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Get user role from localStorage
   const getUserRole = (): UserRole => {
     try {
       const userStr = localStorage.getItem("jawlah_user");
       if (userStr) {
         const user = JSON.parse(userStr);
         const backendRole = user.role?.toLowerCase();
-        // Admin sees manager menu (with account management)
         if (backendRole === "admin") return "manager";
-        // Supervisor sees field operations menu
         if (backendRole === "supervisor") return "supervisor";
       }
     } catch (err) {
       console.error("Failed to parse user role:", err);
     }
-    return "supervisor"; // Default fallback
+    return "supervisor";
   };
 
   const role = getUserRole();
-  const items = role === "manager" ? managerItems : supervisorItems;
+
+  const items = useMemo(() => {
+    return role === "manager" ? managerItems : supervisorItems;
+  }, [role]);
+
+  const handleLogout = () => {
+    // TODO backend: call logout endpoint when available
+    localStorage.removeItem("jawlah_token");
+    localStorage.removeItem("jawlah_user");
+    navigate("/login");
+  };
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -67,28 +88,23 @@ export default function AppLayout() {
   return (
     <div dir="rtl" className="h-screen w-screen bg-background overflow-hidden">
       <div className="h-full flex flex-col">
-        {/* Topbar */}
         <div className="shrink-0 w-full">
           <Topbar onMenuClick={() => setDrawerOpen(true)} />
         </div>
 
-        {/* Body */}
         <div className="flex-1 min-h-0 flex overflow-hidden" dir="rtl">
-          {/* Sidebar (Desktop only) */}
-          <div className="w-[250px] shrink-0 h-full hidden md:block">
+          <div className="w-[280px] shrink-0 h-full hidden md:block">
             <Sidebar role={role} />
           </div>
 
-          {/* Main */}
-          <main  className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
+          <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </main>
         </div>
       </div>
 
-      {/* Mobile Drawer (RIGHT) */}
+      {/* Mobile Drawer */}
       <div className={drawerOpen ? "md:hidden" : "hidden"}>
-        {/* Overlay */}
         <button
           type="button"
           onClick={() => setDrawerOpen(false)}
@@ -96,18 +112,15 @@ export default function AppLayout() {
           aria-label="إغلاق القائمة"
         />
 
-        {/* Panel */}
         <aside
           className={[
             "fixed top-0 right-0 h-full w-[290px] max-w-[86vw]",
-            "bg-[#7895B2] z-50",
-            "shadow-2xl",
+            "bg-[#7895B2] z-50 shadow-2xl",
             "transform transition-transform duration-200",
             drawerOpen ? "translate-x-0" : "translate-x-full",
           ].join(" ")}
           dir="rtl"
         >
-          {/* Header */}
           <div className="h-[76px] px-4 flex items-center justify-between">
             <div className="text-white font-sans font-semibold">القائمة</div>
             <button
@@ -120,8 +133,7 @@ export default function AppLayout() {
             </button>
           </div>
 
-          {/* Links */}
-          <nav className="px-3 pt-4 flex flex-col gap-3">
+          <nav className="px-3 pt-4 flex flex-col gap-2">
             {items.map((it) => (
               <NavLink
                 key={it.to}
@@ -129,44 +141,71 @@ export default function AppLayout() {
                 end={it.end}
                 className={({ isActive }) =>
                   [
-                    "w-full rounded-[12px] px-4 py-3",
-                    "font-sans font-semibold text-[16px]",
-                    isActive ? "bg-[#F3F1ED] text-[#2F2F2F]" : "bg-white/15 text-white hover:bg-white/20",
+                    "w-full rounded-[12px] px-4 py-2.5",
+                    "font-sans font-semibold text-[14px]",
+                    "flex items-center gap-3",
+                    isActive
+                      ? "bg-[#F3F1ED] text-[#2F2F2F]"
+                      : "bg-white/15 text-white hover:bg-white/20",
                   ].join(" ")
                 }
               >
-                {it.label}
+                <it.icon size={18} className="shrink-0" />
+                <span className="flex-1 text-right">{it.label}</span>
               </NavLink>
             ))}
           </nav>
 
-          {/* Divider */}
-          <div className="my-5 mx-4 h-[1px] bg-white/25" />
+          <div className="my-4 mx-4 h-[1px] bg-white/25" />
 
-          {/* Profile / Settings */}
-          <div className="px-3 flex flex-col gap-3">
+          <div className="px-3 flex flex-col gap-2">
+            <NavLink
+              to="/profile"
+              className={({ isActive }) =>
+                [
+                  "w-full rounded-[12px] px-4 py-2.5",
+                  "font-sans font-semibold text-[14px]",
+                  "flex items-center gap-3",
+                  isActive
+                    ? "bg-[#F3F1ED] text-[#2F2F2F]"
+                    : "bg-white/15 text-white hover:bg-white/20",
+                ].join(" ")
+              }
+              onClick={() => setDrawerOpen(false)}
+            >
+              <User size={18} className="shrink-0" />
+              <span className="flex-1 text-right">الملف الشخصي</span>
+            </NavLink>
+
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                [
+                  "w-full rounded-[12px] px-4 py-2.5",
+                  "font-sans font-semibold text-[14px]",
+                  "flex items-center gap-3",
+                  isActive
+                    ? "bg-[#F3F1ED] text-[#2F2F2F]"
+                    : "bg-white/15 text-white hover:bg-white/20",
+                ].join(" ")
+              }
+              onClick={() => setDrawerOpen(false)}
+            >
+              <SettingsIcon size={18} className="shrink-0" />
+              <span className="flex-1 text-right">الإعدادات</span>
+            </NavLink>
+
             <button
               type="button"
               onClick={() => {
-                // TODO: navigate("/profile")
                 setDrawerOpen(false);
+                handleLogout();
               }}
-              className="w-full rounded-[12px] px-4 py-3 bg-white/15 text-white hover:bg-white/20 transition flex items-center justify-between"
+              className="w-full rounded-[12px] px-4 py-2.5 font-sans font-semibold text-[14px] flex items-center gap-3 bg-white/15 text-white hover:bg-white/20 transition"
+              aria-label="تسجيل الخروج"
             >
-              <span className="font-sans font-semibold text-[16px]">الملف الشخصي</span>
-              <User size={18} className="text-white" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                // TODO: navigate("/settings")
-                setDrawerOpen(false);
-              }}
-              className="w-full rounded-[12px] px-4 py-3 bg-white/15 text-white hover:bg-white/20 transition flex items-center justify-between"
-            >
-              <span className="font-sans font-semibold text-[16px]">الإعدادات</span>
-              <Settings size={18} className="text-white" />
+              <LogOut size={18} className="shrink-0" />
+              <span className="flex-1 text-right">تسجيل الخروج</span>
             </button>
           </div>
         </aside>
