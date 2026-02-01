@@ -7,6 +7,7 @@ import '../data/models/task_model.dart';
 import '../data/services/tasks_service.dart';
 import '../data/services/location_service.dart';
 import '../data/repositories/local/task_local_repository.dart';
+import '../core/errors/app_exception.dart';
 
 import 'sync_manager.dart';
 import 'base_controller.dart';
@@ -16,13 +17,13 @@ class TaskManager extends BaseController {
   final TaskLocalRepository _taskLocalRepo = TaskLocalRepository();
   SyncManager? _syncManager;
 
-  List<TaskModel> myTasks = []; // list to hold all tasks
-  TaskModel? currentTask; // the task user is currently viewing
+  List<TaskModel> myTasks = []; // all tasks list
+  TaskModel? currentTask; // task user is looking at
 
   String? filterStatus;
   String? filterPriority;
 
-  // pagination state
+  // pagination stuff
   int _currentPage = 1;
   final int _pageSize = 100;
   bool _hasMoreData = true;
@@ -37,11 +38,23 @@ class TaskManager extends BaseController {
       myTasks.where((task) => task.isInProgress).toList();
   List<TaskModel> get completedTasks =>
       myTasks.where((task) => task.isCompleted).toList();
+  List<TaskModel> get approvedTasks =>
+      myTasks.where((task) => task.isApproved).toList();
+  List<TaskModel> get rejectedTasks =>
+      myTasks.where((task) => task.isRejected).toList();
+  // reviewed = approved + rejected (tasks that supervisor has reviewed)
+  List<TaskModel> get reviewedTasks =>
+      myTasks.where((task) => task.isApproved || task.isRejected).toList();
 
   int get totalTasks => myTasks.length;
   int get pendingCount => pendingTasks.length;
   int get inProgressCount => inProgressTasks.length;
   int get completedCount => completedTasks.length;
+  int get approvedCount => approvedTasks.length;
+  int get rejectedCount => rejectedTasks.length;
+  int get reviewedCount => reviewedTasks.length;
+  // actionable = pending + inProgress + completed (excludes reviewed)
+  int get actionableCount => pendingCount + inProgressCount + completedCount;
 
   bool get hasTasks => myTasks.isNotEmpty;
   bool get isEmpty => myTasks.isEmpty;
@@ -50,7 +63,7 @@ class TaskManager extends BaseController {
     _syncManager = manager;
   }
 
-  // this method loads all tasks from server or local
+  // load all tasks from server or local storage
   Future<void> loadTasks({
     String? status,
     String? priority,
@@ -68,13 +81,13 @@ class TaskManager extends BaseController {
 
     final isOnline = _syncManager?.isOnline ?? true;
 
-    // 1. if we are offline, just get tasks from the device
+    // if offline get tasks from phone
     if (!isOnline) {
       await getDataFromDevice(status, priority);
       return;
     }
 
-    // 2. if online, fetch them from the server
+    // if online get from server
     try {
       final tasks = await _tasksService.getMyTasks(
         status: status,
@@ -86,7 +99,7 @@ class TaskManager extends BaseController {
       myTasks = tasks;
       _hasMoreData = tasks.length >= _pageSize;
 
-      // 3. save them to local storage for later use when offline
+      // save to local for offline use later
       _saveTasksToLocal(tasks).catchError((e) {
         if (kDebugMode) debugPrint('failed to save tasks locally: $e');
       });
@@ -95,11 +108,12 @@ class TaskManager extends BaseController {
       setError(null);
       notifyListeners();
     } catch (e) {
-      // 4. if fetching fails (like network error), fallback to device data
+      // if server fails get from phone
       await getDataFromDevice(status, priority);
     }
   }
 
+  // get tasks from phone storage when offline
   Future<void> getDataFromDevice(String? status, String? priority) async {
     try {
       myTasks = await _loadLocalTasks(status: status, priority: priority);
@@ -107,10 +121,11 @@ class TaskManager extends BaseController {
       if (myTasks.isEmpty) {
         setError('لا توجد مهام محفوظة. الرجاء الاتصال بالإنترنت.');
       } else {
-        // use strings without placeholders for simplicity or handle them
+        // show message that we offline
         setError('وضع عدم الاتصال - عرض ${myTasks.length} مهمة محفوظة');
       }
     } catch (e) {
+      debugPrint('error loading from device: $e');
       setError('خطأ في قاعدة البيانات المحلية');
       myTasks = [];
     }
@@ -119,17 +134,17 @@ class TaskManager extends BaseController {
     notifyListeners();
   }
 
-  // load tasks from hive
+  // get tasks from hive db
   Future<List<TaskModel>> _loadLocalTasks({
     String? status,
     String? priority,
   }) async {
     final localTasks = await _taskLocalRepo.getAllTasks();
-    var tasks = localTasks.map((local) => TaskModel.fromLocal(local)).toList();
+    List<TaskModel> tasks = localTasks.map((local) => TaskModel.fromLocal(local)).toList();
     return _applyFilters(tasks, status, priority);
   }
 
-  // save tasks to local db
+  // save tasks to phone for offline
   Future<void> _saveTasksToLocal(List<TaskModel> tasks) async {
     for (var task in tasks) {
       await _taskLocalRepo.saveFromServer(task.toLocal());
@@ -170,6 +185,7 @@ class TaskManager extends BaseController {
     return sorted;
   }
 
+  // load more tasks when scrolling down
   Future<void> loadMoreTasks() async {
     if (_isLoadingMore || !_hasMoreData) return;
 
@@ -177,26 +193,31 @@ class TaskManager extends BaseController {
     notifyListeners();
 
     try {
+      _currentPage++;
       final moreTasks = await _tasksService.getMyTasks(
         status: filterStatus,
         priority: filterPriority,
-        page: _currentPage + 1,
+        page: _currentPage,
         pageSize: _pageSize,
       );
 
-      if (moreTasks.isNotEmpty) {
-        _currentPage++;
-        myTasks.addAll(moreTasks);
-        _hasMoreData = moreTasks.length >= _pageSize;
-      } else {
+      if (moreTasks.isEmpty || moreTasks.length < _pageSize) {
         _hasMoreData = false;
       }
+
+      myTasks.addAll(moreTasks);
+
+      // save new tasks localy
+      _saveTasksToLocal(moreTasks).catchError((e) {
+        if (kDebugMode) debugPrint('failed to save tasks: $e');
+      });
     } catch (e) {
-      _hasMoreData = false;
-    } finally {
-      _isLoadingMore = false;
-      notifyListeners();
+      if (kDebugMode) debugPrint('error loading more tasks: $e');
+      _currentPage--;
     }
+
+    _isLoadingMore = false;
+    notifyListeners();
   }
 
   Future<void> getTaskDetails(int taskId) async {
@@ -213,11 +234,11 @@ class TaskManager extends BaseController {
       }
     }
 
-    // fallback to local list if offline or server fails
+    // fallback to local if offline
     final localTask = getTaskById(taskId);
     if (localTask != null) {
       currentTask = localTask;
-      clearError(); // clear network errors if we have the data locally
+      clearError();
     } else if (!isOnline) {
       setError('المهمة غير موجودة في الذاكرة المحلية - يرجى الاتصال بالإنترنت');
     }
@@ -238,44 +259,36 @@ class TaskManager extends BaseController {
     });
 
     if (!success) {
-      return await _saveStatusUpdateOffline(taskId, newStatus, notes: notes);
+      return await _saveTaskOffline(taskId, newStatus, notes: notes);
     }
 
     return success;
   }
 
-  Future<bool> _saveStatusUpdateOffline(
-    int taskId,
-    String newStatus, {
-    String? notes,
-  }) async {
+  // save task status change when offline
+  Future<bool> _saveTaskOffline(int taskId, String newStatus,
+      {String? notes}) async {
     final task = getTaskById(taskId);
     if (task == null) return false;
 
     try {
-      // update task
       final updatedTask = task.copyWith(
         status: newStatus,
         completionNotes: notes,
         updatedAt: DateTime.now(),
       );
 
-      // save to local database
       final taskLocal = updatedTask.toLocal();
       taskLocal.isSynced = false;
       await _taskLocalRepo.saveTask(taskLocal);
-
-      // notify for auto-sync when online
       await _syncManager?.newDataAdded();
 
-      // update state
       updateMyTaskInList(updatedTask);
-      clearError(); // Clear "No Internet" error since we handled it offline
+      clearError();
       notifyListeners();
-
       return true;
     } catch (e) {
-      if (kDebugMode) debugPrint('offline status update failed: $e');
+      if (kDebugMode) debugPrint('offline save failed: $e');
       return false;
     }
   }
@@ -287,41 +300,10 @@ class TaskManager extends BaseController {
     });
 
     if (!success) {
-      return await _saveStartedTaskOffline(taskId);
+      return await _saveTaskOffline(taskId, 'InProgress');
     }
 
     return success;
-  }
-
-  Future<bool> _saveStartedTaskOffline(int taskId) async {
-    final task = getTaskById(taskId);
-    if (task == null) return false;
-
-    try {
-      // update task
-      final updatedTask = task.copyWith(
-        status: 'InProgress',
-        updatedAt: DateTime.now(),
-      );
-
-      // save to local database
-      final taskLocal = updatedTask.toLocal();
-      taskLocal.isSynced = false;
-      await _taskLocalRepo.saveTask(taskLocal);
-
-      // notify for auto-sync when online
-      await _syncManager?.newDataAdded();
-
-      // update state
-      updateMyTaskInList(updatedTask);
-      clearError();
-      notifyListeners();
-
-      return true;
-    } catch (e) {
-      if (kDebugMode) debugPrint('offline start failed: $e');
-      return false;
-    }
   }
 
   Future<bool> finishTask(
@@ -329,8 +311,11 @@ class TaskManager extends BaseController {
     required String notes,
     File? proofPhoto,
   }) async {
-    final success = await executeVoidWithErrorHandling(() async {
-      // get current location
+    try {
+      setLoading(true);
+      clearError();
+
+      // get current gps location
       double? lat;
       double? lng;
 
@@ -353,14 +338,36 @@ class TaskManager extends BaseController {
       );
 
       updateMyTaskInList(updatedTask);
-    });
+      setLoading(false);
+      return true;
+    } on AppException catch (e) {
+      setLoading(false);
 
-    // offline fallback - save locally
-    if (!success) {
+      // Check if this is a validation error (location mismatch)
+      // These errors should NOT use offline fallback
+      final isValidationError = e.message.contains('الموقع غير مطابق') ||
+          e.message.contains('تحذير') ||
+          e.message.contains('رفض') ||
+          e.message.contains('المسافة');
+
+      if (isValidationError) {
+        // Don't use offline fallback for validation errors
+        // Just set the error message and return false
+        setError(e.message);
+        return false;
+      } else {
+        // For network errors, use offline fallback
+        setError(e.message);
+        return await _saveCompletedTaskOffline(taskId, notes, proofPhoto);
+      }
+    } catch (e) {
+      setLoading(false);
+
+      // For unknown errors, try offline fallback
+      final errorMessage = e.toString().replaceAll('Exception: ', '');
+      setError(errorMessage);
       return await _saveCompletedTaskOffline(taskId, notes, proofPhoto);
     }
-
-    return success;
   }
 
   Future<bool> _saveCompletedTaskOffline(
@@ -372,7 +379,7 @@ class TaskManager extends BaseController {
     if (task == null) return false;
 
     try {
-      // save photo permanently if provided
+      // save photo if there is one
       String? permanentPhotoPath;
       if (proofPhoto != null) {
         permanentPhotoPath = await _savePhotoLocally(proofPhoto);
@@ -387,12 +394,12 @@ class TaskManager extends BaseController {
         updatedAt: DateTime.now(),
       );
 
-      // save to local database
+      // save to local db
       final taskLocal = updatedTask.toLocal();
       taskLocal.isSynced = false;
       await _taskLocalRepo.saveTask(taskLocal);
 
-      // notify for auto-sync when online
+      // tell sync manager to sync later
       await _syncManager?.newDataAdded();
 
       // update state
@@ -427,7 +434,7 @@ class TaskManager extends BaseController {
     }
   }
 
-  // helper to update task in both list and selection
+  // helper to update task in list and current selection
   void updateMyTaskInList(TaskModel updatedTask) {
     final index = myTasks.indexWhere((t) => t.taskId == updatedTask.taskId);
     if (index != -1) {
@@ -477,8 +484,37 @@ class TaskManager extends BaseController {
     }
   }
 
-  // simple method to refresh the UI
+  // simple method to refresh ui
   void refreshUI() {
     notifyListeners();
+  }
+
+  // update task progress (for multi-day tasks)
+  Future<void> updateTaskProgress(int taskId, int progressPercentage) async {
+    await executeWithErrorHandling(() async {
+      // call API to update progress
+      final updated = await _tasksService.updateTaskProgress(
+        taskId,
+        progressPercentage,
+      );
+
+      if (updated != null) {
+        // update in myTasks list
+        final index = myTasks.indexWhere((t) => t.taskId == taskId);
+        if (index != -1) {
+          myTasks[index] = updated;
+        }
+
+        // update currentTask if this is the current task
+        if (currentTask?.taskId == taskId) {
+          currentTask = updated;
+        }
+
+        notifyListeners();
+        return true;
+      }
+
+      throw ValidationException('فشل تحديث التقدم');
+    });
   }
 }

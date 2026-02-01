@@ -1,40 +1,21 @@
 {
   "project_info": {
-    "project_number": "633012354866",
-    "project_id": "jawlah-2945f",
-    "storage_bucket": "jawlah-2945f.firebasestorage.app"
+    "project_number": "685687221031",
+    "project_id": "followupbzu",
+    "storage_bucket": "followupbzu.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:633012354866:android:b5e604f33f29f570f2e12b",
+        "mobilesdk_app_id": "1:685687221031:android:070cc9e59f61a0702bd702",
         "android_client_info": {
-          "package_name": "com.albireh.jawlah"
+          "package_name": "com.example.followup"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBtDj97ema8-U3GjIGaou5egPtNyZQYGCI"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:633012354866:android:322be7baca3d35d2f2e12b",
-        "android_client_info": {
-          "package_name": "com.example.jawlah"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBtDj97ema8-U3GjIGaou5egPtNyZQYGCI"
+          "current_key": "AIzaSyD76xqvzXgRqrxtlW4WUZZUhlVW9JclFiM"
         }
       ],
       "services": {

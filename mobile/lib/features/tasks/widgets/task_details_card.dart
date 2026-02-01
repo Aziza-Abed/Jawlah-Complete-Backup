@@ -37,12 +37,22 @@ class TaskDetailsCard extends StatelessWidget {
             valueColor: _getPriorityColor(task.priority),
           ),
           const Divider(height: 24),
-          if (task.location != null) ...[
+          if (task.zoneName != null || task.location != null) ...[
             _buildDetailRow(
               Icons.location_on,
-              'الموقع',
-              task.location!,
+              'المنطقة',
+              task.zoneName ?? 'غير محدد',
             ),
+            if (task.location != null &&
+                task.location!.isNotEmpty &&
+                task.location != task.zoneName) ...[
+              const SizedBox(height: 8),
+              _buildDetailRow(
+                Icons.place,
+                'الموقع التفصيلي',
+                task.location!,
+              ),
+            ],
             const Divider(height: 24),
           ],
           _buildDetailRow(

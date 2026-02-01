@@ -27,7 +27,8 @@ class _LiveWorkDurationState extends State<LiveWorkDuration> {
   }
 
   void _updateDuration() {
-    final diff = DateTime.now().difference(widget.checkInTime);
+    // Use UTC for both times to calculate correct duration
+    final diff = DateTime.now().toUtc().difference(widget.checkInTime);
     final hours = diff.inHours;
     final minutes = diff.inMinutes.remainder(60);
     final seconds = diff.inSeconds.remainder(60);

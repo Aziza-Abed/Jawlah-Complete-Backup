@@ -16,7 +16,23 @@ Thumbs.db
 *.log
 logs/
 
+# Session/conversation logs
+**/2026-*-*.txt
+**/20[0-9][0-9]-*-*.txt
+
 # Environment files
 .env
 .env.local
 .env.*.local
+backend/FollowUp.API/*firebase-adminsdk*.json
+
+# Documentation/notes (not for repo)
+COMPREHENSIVE_CODE_AUDIT_REPORT.md
+CRITICAL_FIXES_SUMMARY.md
+EdgeCasesAndConstraints.md
+IMPLEMENTATION_ASSESSMENT.md
+adminWebNextWorkForTeammate.txt
+supervisorWebNextWorkForteamamte.txt
+ملاحظات مراد.md
+chapters/
+.claude/

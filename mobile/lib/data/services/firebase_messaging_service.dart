@@ -34,28 +34,33 @@ class FirebaseMessagingService {
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
 
+  // Store subscriptions to prevent memory leaks
+  StreamSubscription<String>? _tokenRefreshSubscription;
+  StreamSubscription<RemoteMessage>? _onMessageSubscription;
+  StreamSubscription<RemoteMessage>? _onMessageOpenedAppSubscription;
+
   // starting the notification service
   Future<void> initialize() async {
     if (kDebugMode) {
       debugPrint('Initializing Firebase Messaging...');
     }
 
-    // 1. ask for permission to show notifications
+    // request permission from user
     final settings = await _requestPermission();
     if (settings.authorizationStatus != AuthorizationStatus.authorized) {
       return;
     }
 
-    // 2. prepare local notifications for android/ios
+    // init local notifications
     await _initializeLocalNotifications();
 
-    // 3. get the unique FCM token for this phone
+    // get fcm token from firebase
     await _getFcmToken();
 
-    // 4. setup listeners for when a message arrives
+    // setup listeners for messages
     _setupMessageHandlers();
 
-    // 5. handle messages when app is in the background
+    // background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
 
@@ -95,7 +100,9 @@ class FirebaseMessagingService {
         await SecureStorageHelper.saveFcmToken(_fcmToken!);
       }
 
-      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+      // Cancel existing subscription before creating new one
+      await _tokenRefreshSubscription?.cancel();
+      _tokenRefreshSubscription = _firebaseMessaging.onTokenRefresh.listen((newToken) {
         if (kDebugMode) {
           debugPrint('FCM Token refreshed');
         }
@@ -153,8 +160,45 @@ class FirebaseMessagingService {
     }
   }
 
+  // unregister FCM token from backend (called on logout)
+  Future<bool> unregisterFcmToken() async {
+    try {
+      // clear local FCM token
+      _fcmToken = null;
+      await SecureStorageHelper.removeFcmToken();
+
+      // tell backend to clear the token (send empty string)
+      final apiService = ApiService();
+      final response = await apiService.post(
+        ApiConfig.registerFcmToken,
+        data: {'fcmToken': ''},
+      );
+
+      if (response.statusCode == 200) {
+        if (kDebugMode) {
+          debugPrint('FCM token unregistered from backend successfully');
+        }
+        return true;
+      }
+
+      if (kDebugMode) {
+        debugPrint('Failed to unregister FCM token: ${response.statusCode}');
+      }
+      return false;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error unregistering FCM token: $e');
+      }
+      return false;
+    }
+  }
+
   void _setupMessageHandlers() {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    // Cancel existing subscriptions before creating new ones
+    _onMessageSubscription?.cancel();
+    _onMessageOpenedAppSubscription?.cancel();
+
+    _onMessageSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       if (kDebugMode) {
         debugPrint('Foreground message received: ${message.messageId}');
       }
@@ -162,7 +206,7 @@ class FirebaseMessagingService {
       _showLocalNotification(message);
     });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    _onMessageOpenedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       if (kDebugMode) {
         debugPrint('Notification tapped (background): ${message.messageId}');
       }
@@ -184,8 +228,8 @@ class FirebaseMessagingService {
 
     if (notification != null) {
       const androidDetails = AndroidNotificationDetails(
-        'jawlah_notifications',
-        'Jawlah Notifications',
+        'followup_notifications',
+        'FollowUp Notifications',
         channelDescription: 'Notifications for tasks, issues, and attendance',
         importance: Importance.high,
         priority: Priority.high,
@@ -279,6 +323,10 @@ class FirebaseMessagingService {
   }
 
   void dispose() {
+    // Cancel all subscriptions to prevent memory leaks
+    _tokenRefreshSubscription?.cancel();
+    _onMessageSubscription?.cancel();
+    _onMessageOpenedAppSubscription?.cancel();
     _messageStreamController.close();
   }
 }

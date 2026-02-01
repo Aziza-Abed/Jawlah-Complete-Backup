@@ -10,44 +10,21 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+class _SplashScreenState extends State<SplashScreen> {
+  bool _visible = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.6, curve: Curves.easeIn)),
-    );
-
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack)),
-    );
-
-    _controller.forward();
+    // start animation after delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) setState(() => _visible = true);
+    });
     _navigateToHome();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
   Future<void> _navigateToHome() async {
-    // slightly longer delay for brand visibility
+    // wait 2 seconds to show logo
     await Future.delayed(const Duration(seconds: 2));
 
     final token = await StorageHelper.getToken();
@@ -77,22 +54,25 @@ class _SplashScreenState extends State<SplashScreen>
             ],
           ),
         ),
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: ScaleTransition(
-            scale: _scaleAnimation,
+        child: AnimatedOpacity(
+          opacity: _visible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 800),
+          child: AnimatedScale(
+            scale: _visible ? 1.0 : 0.8,
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOutBack,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Official Logo with soft glow
+                // app logo
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withOpacity(0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Image.asset(
-                    'assets/images/albireh_logo.png',
+                    'assets/images/logo.png',
                     width: 140,
                     height: 140,
                     errorBuilder: (context, error, stackTrace) => const Icon(
@@ -104,7 +84,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(height: 32),
                 const Text(
-                  'جولة',
+                  'FollowUp',
                   style: TextStyle(
                     fontSize: 42,
                     fontWeight: FontWeight.bold,
@@ -115,7 +95,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'نظام جولات بلدية البيرة',
+                  'نظام متابعة العمل الميداني',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18,

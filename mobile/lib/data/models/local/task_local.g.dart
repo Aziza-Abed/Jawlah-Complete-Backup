@@ -32,19 +32,22 @@ class TaskLocalAdapter extends TypeAdapter<TaskLocal> {
       priority: fields[12] as String,
       dueDate: fields[13] as DateTime?,
       zoneId: fields[14] as int?,
+      zoneName: fields[21] as String?,
       latitude: fields[15] as double?,
       longitude: fields[16] as double?,
       locationDescription: fields[17] as String?,
       taskType: fields[18] as String?,
       requiresPhotoProof: fields[19] as bool,
       estimatedDurationMinutes: fields[20] as int?,
+      progressPercentage: fields[22] as int,
+      progressNotes: fields[23] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, TaskLocal obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(24)
       ..writeByte(0)
       ..write(obj.clientId)
       ..writeByte(1)
@@ -75,6 +78,8 @@ class TaskLocalAdapter extends TypeAdapter<TaskLocal> {
       ..write(obj.dueDate)
       ..writeByte(14)
       ..write(obj.zoneId)
+      ..writeByte(21)
+      ..write(obj.zoneName)
       ..writeByte(15)
       ..write(obj.latitude)
       ..writeByte(16)
@@ -86,7 +91,11 @@ class TaskLocalAdapter extends TypeAdapter<TaskLocal> {
       ..writeByte(19)
       ..write(obj.requiresPhotoProof)
       ..writeByte(20)
-      ..write(obj.estimatedDurationMinutes);
+      ..write(obj.estimatedDurationMinutes)
+      ..writeByte(22)
+      ..write(obj.progressPercentage)
+      ..writeByte(23)
+      ..write(obj.progressNotes);
   }
 
   @override

@@ -9,7 +9,7 @@ class TaskCard extends StatelessWidget {
 
   const TaskCard({super.key, required this.task});
 
-  // Helper to get priority color style (bg, text/icon)
+  // get colors for priority badge
   Map<String, Color> _getPriorityStyle() {
     switch (task.priority.toLowerCase()) {
       case 'high':
@@ -61,7 +61,7 @@ class TaskCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // 1. Main Content (Right side in RTL)
+            // main content
             Expanded(
               child: Column(
                 crossAxisAlignment:
@@ -83,12 +83,12 @@ class TaskCard extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Badges Row (Priority & Status)
+                  // priority and status badges
                   Row(
                     mainAxisAlignment:
                         MainAxisAlignment.start, // Align to Right in RTL
                     children: [
-                      // Priority Badge
+                      // priority badge
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
@@ -117,7 +117,7 @@ class TaskCard extends StatelessWidget {
 
                       const SizedBox(width: 8),
 
-                      // Status Badge
+                      // status badge
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
@@ -140,7 +140,7 @@ class TaskCard extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // Location Row
+                  // location row (show zoneName or location)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -149,7 +149,7 @@ class TaskCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          task.location ?? 'المنطقة الرياضية',
+                          task.zoneName ?? task.location ?? 'غير محدد',
                           style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF6C757D),
@@ -165,7 +165,7 @@ class TaskCard extends StatelessWidget {
 
                   const SizedBox(height: 8),
 
-                  // Date Row
+                  // date row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -182,13 +182,58 @@ class TaskCard extends StatelessWidget {
                       ),
                     ],
                   ),
+
+                  // progress bar (show only for InProgress tasks with progress > 0)
+                  if (task.status.toLowerCase() == 'inprogress' &&
+                      task.progressPercentage > 0) ...[
+                    const SizedBox(height: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'التقدم: ${task.progressPercentage}%',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF7895B2),
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                            if (task.progressPercentage == 100)
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                size: 16,
+                                color: Color(0xFF4CAF50),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: task.progressPercentage / 100,
+                            backgroundColor: const Color(0xFF7895B2).withOpacity(0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              task.progressPercentage == 100
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFF7895B2),
+                            ),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
 
             const SizedBox(width: 12),
 
-            // 2. Left Chevron (Points Left in RTL to indicate "Forward" to details)
+            // arrow to go to details
             const Icon(
               Icons.arrow_forward_ios,
               size: 20,

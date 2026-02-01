@@ -1,69 +1,39 @@
 import 'package:flutter/material.dart';
 
+/// Simple fade-in animation using Flutter's built-in AnimatedOpacity
 class FadeInAnimation extends StatefulWidget {
   final Widget child;
   final Duration delay;
-  final Offset offset;
 
   const FadeInAnimation({
     super.key,
     required this.child,
     this.delay = Duration.zero,
-    this.offset = const Offset(0, 30),
   });
 
   @override
   State<FadeInAnimation> createState() => _FadeInAnimationState();
 }
 
-class _FadeInAnimationState extends State<FadeInAnimation>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _opacity;
-  late Animation<Offset> _position;
+class _FadeInAnimationState extends State<FadeInAnimation> {
+  bool _visible = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
-    _opacity = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-
-    _position = Tween<Offset>(begin: widget.offset, end: Offset.zero).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-
+    // wait for delay then show the widget
     Future.delayed(widget.delay, () {
       if (mounted) {
-        _controller.forward();
+        setState(() => _visible = true);
       }
     });
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _opacity.value,
-          child: Transform.translate(
-            offset: _position.value,
-            child: child,
-          ),
-        );
-      },
+    return AnimatedOpacity(
+      opacity: _visible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
       child: widget.child,
     );
   }

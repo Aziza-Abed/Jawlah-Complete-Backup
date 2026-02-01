@@ -63,13 +63,14 @@ class AttendanceLocal extends HiveObject {
     this.syncedAt,
   });
 
-  // convert to sync DTO
+  // convert to sync DTO - field names must match backend expectations
   Map<String, dynamic> toSyncDto() {
     return {
       'clientId': clientId,
       'userId': userId,
-      'checkInTime': checkInTime.toIso8601String(),
-      'checkOutTime': checkOutTime?.toIso8601String(),
+      // CRITICAL: Backend expects 'checkInEventTime' not 'checkInTime'
+      'checkInEventTime': checkInTime.toIso8601String(),
+      'checkOutEventTime': checkOutTime?.toIso8601String(),
       'checkInLatitude': checkInLatitude,
       'checkInLongitude': checkInLongitude,
       'checkOutLatitude': checkOutLatitude,

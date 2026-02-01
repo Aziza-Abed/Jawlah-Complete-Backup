@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:jawlah/core/utils/hive_init.dart';
-import 'package:jawlah/data/services/tracking_service.dart';
-import 'package:jawlah/data/services/location_service.dart';
+import 'package:followup/core/utils/hive_init.dart';
+import 'package:followup/data/services/tracking_service.dart';
+import 'package:followup/data/services/location_service.dart';
 
 class BackgroundServiceUtils {
   static final FlutterBackgroundService _service = FlutterBackgroundService();
 
   static Future<void> initializeService() async {
-    const notificationChannelId = 'jawlah_tracking_channel';
+    const notificationChannelId = 'followup_tracking_channel';
     const notificationId = 888;
 
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -20,7 +20,7 @@ class BackgroundServiceUtils {
     // create Notification Channel for Android
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       notificationChannelId,
-      'Jawlah Tracking Service',
+      'FollowUp Tracking Service',
       description: 'Background service for location tracking',
       importance: Importance.low,
     );
@@ -36,7 +36,7 @@ class BackgroundServiceUtils {
         autoStart: false, // Start manually after login
         isForegroundMode: true,
         notificationChannelId: notificationChannelId,
-        initialNotificationTitle: 'جولة - Jawlah',
+        initialNotificationTitle: 'FollowUp',
         initialNotificationContent: 'جاري تتبع الموقع...',
         foregroundServiceNotificationId: notificationId,
       ),
@@ -88,7 +88,7 @@ class BackgroundServiceUtils {
 
     await trackingService.connect();
 
-    // 5. check and request location permissions
+    // check and request location permissions
     bool hasPermission = await _checkLocationPermission();
     if (!hasPermission) {
       debugPrint('Location permission denied, stopping background service');
@@ -96,20 +96,32 @@ class BackgroundServiceUtils {
       return;
     }
 
-    // 6. start the location update loop
+    // start location update loop
     Position? previousPosition;
     Duration currentInterval = LocationService.movingFastInterval;
 
-    void scheduleNextUpdate(Timer? previousTimer) {
-      previousTimer?.cancel();
+    // Store timer reference to prevent leaks
+    Timer? activeTimer;
 
-      Timer(currentInterval, () async {
+    void scheduleNextUpdate() {
+      // Cancel any existing timer first to prevent leaks
+      activeTimer?.cancel();
+      activeTimer = null;
+
+      // Don't schedule if service is stopping
+      if (!isRunning) {
+        return;
+      }
+
+      activeTimer = Timer(currentInterval, () async {
         if (!isRunning) {
+          activeTimer?.cancel();
+          activeTimer = null;
           return; // service stopped
         }
 
         try {
-          // 7. check if the user turned off location or permission
+          // check location service status
           LocationPermission permission = await Geolocator.checkPermission();
           if (permission == LocationPermission.denied ||
               permission == LocationPermission.deniedForever) {
@@ -119,6 +131,8 @@ class BackgroundServiceUtils {
                 content: "يرجى تفعيل صلاحيات الموقع لاستمرار العمل",
               );
             }
+            activeTimer?.cancel();
+            activeTimer = null;
             service.stopSelf();
             return;
           }
@@ -131,17 +145,17 @@ class BackgroundServiceUtils {
                 content: "يرجى تشغيل GPS لاستمرار العمل",
               );
             }
-            scheduleNextUpdate(null);
+            scheduleNextUpdate();
             return;
           }
 
-          // 8. get the current position
+          // get current position
           Position position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationService.defaultAccuracy,
             timeLimit: const Duration(seconds: 15),
           );
 
-          // 9. figure out how long to wait for the next update
+          // calculate next interval
           if (previousPosition != null) {
             currentInterval = LocationService.getOptimalPollingInterval(
               position,
@@ -151,7 +165,7 @@ class BackgroundServiceUtils {
 
           previousPosition = position;
 
-          // 10. send the location to the server
+          // send location to server
           await trackingService.sendLocation(
             position.latitude,
             position.longitude,
@@ -166,7 +180,7 @@ class BackgroundServiceUtils {
                     ? 'ثابت'
                     : 'متحرك';
             service.setForegroundNotificationInfo(
-              title: "جولة - Jawlah ($movementStatus)",
+              title: "FollowUp ($movementStatus)",
               content:
                   "آخر تحديث: ${DateTime.now().toLocal().toString().split('.')[0]}",
             );
@@ -177,12 +191,12 @@ class BackgroundServiceUtils {
         }
 
         // Schedule next update with adaptive interval
-        scheduleNextUpdate(null);
+        scheduleNextUpdate();
       });
     }
 
     // Start first update
-    scheduleNextUpdate(null);
+    scheduleNextUpdate();
   }
 
   @pragma('vm:entry-point')

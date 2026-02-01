@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../providers/auth_manager.dart';
+import 'battery_widget.dart';
 
 class GreetingCard extends StatelessWidget {
   const GreetingCard({super.key});
@@ -28,12 +29,12 @@ class GreetingCard extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -96,6 +97,9 @@ class GreetingCard extends StatelessWidget {
                           fontFamily: 'Cairo',
                         ),
                       ),
+                      const SizedBox(height: 10),
+                      // Battery indicator
+                      const BatteryWidget(),
                     ],
                   ),
                 ),

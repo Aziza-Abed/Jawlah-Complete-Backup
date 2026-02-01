@@ -32,13 +32,6 @@ class StorageHelper {
   static Future<bool> removeToken() => SecureStorageHelper.removeToken();
   static Future<bool> hasToken() => SecureStorageHelper.hasToken();
 
-  static Future<bool> saveRefreshToken(String refreshToken) =>
-      SecureStorageHelper.saveRefreshToken(refreshToken);
-  static Future<String?> getRefreshToken() =>
-      SecureStorageHelper.getRefreshToken();
-  static Future<bool> removeRefreshToken() =>
-      SecureStorageHelper.removeRefreshToken();
-
   // user profile methods
   static Future<bool> keepUser(UserModel user) async {
     try {
@@ -71,21 +64,15 @@ class StorageHelper {
     return user != null;
   }
 
-  // shared preferences methods
-  static Future<bool> saveEmployeeId(String employeeId) async {
-    final p = await _instance;
-    return await p.setString(_keyEmployeeId, employeeId);
-  }
+  // employee ID (PIN) methods - now using secure storage for security
+  static Future<bool> saveEmployeeId(String employeeId) =>
+      SecureStorageHelper.saveEmployeeId(employeeId);
 
-  static Future<String?> getEmployeeId() async {
-    final p = await _instance;
-    return p.getString(_keyEmployeeId);
-  }
+  static Future<String?> getEmployeeId() =>
+      SecureStorageHelper.getEmployeeId();
 
-  static Future<bool> removeEmployeeId() async {
-    final p = await _instance;
-    return await p.remove(_keyEmployeeId);
-  }
+  static Future<bool> removeEmployeeId() =>
+      SecureStorageHelper.removeEmployeeId();
 
   static Future<bool> saveRememberMe(bool value) async {
     final p = await _instance;

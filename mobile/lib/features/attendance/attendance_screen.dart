@@ -6,6 +6,7 @@ import '../../presentation/widgets/base_screen.dart';
 import '../../core/routing/app_router.dart';
 import '../../providers/attendance_manager.dart';
 import '../../providers/auth_manager.dart';
+import '../../core/utils/date_formatter.dart';
 import 'widgets/live_work_duration.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -19,7 +20,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   void initState() {
     super.initState();
-    // 1. load the attendance for today when screen starts
+    // load today attendance when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AttendanceManager>().loadTodayRecord();
     });
@@ -28,7 +29,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     return BaseScreen(
-      title: 'الحضور والانصراف',
+      title: 'بدء وإنهاء العمل',
       showBackButton: true,
       actions: [
         IconButton(
@@ -145,7 +146,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       child: Column(
         children: [
           Text(
-              'اليوم: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+              'اليوم: ${DateFormatter.formatDate(DateTime.now())}',
               style: const TextStyle(
                   color: AppColors.textSecondary, fontFamily: 'Cairo')),
           const SizedBox(height: 16),
@@ -165,14 +166,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ? 'أنت الآن في فترة العمل'
                   : (attendance != null
                       ? 'تم إنهاء العمل لهذا اليوم'
-                      : 'لم يتم تسجيل الحضور'),
+                      : 'لم تبدأ العمل بعد'),
               style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Cairo')),
           if (attendance != null) ...[
             const SizedBox(height: 8),
-            Text('وقت الحضور: ${attendance.checkInTimeFormatted}',
+            Text('بدأت العمل: ${attendance.checkInTimeFormatted}',
                 style: const TextStyle(
                     color: AppColors.textSecondary, fontFamily: 'Cairo')),
             if (isWorking) ...[
@@ -180,11 +181,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               LiveWorkDuration(checkInTime: attendance.checkInTime),
             ] else if (attendance.checkOutTime != null) ...[
               const SizedBox(height: 4),
-              Text('وقت الانصراف: ${attendance.checkOutTimeFormatted}',
+              Text('أنهيت العمل: ${attendance.checkOutTimeFormatted}',
                   style: const TextStyle(
                       color: AppColors.textSecondary, fontFamily: 'Cairo')),
               const SizedBox(height: 8),
-              Text('إجمالي المدة: ${attendance.workDurationFormatted}',
+              Text('إجمالي مدة العمل: ${attendance.workDurationFormatted}',
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
             ],
@@ -221,9 +222,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(canCheckIn ? Icons.login : Icons.logout),
+                  Icon(canCheckIn ? Icons.play_arrow_rounded : Icons.stop_rounded),
                   const SizedBox(width: 8),
-                  Text(canCheckIn ? 'تسجيل الحضور' : 'تسجيل الانصراف',
+                  Text(canCheckIn ? 'بدء العمل' : 'إنهاء العمل',
                       style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -249,13 +250,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _handleAction(AttendanceManager provider, bool isCheckIn) async {
     HapticFeedback.heavyImpact();
+
+    // Use automatic GPS location (no map picker for attendance)
     final success =
         isCheckIn ? await provider.doCheckIn() : await provider.doCheckOut();
     if (mounted) {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
-                isCheckIn ? 'تم تسجيل الحضور بنجاح' : 'تم تسجيل الانصراف بنجاح',
+                isCheckIn ? 'تم بدء العمل بنجاح - بالتوفيق!' : 'تم إنهاء العمل بنجاح - شكراً لك!',
                 style: const TextStyle(fontFamily: 'Cairo')),
             backgroundColor: AppColors.success));
       } else {
@@ -301,7 +304,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (confirmed == true) {
       if (!context.mounted) return;
 
-      // show loading
+      // show loading spinner
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -316,10 +319,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
       final navigator = Navigator.of(context);
 
-      // pop loading
+      // close loading
       navigator.pop();
 
-      // go to login and clear stacks
+      // go to login page
       navigator.pushNamedAndRemoveUntil(Routes.login, (route) => false);
     }
   }

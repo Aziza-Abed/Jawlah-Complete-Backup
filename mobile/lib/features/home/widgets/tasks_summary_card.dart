@@ -12,22 +12,22 @@ class TasksSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<TaskManager>(
       builder: (context, tasksProvider, child) {
-        final total = tasksProvider.totalTasks;
         final pending = tasksProvider.pendingCount;
         final inProgress = tasksProvider.inProgressCount;
         final completed = tasksProvider.completedCount;
+        final actionableTotal = tasksProvider.actionableCount;
 
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -54,10 +54,11 @@ class TasksSummaryCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+              // Only show actionable tasks: Total, New, In Progress, Completed
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildTaskStat('الكُل', '$total', AppColors.textPrimary),
+                  _buildTaskStat('الكُل', '$actionableTotal', AppColors.textPrimary),
                   _buildTaskStat('جديد', '$pending', AppColors.info),
                   _buildTaskStat(
                       'قيد التنفيذ', '$inProgress', AppColors.statusInProgress),

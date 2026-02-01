@@ -33,12 +33,9 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    final image = await PhotoPickerHelper.pickImageWithChoice(
-      context,
-      maxWidth: 1920,
-      maxHeight: 1080,
-      imageQuality: 85,
-    );
+    // use default settings from PhotoPickerHelper (1024x1024, quality 70)
+    // this ensures all images are compressed consistantly
+    final image = await PhotoPickerHelper.pickImageWithChoice(context);
 
     if (image != null) {
       setState(() {
@@ -83,20 +80,79 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
           );
           Navigator.pop(context, true); // Return true to indicate success
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فشل إكمال المهمة، يرجى المحاولة مرة أخرى'),
-              backgroundColor: Colors.red,
+          // Show actual error message from backend in a dialog
+          final taskManager = context.read<TaskManager>();
+          final errorMessage = taskManager.errorMessage ??
+                               'فشل إكمال المهمة، يرجى المحاولة مرة أخرى';
+
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text(
+                'تنبيه',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.right,
+              ),
+              content: Text(
+                errorMessage,
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.right,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'حسناً',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ: $e'),
-            backgroundColor: Colors.red,
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text(
+              'خطأ',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.right,
+            ),
+            content: Text(
+              'خطأ: $e',
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.right,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'حسناً',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       }
@@ -121,7 +177,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // task Info Card
+            // task info card
             Card(
               elevation: 2,
               child: Padding(
@@ -179,7 +235,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
 
             const SizedBox(height: 24),
 
-            // completion Notes
+            // notes section
             const Text(
               'ملاحظات الإكمال *',
               style: TextStyle(
@@ -215,7 +271,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
 
             const SizedBox(height: 24),
 
-            // proof Photo
+            // photo section
             const Text(
               'صورة إثبات *',
               style: TextStyle(
@@ -288,7 +344,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
 
             const SizedBox(height: 32),
 
-            // submit Button
+            // send button
             ElevatedButton(
               onPressed: _isSubmitting ? null : _submitCompletion,
               style: ElevatedButton.styleFrom(
@@ -318,7 +374,7 @@ class _TaskCompletionScreenState extends State<TaskCompletionScreen> {
 
             const SizedBox(height: 16),
 
-            // info Note
+            // gps info note
             const GpsNoticeWidget(
               customMessage:
                   'سيتم تسجيل موقعك الحالي تلقائياً عند إكمال المهمة',

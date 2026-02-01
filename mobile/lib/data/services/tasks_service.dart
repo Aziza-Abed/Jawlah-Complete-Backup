@@ -12,27 +12,27 @@ import 'api_service.dart';
 class TasksService {
   final ApiService _apiService = ApiService();
 
-  // get tasks assigned to current user (with optional filters and pagination)
+  // get tasks assigned to current user with optional filters and pagination
   Future<List<TaskModel>> getMyTasks({
     String? status,
     String? priority,
     int? page,
     int? pageSize,
   }) async {
-    // 1. prepare the filters
+    // prepare the filters
     final queryParams = <String, dynamic>{};
     if (status != null) queryParams['status'] = status;
     if (priority != null) queryParams['priority'] = priority;
     if (page != null) queryParams['page'] = page;
     if (pageSize != null) queryParams['pageSize'] = pageSize;
 
-    // 2. call the api
+    // call the api
     final response = await _apiService.get(
       ApiConfig.myTasks,
       queryParameters: queryParams.isNotEmpty ? queryParams : null,
     );
 
-    // 3. check if the response is ok and return the tasks
+    // check if the response is ok and return the tasks
     final responseData = response.data;
     if (responseData['success'] != true) {
       throw ServerException(
@@ -63,11 +63,11 @@ class TasksService {
     String newStatus, {
     String? notes,
   }) async {
-    // send status in camelCase format (backend now configured for camelCase JSON)
+    // send status in camelCase format backend now configured for camelCase JSON
     final response = await _apiService.put(
       '${ApiConfig.updateTaskStatus}/$taskId/status',
       data: {
-        'status': newStatus, // Backend now uses camelCase JSON policy
+        'status': newStatus,
         if (notes != null) 'completionNotes': notes,
       },
     );
@@ -93,9 +93,9 @@ class TasksService {
   }) async {
     final formData = FormData();
 
-    formData.fields.add(MapEntry('notes', notes));
+    formData.fields.add(MapEntry('completionNotes', notes));
 
-    // include GPS coordinates
+    // include GPS coordinates if we have them
     if (latitude != null) {
       formData.fields.add(MapEntry('latitude', latitude.toString()));
     }
@@ -118,7 +118,7 @@ class TasksService {
           'photo',
           await MultipartFile.fromFile(
             proofPhoto.path,
-            filename: path.basename(proofPhoto.path), // Get filename from path
+            filename: path.basename(proofPhoto.path),
           ),
         ),
       );
@@ -146,5 +146,32 @@ class TasksService {
       'InProgress',
       notes: 'تم بدء المهمة',
     );
+  }
+
+  // update task progress (for multi-day tasks)
+  Future<TaskModel?> updateTaskProgress(
+    int taskId,
+    int progressPercentage,
+  ) async {
+    try {
+      final response = await _apiService.put(
+        '${ApiConfig.updateTaskProgress}/$taskId/progress',
+        data: {
+          'progressPercentage': progressPercentage,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = response.data;
+        if (responseData['success'] == true && responseData['data'] != null) {
+          return TaskModel.fromJson(responseData['data']);
+        }
+      }
+
+      return null;
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw ServerException('فشل تحديث التقدم');
+    }
   }
 }

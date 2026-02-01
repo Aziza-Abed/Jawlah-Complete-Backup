@@ -9,10 +9,10 @@ class NotificationsService {
   // get all user notifications from the server
   Future<List<NotificationModel>> getMyNotifications() async {
     try {
-      // 1. call the api
+      // call the api
       final response = await _apiService.get(ApiConfig.notifications);
       if (response.data['success'] == true) {
-        // 2. convert the list from json to models
+        // convert the list from json to models
         final List<dynamic> data = response.data['data'] as List<dynamic>;
         return data.map((json) => NotificationModel.fromJson(json)).toList();
       }
@@ -54,19 +54,6 @@ class NotificationsService {
   Future<bool> markAllAsRead() async {
     try {
       final response = await _apiService.put(ApiConfig.markAllAsRead);
-      return response.data['success'] == true;
-    } catch (e) {
-      if (e is AppException) rethrow;
-      return false;
-    }
-  }
-
-  // delete notification
-  Future<bool> deleteNotification(int notificationId) async {
-    try {
-      final response = await _apiService.delete(
-        ApiConfig.getDeleteNotificationUrl(notificationId),
-      );
       return response.data['success'] == true;
     } catch (e) {
       if (e is AppException) rethrow;

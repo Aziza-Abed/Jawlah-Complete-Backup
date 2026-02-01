@@ -2,17 +2,24 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_colors.dart';
+import 'image_compressor.dart';
 
 // centralized photo picker helper
+// compresses images if they are bigger than 5MB
 class PhotoPickerHelper {
   static final ImagePicker _picker = ImagePicker();
+
+  // standard settings for all images (from discussion comments)
+  static const int _standardMaxWidth = 1024;
+  static const int _standardMaxHeight = 1024;
+  static const int _standardQuality = 70;
 
   // pick image with camera only
   static Future<File?> pickImageCameraOnly(
     BuildContext context, {
-    int maxWidth = 800,
-    int maxHeight = 800,
-    int imageQuality = 70,
+    int maxWidth = _standardMaxWidth,
+    int maxHeight = _standardMaxHeight,
+    int imageQuality = _standardQuality,
   }) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -23,7 +30,9 @@ class PhotoPickerHelper {
       );
 
       if (image != null) {
-        return File(image.path);
+        // compress if file is too big
+        final file = File(image.path);
+        return await ImageCompressor.compressIfNeeded(file);
       }
       return null;
     } catch (e) {
@@ -40,9 +49,9 @@ class PhotoPickerHelper {
   // pick image with modal choice (camera or gallery)
   static Future<File?> pickImageWithChoice(
     BuildContext context, {
-    int maxWidth = 800,
-    int maxHeight = 800,
-    int imageQuality = 70,
+    int maxWidth = _standardMaxWidth,
+    int maxHeight = _standardMaxHeight,
+    int imageQuality = _standardQuality,
   }) async {
     // show modal bottom sheet to choose source
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
@@ -95,7 +104,9 @@ class PhotoPickerHelper {
       );
 
       if (image != null) {
-        return File(image.path);
+        // compress if file is too big
+        final file = File(image.path);
+        return await ImageCompressor.compressIfNeeded(file);
       }
       return null;
     } catch (e) {

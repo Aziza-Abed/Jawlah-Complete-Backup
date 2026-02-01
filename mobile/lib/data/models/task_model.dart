@@ -1,4 +1,21 @@
+import 'package:flutter/foundation.dart';
+
 import 'local/task_local.dart';
+
+/// Safe DateTime parser that handles malformed dates gracefully
+DateTime? _safeParseDateTimeUtc(dynamic value) {
+  if (value == null) return null;
+  try {
+    final str = value.toString();
+    if (str.isEmpty) return null;
+    // Ensure UTC parsing by adding Z if missing
+    final utcStr = str.endsWith('Z') ? str : '${str}Z';
+    return DateTime.parse(utcStr);
+  } catch (e) {
+    if (kDebugMode) debugPrint('Failed to parse DateTime: $value - $e');
+    return null;
+  }
+}
 
 class TaskModel {
   final int taskId;
@@ -11,6 +28,8 @@ class TaskModel {
   final int? estimatedDurationMinutes; // New: Estimated duration
   final String? assignedTo;
   final int? assignedToUserId;
+  final int? zoneId; // Zone ID
+  final String? zoneName; // Zone name for display
   final String? location;
   final double? latitude;
   final double? longitude;
@@ -23,6 +42,22 @@ class TaskModel {
   final DateTime updatedAt;
   final int syncVersion; // Added for sync conflict resolution
 
+  // Task location verification
+  final int maxDistanceMeters;
+  final int? completionDistanceMeters;
+  final bool isDistanceWarning;
+
+  // Progress tracking for multi-day tasks
+  final int progressPercentage;
+  final String? progressNotes;
+  final DateTime? extendedDeadline;
+
+  // Auto-rejection tracking
+  final bool isAutoRejected;
+  final String? rejectionReason;
+  final DateTime? rejectedAt;
+  final int? rejectionDistanceMeters;
+
   TaskModel({
     required this.taskId,
     required this.title,
@@ -34,6 +69,8 @@ class TaskModel {
     this.estimatedDurationMinutes,
     this.assignedTo,
     this.assignedToUserId,
+    this.zoneId,
+    this.zoneName,
     this.location,
     this.latitude,
     this.longitude,
@@ -45,6 +82,16 @@ class TaskModel {
     required this.createdAt,
     required this.updatedAt,
     this.syncVersion = 1,
+    this.maxDistanceMeters = 100,
+    this.completionDistanceMeters,
+    this.isDistanceWarning = false,
+    this.progressPercentage = 0,
+    this.progressNotes,
+    this.extendedDeadline,
+    this.isAutoRejected = false,
+    this.rejectionReason,
+    this.rejectedAt,
+    this.rejectionDistanceMeters,
   }) : photos = photos ?? (photoUrl != null ? [photoUrl] : []);
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -54,14 +101,22 @@ class TaskModel {
       if (value is String) return value;
       if (value is int) {
         switch (value) {
-          case 0: return 'GarbageCollection';
-          case 1: return 'StreetSweeping';
-          case 2: return 'ContainerMaintenance';
-          case 3: return 'RepairMaintenance';
-          case 4: return 'PublicSpaceCleaning';
-          case 5: return 'Inspection';
-          case 99: return 'Other';
-          default: return null;
+          case 0:
+            return 'GarbageCollection';
+          case 1:
+            return 'StreetSweeping';
+          case 2:
+            return 'ContainerMaintenance';
+          case 3:
+            return 'RepairMaintenance';
+          case 4:
+            return 'PublicSpaceCleaning';
+          case 5:
+            return 'Inspection';
+          case 99:
+            return 'Other';
+          default:
+            return null;
         }
       }
       return null;
@@ -70,8 +125,9 @@ class TaskModel {
     return TaskModel(
       taskId: json['taskId'] as int? ?? json['TaskId'] as int? ?? 0,
       title: json['title'] as String? ?? json['Title'] as String? ?? '',
-      description:
-          json['description'] as String? ?? json['Description'] as String? ?? '',
+      description: json['description'] as String? ??
+          json['Description'] as String? ??
+          '',
       status:
           json['status'] as String? ?? json['Status'] as String? ?? 'Pending',
       priority: json['priority'] as String? ??
@@ -87,8 +143,9 @@ class TaskModel {
           json['AssignedToUserName'] as String?,
       assignedToUserId:
           json['assignedToUserId'] as int? ?? json['AssignedToUserId'] as int?,
-      location:
-          json['location'] as String? ??
+      zoneId: json['zoneId'] as int? ?? json['ZoneId'] as int?,
+      zoneName: json['zoneName'] as String? ?? json['ZoneName'] as String?,
+      location: json['location'] as String? ??
           json['locationDescription'] as String? ??
           json['LocationDescription'] as String?,
       latitude: (json['latitude'] ?? json['Latitude']) != null
@@ -97,39 +154,45 @@ class TaskModel {
       longitude: (json['longitude'] ?? json['Longitude']) != null
           ? ((json['longitude'] ?? json['Longitude']) as num).toDouble()
           : null,
-      dueDate: (json['dueDate'] ?? json['DueDate']) != null
-          ? DateTime.parse(
-              ((json['dueDate'] ?? json['DueDate']) as String).endsWith('Z')
-                  ? (json['dueDate'] ?? json['DueDate']) as String
-                  : '${(json['dueDate'] ?? json['DueDate'])}Z')
-          : null,
-      completedAt: (json['completedAt'] ?? json['CompletedAt']) != null
-          ? DateTime.parse(
-              ((json['completedAt'] ?? json['CompletedAt']) as String)
-                      .endsWith('Z')
-                  ? (json['completedAt'] ?? json['CompletedAt']) as String
-                  : '${(json['completedAt'] ?? json['CompletedAt'])}Z')
-          : null,
+      dueDate: _safeParseDateTimeUtc(json['dueDate'] ?? json['DueDate']),
+      completedAt:
+          _safeParseDateTimeUtc(json['completedAt'] ?? json['CompletedAt']),
       completionNotes: json['completionNotes'] as String? ??
           json['CompletionNotes'] as String?,
       photoUrl: json['photoUrl'] as String? ?? json['PhotoUrl'] as String?,
-      photos: (json['photos'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList(),
-      createdAt: (json['createdAt'] ?? json['CreatedAt']) != null
-          ? DateTime.parse(
-              ((json['createdAt'] ?? json['CreatedAt']) as String).endsWith('Z')
-                  ? (json['createdAt'] ?? json['CreatedAt']) as String
-                  : '${(json['createdAt'] ?? json['CreatedAt'])}Z')
-          : DateTime.now().toUtc(),
-      updatedAt: (json['updatedAt'] ?? json['SyncTime']) != null
-          ? DateTime.parse(
-              ((json['updatedAt'] ?? json['SyncTime']) as String).endsWith('Z')
-                  ? (json['updatedAt'] ?? json['SyncTime']) as String
-                  : '${(json['updatedAt'] ?? json['SyncTime'])}Z')
-          : DateTime.now().toUtc(),
+      photos:
+          (json['photos'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+      createdAt:
+          _safeParseDateTimeUtc(json['createdAt'] ?? json['CreatedAt']) ??
+              DateTime.now().toUtc(),
+      updatedAt: _safeParseDateTimeUtc(json['updatedAt'] ?? json['SyncTime']) ??
+          DateTime.now().toUtc(),
       syncVersion:
           json['syncVersion'] as int? ?? json['SyncVersion'] as int? ?? 1,
+      maxDistanceMeters: json['maxDistanceMeters'] as int? ??
+          json['MaxDistanceMeters'] as int? ??
+          100,
+      completionDistanceMeters: json['completionDistanceMeters'] as int? ??
+          json['CompletionDistanceMeters'] as int?,
+      isDistanceWarning: json['isDistanceWarning'] as bool? ??
+          json['IsDistanceWarning'] as bool? ??
+          false,
+      progressPercentage: json['progressPercentage'] as int? ??
+          json['ProgressPercentage'] as int? ??
+          0,
+      progressNotes:
+          json['progressNotes'] as String? ?? json['ProgressNotes'] as String?,
+      extendedDeadline: _safeParseDateTimeUtc(
+          json['extendedDeadline'] ?? json['ExtendedDeadline']),
+      isAutoRejected: json['isAutoRejected'] as bool? ??
+          json['IsAutoRejected'] as bool? ??
+          false,
+      rejectionReason: json['rejectionReason'] as String? ??
+          json['RejectionReason'] as String?,
+      rejectedAt:
+          _safeParseDateTimeUtc(json['rejectedAt'] ?? json['RejectedAt']),
+      rejectionDistanceMeters: json['rejectionDistanceMeters'] as int? ??
+          json['RejectionDistanceMeters'] as int?,
     );
   }
 
@@ -146,6 +209,8 @@ class TaskModel {
       estimatedDurationMinutes: local.estimatedDurationMinutes,
       assignedTo: null, // Not stored in local model
       assignedToUserId: null, // Not stored in local model
+      zoneId: local.zoneId,
+      zoneName: local.zoneName,
       location: local.locationDescription,
       latitude: local.latitude,
       longitude: local.longitude,
@@ -157,6 +222,8 @@ class TaskModel {
       createdAt: local.updatedAt, // Use updatedAt as createdAt fallback
       updatedAt: local.updatedAt,
       syncVersion: local.syncVersion,
+      progressPercentage: local.progressPercentage,
+      progressNotes: local.progressNotes,
     );
   }
 
@@ -172,6 +239,8 @@ class TaskModel {
       'estimatedDurationMinutes': estimatedDurationMinutes,
       'assignedTo': assignedTo,
       'assignedToUserId': assignedToUserId,
+      'zoneId': zoneId,
+      'zoneName': zoneName,
       'location': location,
       'latitude': latitude,
       'longitude': longitude,
@@ -182,6 +251,9 @@ class TaskModel {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'syncVersion': syncVersion,
+      'progressPercentage': progressPercentage,
+      'progressNotes': progressNotes,
+      'extendedDeadline': extendedDeadline?.toIso8601String(),
     };
   }
 
@@ -196,6 +268,8 @@ class TaskModel {
     int? estimatedDurationMinutes,
     String? assignedTo,
     int? assignedToUserId,
+    int? zoneId,
+    String? zoneName,
     String? location,
     double? latitude,
     double? longitude,
@@ -206,6 +280,16 @@ class TaskModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     int? syncVersion,
+    int? maxDistanceMeters,
+    int? completionDistanceMeters,
+    bool? isDistanceWarning,
+    int? progressPercentage,
+    String? progressNotes,
+    DateTime? extendedDeadline,
+    bool? isAutoRejected,
+    String? rejectionReason,
+    DateTime? rejectedAt,
+    int? rejectionDistanceMeters,
   }) {
     return TaskModel(
       taskId: taskId ?? this.taskId,
@@ -215,9 +299,12 @@ class TaskModel {
       priority: priority ?? this.priority,
       taskType: taskType ?? this.taskType,
       requiresPhotoProof: requiresPhotoProof ?? this.requiresPhotoProof,
-      estimatedDurationMinutes: estimatedDurationMinutes ?? this.estimatedDurationMinutes,
+      estimatedDurationMinutes:
+          estimatedDurationMinutes ?? this.estimatedDurationMinutes,
       assignedTo: assignedTo ?? this.assignedTo,
       assignedToUserId: assignedToUserId ?? this.assignedToUserId,
+      zoneId: zoneId ?? this.zoneId,
+      zoneName: zoneName ?? this.zoneName,
       location: location ?? this.location,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
@@ -228,6 +315,18 @@ class TaskModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       syncVersion: syncVersion ?? this.syncVersion,
+      maxDistanceMeters: maxDistanceMeters ?? this.maxDistanceMeters,
+      completionDistanceMeters:
+          completionDistanceMeters ?? this.completionDistanceMeters,
+      isDistanceWarning: isDistanceWarning ?? this.isDistanceWarning,
+      progressPercentage: progressPercentage ?? this.progressPercentage,
+      progressNotes: progressNotes ?? this.progressNotes,
+      extendedDeadline: extendedDeadline ?? this.extendedDeadline,
+      isAutoRejected: isAutoRejected ?? this.isAutoRejected,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      rejectedAt: rejectedAt ?? this.rejectedAt,
+      rejectionDistanceMeters:
+          rejectionDistanceMeters ?? this.rejectionDistanceMeters,
     );
   }
 
@@ -249,7 +348,8 @@ class TaskModel {
 
   bool get hasLocation => latitude != null && longitude != null;
 
-  bool get hasPhoto => photos.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
+  bool get hasPhoto =>
+      photos.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
 
   String get statusArabic {
     switch (status.toLowerCase()) {
@@ -276,6 +376,8 @@ class TaskModel {
         return 'متوسطة';
       case 'high':
         return 'عالية';
+      case 'urgent':
+        return 'عاجلة';
       default:
         return priority;
     }
@@ -336,11 +438,15 @@ class TaskModel {
       completedAt: completedAt,
       updatedAt: updatedAt,
       dueDate: dueDate,
+      zoneId: zoneId,
+      zoneName: zoneName,
       latitude: latitude,
       longitude: longitude,
       locationDescription: location,
       isSynced: true, // Default to true if converting from API model
       syncVersion: syncVersion,
+      progressPercentage: progressPercentage,
+      progressNotes: progressNotes,
     );
   }
 }

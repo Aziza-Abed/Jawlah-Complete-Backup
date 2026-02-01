@@ -1,5 +1,5 @@
-name: jawlah
-description: Smart Field Management System for Al-Bireh Municipality
+name: followup
+description: FollowUp Smart Field Management System for Al-Bireh Municipality
 publish_to: "none"
 version: 1.0.0+1
 
@@ -28,12 +28,20 @@ dependencies:
   # ============ GPS LOCATION ============
   geolocator: ^14.0.2
   permission_handler: ^12.0.1
+  flutter_map: ^7.0.2 # OSM map display (no API key needed)
+  latlong2: ^0.9.1 # Latitude/Longitude utilities for flutter_map
 
-  # ============ IMAGE PICKER ============
+  # ============ BATTERY MONITORING ============
+  battery_plus: ^6.0.3
+
+  # ============ IMAGE PICKER & COMPRESSION ============
   image_picker: ^1.1.2
+  flutter_image_compress: ^2.3.0 # Compress images before upload (if > 5MB)
+  cached_network_image: ^3.4.1 # Cache network images for offline viewing
 
   # ============ UI UTILITIES ============
   intl: ^0.20.2 # Date/time formatting
+  url_launcher: ^6.3.1 # Open external URLs (maps, phone, etc)
 
   # ============ M2 OFFLINE MODE ============
   # Hive for local offline database
@@ -47,8 +55,6 @@ dependencies:
   signalr_netcore: ^1.4.4
   flutter_background_service: ^5.1.0
   flutter_local_notifications: ^19.5.0
-  flutter_map: ^6.1.0
-  latlong2: ^0.9.0
 
   # ============ FIREBASE - PUSH NOTIFICATIONS ============
   firebase_core: ^4.3.0
@@ -58,13 +64,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  mockito: ^5.4.4
 
   # Hive code generation for M2
   hive_generator: ^2.0.1
   build_runner: ^2.4.13
-  path_provider_platform_interface: ^2.1.2
-  plugin_platform_interface: ^2.1.8
 
 flutter:
   uses-material-design: true

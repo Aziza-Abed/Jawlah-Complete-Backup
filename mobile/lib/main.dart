@@ -25,18 +25,20 @@ import 'providers/attendance_manager.dart';
 import 'providers/issue_manager.dart';
 import 'providers/notice_manager.dart';
 import 'providers/sync_manager.dart';
+import 'providers/battery_provider.dart';
+import 'providers/appeal_manager.dart';
 
 // global navigator key for deep linking from notifications
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
-  // 1. make sure flutter is ready
+  // ensure bindings are ready
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 3. start the background services and database
+  // init services and db
   await _initializeServices();
 
-  // 4. set the status bar style
+  // helper to set status bar style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -45,29 +47,29 @@ void main() async {
     ),
   );
 
-  // 5. lock the phone to vertical mode
+  // lock orientation to portrait
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // 6. run the app
-  runApp(const JawlahApp());
+  // start app
+  runApp(const FollowUpApp());
 }
 
 Future<void> _initializeServices() async {
   try {
-    // 1. start the small local storage
+    // init secure storage
     await StorageHelper.startStorage();
 
-    // 2. start Hive for offline mode
+    // init hive
     await HiveInit.initialize();
 
-    // 3. set up our API client
+    // setup api
     ApiService().setUpApi();
     await ApiService().loadToken();
 
-    // 4. initialize Firebase with the generated options
+    // init firebase
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
@@ -86,8 +88,8 @@ Future<void> _initializeServices() async {
   }
 }
 
-class JawlahApp extends StatelessWidget {
-  const JawlahApp({super.key});
+class FollowUpApp extends StatelessWidget {
+  const FollowUpApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -137,12 +139,18 @@ class JawlahApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => NoticeManager(),
         ),
+        ChangeNotifierProvider(
+          create: (_) => BatteryProvider()..initialize(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AppealManager(),
+        ),
       ],
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: MaterialApp(
           navigatorKey: navigatorKey,
-          title: 'جولة - Jawlah',
+          title: 'FollowUp',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.theme,
           locale: const Locale('ar'),

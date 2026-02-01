@@ -1,16 +1,19 @@
 import 'package:flutter/foundation.dart';
 import '../core/errors/app_exception.dart';
 
-// base class for all providers with common loading/error handling
+// base class that all providers extend from
 abstract class BaseController with ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
-  // loading state
+  // is it loading or not
   bool get isLoading => _isLoading;
 
-  // error message
+  // error message if there is one
   String? get errorMessage => _errorMessage;
+
+  // check if there is an error
+  bool get hasError => _errorMessage != null;
 
   // set loading state
   @protected
@@ -37,28 +40,15 @@ abstract class BaseController with ChangeNotifier {
     }
   }
 
-  // execute async operation with loading and error handling
+  // run async with loading and error handeling
   @protected
   Future<T?> executeWithErrorHandling<T>(Future<T> Function() action) async {
     try {
       setLoading(true);
       clearError();
-      final result = await action();
-      return result;
-    } on NetworkException catch (e) {
-      setError(e.message);
-      return null;
-    } on ServerException catch (e) {
-      setError(e.message);
-      return null;
-    } on ValidationException catch (e) {
-      setError(e.message);
-      return null;
-    } on UnauthorizedException catch (e) {
-      setError(e.message);
-      return null;
+      return await action();
     } on AppException catch (e) {
-      setError(e.toString());
+      setError(e.message);
       return null;
     } catch (e) {
       setError(e.toString().replaceAll('Exception: ', ''));
@@ -68,7 +58,7 @@ abstract class BaseController with ChangeNotifier {
     }
   }
 
-  // execute void operation (like delete, update)
+  // run void operation like delete or update
   @protected
   Future<bool> executeVoidWithErrorHandling(
       Future<void> Function() action) async {
@@ -77,20 +67,8 @@ abstract class BaseController with ChangeNotifier {
       clearError();
       await action();
       return true;
-    } on NetworkException catch (e) {
-      setError(e.message);
-      return false;
-    } on ServerException catch (e) {
-      setError(e.message);
-      return false;
-    } on ValidationException catch (e) {
-      setError(e.message);
-      return false;
-    } on UnauthorizedException catch (e) {
-      setError(e.message);
-      return false;
     } on AppException catch (e) {
-      setError(e.toString());
+      setError(e.message);
       return false;
     } catch (e) {
       setError(e.toString().replaceAll('Exception: ', ''));

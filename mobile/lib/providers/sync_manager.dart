@@ -4,13 +4,13 @@ import 'package:flutter/foundation.dart';
 import '../data/services/sync/sync_service.dart';
 import 'base_controller.dart';
 
-// manager to handle internet connection and syncing data
+// this manager checks internet and syncs data to server
 class SyncManager extends BaseController {
   final Connectivity _connectivity = Connectivity();
   final SyncService _syncService;
 
   bool _isOnline = true;
-  int waitingItems = 0; // count of items waiting to be sent to server
+  int waitingItems = 0; // how many items need to be synced
   bool isSyncingNow = false;
   SyncResult? lastResult;
   StreamSubscription<List<ConnectivityResult>>? _subscription;
@@ -22,7 +22,7 @@ class SyncManager extends BaseController {
 
   bool get isOnline => _isOnline;
 
-  // check connection at start
+  // check if we have internet when app starts
   Future<void> _initConnectivity() async {
     try {
       final results = await _connectivity.checkConnectivity();
@@ -33,21 +33,27 @@ class SyncManager extends BaseController {
     }
   }
 
-  // watch for connection changes
+  // listen for connection changes
   void _monitorConnectivity() {
     _subscription = _connectivity.onConnectivityChanged.listen(
       (List<ConnectivityResult> results) async {
         _updateConnectionStatus(results);
 
-        // sync automatically when internet is back
+        // FIXED: if we get internet back try to sync automatically
+        // Use unawaited to prevent blocking the listener
         if (_isOnline && waitingItems > 0 && !isSyncingNow) {
-          await startSync();
+          // Don't await - fire and forget to prevent race conditions
+          startSync().then((_) {
+            if (kDebugMode) debugPrint('Auto-sync completed');
+          }).catchError((e) {
+            if (kDebugMode) debugPrint('Auto-sync failed: $e');
+          });
         }
       },
     );
   }
 
-  // update the online/offline status
+  // update online or offline status
   void _updateConnectionStatus(List<ConnectivityResult> results) {
     final wasOnline = _isOnline;
     _isOnline = results.any((result) =>
@@ -60,19 +66,21 @@ class SyncManager extends BaseController {
     }
   }
 
-  // count how many items need syncing
+  // count items that need syncing
   Future<void> _refreshWaitingCount() async {
     waitingItems = await _syncService.getPendingSyncCount();
     notifyListeners();
   }
 
-  // start the sync process
+  // start syncing data to server
   Future<SyncResult> startSync() async {
+    // FIXED: Atomic check-and-set to prevent race condition
     if (isSyncingNow) {
+      if (kDebugMode) debugPrint('Sync already in progress, skipping');
       return lastResult ?? SyncResult();
     }
 
-    // 1. check if we have internet before starting
+    // check if we have internet first
     if (!_isOnline) {
       final result = SyncResult();
       result.success = false;
@@ -80,18 +88,19 @@ class SyncManager extends BaseController {
       return result;
     }
 
+    // Set flag immediately to prevent concurrent calls
     isSyncingNow = true;
     notifyListeners();
 
     try {
-      // 2. send all saved data on the phone to the server
+      // send local data to server
       final uploadResult = await _syncService.syncToServer();
       lastResult = uploadResult;
 
-      // 3. fetch new data from the server
+      // get new data from server
       await _syncService.syncFromServer();
 
-      // 4. update the count of waiting items
+      // update count
       await _refreshWaitingCount();
 
       return uploadResult;
@@ -107,13 +116,19 @@ class SyncManager extends BaseController {
     }
   }
 
-  // call this when user adds new data while offline
+  // call this when user saves new data while offline
   Future<void> newDataAdded() async {
     await _refreshWaitingCount();
 
-    // try to sync if online
+    // try sync if online - fire and forget with error handling
     if (_isOnline && !isSyncingNow) {
-      startSync();
+      startSync().then((result) {
+        if (!result.success && kDebugMode) {
+          debugPrint('Background sync after new data failed: ${result.errorMessage}');
+        }
+      }).catchError((e) {
+        if (kDebugMode) debugPrint('Background sync error: $e');
+      });
     }
   }
 
