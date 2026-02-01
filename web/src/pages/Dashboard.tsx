@@ -259,3 +259,142 @@ function DashboardStatItem({ icon: Icon, label, value, color }: any) {
     </div>
   );
 }
+
+function WarningRow({ text, severity }: { text: string; severity: "high" | "medium" | "low" }) {
+  const styles =
+    severity === "high"
+      ? "bg-red-50 border-red-200 text-red-700"
+      : severity === "medium"
+      ? "bg-amber-50 border-amber-200 text-amber-800"
+      : "bg-slate-50 border-slate-200 text-slate-700";
+
+  return (
+    <div className={["w-full rounded-[14px] border p-3", styles].join(" ")}>
+      <div className="text-right font-sans font-semibold text-[14px]">{text}</div>
+    </div>
+  );
+}
+
+function StatCard({
+  title,
+  total,
+  donut,
+  chips,
+}: {
+  title: string;
+  total: number;
+  donut: { parts: { value: number; color: string }[] };
+  chips: StatChip[];
+}) {
+  return (
+    <CardShell>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
+          <div className="text-right text-[14px] sm:text-[15px] text-[#2F2F2F]">
+            {title} : <span className="font-semibold text-[#2F2F2F]">{total}</span>
+          </div>
+
+          <div className="mt-3 flex items-center justify-end gap-3 flex-wrap">
+            {chips.map((c) => (
+              <Chip key={c.label} value={c.value} label={c.label} bg={c.bg} text={c.text} />
+            ))}
+          </div>
+        </div>
+
+        <div className="shrink-0">
+          <Donut size={54} stroke={10} parts={donut.parts} background="#E5E7EB" />
+        </div>
+      </div>
+    </CardShell>
+  );
+}
+
+function Chip({
+  value,
+  label,
+  bg,
+  text,
+}: {
+  value: number;
+  label: string;
+  bg: string;
+  text: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center">
+      <div
+        className="min-w-[44px] px-3 py-1 rounded-full text-center text-[12px] font-semibold"
+        style={{ backgroundColor: bg, color: text }}
+      >
+        {value}
+      </div>
+      <div className="mt-1 text-[11px] text-[#2F2F2F]">{label}</div>
+    </div>
+  );
+}
+
+function Donut({
+  size,
+  stroke,
+  parts,
+  background,
+}: {
+  size: number;
+  stroke: number;
+  parts: { value: number; color: string }[];
+  background: string;
+}) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const total = parts.reduce((acc, p) => acc + p.value, 0) || 1;
+
+  let offset = 0;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={background} strokeWidth={stroke} />
+      {parts.map((p, idx) => {
+        const frac = p.value / total;
+        const dash = c * frac;
+        const dashArray = `${dash} ${c - dash}`;
+        const dashOffset = c * (1 - offset);
+
+        offset += frac;
+
+        return (
+          <circle
+            key={idx}
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={p.color}
+            strokeWidth={stroke}
+            strokeLinecap="butt"
+            strokeDasharray={dashArray}
+            strokeDashoffset={dashOffset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        );
+      })}
+      <circle cx={size / 2} cy={size / 2} r={r - stroke / 2} fill="#F3F1ED" />
+    </svg>
+  );
+}
+
+function PinIcon({ className }: { className?: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
+      <path
+        d="M12 22s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M12 13.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}

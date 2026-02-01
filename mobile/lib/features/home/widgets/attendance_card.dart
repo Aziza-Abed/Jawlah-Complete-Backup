@@ -173,7 +173,7 @@ class AttendanceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'مدة العمل: $workDuration',
+                    'مدة العمل حتى الآن: $workDuration',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,

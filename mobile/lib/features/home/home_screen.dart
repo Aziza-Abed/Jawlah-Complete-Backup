@@ -12,6 +12,7 @@ import '../../providers/task_manager.dart';
 import '../../providers/sync_manager.dart';
 import '../../providers/notice_manager.dart';
 import '../../core/routing/app_router.dart';
+import '../../data/services/battery_service.dart';
 import 'widgets/greeting_card.dart';
 import 'widgets/sync_status_card.dart';
 import 'widgets/attendance_card.dart';

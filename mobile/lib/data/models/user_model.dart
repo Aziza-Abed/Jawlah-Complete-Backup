@@ -128,6 +128,7 @@ class UserModel {
         return 'صيانة';
       // Legacy support for old values
       case 'inspector':
+      case '1':
         return 'مفتش';
       case 'emergency':
         return 'طوارئ';

@@ -34,6 +34,20 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceId"));
 
+                    b.Property<string>("ApprovalStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AttendanceType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CheckInEventTime")
                         .HasColumnType("datetime2");
 
@@ -62,11 +76,29 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("CheckOutSyncTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("EarlyLeaveMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsManual")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsSynced")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsValidated")
                         .HasColumnType("bit");
+
+                    b.Property<int>("LateMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ManualReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OvertimeMinutes")
+                        .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -132,6 +164,9 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasPrecision(18, 15)
                         .HasColumnType("float(18)");
 
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
                     b.Property<string>("PhotoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -182,7 +217,7 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.HasKey("IssueId");
 
-                    b.HasIndex("ReportedAt");
+                    b.HasIndex("MunicipalityId");
 
                     b.HasIndex("ResolvedByUserId");
 
@@ -266,6 +301,9 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
                     b.Property<string>("PayloadJson")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -292,6 +330,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("IsSent");
+
+                    b.HasIndex("MunicipalityId");
 
                     b.HasIndex("Type");
 
@@ -418,6 +458,9 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("CompletionDistanceMeters")
+                        .HasColumnType("int");
+
                     b.Property<string>("CompletionNotes")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -439,6 +482,18 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Property<DateTime>("EventTime")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("ExtendedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ExtendedDeadline")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAutoRejected")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDistanceWarning")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsSynced")
                         .HasColumnType("bit");
 
@@ -454,12 +509,42 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasPrecision(18, 15)
                         .HasColumnType("float(18)");
 
+                    b.Property<int>("MaxDistanceMeters")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
                     b.Property<string>("PhotoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("Priority")
                         .HasColumnType("int");
+
+                    b.Property<string>("ProgressNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProgressPercentage")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("RejectedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("RejectionDistanceMeters")
+                        .HasColumnType("int");
+
+                    b.Property<double?>("RejectionLatitude")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("RejectionLongitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("RequiresPhotoProof")
                         .HasColumnType("bit");
@@ -498,6 +583,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.HasIndex("DueDate");
 
+                    b.HasIndex("MunicipalityId");
+
                     b.HasIndex("Priority");
 
                     b.HasIndex("ZoneId");
@@ -527,6 +614,15 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<TimeSpan>("ExpectedEndTime")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("ExpectedStartTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("int");
+
                     b.Property<string>("FcmToken")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
@@ -536,8 +632,23 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("GraceMinutes")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastWarningAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastWarningReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("LockoutEndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -552,6 +663,9 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasMaxLength(4)
                         .HasColumnType("nvarchar(4)");
 
+                    b.Property<string>("RegisteredDeviceId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("Role")
                         .HasColumnType("int");
 
@@ -563,12 +677,17 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int>("WarningCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("WorkerType")
                         .HasColumnType("int");
 
                     b.HasKey("UserId");
 
                     b.HasIndex("Email");
+
+                    b.HasIndex("MunicipalityId");
 
                     b.HasIndex("Pin")
                         .IsUnique()
@@ -652,6 +771,9 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -682,6 +804,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.HasIndex("IsActive")
                         .HasDatabaseName("IX_Zone_IsActive");
 
+                    b.HasIndex("MunicipalityId");
+
                     b.HasIndex("ZoneCode")
                         .IsUnique()
                         .HasDatabaseName("IX_Zone_ZoneCode_Unique");
@@ -701,6 +825,10 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .WithMany("AttendanceRecords")
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ApprovedByUser");
+
+                    b.Navigation("Municipality");
 
                     b.Navigation("User");
 
@@ -724,6 +852,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .WithMany("Issues")
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Municipality");
 
                     b.Navigation("ReportedByUser");
 
@@ -751,6 +881,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Municipality");
+
                     b.Navigation("User");
                 });
 
@@ -758,16 +890,22 @@ namespace FollowUp.Infrastructure.Data.Migrations
                 {
                     b.HasOne("FollowUp.Core.Entities.Issue", null)
                         .WithMany("Photos")
-                        .HasForeignKey("IssueId");
+                        .HasForeignKey("IssueId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("FollowUp.Core.Entities.Task", null)
                         .WithMany("Photos")
-                        .HasForeignKey("TaskId");
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("FollowUp.Core.Entities.User", "UploadedByUser")
                         .WithMany()
                         .HasForeignKey("UploadedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Issue");
+
+                    b.Navigation("Task");
 
                     b.Navigation("UploadedByUser");
                 });
@@ -804,6 +942,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Navigation("AssignedByUser");
 
                     b.Navigation("AssignedToUser");
+
+                    b.Navigation("Municipality");
 
                     b.Navigation("Zone");
                 });
@@ -852,8 +992,6 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Navigation("AssignedZones");
 
                     b.Navigation("AttendanceRecords");
-
-                    b.Navigation("RefreshTokens");
 
                     b.Navigation("ReportedIssues");
                 });
