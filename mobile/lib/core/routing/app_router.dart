@@ -10,6 +10,7 @@ import '../../features/issues/report_problem_screen.dart';
 import '../../features/tasks/submit_evidence_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/appeals/appeals_list_screen.dart';
 import '../../presentation/widgets/bottom_navigation.dart';
 
 class Routes {
@@ -32,6 +33,7 @@ class Routes {
 
   static const String profile = '/profile';
   static const String settings = '/settings';
+  static const String appeals = '/appeals';
 }
 
 class AppRouter {
@@ -101,6 +103,12 @@ class AppRouter {
       case Routes.settings:
         return _buildRoute(
           const SettingsScreen(),
+          settings,
+        );
+
+      case Routes.appeals:
+        return _buildRoute(
+          const AppealsListScreen(),
           settings,
         );
 

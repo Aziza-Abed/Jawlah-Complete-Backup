@@ -13,6 +13,12 @@ class NotCheckedInBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AttendanceManager>(
       builder: (context, attendanceManager, child) {
+        // don't show banner while loading attendance data
+        // this prevents the banner from flashing briefly before we know the real status
+        if (attendanceManager.isLoading) {
+          return const SizedBox.shrink();
+        }
+
         // show banner only if user has not checked in today
         if (!attendanceManager.hasNotCheckedInToday) {
           return const SizedBox.shrink();

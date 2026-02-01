@@ -1,148 +1,102 @@
-import React, { useMemo, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
-import { Bell, User, Settings, Search, Menu } from "lucide-react";
+import { Menu, Bell, User, Settings } from "lucide-react";
+import { getUnreadNotificationsCount } from "../../api/notifications";
 
 export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
-  const location = useLocation();
-  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const unreadCount = 3;
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const count = await getUnreadNotificationsCount();
+        setUnreadCount(count);
+      } catch (err) {
+        console.error("Failed to fetch unread count:", err);
+      }
+    };
+    fetchUnreadCount();
 
-  const isNotificationsActive = useMemo(() => {
-    return location.pathname.startsWith("/notifications");
-  }, [location.pathname]);
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const onSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: later: navigate(`/search?q=${encodeURIComponent(query)}`)
-  };
+
 
   return (
-    <header className="w-full bg-[#7895B2] px-3 sm:px-6 md:px-8 h-[76px] sm:h-[90px] md:h-[100px]">
-      <div className="h-full flex items-center justify-between gap-3">
-        {/* Right: Logo */}
-        <div className="flex items-center justify-end w-[90px] sm:w-[120px] md:w-[140px]">
-          <img
-            src={logo}
-            alt="بلدية البيرة"
-            className="w-[56px] h-[56px] sm:w-[68px] sm:h-[68px] md:w-[77px] md:h-[76px] object-contain"
-          />
-        </div>
-
-        {/* Center: Search (always visible) */}
-        <div className="flex-1 flex justify-center min-w-0">
-          <form
-            onSubmit={onSearchSubmit}
-            className="w-full max-w-[590px] h-[44px] sm:h-[50px] bg-[#F3F1ED] rounded-full flex items-center px-4 sm:px-5 gap-3"
-          >
-            <Search size={20} className="text-[#60778E] shrink-0" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="بحث..."
-              className="w-full min-w-0 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 text-right text-[14px] sm:text-[16px] placeholder:text-[#60778E]/70"
+    <header className="w-full bg-[#7895B2] px-6 sm:px-8 md:px-10 h-[85px] sm:h-[105px] shadow-lg relative z-30">
+      <div className="h-full flex items-center justify-between">
+        
+        {/* Right Side: Logo and Title (The Start in RTL) */}
+        <div className="flex items-center gap-4 lg:gap-6">
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-white/20 rounded-full blur opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            <img
+              src={logo}
+              alt="FollowUp"
+              className="relative w-[50px] h-[50px] sm:w-[60px] sm:h-[60px] object-contain drop-shadow-md"
             />
-          </form>
+          </div>
+          <div className="text-right">
+            <h1 className="text-white font-black text-[24px] sm:text-[32px] tracking-tight leading-tight">FollowUp</h1>
+            <p className="text-white/80 text-[13px] sm:text-[16px] font-bold tracking-wide">نظام متابعة العمل الميداني</p>
+          </div>
         </div>
 
-        {/* Left: Actions */}
-        <div className="flex items-center justify-start gap-2 w-[140px] sm:w-[170px]">
-          {/* Mobile: Menu + Notifications */}
-          <div className="md:hidden h-[44px] sm:h-[50px] bg-[#F3F1ED] rounded-full px-2 flex items-center gap-2">
+        {/* Left Side: Premium Icon Pill (The End in RTL) */}
+        <div className="flex items-center gap-4">
+          {/* Desktop Icon Pill */}
+          <div className="hidden md:flex items-center bg-white/95 backdrop-blur-md rounded-xl px-2 py-1.5 shadow-xl border border-white/50">
+            {/* Notifications */}
             <button
               type="button"
-              onClick={onMenuClick}
-              className="w-[40px] h-[40px] sm:w-[44px] sm:h-[44px] rounded-full grid place-items-center hover:bg-white/70 transition"
-              aria-label="القائمة"
+              onClick={() => navigate("/notifications")}
+              className="w-[36px] h-[36px] rounded-lg grid place-items-center hover:bg-gray-100 transition-all text-[#6B7280] relative hover:scale-105 active:scale-95"
+              title="الإشعارات"
             >
-              <Menu size={22} className="text-[#60778E]" />
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 min-w-[17px] h-[17px] bg-[#C86E5D] text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow-sm border border-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
 
-            <div className="w-[1px] h-6 bg-[#60778E]/20" />
-
-            <NavLink
-              to="/notifications"
-              className={({ isActive }) =>
-                [
-                  "relative",
-                  "w-[40px] h-[40px] sm:w-[44px] sm:h-[44px]",
-                  "rounded-full grid place-items-center transition",
-                  isActive || isNotificationsActive ? "bg-white/70" : "hover:bg-white/70",
-                ].join(" ")
-              }
-              aria-label="الإشعارات"
+            {/* Profile */}
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="w-[36px] h-[36px] rounded-lg grid place-items-center hover:bg-gray-100 transition-all text-[#6B7280] hover:scale-105 active:scale-95"
+              title="الملف الشخصي"
             >
-              <Bell size={22} className="text-[#60778E]" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#C86E5D] text-white text-[11px] font-sans font-bold flex items-center justify-center">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </NavLink>
+              <User size={18} />
+            </button>
+
+            {/* Settings */}
+            <button
+              type="button"
+              onClick={() => navigate("/settings")}
+              className="w-[36px] h-[36px] rounded-lg grid place-items-center hover:bg-gray-100 transition-all text-[#6B7280] hover:scale-105 active:scale-95"
+              title="الإعدادات"
+            >
+              <Settings size={18} />
+            </button>
           </div>
 
-          {/* Desktop: Notifications + Profile + Settings */}
-          <div className="hidden md:flex h-[46px] sm:h-[50px] bg-[#F3F1ED] rounded-full px-2 items-center gap-2">
-            <NavLink
-              to="/notifications"
-              className={({ isActive }) =>
-                [
-                  "relative",
-                  "w-[44px] h-[44px] rounded-full grid place-items-center transition",
-                  isActive || isNotificationsActive ? "bg-white/70" : "hover:bg-white/70",
-                ].join(" ")
-              }
-              aria-label="الإشعارات"
-            >
-              <Bell size={22} className="text-[#60778E]" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#C86E5D] text-white text-[11px] font-sans font-bold flex items-center justify-center">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </NavLink>
-
-            <div className="w-[1px] h-6 bg-[#60778E]/20" />
-
-            <PillLink to="/profile" ariaLabel="الملف الشخصي">
-              <User size={22} className="text-[#60778E]" />
-            </PillLink>
-
-            <div className="w-[1px] h-6 bg-[#60778E]/20" />
-
-            <PillLink to="/settings" ariaLabel="الإعدادات">
-              <Settings size={22} className="text-[#60778E]" />
-            </PillLink>
-          </div>
+          {/* Mobile Menu Button */}
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="md:hidden w-[40px] h-[40px] rounded-xl bg-white/10 grid place-items-center hover:bg-white/20 transition-all active:scale-90"
+            aria-label="القائمة"
+          >
+            <Menu size={20} className="text-white" />
+          </button>
         </div>
       </div>
     </header>
-  );
-}
-
-function PillLink({
-  children,
-  to,
-  ariaLabel,
-}: {
-  children: React.ReactNode;
-  to: string;
-  ariaLabel?: string;
-}) {
-  return (
-    <NavLink
-      to={to}
-      aria-label={ariaLabel}
-      className={({ isActive }) =>
-        [
-          "w-[44px] h-[44px] rounded-full grid place-items-center border-0 outline-none transition",
-          isActive ? "bg-white/70" : "hover:bg-white/70",
-        ].join(" ")
-      }
-    >
-      {children}
-    </NavLink>
   );
 }

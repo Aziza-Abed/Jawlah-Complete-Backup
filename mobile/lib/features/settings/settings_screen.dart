@@ -48,6 +48,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Navigator.of(context).pushNamed(Routes.attendance);
                   },
                 ),
+                _SettingItem(
+                  icon: Icons.gavel,
+                  title: 'طعوني',
+                  subtitle: 'عرض حالة الطعون المقدمة',
+                  onTap: () {
+                    Navigator.of(context).pushNamed(Routes.appeals);
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -515,7 +523,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               SizedBox(height: 16),
               Text(
-                'بلدية البيرة',
+                'FollowUp',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontSize: 15,
@@ -525,7 +533,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               SizedBox(height: 8),
               Text(
-                'تطبيق لإدارة المهام الميدانية والمتابعة الميدانية الذكية لعمال بلدية البيرة',
+                'تطبيق لإدارة المهام الميدانية والمتابعة الميدانية الذكية',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontSize: 14,

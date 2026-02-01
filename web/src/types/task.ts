@@ -14,12 +14,17 @@ export type TaskResponse = {
   assignedByUserName?: string;
   zoneId?: number;
   zoneName?: string;
+  // Team task support
+  teamId?: number;
+  teamName?: string;
+  isTeamTask: boolean;
   priority: TaskPriority;
   status: TaskStatus;
   taskType?: TaskType;
   requiresPhotoProof: boolean;
   estimatedDurationMinutes?: number;
   createdAt: string;
+  scheduledAt?: string;
   dueDate?: string;
   startedAt?: string;
   completedAt?: string;
@@ -49,12 +54,16 @@ export type TaskResponse = {
 export type CreateTaskRequest = {
   title: string;
   description: string;
-  assignedToUserId: number;
+  // For individual tasks - either assignedToUserId or teamId is required
+  assignedToUserId?: number;
+  // For team tasks - all team members can work on this task
+  teamId?: number;
   zoneId?: number;
   priority: TaskPriority;
   taskType?: TaskType;
   requiresPhotoProof?: boolean;
   estimatedDurationMinutes?: number;
+  scheduledAt?: string;
   dueDate?: string;
   latitude?: number;
   longitude?: number;
@@ -70,6 +79,7 @@ export type UpdateTaskRequest = {
   taskType?: TaskType;
   requiresPhotoProof?: boolean;
   estimatedDurationMinutes?: number;
+  scheduledAt?: string;
   dueDate?: string;
   latitude?: number;
   longitude?: number;

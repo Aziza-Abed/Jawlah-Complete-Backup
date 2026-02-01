@@ -93,7 +93,7 @@ class TasksService {
   }) async {
     final formData = FormData();
 
-    formData.fields.add(MapEntry('notes', notes));
+    formData.fields.add(MapEntry('completionNotes', notes));
 
     // include GPS coordinates if we have them
     if (latitude != null) {
@@ -146,5 +146,32 @@ class TasksService {
       'InProgress',
       notes: 'تم بدء المهمة',
     );
+  }
+
+  // update task progress (for multi-day tasks)
+  Future<TaskModel?> updateTaskProgress(
+    int taskId,
+    int progressPercentage,
+  ) async {
+    try {
+      final response = await _apiService.put(
+        '${ApiConfig.updateTaskProgress}/$taskId/progress',
+        data: {
+          'progressPercentage': progressPercentage,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = response.data;
+        if (responseData['success'] == true && responseData['data'] != null) {
+          return TaskModel.fromJson(responseData['data']);
+        }
+      }
+
+      return null;
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw ServerException('فشل تحديث التقدم');
+    }
   }
 }

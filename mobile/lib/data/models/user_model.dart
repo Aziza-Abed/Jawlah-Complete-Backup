@@ -31,11 +31,9 @@ class UserModel {
       role: json['role'] as String,
       workerType: json['workerType'] as String?,
       email: json['email'] as String?,
-      // use current date if createdAt is missing
-      // parse as UTC
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse('${json['createdAt'] as String}Z')
-          : DateTime.now().toUtc(),
+      // use current date if createdAt is missing or malformed
+      // parse as UTC with error handling
+      createdAt: _parseDateTime(json['createdAt']),
     );
   }
 
@@ -50,6 +48,23 @@ class UserModel {
       'email': email,
       'createdAt': createdAt.toIso8601String(),
     };
+  }
+
+  // Safe DateTime parsing to prevent crashes from malformed dates
+  static DateTime _parseDateTime(dynamic dateValue) {
+    if (dateValue == null) {
+      return DateTime.now().toUtc();
+    }
+
+    try {
+      final dateStr = dateValue as String;
+      // Add Z suffix if not already present to parse as UTC
+      final normalizedDate = dateStr.endsWith('Z') ? dateStr : '${dateStr}Z';
+      return DateTime.parse(normalizedDate);
+    } catch (e) {
+      // If parsing fails, use current time instead of crashing
+      return DateTime.now().toUtc();
+    }
   }
 
   UserModel copyWith({
@@ -97,19 +112,26 @@ class UserModel {
     if (workerType == null || workerType!.isEmpty) return '';
 
     // Handle both enum names and numeric values
+    // Standard municipality department worker types
     switch (workerType!.toLowerCase()) {
       case 'sanitation':
       case '0':
-        return 'عامل نظافة';
+        return 'صحة/نظافة';
+      case 'publicworks':
+      case '1':
+        return 'أشغال';
+      case 'agriculture':
+      case '2':
+        return 'زراعة';
+      case 'maintenance':
+      case '3':
+        return 'صيانة';
+      // Legacy support for old values
       case 'inspector':
       case '1':
         return 'مفتش';
       case 'emergency':
-      case '2':
         return 'طوارئ';
-      case 'maintenance':
-      case '3':
-        return 'عامل صيانة';
       default:
         return workerType!;
     }

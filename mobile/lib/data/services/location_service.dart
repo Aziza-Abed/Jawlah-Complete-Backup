@@ -59,6 +59,8 @@ class LocationService {
 
   static Future<Position?> getCurrentLocation({
     LocationAccuracy accuracy = defaultAccuracy,
+    bool validateAccuracy = true,
+    double maxAccuracyMeters = 100.0,
   }) async {
     final serviceEnabled = await isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -82,9 +84,20 @@ class LocationService {
         desiredAccuracy: accuracy,
         timeLimit: const Duration(seconds: gpsTimeoutSeconds),
       );
+
+      // FIX 5: GPS ACCURACY VALIDATION
+      if (validateAccuracy && position.accuracy > maxAccuracyMeters) {
+        throw ValidationException(
+          'دقة GPS منخفضة جداً (${position.accuracy.toInt()}م).\n'
+          'انتقل إلى مكان مفتوح والحد الأقصى المسموح: ${maxAccuracyMeters.toInt()}م'
+        );
+      }
+
       return position;
     } on TimeoutException {
       throw ValidationException('انتهت مهلة تحديد الموقع. يرجى التأكد من وجود إشارة GPS جيدة.');
+    } on ValidationException {
+      rethrow; // Re-throw our custom accuracy validation error
     } catch (e) {
       throw ValidationException('فشل الحصول على موقع GPS: ${e.toString()}');
     }

@@ -5,7 +5,7 @@ part 'task_local.g.dart';
 @HiveType(typeId: 1)
 class TaskLocal extends HiveObject {
   @HiveField(0)
-  String? clientId; // Local ID before syncing
+  String? clientId; // Local ID for offline tasks
 
   @HiveField(1)
   int taskId; // Server task ID
@@ -14,7 +14,7 @@ class TaskLocal extends HiveObject {
   String? title;
 
   @HiveField(3)
-  String status; // Pending, InProgress, Completed
+  String status;
 
   @HiveField(4)
   String? completionNotes;
@@ -70,6 +70,12 @@ class TaskLocal extends HiveObject {
   @HiveField(20)
   int? estimatedDurationMinutes;
 
+  @HiveField(22)
+  int progressPercentage;
+
+  @HiveField(23)
+  String? progressNotes;
+
   TaskLocal({
     this.clientId,
     required this.taskId,
@@ -78,12 +84,12 @@ class TaskLocal extends HiveObject {
     this.completionNotes,
     this.photoUrl,
     this.completedAt,
-    this.syncVersion = 0,
+    this.syncVersion = 1,
     this.isSynced = false,
     required this.updatedAt,
     this.syncedAt,
     this.description,
-    this.priority = 'Medium',
+    required this.priority,
     this.dueDate,
     this.zoneId,
     this.zoneName,
@@ -91,32 +97,22 @@ class TaskLocal extends HiveObject {
     this.longitude,
     this.locationDescription,
     this.taskType,
-    this.requiresPhotoProof = true,
+    this.requiresPhotoProof = false,
     this.estimatedDurationMinutes,
+    this.progressPercentage = 0,
+    this.progressNotes,
   });
 
-  // convert to sync DTO
+  // Convert to sync DTO for uploading completed tasks
   Map<String, dynamic> toSyncDto() {
     return {
-      'clientId': clientId,
       'taskId': taskId,
-      'title': title,
       'status': status,
       'completionNotes': completionNotes,
       'photoUrl': photoUrl,
       'completedAt': completedAt?.toIso8601String(),
-      'syncVersion': syncVersion,
-      'description': description,
-      'priority': priority,
-      'dueDate': dueDate?.toIso8601String(),
-      'zoneId': zoneId,
-      'zoneName': zoneName,
       'latitude': latitude,
       'longitude': longitude,
-      'locationDescription': locationDescription,
-      'taskType': taskType,
-      'requiresPhotoProof': requiresPhotoProof,
-      'estimatedDurationMinutes': estimatedDurationMinutes,
     };
   }
 }

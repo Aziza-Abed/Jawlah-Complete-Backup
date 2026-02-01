@@ -228,8 +228,8 @@ class FirebaseMessagingService {
 
     if (notification != null) {
       const androidDetails = AndroidNotificationDetails(
-        'jawlah_notifications',
-        'Jawlah Notifications',
+        'followup_notifications',
+        'FollowUp Notifications',
         channelDescription: 'Notifications for tasks, issues, and attendance',
         importance: Importance.high,
         priority: Priority.high,

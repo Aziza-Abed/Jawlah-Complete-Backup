@@ -44,17 +44,15 @@ class TaskDetailsCard extends StatelessWidget {
               'المنطقة',
               task.zoneName ?? 'غير محدد',
             ),
-            if (task.location != null && task.location!.isNotEmpty && task.location != task.zoneName) ...[
+            if (task.location != null &&
+                task.location!.isNotEmpty &&
+                task.location != task.zoneName) ...[
               const SizedBox(height: 8),
               _buildDetailRow(
                 Icons.place,
                 'الموقع التفصيلي',
                 task.location!,
               ),
-            ],
-            if (task.hasLocation) ...[
-              const SizedBox(height: 12),
-              _buildNavigateButton(),
             ],
             const Divider(height: 24),
           ],

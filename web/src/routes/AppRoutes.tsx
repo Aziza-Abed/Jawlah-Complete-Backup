@@ -11,22 +11,45 @@ import TaskDetails from "../pages/TaskDetails";
 import IssueDetails from "../pages/IssueDetails";
 import TasksList from "../pages/Tasks";
 import ProtectedRoute from "./ProtectedRoute";
+import AdminRoute from "./AdminRoute";
 import Issues from "../pages/Issues";
-import ForgotPassword from "../pages/ForgotPassword";
-import ResetPassword from "../pages/ResetPassword";
-import VerifyOtp from "../pages/VerifyOtp";
 import Profile from "../pages/Profile";
 import Settings from "../pages/Settings";
-import Accounts from "../pages/Accounts";
+import AdminZones from "../pages/AdminZones";
+import AdminDepartments from "../pages/AdminDepartments";
+import AdminTeams from "../pages/AdminTeams";
+import AdminTasks from "../pages/AdminTasks";
+import AdminMonitoring from "../pages/AdminMonitoring";
+import AdminAuditLogs from "../pages/AdminAuditLogs";
+import AdminAccounts from "../pages/AdminAccounts";
+import AdminDashboard from "../pages/AdminDashboard";
+import AdminSupervisors from "../pages/AdminSupervisors";
+import AdminIssues from "../pages/AdminIssues";
+import AdminAppeals from "../pages/AdminAppeals";
+import AdminTaskTemplates from "../pages/AdminTaskTemplates";
+import MyWorkers from "../pages/MyWorkers";
+import LocationHistory from "../pages/LocationHistory";
 
 export default function AppRoutes() {
+  const getUserRole = (): string | null => {
+    try {
+      const userStr = localStorage.getItem("followup_user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user.role?.toLowerCase() || null;
+      }
+    } catch (err) {}
+    // FIX: Return null instead of "supervisor" to prevent privilege escalation
+    // Unauthenticated users should not get supervisor privileges
+    return null;
+  };
+
+  const role = getUserRole();
+
   return (
     <Routes>
       {/* Public */}
       <Route path="/login" element={<Login />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/verify-otp" element={<VerifyOtp />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected */}
       <Route
@@ -41,7 +64,7 @@ export default function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
 
         {/* Dashboard */}
-        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="dashboard" element={(role === "admin" || role === "manager") ? <AdminDashboard /> : <Dashboard />} />
 
         {/* Task Creation */}
         <Route path="tasks/new" element={<CreateTask />} />
@@ -56,7 +79,14 @@ export default function AppRoutes() {
         <Route path="tasks" element={<TasksList />} />
 
         <Route path="issues/:id" element={<IssueDetails />} />
-        <Route path="issues" element={<Issues />} />
+        <Route path="issues" element={role === "admin" ? <AdminIssues /> : <Issues />} />
+
+        {/* Appeals - for supervisors and admin */}
+        <Route path="appeals" element={<AdminAppeals />} />
+
+        {/* Supervisor: My Workers and Location History */}
+        <Route path="my-workers" element={<MyWorkers />} />
+        <Route path="location-history/:workerId" element={<LocationHistory />} />
 
         {/* Notifications */}
         <Route path="notifications" element={<Notifications />} />
@@ -65,8 +95,16 @@ export default function AppRoutes() {
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
 
-        {/* Admin only */}
-        <Route path="accounts" element={<Accounts />} />
+        {/* Admin only - Protected by role */}
+        <Route path="accounts" element={<AdminRoute><AdminAccounts /></AdminRoute>} />
+        <Route path="departments" element={<AdminRoute><AdminDepartments /></AdminRoute>} />
+        <Route path="teams" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><AdminTeams /></AdminRoute>} />
+        <Route path="zones-admin" element={<AdminRoute><AdminZones /></AdminRoute>} />
+        <Route path="task-oversight" element={<AdminRoute><AdminTasks /></AdminRoute>} />
+        <Route path="task-templates" element={<AdminRoute><AdminTaskTemplates /></AdminRoute>} />
+        <Route path="monitoring" element={<AdminRoute><AdminMonitoring /></AdminRoute>} />
+        <Route path="supervisors" element={<AdminRoute><AdminSupervisors /></AdminRoute>} />
+        <Route path="audit-logs" element={<AdminRoute><AdminAuditLogs /></AdminRoute>} />
       </Route>
 
       {/* Fallback */}

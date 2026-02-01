@@ -46,8 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<NoticeManager>().loadNotices();
     });
 
-    // start battery monitoring for low battery alerts
-    BatteryService().startMonitoring();
+    // progress tracking and other services already initialized in providers
 
     // update work time every minute
     _workDurationTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
@@ -60,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _workDurationTimer?.cancel();
-    BatteryService().stopMonitoring();
+    // cleanup
     super.dispose();
   }
 

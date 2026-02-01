@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getIssue, updateIssueStatus } from "../api/issues";
+import { getUsersByRole } from "../api/users";
 import type { IssueResponse } from "../types/issue";
+import type { UserResponse } from "../types/user";
 
 type Severity = "low" | "medium" | "high" | "critical";
 type IssueStatus = "new" | "reviewing" | "converted" | "forwarded" | "rejected" | "closed";
@@ -25,11 +27,11 @@ type IssueDTO = {
   status: IssueStatus;
 };
 
-type Option = { id: string; name: string };
+
 
 // Map backend severity to frontend severity
-const mapSeverity = (severity: string): Severity => {
-  switch (severity.toLowerCase()) {
+const mapSeverity = (severity: string | undefined | null): Severity => {
+  switch ((severity || "").toLowerCase()) {
     case "minor": return "low";
     case "medium": return "medium";
     case "major": return "high";
@@ -87,49 +89,46 @@ export default function IssueDetails() {
   const navigate = useNavigate();
 
   const [issue, setIssue] = useState<IssueDTO | null>(null);
-  const [_loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [_error, setError] = useState("");
+
+  const [supervisors, setSupervisors] = useState<UserResponse[]>([]);
 
   // Modals
   const [forwardOpen, setForwardOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
 
-  const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
-  const [note, setNote] = useState<string>("");
-
-  const [rejectReason, setRejectReason] = useState<string>("");
-
-  // Mock supervisors (later from API)
-  const supervisors: Option[] = useMemo(
-    () => [
-      { id: "s-1", name: "مشرف 1" },
-      { id: "s-2", name: "مشرف 2" },
-    ],
-    []
-  );
-
-  // Fetch issue details from backend
+  // Fetch issue details and supervisors
   useEffect(() => {
-    const fetchIssue = async () => {
+    const fetchInitialData = async () => {
       try {
         setLoading(true);
         setError("");
-        // Extract numeric ID from "i-77" format
+        
         const numericId = id?.startsWith("i-") ? id.slice(2) : id;
         if (!numericId) throw new Error("Invalid issue ID");
 
-        const issueData = await getIssue(Number(numericId));
+        const [issueData, supervisorData] = await Promise.all([
+          getIssue(Number(numericId)),
+          getUsersByRole('Supervisor').catch(() => [])
+        ]);
+
         const dto = mapIssueResponseToDTO(issueData);
         setIssue(dto);
+        setSupervisors(supervisorData);
       } catch (err) {
-        console.error("Failed to fetch issue:", err);
-        setError("فشل تحميل بيانات البلاغ");
+        console.error("Failed to fetch data:", err);
+        setError("فشل تحميل بيانات الصفحة");
       } finally {
         setLoading(false);
       }
     };
-    fetchIssue();
+    fetchInitialData();
   }, [id]);
+
+  const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
+  const [note, setNote] = useState<string>("");
+  const [rejectReason, setRejectReason] = useState<string>("");
 
   const onConvertToTask = () => {
     if (!issue) return;
@@ -152,7 +151,7 @@ export default function IssueDetails() {
       },
     });
 
-    // TODO backend:
+    // Future work: Backend endpoint for converting issues to tasks
     // POST /issues/:id/convert-to-task (or POST /tasks/from-issue)
   };
 
@@ -164,10 +163,13 @@ export default function IssueDetails() {
       const numericId = id?.startsWith("i-") ? id.slice(2) : id;
       if (!numericId) return;
 
+      const supervisor = supervisors.find(s => s.userId.toString() === selectedSupervisorId);
+      const supervisorName = supervisor?.fullName || selectedSupervisorId;
+
       // Update status to UnderReview when forwarding
       await updateIssueStatus(Number(numericId), {
         status: "UnderReview",
-        resolutionNotes: `تم التحويل للمشرف (${selectedSupervisorId}). ${note || ''}`
+        resolutionNotes: `تم التحويل للمشرف: ${supervisorName}. ${note || ''}`
       });
 
       setIssue({ ...issue, status: "reviewing" });
@@ -203,16 +205,27 @@ export default function IssueDetails() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="h-full w-full bg-[#F3F1ED] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[#7895B2]/30 border-t-[#7895B2] rounded-full animate-spin"></div>
+          <p className="text-[#6B7280] font-medium">جاري تحميل البيانات...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!issue) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] grid place-items-center">
+      <div className="h-full w-full bg-[#F3F1ED] grid place-items-center">
         <div className="text-[#C86E5D] font-sans font-semibold">فشل في تحميل البيانات</div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-[#F3F1ED] overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1100px] mx-auto">
           {/* Header: title on RIGHT, no back button */}
@@ -341,7 +354,7 @@ export default function IssueDetails() {
               <button
                 type="button"
                 onClick={onConvertToTask}
-                className="h-[44px] px-6 rounded-[12px] bg-[#60778E] text-white font-sans font-semibold text-[14px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 w-full sm:w-auto"
+                className="h-[44px] px-6 rounded-[12px] bg-[#7895B2] text-white font-sans font-semibold text-[14px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 w-full sm:w-auto"
               >
                 تحويل البلاغ إلى مهمة
               </button>
@@ -372,7 +385,7 @@ export default function IssueDetails() {
                 </button>
                 <button
                   type="button"
-                  className="h-[40px] px-4 rounded-[10px] bg-[#60778E] text-white font-sans font-semibold disabled:opacity-50"
+                  className="h-[40px] px-4 rounded-[10px] bg-[#7895B2] text-white font-sans font-semibold disabled:opacity-50"
                   onClick={submitForwardToSupervisor}
                   disabled={!selectedSupervisorId}
                 >
@@ -389,8 +402,8 @@ export default function IssueDetails() {
             >
               <option value="">— اختر مشرف —</option>
               {supervisors.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+                <option key={s.userId} value={s.userId}>
+                  {s.fullName}
                 </option>
               ))}
             </select>
@@ -445,8 +458,7 @@ export default function IssueDetails() {
           </Modal>
 
           <div className="mt-6 text-right text-[12px] text-[#6B7280]">
-            {/* TODO backend:
-              GET /issues/:id
+            {/* Future work: Additional backend endpoints
               POST /issues/:id/convert-to-task
               POST /issues/:id/forward
               POST /issues/:id/reject
@@ -522,7 +534,7 @@ function StatusBadge({ status }: { status: IssueStatus }) {
     new: { label: "جديد", bg: "#E5E7EB", text: "#2F2F2F" },
     reviewing: { label: "قيد المراجعة", bg: "#F3F1ED", text: "#2F2F2F" },
     converted: { label: "تم تحويله لمهمة", bg: "#8FA36A", text: "#FFFFFF" },
-    forwarded: { label: "تم تحويله لمشرف", bg: "#60778E", text: "#FFFFFF" },
+    forwarded: { label: "تم تحويله لمشرف", bg: "#7895B2", text: "#FFFFFF" },
     rejected: { label: "مرفوض", bg: "#C86E5D", text: "#FFFFFF" },
     closed: { label: "مغلق", bg: "#6B7280", text: "#FFFFFF" },
   };

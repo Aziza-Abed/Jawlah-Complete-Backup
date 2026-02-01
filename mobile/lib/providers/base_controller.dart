@@ -12,6 +12,9 @@ abstract class BaseController with ChangeNotifier {
   // error message if there is one
   String? get errorMessage => _errorMessage;
 
+  // check if there is an error
+  bool get hasError => _errorMessage != null;
+
   // set loading state
   @protected
   void setLoading(bool value) {

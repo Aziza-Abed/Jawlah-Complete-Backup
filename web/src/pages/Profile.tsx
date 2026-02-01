@@ -66,105 +66,126 @@ export default function Profile() {
   }
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto">
+    <div className="h-full w-full bg-[#F3F1ED] overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[800px] mx-auto">
-          <h1 className="text-right font-sans font-semibold text-[24px] text-[#2F2F2F] mb-6">
-            الملف الشخصي
-          </h1>
-
-          <div className="bg-white/80 backdrop-blur-md rounded-[24px] border border-white/20 shadow-xl overflow-hidden">
-            <div className="bg-[#7895B2] p-8 text-white relative">
-              <div className="flex items-center justify-end gap-6 text-right">
-                <div>
-                  <h2 className="text-[28px] font-bold">{profile?.fullName}</h2>
-                  <p className="opacity-90 text-[18px]">{profile?.role === "Admin" ? "مدير النظام" : "مشرف ميداني"}</p>
+          {/* Header (Corrected Layout) */}
+          <div className="flex items-center justify-between gap-6 mb-8">
+            <div className="flex items-center gap-4">
+                 <div className="p-3.5 rounded-[18px] bg-[#7895B2]/10 text-[#7895B2] shadow-sm">
+                    <User size={28} />
                 </div>
-                <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center border-4 border-white/30 backdrop-blur-sm">
-                  <User size={48} />
+                <div className="text-right">
+                    <h1 className="font-sans font-black text-[28px] text-[#2F2F2F] tracking-tight">
+                        الملف الشخصي
+                    </h1>
+                    <p className="text-[14px] font-bold text-[#AFAFAF] mt-1">تعديل بياناتك الشخصية ومعلومات الحساب</p>
+                </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[24px] shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-black/5 overflow-hidden">
+            {/* User Banner */}
+            <div className="bg-[#7895B2] p-8 text-white relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
+              <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+                <div className="w-32 h-32 rounded-[28px] bg-white/20 flex items-center justify-center border-4 border-white/20 backdrop-blur-md shadow-2xl transition-transform group-hover:scale-105">
+                  <User size={64} className="text-white drop-shadow-lg" />
+                </div>
+                <div className="text-right">
+                  <h2 className="text-[32px] font-black tracking-tight">{profile?.fullName}</h2>
+                  <div className="flex items-center justify-end gap-2 mt-2">
+                    <span className="px-3 py-1 bg-white/20 rounded-full text-[12px] font-black uppercase tracking-widest backdrop-blur-sm">
+                      {profile?.role === "Admin" ? "مدير النظام" : "مشرف ميداني"}
+                    </span>
+                    <Shield size={16} className="text-white/80" />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-8">
+            <div className="p-6">
               {message && (
-                <div className={`mb-6 p-4 rounded-xl flex items-center justify-end gap-3 ${
-                  message.type === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                <div className={`mb-8 p-4 rounded-[18px] flex items-center justify-end gap-3 animate-in fade-in slide-in-from-top-4 duration-500 border ${
+                  message.type === "success" ? "bg-[#8FA36A]/10 text-[#8FA36A] border-[#8FA36A]/20" : "bg-[#C86E5D]/10 text-[#C86E5D] border-[#C86E5D]/20"
                 }`}>
-                  <span className="text-right">{message.text}</span>
+                  <span className="text-right font-black text-[14px]">{message.text}</span>
                   {message.type === "success" && <CheckCircle size={20} />}
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Full Name */}
-                  <div className="space-y-2">
-                    <label className="block text-right text-sm font-semibold text-[#6B7280]">الاسم الكامل</label>
+                  <div className="space-y-3">
+                    <label className="block text-right text-[10px] text-[#AFAFAF] font-black uppercase tracking-widest mb-1 pr-1">الاسم الكامل</label>
                     <div className="relative">
                       <input
                         type="text"
                         value={formData.fullName}
                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        className="w-full h-12 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] px-4 pr-12 text-right outline-none focus:ring-2 focus:ring-[#7895B2]/50 transition-all font-sans"
+                        className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
                         required
+                        placeholder="أدخل اسمك الكامل"
                       />
-                      <User className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={20} />
+                      <User className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
                     </div>
                   </div>
 
                   {/* Phone Number */}
-                  <div className="space-y-2">
-                    <label className="block text-right text-sm font-semibold text-[#6B7280]">رقم الهاتف</label>
+                  <div className="space-y-3">
+                    <label className="block text-right text-[10px] text-[#AFAFAF] font-black uppercase tracking-widest mb-1 pr-1">رقم الهاتف</label>
                     <div className="relative">
                       <input
                         type="tel"
                         value={formData.phoneNumber}
                         onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                        className="w-full h-12 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] px-4 pr-12 text-right outline-none focus:ring-2 focus:ring-[#7895B2]/50 transition-all font-sans"
+                        className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
                         required
+                        placeholder="059xxxxxxx"
                       />
-                      <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={20} />
+                      <Phone className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
                     </div>
                   </div>
 
                   {/* Email */}
-                  <div className="space-y-2">
-                    <label className="block text-right text-sm font-semibold text-[#6B7280]">البريد الإلكتروني</label>
+                  <div className="space-y-3">
+                    <label className="block text-right text-[10px] text-[#AFAFAF] font-black uppercase tracking-widest mb-1 pr-1">البريد الإلكتروني</label>
                     <div className="relative">
                       <input
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full h-12 rounded-xl bg-[#F9FAFB] border border-[#E5E7EB] px-4 pr-12 text-right outline-none focus:ring-2 focus:ring-[#7895B2]/50 transition-all font-sans"
+                        className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
+                        placeholder="example@mail.com"
                       />
-                      <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={20} />
+                      <Mail className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
                     </div>
                   </div>
 
                   {/* Username (Read Only) */}
-                  <div className="space-y-2 opacity-70">
-                    <label className="block text-right text-sm font-semibold text-[#6B7280]">اسم المستخدم</label>
+                  <div className="space-y-3 group">
+                    <label className="block text-right text-[10px] text-[#AFAFAF] font-black uppercase tracking-widest mb-1 pr-1">اسم المستخدم (ثابت)</label>
                     <div className="relative">
                       <input
                         type="text"
                         value={profile?.username || ""}
                         readOnly
-                        className="w-full h-12 rounded-xl bg-[#F3F4F6] border border-[#E5E7EB] px-4 pr-12 text-right cursor-not-allowed font-sans"
+                        className="w-full h-14 rounded-[18px] bg-[#F3F1ED] border border-black/5 px-6 pr-14 text-right cursor-not-allowed font-bold text-[#AFAFAF]"
                       />
-                      <Shield className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={20} />
+                      <Shield className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-[#F3F4F6] flex justify-end">
+                <div className="pt-8 border-t border-black/5 flex justify-start">
                   <button
                     type="submit"
                     disabled={saving}
-                    className="h-12 px-8 bg-[#2F2F2F] text-white rounded-xl font-semibold flex items-center gap-2 hover:bg-black transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    className="h-14 px-10 bg-[#7895B2] text-white rounded-[18px] font-black text-[15px] flex items-center justify-center gap-3 hover:bg-[#647e99] transition-all shadow-lg shadow-[#7895B2]/20 active:scale-95 disabled:opacity-50 group"
                   >
                     {saving ? "جاري الحفظ..." : "حفظ التغييرات"}
-                    <Save size={20} />
+                    <Save size={20} className="group-hover:translate-y-[-2px] transition-transform" />
                   </button>
                 </div>
               </form>

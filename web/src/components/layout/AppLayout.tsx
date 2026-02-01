@@ -11,12 +11,16 @@ import {
   Map,
   BarChart3,
   Users,
+  UserCog,
+  Building,
+  ShieldCheck,
+  Scale,
   User,
   Settings as SettingsIcon,
   LogOut,
 } from "lucide-react";
 
-type UserRole = "manager" | "supervisor";
+type UserRole = "admin" | "manager" | "supervisor";
 
 type NavItem = {
   to: string;
@@ -34,10 +38,15 @@ const supervisorItems: NavItem[] = [
   { to: "/reports", label: "التقارير", icon: BarChart3 },
 ];
 
-const managerItems: NavItem[] = [
+const adminItems: NavItem[] = [
   { to: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, end: true },
-  { to: "/reports", label: "التقارير", icon: BarChart3 },
   { to: "/accounts", label: "إدارة الحسابات", icon: Users },
+  { to: "/supervisors", label: "إدارة المشرفين", icon: UserCog },
+  { to: "/departments", label: "إدارة الأقسام", icon: Building },
+  { to: "/zones-admin", label: "إدارة المناطق", icon: Map },
+  { to: "/task-oversight", label: "الرقابة على المهام", icon: ShieldCheck },
+  { to: "/appeals", label: "مركز المراجعة", icon: Scale },
+  { to: "/reports", label: "التقارير", icon: BarChart3 },
 ];
 
 export default function AppLayout() {
@@ -47,11 +56,12 @@ export default function AppLayout() {
 
   const getUserRole = (): UserRole => {
     try {
-      const userStr = localStorage.getItem("jawlah_user");
+      const userStr = localStorage.getItem("followup_user");
       if (userStr) {
         const user = JSON.parse(userStr);
         const backendRole = user.role?.toLowerCase();
-        if (backendRole === "admin") return "manager";
+        if (backendRole === "admin") return "admin";
+        if (backendRole === "manager") return "manager";
         if (backendRole === "supervisor") return "supervisor";
       }
     } catch (err) {
@@ -63,13 +73,12 @@ export default function AppLayout() {
   const role = getUserRole();
 
   const items = useMemo(() => {
-    return role === "manager" ? managerItems : supervisorItems;
+    return (role === "admin" || role === "manager") ? adminItems : supervisorItems;
   }, [role]);
 
   const handleLogout = () => {
-    // TODO backend: call logout endpoint when available
-    localStorage.removeItem("jawlah_token");
-    localStorage.removeItem("jawlah_user");
+    localStorage.removeItem("followup_token");
+    localStorage.removeItem("followup_user");
     navigate("/login");
   };
 
@@ -86,7 +95,7 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <div dir="rtl" className="h-screen w-screen bg-background overflow-hidden">
+    <div dir="rtl" className="h-screen w-screen bg-[#F3F1ED] overflow-hidden">
       <div className="h-full flex flex-col">
         <div className="shrink-0 w-full">
           <Topbar onMenuClick={() => setDrawerOpen(true)} />
@@ -145,7 +154,7 @@ export default function AppLayout() {
                     "font-sans font-semibold text-[14px]",
                     "flex items-center gap-3",
                     isActive
-                      ? "bg-[#F3F1ED] text-[#2F2F2F]"
+                      ? "bg-[#E2E8F0] text-[#2F2F2F]"
                       : "bg-white/15 text-white hover:bg-white/20",
                   ].join(" ")
                 }
@@ -167,7 +176,7 @@ export default function AppLayout() {
                   "font-sans font-semibold text-[14px]",
                   "flex items-center gap-3",
                   isActive
-                    ? "bg-[#F3F1ED] text-[#2F2F2F]"
+                    ? "bg-[#E2E8F0] text-[#2F2F2F]"
                     : "bg-white/15 text-white hover:bg-white/20",
                 ].join(" ")
               }
@@ -185,7 +194,7 @@ export default function AppLayout() {
                   "font-sans font-semibold text-[14px]",
                   "flex items-center gap-3",
                   isActive
-                    ? "bg-[#F3F1ED] text-[#2F2F2F]"
+                    ? "bg-[#E2E8F0] text-[#2F2F2F]"
                     : "bg-white/15 text-white hover:bg-white/20",
                 ].join(" ")
               }

@@ -1,10 +1,27 @@
 // src/pages/TaskDetails.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import { getTask, approveTask, rejectTask } from "../api/tasks";
+import type { TaskResponse } from "../types/task";
+import "leaflet/dist/leaflet.css";
 
-// ✅ TODO backend: re-enable APIs when backend is ready
-// import { getTask, approveTask, rejectTask } from "../api/tasks";
-// import type { TaskResponse } from "../types/task";
+// Fix Leaflet marker icons
+const TaskLocationIcon = L.divIcon({
+  className: "custom-marker",
+  html: `<div class="relative flex items-center justify-center w-10 h-10">
+    <div class="absolute w-full h-full bg-blue-500 rounded-full animate-ping opacity-30"></div>
+    <div class="relative w-6 h-6 bg-blue-600 rounded-full border-3 border-white shadow-lg flex items-center justify-center">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3" fill="white"></circle>
+      </svg>
+    </div>
+  </div>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 20]
+});
 
 type Priority = "Low" | "Medium" | "High";
 
@@ -30,12 +47,16 @@ type TaskDTO = {
   id: string;
   title: string;
   description: string;
+  scheduledAt?: string;
   dueDate?: string;
   priority: Priority;
   status: TaskStatus;
 
   assignedWorkerName: string;
   zoneName?: string;
+  // Team task support
+  isTeamTask: boolean;
+  teamName?: string;
 
   lastLocationText?: string;
   lastGps?: { lat: number; lng: number };
@@ -60,8 +81,6 @@ export default function TaskDetails() {
       try {
         setLoading(true);
         setErr("");
-
-        // ✅ backend OFF: load mock details
         const data = await apiGetTaskDetails(String(id));
         setTask(data);
       } catch {
@@ -93,12 +112,9 @@ export default function TaskDetails() {
     try {
       setBusyAction("approve");
       setErr("");
-
-      // ✅ backend OFF: simulate approve
       await apiApproveTask(task.id);
-
-      // update UI state
-      setTask((prev) => (prev ? { ...prev, status: "approved", lastRejectReason: undefined } : prev));
+      const updated = await apiGetTaskDetails(task.id);
+      setTask(updated);
     } catch {
       setErr("فشل في اعتماد المهمة");
     } finally {
@@ -121,22 +137,10 @@ export default function TaskDetails() {
     try {
       setBusyAction("reject");
       setErr("");
-
-      // ✅ backend OFF: simulate reject
       await apiRejectTask(task.id, rejectReason.trim());
-
       setRejectOpen(false);
-
-      // update UI state
-      setTask((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: "rejected",
-              lastRejectReason: rejectReason.trim(),
-            }
-          : prev
-      );
+      const updated = await apiGetTaskDetails(task.id);
+      setTask(updated);
     } catch {
       setErr("فشل في رفض المهمة");
     } finally {
@@ -146,7 +150,7 @@ export default function TaskDetails() {
 
   if (loading) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] grid place-items-center">
+      <div className="h-full w-full bg-[#F3F1ED] grid place-items-center">
         <div className="text-[#2F2F2F] font-sans font-semibold">
           جاري التحميل...
         </div>
@@ -156,7 +160,7 @@ export default function TaskDetails() {
 
   if (!task) {
     return (
-      <div className="h-full w-full bg-[#D9D9D9] grid place-items-center">
+      <div className="h-full w-full bg-[#F3F1ED] grid place-items-center">
         <div className="text-[#C86E5D] font-sans font-semibold">
           {err || "لا توجد بيانات"}
         </div>
@@ -165,7 +169,7 @@ export default function TaskDetails() {
   }
 
   return (
-    <div className="h-full w-full bg-[#D9D9D9] overflow-auto" dir="rtl">
+    <div className="h-full w-full bg-[#F3F1ED] overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-start justify-between gap-3">
@@ -174,10 +178,22 @@ export default function TaskDetails() {
                 تفاصيل المهمة
               </h1>
               <div className="mt-1 text-[12px] text-[#6B7280]">
-                #{task.id} •{" "}
-                {task.dueDate
-                  ? `موعد التنفيذ: ${formatDate(task.dueDate)}`
-                  : "بدون موعد محدد"}
+                <span className="font-sans font-bold text-[#2F2F2F]">#{task.id}</span>
+                <div className="mt-1 text-[12px] text-[#6B7280] flex flex-wrap gap-x-4 gap-y-1">
+                  {task.scheduledAt && (
+                    <span className="flex items-center gap-1.5">
+                       <span className="font-bold">البدء:</span>
+                       <span className="font-sans font-bold text-[#2F2F2F]">{formatDateTime(task.scheduledAt)}</span>
+                    </span>
+                  )}
+                  {task.dueDate && (
+                    <span className="flex items-center gap-1.5">
+                       <span className="font-bold">الانتهاء:</span>
+                       <span className="font-sans font-bold text-[#2F2F2F]">{formatDateTime(task.dueDate)}</span>
+                    </span>
+                  )}
+                  {!task.scheduledAt && !task.dueDate && "بدون مواعيد محددة"}
+                </div>
               </div>
             </div>
 
@@ -199,7 +215,15 @@ export default function TaskDetails() {
             </div>
 
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <InfoBox label="الموظف (العامل)" value={task.assignedWorkerName} />
+              {task.isTeamTask ? (
+                <InfoBox
+                  label="الفريق"
+                  value={task.teamName || "—"}
+                  subLabel={task.assignedWorkerName !== "غير محدد" ? `منفذ: ${task.assignedWorkerName}` : "مهمة جماعية"}
+                />
+              ) : (
+                <InfoBox label="الموظف (العامل)" value={task.assignedWorkerName} />
+              )}
               <InfoBox label="المنطقة (Zone)" value={task.zoneName || "—"} />
               <InfoBox label="نسبة الإنجاز (آخر تحديث)" value={`${progress}%`} />
             </div>
@@ -208,7 +232,7 @@ export default function TaskDetails() {
               <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold">
                 وصف المهمة
               </div>
-              <div className="mt-2 bg-white rounded-[12px] border border-black/10 p-4 text-right text-[14px] text-[#2F2F2F] leading-relaxed whitespace-pre-line">
+              <div className="mt-2 bg-white rounded-[12px] border border-black/10 p-4 text-right text-[14px] text-[#2F2F2F] leading-relaxed">
                 {task.description}
               </div>
             </div>
@@ -232,12 +256,48 @@ export default function TaskDetails() {
               </div>
 
               <div className="bg-white rounded-[12px] border border-black/10 p-4">
-                <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold">
-                  خريطة (Placeholder)
+                <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold mb-2">
+                  موقع المهمة على الخريطة
                 </div>
-                <div className="mt-2 h-[140px] rounded-[10px] bg-[#E9E6E0] border border-black/5 grid place-items-center text-[#6B7280] text-[12px]">
-                  لاحقاً: خريطة + Marker من GPS آخر تحديث
-                </div>
+                {(latestUpdate?.gps || task.lastGps) ? (
+                  <div className="h-[180px] rounded-[10px] overflow-hidden border border-black/5">
+                    <MapContainer
+                      center={[(latestUpdate?.gps || task.lastGps)!.lat, (latestUpdate?.gps || task.lastGps)!.lng]}
+                      zoom={15}
+                      className="w-full h-full"
+                      zoomControl={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker
+                        position={[(latestUpdate?.gps || task.lastGps)!.lat, (latestUpdate?.gps || task.lastGps)!.lng]}
+                        icon={TaskLocationIcon}
+                      >
+                        <Popup>
+                          <div dir="rtl" className="text-right font-sans p-1">
+                            <div className="font-bold text-[#2F2F2F] text-sm mb-1">
+                              آخر موقع للعامل
+                            </div>
+                            <div className="text-[10px] text-[#6B7280]">
+                              {(latestUpdate?.gps || task.lastGps)!.lat.toFixed(5)}, {(latestUpdate?.gps || task.lastGps)!.lng.toFixed(5)}
+                            </div>
+                            {latestUpdate?.locationText || task.lastLocationText ? (
+                              <div className="text-[10px] text-[#6B7280] mt-1">
+                                {latestUpdate?.locationText || task.lastLocationText}
+                              </div>
+                            ) : null}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    </MapContainer>
+                  </div>
+                ) : (
+                  <div className="h-[140px] rounded-[10px] bg-[#E9E6E0] border border-black/5 grid place-items-center text-[#6B7280] text-[12px]">
+                    لا يوجد موقع GPS متاح حالياً
+                  </div>
+                )}
               </div>
             </div>
 
@@ -391,8 +451,8 @@ export default function TaskDetails() {
                 className={[
                   "h-[44px] px-6 rounded-[12px] font-sans font-semibold text-[14px] shadow-[0_2px_0_rgba(0,0,0,0.15)]",
                   canDecide
-                    ? "bg-[#60778E] text-white hover:opacity-95"
-                    : "bg-[#60778E]/50 text-white cursor-not-allowed",
+                    ? "bg-[#7895B2] text-white hover:opacity-95"
+                    : "bg-[#7895B2]/50 text-white cursor-not-allowed",
                 ].join(" ")}
               >
                 {busyAction === "approve" ? "..." : "اعتماد المهمة"}
@@ -460,8 +520,6 @@ export default function TaskDetails() {
   );
 }
 
-/* ---------- UI components ---------- */
-
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <div
@@ -475,11 +533,14 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
   );
 }
 
-function InfoBox({ label, value }: { label: string; value: string }) {
+function InfoBox({ label, value, subLabel }: { label: string; value: string; subLabel?: string }) {
   return (
     <div className="bg-white rounded-[12px] border border-black/10 p-4">
       <div className="text-right text-[12px] text-[#6B7280] font-sans font-semibold">{label}</div>
       <div className="mt-2 text-right text-[15px] text-[#2F2F2F] font-sans font-semibold">{value}</div>
+      {subLabel && (
+        <div className="mt-1 text-right text-[11px] text-[#7895B2] font-sans">{subLabel}</div>
+      )}
     </div>
   );
 }
@@ -505,7 +566,7 @@ function StatusBadge({ status }: { status: TaskStatus }) {
   const map: Record<TaskStatus, { label: string; bg: string; text: string }> = {
     open: { label: "مفتوحة", bg: "#E5E7EB", text: "#2F2F2F" },
     in_progress: { label: "قيد التنفيذ", bg: "#F3F1ED", text: "#2F2F2F" },
-    pending_approval: { label: "بانتظار الاعتماد", bg: "#60778E", text: "#FFFFFF" },
+    pending_approval: { label: "بانتظار الاعتماد", bg: "#7895B2", text: "#FFFFFF" },
     approved: { label: "معتمدة", bg: "#8FA36A", text: "#FFFFFF" },
     rejected: { label: "مرفوضة", bg: "#C86E5D", text: "#FFFFFF" },
   };
@@ -551,7 +612,7 @@ function MiniProgressRing({ value }: { value: number }) {
         cy={size / 2}
         r={r}
         fill="none"
-        stroke="#60778E"
+        stroke="#7895B2"
         strokeWidth={stroke}
         strokeDasharray={`${dash} ${c - dash}`}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
@@ -575,7 +636,12 @@ function MiniProgressRing({ value }: { value: number }) {
 function CenterModal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" onClick={onClose} aria-label="Close" />
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+        aria-label="Close"
+      />
       <div className="relative w-full max-w-[560px] bg-[#F3F1ED] rounded-[16px] shadow-2xl border border-black/10 p-5">
         {children}
       </div>
@@ -585,10 +651,6 @@ function CenterModal({ children, onClose }: { children: React.ReactNode; onClose
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
-}
-
-function formatDate(d: string) {
-  return d.slice(0, 10);
 }
 
 function formatDateTime(d: string) {
@@ -602,62 +664,71 @@ function formatDateTime(d: string) {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 }
 
-/* ---------- Mock "API" (backend OFF) ---------- */
+// Map backend status to frontend status
+const mapBackendStatus = (status: string): TaskStatus => {
+  switch (status) {
+    case "Pending": return "open";
+    case "InProgress": return "in_progress";
+    case "Completed": return "pending_approval";
+    case "Approved": return "approved";
+    case "Rejected": return "rejected";
+    default: return "open";
+  }
+};
+
+// Map backend priority
+const mapBackendPriority = (priority: string): Priority => {
+  if (priority === "Urgent") return "High";
+  return priority as Priority;
+};
+
+// Convert backend TaskResponse to frontend TaskDTO
+const mapBackendTaskToDTO = (task: TaskResponse): TaskDTO => {
+  // Create updates array from task photos if available
+  const updates: TaskUpdate[] = [];
+  if (task.photos && task.photos.length > 0) {
+    updates.push({
+      id: "completion-" + task.taskId,
+      createdAt: task.completedAt || task.startedAt || task.createdAt,
+      statusSnapshot: task.status === "Completed" || task.status === "Approved" ? "completed" : "in_progress",
+      progressPercent: task.progressPercentage || (task.status === "Approved" ? 100 : task.status === "Completed" ? 100 : 50),
+      note: task.completionNotes || task.progressNotes,
+      images: task.photos,
+      locationText: task.locationDescription,
+      gps: task.latitude && task.longitude ? { lat: task.latitude, lng: task.longitude } : undefined,
+    });
+  }
+
+  return {
+    id: task.taskId.toString(),
+    title: task.title,
+    description: task.description,
+    scheduledAt: task.scheduledAt,
+    dueDate: task.dueDate,
+    priority: mapBackendPriority(task.priority),
+    status: mapBackendStatus(task.status),
+    assignedWorkerName: task.assignedToUserName || "غير محدد",
+    zoneName: task.zoneName,
+    isTeamTask: task.isTeamTask,
+    teamName: task.teamName,
+    lastLocationText: task.locationDescription,
+    lastGps: task.latitude && task.longitude ? { lat: task.latitude, lng: task.longitude } : undefined,
+    updates: updates,
+    lastRejectReason: task.rejectionReason || (task.status === "Rejected" ? "تم رفض المهمة" : undefined),
+  };
+};
 
 async function apiGetTaskDetails(taskId: string): Promise<TaskDTO> {
-  // simulate network
-  await new Promise((r) => setTimeout(r, 250));
-
-  const base: TaskDTO = {
-    id: taskId,
-    title: "إصلاح حفرة قرب المدرسة",
-    description:
-      "يرجى معالجة الحفرة القريبة من المدرسة لتفادي الحوادث.\n\n- التأكد من سلامة المكان\n- تصوير قبل/بعد\n- إرسال تحديث بنسبة الإنجاز",
-    dueDate: "2026-01-22",
-    priority: "High",
-    status: "pending_approval",
-    assignedWorkerName: "محمد سليم",
-    zoneName: "المنطقة 2",
-    lastLocationText: "شارع المدرسة — قرب الإشارة",
-    lastGps: { lat: 31.9032, lng: 35.2091 },
-    updates: [
-      {
-        id: "u-1",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-        statusSnapshot: "in_progress",
-        progressPercent: 40,
-        note: "تم تنظيف الموقع وتجهيز المواد.",
-        images: [
-          "https://images.unsplash.com/photo-1581092919535-7146a4a42b54?auto=format&fit=crop&w=800&q=60",
-          "https://images.unsplash.com/photo-1581093588401-22d1c4b49e62?auto=format&fit=crop&w=800&q=60",
-        ],
-        locationText: "قرب المدرسة — بداية الشارع",
-        gps: { lat: 31.9030, lng: 35.2094 },
-      },
-      {
-        id: "u-2",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-        statusSnapshot: "completed",
-        progressPercent: 100,
-        note: "تمت المعالجة بالكامل وإغلاق الحفرة.",
-        images: [
-          "https://images.unsplash.com/photo-1581092334247-1c1d1e3a1a27?auto=format&fit=crop&w=800&q=60",
-        ],
-        locationText: "شارع المدرسة — قرب الإشارة",
-        gps: { lat: 31.9032, lng: 35.2091 },
-      },
-    ],
-  };
-
-  return base;
+  const task = await getTask(Number(taskId));
+  return mapBackendTaskToDTO(task);
 }
 
-async function apiApproveTask(_taskId: string) {
-  await new Promise((r) => setTimeout(r, 350));
+async function apiApproveTask(taskId: string) {
+  await approveTask(Number(taskId), "تمت الموافقة على المهمة");
   return true;
 }
 
-async function apiRejectTask(_taskId: string, _reason: string) {
-  await new Promise((r) => setTimeout(r, 350));
+async function apiRejectTask(taskId: string, reason: string) {
+  await rejectTask(Number(taskId), reason);
   return true;
 }

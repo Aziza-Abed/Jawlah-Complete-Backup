@@ -182,6 +182,51 @@ class TaskCard extends StatelessWidget {
                       ),
                     ],
                   ),
+
+                  // progress bar (show only for InProgress tasks with progress > 0)
+                  if (task.status.toLowerCase() == 'inprogress' &&
+                      task.progressPercentage > 0) ...[
+                    const SizedBox(height: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'التقدم: ${task.progressPercentage}%',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF7895B2),
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                            if (task.progressPercentage == 100)
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                size: 16,
+                                color: Color(0xFF4CAF50),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: task.progressPercentage / 100,
+                            backgroundColor: const Color(0xFF7895B2).withOpacity(0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              task.progressPercentage == 100
+                                  ? const Color(0xFF4CAF50)
+                                  : const Color(0xFF7895B2),
+                            ),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

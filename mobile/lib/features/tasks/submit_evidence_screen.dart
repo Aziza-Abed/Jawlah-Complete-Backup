@@ -434,7 +434,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // finish the task
+    // finish the task with automatic GPS location
     final taskManager = context.read<TaskManager>();
     final success = await taskManager.finishTask(
           task.taskId,
@@ -461,15 +461,41 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
       Navigator.of(context).pop();
       Navigator.of(context).pop();
     } else if (mounted) {
-      // show error
+      // show error in dialog for better readability of long messages
       final provider = context.read<TaskManager>();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            provider.errorMessage ?? 'فشل إكمال المهمة',
-            style: const TextStyle(fontFamily: 'Cairo'),
+      final errorMessage = provider.errorMessage ?? 'فشل إكمال المهمة';
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text(
+            'تنبيه',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.right,
           ),
-          backgroundColor: AppColors.error,
+          content: Text(
+            errorMessage,
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.right,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'حسناً',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }

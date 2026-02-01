@@ -4,6 +4,7 @@ export type ZoneResponse = {
   zoneId: number;
   zoneName: string;
   zoneCode: string;
+  municipalityId?: number;
   description?: string;
   centerLatitude: number;
   centerLongitude: number;
@@ -11,5 +12,8 @@ export type ZoneResponse = {
   district?: string;
   version: number;
   isActive: boolean;
+  geometryJson?: string;
+  // GeoJSON boundary for map display
+  boundaryGeoJson?: string;
   createdAt: string;
 };
