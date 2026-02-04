@@ -597,4 +597,44 @@ public class NotificationService : INotificationService
                 });
         }
     }
+
+    // Send milestone notification to worker when task progress reaches 25%, 50%, or 75%
+    public async Task SendTaskMilestoneNotificationAsync(int workerId, int taskId, string taskTitle, int milestone)
+    {
+        var user = await _users.GetByIdAsync(workerId);
+        if (user == null)
+        {
+            _logger.LogWarning("Cannot send milestone notification - Worker {WorkerId} not found", workerId);
+            return;
+        }
+
+        var title = $"🎯 تم إنجاز {milestone}% من المهمة";
+        var body = $"أحسنت! لقد أنجزت {milestone}% من المهمة \"{taskTitle}\"";
+        var data = new Dictionary<string, string>
+        {
+            { "taskId", taskId.ToString() },
+            { "type", "task_milestone" },
+            { "milestone", milestone.ToString() }
+        };
+
+        var notification = new AppNotification
+        {
+            UserId = workerId,
+            MunicipalityId = user.MunicipalityId,
+            Title = title,
+            Message = body,
+            Type = NotificationType.TaskUpdated,
+            IsRead = false,
+            IsSent = true,
+            CreatedAt = DateTime.UtcNow,
+            SentAt = DateTime.UtcNow,
+            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { taskId, milestone })
+        };
+
+        await _notifications.AddAsync(notification);
+        await _notifications.SaveChangesAsync();
+
+        await SendPushNotificationAsync(workerId, title, body, data);
+        _logger.LogInformation("Task milestone notification sent to worker {WorkerId} for task {TaskId} at {Milestone}%", workerId, taskId, milestone);
+    }
 }

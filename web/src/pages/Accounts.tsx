@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { getUsers, resetDeviceId, resetUserPassword, updateUserStatus } from "../api/users";
-import type { UserResponse } from "../types/user";
+import type { UserResponse, UserStatus } from "../types/user";
 import {
-  Users,
   Search,
-  MoreVertical,
   Smartphone,
   KeyRound,
-  Shield,
   UserCheck,
   UserX,
   Loader2,
@@ -67,7 +64,7 @@ export default function Accounts() {
     setActionLoading(userId);
     try {
       await updateUserStatus(userId, newStatus);
-      setUsers(users.map(u => u.userId === userId ? { ...u, status: newStatus as any } : u));
+      setUsers(users.map(u => u.userId === userId ? { ...u, status: newStatus as UserStatus } : u));
       setMessage({ type: "success", text: `تم ${actionText} المستخدم بنجاح` });
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {

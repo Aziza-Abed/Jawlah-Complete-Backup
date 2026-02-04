@@ -97,7 +97,7 @@ export default function AdminTasks() {
       try {
         const newTemplate = await createTaskTemplate({
             ...templateForm,
-            zoneId: templateForm.zoneId === 0 ? null : templateForm.zoneId
+            zoneId: templateForm.zoneId === 0 ? undefined : templateForm.zoneId
         });
         setTemplates([...templates, newTemplate]);
         setShowTemplateModal(false);
@@ -264,7 +264,7 @@ export default function AdminTasks() {
                   </select>
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    onChange={(e) => setStatusFilter(e.target.value as TaskStatus | "all")}
                     className="h-[52px] w-full sm:w-[150px] px-4 bg-[#F9F8F6] rounded-[18px] text-right text-[13px] font-black text-[#2F2F2F] border-0 outline-none focus:ring-4 focus:ring-[#7895B2]/10 cursor-pointer appearance-none transition-all"
                   >
                     <option value="all">كل الحالات</option>
@@ -277,7 +277,7 @@ export default function AdminTasks() {
                   </select>
                   <select
                     value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value as any)}
+                    onChange={(e) => setPriorityFilter(e.target.value as TaskPriority | "all")}
                     className="h-[52px] w-full sm:w-[150px] px-4 bg-[#F9F8F6] rounded-[18px] text-right text-[13px] font-black text-[#2F2F2F] border-0 outline-none focus:ring-4 focus:ring-[#7895B2]/10 cursor-pointer appearance-none transition-all"
                   >
                     <option value="all">الأولوية</option>
@@ -471,7 +471,7 @@ export default function AdminTasks() {
                   <label className="block text-right text-[12px] font-semibold text-[#6B7280]">التكرار</label>
                   <select
                     value={templateForm.frequency}
-                    onChange={e => setTemplateForm({...templateForm, frequency: e.target.value as any})}
+                    onChange={e => setTemplateForm({...templateForm, frequency: e.target.value})}
                     className="w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30"
                   >
                     <option value="Daily">يومي</option>

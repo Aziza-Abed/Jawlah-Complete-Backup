@@ -5,6 +5,14 @@ import "leaflet/dist/leaflet.css";
 import { Search, MapPin, Crosshair } from "lucide-react";
 import { useMunicipality } from "../../contexts/MunicipalityContext";
 
+// Nominatim search result type
+type NominatimResult = {
+  lat: string;
+  lon: string;
+  display_name: string;
+  place_id: number;
+};
+
 // Fix Leaflet default icon issue
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -120,7 +128,7 @@ export default function LocationPicker({
   };
 
   // Select a search result
-  const selectResult = (result: any) => {
+  const selectResult = (result: NominatimResult) => {
     const lat = parseFloat(result.lat);
     const lng = parseFloat(result.lon);
     setTargetZoom(18); // Zoom in close when selecting from search

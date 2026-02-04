@@ -272,8 +272,13 @@ class FirebaseMessagingService {
     }
 
     switch (notificationType?.toLowerCase()) {
+      // Task-related notifications
       case 'taskassigned':
       case 'task_assigned':
+      case 'task_updated':
+      case 'task_completed':
+      case 'task_auto_rejected':
+      case 'task_milestone':
       case 'task':
         if (taskId != null) {
           final id = int.tryParse(taskId);
@@ -285,16 +290,43 @@ class FirebaseMessagingService {
         _navigateToScreen(Routes.tasksList, null);
         break;
 
+      // Issue-related notifications - go to notifications to see details
       case 'issuereported':
       case 'issue_reported':
+      case 'issue_reviewed':
       case 'issue':
-        _navigateToScreen(Routes.reportIssue, null);
+        _navigateToScreen(Routes.notifications, null);
         break;
 
+      // Attendance notifications
       case 'attendancereminder':
       case 'attendance_reminder':
       case 'attendance':
         _navigateToScreen(Routes.attendance, null);
+        break;
+
+      // Warning notifications - go to notifications screen
+      case 'warning_issued':
+      case 'worker_warning_alert':
+        _navigateToScreen(Routes.notifications, null);
+        break;
+
+      // Battery and system alerts - go to notifications screen
+      case 'battery_low':
+      case 'system_alert':
+        _navigateToScreen(Routes.notifications, null);
+        break;
+
+      // Task extension request - go to task details if available
+      case 'task_extension_request':
+        if (taskId != null) {
+          final id = int.tryParse(taskId);
+          if (id != null) {
+            _navigateToScreen(Routes.taskDetails, id);
+            return;
+          }
+        }
+        _navigateToScreen(Routes.notifications, null);
         break;
 
       default:

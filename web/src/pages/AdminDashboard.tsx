@@ -201,7 +201,7 @@ export default function AdminDashboard() {
                         <span className="bg-white/20 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-widest">تنبيه حرج</span>
                       </div>
                       <h2 className="text-4xl font-black mb-2">{overview?.issues.unresolved || 0}</h2>
-                      <p className="text-white/80 font-bold text-[15px] mb-8">بلاغات مواطنين نشطة لم يتم إغلاقها حتى الآن.</p>
+                      <p className="text-white/80 font-bold text-[15px] mb-8">بلاغات نشطة لم يتم إغلاقها حتى الآن.</p>
                       <button 
                         onClick={() => navigate('/issues')}
                         className="w-full h-14 bg-white text-[#C86E5D] rounded-2xl font-black text-[16px] shadow-lg hover:shadow-2xl transition-all hover:-translate-y-1"
@@ -254,7 +254,7 @@ export default function AdminDashboard() {
 
 /* -------- Helper UI Components -------- */
 
-function StatCard({ label, value, icon: Icon, color, trend }: any) {
+function StatCard({ label, value, icon: Icon, color, trend }: { label: string; value: number | string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>; color: string; trend: string }) {
   return (
     <div className="bg-white rounded-[24px] p-6 shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-black/5 flex items-center justify-between group hover:border-[#7895B2]/30 transition-all">
       <div className="text-right">
@@ -272,7 +272,7 @@ function StatCard({ label, value, icon: Icon, color, trend }: any) {
   );
 }
 
-function DetailRow({ label, value, color }: any) {
+function DetailRow({ label, value, color }: { label: string; value: number | string; color: string }) {
   return (
     <div className="flex items-center justify-between">
        <div className="flex items-center gap-3">
@@ -284,7 +284,7 @@ function DetailRow({ label, value, color }: any) {
   );
 }
 
-function TaskProgressRow({ label, value, total, color }: any) {
+function TaskProgressRow({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
   const percent = Math.min(100, Math.round((value / total) * 100));
   return (
     <div className="space-y-3">
@@ -299,7 +299,7 @@ function TaskProgressRow({ label, value, total, color }: any) {
   );
 }
 
-function ManagerAction({ icon: Icon, label, onClick }: any) {
+function ManagerAction({ icon: Icon, label, onClick }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; onClick: () => void }) {
   return (
     <button 
       onClick={onClick}

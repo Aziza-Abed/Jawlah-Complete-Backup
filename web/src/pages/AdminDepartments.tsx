@@ -105,10 +105,11 @@ export default function AdminDepartments() {
       }
       closeModal();
       fetchDepartments();
-    } catch (err: any) {
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "فشل حفظ القسم",
+        text: axiosErr.response?.data?.message || "فشل حفظ القسم",
       });
     } finally {
       setSaving(false);
@@ -124,10 +125,11 @@ export default function AdminDepartments() {
         text: dept.isActive ? "تم تعطيل القسم" : "تم تفعيل القسم",
       });
       fetchDepartments();
-    } catch (err: any) {
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "فشل تحديث حالة القسم",
+        text: axiosErr.response?.data?.message || "فشل تحديث حالة القسم",
       });
     }
     setTimeout(() => setMessage(null), 3000);
@@ -141,10 +143,11 @@ export default function AdminDepartments() {
       setMessage({ type: "success", text: "تم حذف القسم بنجاح" });
       setDeleteConfirm(null);
       fetchDepartments();
-    } catch (err: any) {
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "فشل حذف القسم",
+        text: axiosErr.response?.data?.message || "فشل حذف القسم",
       });
     } finally {
       setDeleting(false);

@@ -36,7 +36,7 @@ type FromIssue = {
 
 export default function CreateTask() {
   const location = useLocation();
-  const fromIssue = (location.state as any)?.fromIssue as FromIssue | undefined;
+  const fromIssue = (location.state as { fromIssue?: FromIssue } | null)?.fromIssue;
 
   const [employees, setEmployees] = useState<UserResponse[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);

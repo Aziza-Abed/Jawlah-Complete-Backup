@@ -6,7 +6,7 @@ export default function ResetPassword() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const phone = (location.state as any)?.phone as string | undefined;
+  const phone = (location.state as { phone?: string } | null)?.phone;
 
   const [newPass, setNewPass] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -100,7 +100,7 @@ export default function ResetPassword() {
         <button
           type="submit"
           disabled={loading || !canSubmit}
-          className="w-full h-[52px] rounded-[12px] bg-[#60778E] text-white font-sans font-semibold text-[16px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 disabled:opacity-50"
+          className="w-full h-[52px] rounded-[12px] bg-[#7895B2] text-white font-sans font-semibold text-[16px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 disabled:opacity-50"
         >
           {loading ? "جاري الحفظ..." : "حفظ كلمة المرور"}
         </button>
@@ -108,7 +108,7 @@ export default function ResetPassword() {
         <div className="flex items-center justify-between text-[13px]">
           <Link
             to="/login"
-            className="text-[#60778E] font-sans font-semibold hover:opacity-80"
+            className="text-[#7895B2] font-sans font-semibold hover:opacity-80"
           >
             رجوع لتسجيل الدخول
           </Link>

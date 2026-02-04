@@ -87,7 +87,7 @@ class SyncService {
   }) async {
     AppException? lastError;
 
-    // retry loop try request up to maxRetries times
+    // retry loop try request up to maxRetries times with exponential backoff
     for (int attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await request();
@@ -100,8 +100,12 @@ class SyncService {
         }
 
         if (attempt < maxRetries - 1) {
-          // wait 3 seconds before retry
-          await Future.delayed(Duration(seconds: 3));
+          // Exponential backoff: 2s, 4s, 8s
+          final delay = Duration(seconds: 2 << attempt);
+          if (kDebugMode) {
+            debugPrint('Sync retry attempt ${attempt + 1}, waiting ${delay.inSeconds}s');
+          }
+          await Future.delayed(delay);
         }
       }
     }

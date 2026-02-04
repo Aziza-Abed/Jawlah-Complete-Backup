@@ -23,4 +23,7 @@ public interface INotificationService
 
     // Task extension request notification
     Task SendTaskExtensionRequestAsync(int supervisorId, int taskId, string taskTitle, DateTime originalDeadline, DateTime requestedDeadline);
+
+    // Task milestone notification (25%, 50%, 75% progress)
+    Task SendTaskMilestoneNotificationAsync(int workerId, int taskId, string taskTitle, int milestone);
 }

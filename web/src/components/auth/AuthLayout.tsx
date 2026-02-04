@@ -56,12 +56,12 @@ export default function AuthLayout({
       <div className="w-full max-w-[980px] grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Info Slider */}
         <div className="hidden lg:flex bg-gradient-to-tr from-[#5a7a9a] to-[#7895B2] rounded-[24px] p-10 text-right shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/10 flex-col">
-          <div className="flex items-center justify-end gap-4">
+          <div className="flex items-center gap-4">
+            <img src={logo} alt="Logo" className="w-[72px] h-[72px] object-contain" />
             <div className="text-white">
               <div className="text-[22px] font-sans font-semibold">{current.title}</div>
               <div className="text-[14px] text-white/80 mt-1">{current.subtitle}</div>
             </div>
-            <img src={logo} alt="Logo" className="w-[72px] h-[72px] object-contain" />
           </div>
 
           <div className="mt-10 text-white/90 text-[15px] leading-relaxed">

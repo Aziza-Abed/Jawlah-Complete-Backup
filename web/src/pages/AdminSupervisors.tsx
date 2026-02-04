@@ -511,7 +511,7 @@ export default function AdminSupervisors() {
   );
 }
 
-function SummaryCard({ icon: Icon, label, value, subtext, color }: any) {
+function SummaryCard({ icon: Icon, label, value, subtext, color }: { icon: React.ComponentType<{ size?: number }>; label: string; value: number | string | undefined; subtext: string; color: string }) {
   return (
     <div className="bg-white rounded-[24px] p-6 shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-black/5 flex flex-col items-center text-center">
       <div className="w-12 h-12 rounded-[16px] flex items-center justify-center bg-[#F9F8F6] text-[#7895B2] mb-4 shadow-sm border border-black/5" style={{ color: color }}>
@@ -524,7 +524,7 @@ function SummaryCard({ icon: Icon, label, value, subtext, color }: any) {
   );
 }
 
-function DetailStatCard({ icon: Icon, label, value, color, bgColor }: any) {
+function DetailStatCard({ icon: Icon, label, value, color, bgColor }: { icon: React.ComponentType<{ size?: number }>; label: string; value: number | string | undefined; color: string; bgColor: string }) {
   return (
     <div className={`${bgColor} rounded-[24px] p-5 border border-black/5 flex flex-col items-center text-center`}>
       <div className="w-10 h-10 rounded-[14px] bg-white flex items-center justify-center mb-3 shadow-sm" style={{ color: color }}>

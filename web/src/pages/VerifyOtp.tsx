@@ -11,7 +11,7 @@ const OTP_LEN = 6;
 export default function VerifyOtp() {
   const navigate = useNavigate();
   const location = useLocation();
-  const phone = (location.state as any)?.phone as string | undefined;
+  const phone = (location.state as { phone?: string } | null)?.phone;
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -116,7 +116,7 @@ export default function VerifyOtp() {
         <button
           type="submit"
           disabled={loading || !otpValid}
-          className="w-full h-[52px] rounded-[12px] bg-[#60778E] text-white font-sans font-semibold text-[16px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 disabled:opacity-50"
+          className="w-full h-[52px] rounded-[12px] bg-[#7895B2] text-white font-sans font-semibold text-[16px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 disabled:opacity-50"
         >
           {loading ? "جاري التحقق..." : "تحقق"}
         </button>
@@ -126,14 +126,14 @@ export default function VerifyOtp() {
             type="button"
             onClick={onResend}
             disabled={loading || !phone}
-            className="text-[#60778E] font-sans font-semibold hover:opacity-80 disabled:opacity-50"
+            className="text-[#7895B2] font-sans font-semibold hover:opacity-80 disabled:opacity-50"
           >
             إعادة إرسال الرمز
           </button>
 
           <Link
             to="/forgot-password"
-            className="text-[#60778E] font-sans font-semibold hover:opacity-80"
+            className="text-[#7895B2] font-sans font-semibold hover:opacity-80"
           >
             رجوع
           </Link>

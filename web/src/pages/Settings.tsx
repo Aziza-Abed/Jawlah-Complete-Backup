@@ -134,10 +134,11 @@ export default function Settings() {
       });
       setMessage({ type: "success", text: "تم تغيير كلمة المرور بنجاح" });
       setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
-    } catch (err: any) {
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
       setMessage({
         type: "error",
-        text: err.response?.data?.message || "فشل تغيير كلمة المرور. يرجى التأكد من كلمة المرور القديمة.",
+        text: axiosErr.response?.data?.message || "فشل تغيير كلمة المرور. يرجى التأكد من كلمة المرور القديمة.",
       });
     } finally {
       setSaving(false);
@@ -170,23 +171,26 @@ export default function Settings() {
             </div>
 
             <div className="grid gap-4">
-              <NotificationToggle 
-                title="إشعارات المهام الجديدة" 
-                description="تلقي إشعار فوري عند إسناد مهام ميدانية جديدة لك" 
+              <NotificationToggle
+                title="إشعارات المهام الجديدة"
+                description="تلقي إشعار فوري عند إسناد مهام ميدانية جديدة لك"
+                storageKey="new_tasks"
               />
-              <NotificationToggle 
-                title="تذكير بدء الدوام" 
-                description="تنبيه ذكي قبل موعد بدء العمل بـ 15 دقيقة" 
+              <NotificationToggle
+                title="تذكير بدء الدوام"
+                description="تنبيه ذكي قبل موعد بدء العمل بـ 15 دقيقة"
+                storageKey="work_reminder"
               />
-              <NotificationToggle 
-                title="إشعارات البلاغات" 
-                description="تلقي إشعارات عند تحديث حالة البلاغات التي تتابعها" 
+              <NotificationToggle
+                title="إشعارات البلاغات"
+                description="تلقي إشعارات عند تحديث حالة البلاغات التي تتابعها"
+                storageKey="issues"
               />
 
-              <div className="bg-[#F9F8F6] p-4 rounded-xl border border-black/5 mt-4">
-                 <p className="text-[11px] text-[#AFAFAF] text-right font-black leading-relaxed">
-                   <AlertCircle size={12} className="inline ml-1 opacity-50" />
-                   ملاحظة هامة: هذه الإعدادات تُحفظ محلياً على متصفحك الحالي فقط لضمان سرعة الوصول.
+              <div className="bg-[#8FA36A]/10 p-4 rounded-xl border border-[#8FA36A]/20 mt-4">
+                 <p className="text-[11px] text-[#8FA36A] text-right font-black leading-relaxed">
+                   <CheckCircle size={12} className="inline ml-1" />
+                   يتم حفظ إعدادات الإشعارات تلقائياً على هذا الجهاز.
                  </p>
               </div>
             </div>
@@ -470,7 +474,7 @@ export default function Settings() {
                       }`}
                     >
                       <div className={`p-2 rounded-lg ${activeTab === tab.id ? 'bg-white/20' : 'bg-[#F3F1ED]'}`}>
-                        {React.cloneElement(tab.icon as any, { size: 20 })}
+                        {React.cloneElement(tab.icon as React.ReactElement<{ size?: number }>, { size: 20 })}
                       </div>
                       <span className="font-black text-[15px]">{tab.label}</span>
                     </button>
@@ -485,7 +489,17 @@ export default function Settings() {
   );
 }
 
-function NotificationToggle({ title, description }: { title: string; description: string }) {
+function NotificationToggle({ title, description, storageKey }: { title: string; description: string; storageKey: string }) {
+  const [enabled, setEnabled] = React.useState(() => {
+    const saved = localStorage.getItem(`notification_${storageKey}`);
+    return saved !== null ? saved === "true" : true; // Default to enabled
+  });
+
+  const handleChange = (checked: boolean) => {
+    setEnabled(checked);
+    localStorage.setItem(`notification_${storageKey}`, String(checked));
+  };
+
   return (
     <div className="flex items-center justify-between p-5 bg-[#F9F8F6] rounded-[20px] border border-black/5 hover:border-[#7895B2]/30 transition-all">
       <div className="text-right">
@@ -493,7 +507,12 @@ function NotificationToggle({ title, description }: { title: string; description
         <span className="text-[12px] font-bold text-[#AFAFAF]">{description}</span>
       </div>
       <label className="relative inline-flex items-center cursor-pointer">
-        <input type="checkbox" defaultChecked className="sr-only peer" />
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => handleChange(e.target.checked)}
+          className="sr-only peer"
+        />
         <div className="w-12 h-6 bg-[#E5E7EB] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-[#E5E7EB] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7895B2] shadow-inner"></div>
       </label>
     </div>

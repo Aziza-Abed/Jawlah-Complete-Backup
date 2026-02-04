@@ -47,10 +47,11 @@ export default function Profile() {
       
       // Clear success message after 3 seconds
       setTimeout(() => setMessage(null), 3000);
-    } catch (err: any) {
-      setMessage({ 
-        type: "error", 
-        text: err.response?.data?.message || "فشل تحديث الملف الشخصي" 
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setMessage({
+        type: "error",
+        text: axiosErr.response?.data?.message || "فشل تحديث الملف الشخصي"
       });
     } finally {
       setSaving(false);

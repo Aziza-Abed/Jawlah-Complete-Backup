@@ -1207,6 +1207,9 @@ public class TasksController : BaseApiController
             }
         }
 
+        // Store old progress BEFORE updating for milestone check
+        var oldProgress = task.ProgressPercentage;
+
         // update progress
         task.ProgressPercentage = request.ProgressPercentage;
         task.ProgressNotes = InputSanitizer.SanitizeString(request.ProgressNotes, 1000);
@@ -1228,6 +1231,20 @@ public class TasksController : BaseApiController
                     task.Title,
                     task.DueDate ?? DateTime.UtcNow,
                     request.ExtendedDeadline.Value);
+            }
+        }
+
+        // Check for milestone notifications (25%, 50%, 75%)
+        int[] milestones = { 25, 50, 75 };
+        foreach (var milestone in milestones)
+        {
+            // Send notification if we crossed this milestone
+            if (oldProgress < milestone && request.ProgressPercentage >= milestone)
+            {
+                // Get worker ID (assigned user)
+                var workerId = task.AssignedToUserId;
+                await _notifications.SendTaskMilestoneNotificationAsync(
+                    workerId, task.TaskId, task.Title, milestone);
             }
         }
 

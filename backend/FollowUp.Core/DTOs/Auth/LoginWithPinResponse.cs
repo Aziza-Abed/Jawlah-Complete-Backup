@@ -1,6 +1,7 @@
-using Jawlah.Core.DTOs.Attendance;
+using FollowUp.Core.DTOs.Attendance;
+using FollowUp.Core.DTOs.Users;
 
-namespace Jawlah.Core.DTOs.Auth;
+namespace FollowUp.Core.DTOs.Auth;
 
 // response for PIN-based login with optional auto check-in
 // If location was provided, includes check-in result and lateness info

@@ -207,7 +207,7 @@ export default function Reports() {
   }, [tab, applied]);
 
   const view = useMemo<ViewModel>(() => {
-    // Use API data if available, otherwise fallback to mock
+    // Use API data - show empty state if no data
     if (tab === "tasks" && tasksData) {
       return buildViewFromTasksApi(tasksData, applied, lastUpdated);
     }
@@ -217,7 +217,8 @@ export default function Reports() {
     if (tab === "zones" && zonesData) {
       return buildViewFromZonesApi(zonesData, applied, lastUpdated);
     }
-    return buildMockView(tab, applied, lastUpdated);
+    // Return empty view structure when no data
+    return buildEmptyView(tab, applied, lastUpdated);
   }, [tab, applied, lastUpdated, tasksData, workersData, zonesData]);
 
   const [exporting, setExporting] = useState(false);
@@ -1075,44 +1076,23 @@ function buildViewFromZonesApi(data: ZonesReportData, _f: FiltersDraft, lastUpda
   };
 }
 
-/* ---------- Mock Builder ---------- */
+/* ---------- Empty View Builder ---------- */
 
-function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewModel {
+function buildEmptyView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewModel {
   const labels = buildLabelsForPeriod(f.period);
+  const emptyPoints = labels.map((label) => ({ label, a: 0, b: 0, c: 0 }));
 
   if (tab === "tasks") {
-    const points: SeriesPoint[] = labels.map((label, i) => ({
-      label,
-      a: i % 4 === 0 ? 18 : 28 + (i % 5) * 3,
-      b: i % 3 === 0 ? 12 : 18 + (i % 4) * 2,
-      c: i % 6 === 0 ? 6 : 8 + (i % 3),
-    }));
-
-    const rows: TaskRow[] = [
-      { id: "1", title: "تنظيف شارع", worker: "محمد", zone: "المنطقة 2", status: "مكتملة", priority: "متوسطة", dueDate: "2026-01-18", time: "09:15" },
-      { id: "2", title: "إصلاح حفرة", worker: "أحمد", zone: "المنطقة 1", status: "نشطة", priority: "عالية", dueDate: "2026-01-18", time: "10:00" },
-      { id: "3", title: "رفع نفايات", worker: "كمال", zone: "المنطقة 3", status: "معلقة", priority: "منخفضة", dueDate: "2026-01-19", time: "11:00" },
-      { id: "4", title: "تنظيف دوار", worker: "نعيم", zone: "المنطقة 4", status: "مفتوحة", priority: "متوسطة", dueDate: "2026-01-20", time: "12:00" },
-      { id: "5", title: "تنظيف شارع", worker: "سامر", zone: "المنطقة 4", status: "مكتملة", priority: "عالية", dueDate: "2026-01-20", time: "01:00" },
-    ].filter((r) => {
-      if (f.status === "all") return true;
-      if (f.status === "closed") return r.status === "مكتملة";
-      if (f.status === "in_progress") return r.status === "نشطة";
-      if (f.status === "pending") return r.status === "معلقة";
-      if (f.status === "open") return r.status === "مفتوحة";
-      return true;
-    });
-
     return {
       tab: "tasks",
       title: "تقرير المهام",
       lastUpdated,
-      filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
+      filtersNote: "لا توجد بيانات للفترة المحددة",
       kpis: [
-        { title: "إجمالي المهام", value: "33", icon: "check", color: palette.blue },
-        { title: "معدل الإنجاز", value: "78%", icon: "speed", color: palette.green },
-        { title: "مهام معلقة", value: "3", icon: "alert", color: palette.red },
-        { title: "العمال النشطين", value: "28 / 35", icon: "users", color: palette.purple },
+        { title: "إجمالي المهام", value: "0", icon: "check", color: palette.blue },
+        { title: "معدل الإنجاز", value: "0%", icon: "speed", color: palette.green },
+        { title: "مهام معلقة", value: "0", icon: "alert", color: palette.red },
+        { title: "العمال النشطين", value: "0 / 0", icon: "users", color: palette.purple },
       ],
       chart1: {
         title: "أداء المهام حسب الفترة",
@@ -1121,57 +1101,35 @@ function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewM
           { label: "نشطة", color: palette.blue },
           { label: "معلقة", color: palette.red },
         ],
-        points,
+        points: emptyPoints,
       },
       chart2: {
         title: "توزيع حالة المهام",
         parts: [
-          { label: "مكتملة", value: 60, color: palette.green },
-          { label: "نشطة", value: 30, color: palette.blue },
-          { label: "معلقة", value: 10, color: palette.red },
+          { label: "مكتملة", value: 0, color: palette.green },
+          { label: "نشطة", value: 0, color: palette.blue },
+          { label: "معلقة", value: 0, color: palette.red },
         ],
       },
       table: {
         title: "جدول المهام التفصيلي",
         columns: ["#", "المهمة", "العامل", "المنطقة", "الحالة", "الأولوية", "الموعد", "الوقت"],
-        rows,
+        rows: [],
       },
     };
   }
 
   if (tab === "workers") {
-    const points: SeriesPoint[] = labels.map((label, i) => ({
-      label,
-      a: 24 + (i % 4) * 2, // حضور
-      b: i % 6 === 0 ? 10 : 6 + (i % 3), // غياب
-    }));
-
-    const topWorkload = [
-      { label: "محمد أحمد", value: 9, color: palette.blue },
-      { label: "أبو عمار", value: 8, color: palette.blue },
-      { label: "محمود", value: 7, color: palette.blue },
-      { label: "أحمد", value: 6, color: palette.blue },
-      { label: "سامر", value: 5, color: palette.blue },
-    ];
-
-    const rows: WorkerRow[] = [
-      { id: "w1", name: "محمد أحمد", presence: "حضور", lastSeen: "10:45", activeTasks: 3, doneTasks: 6 },
-      { id: "w2", name: "أبو عمار", presence: "حضور", lastSeen: "10:40", activeTasks: 4, doneTasks: 4 },
-      { id: "w3", name: "أحمد", presence: "غياب", lastSeen: "—", activeTasks: 0, doneTasks: 3 },
-      { id: "w4", name: "محمود", presence: "حضور", lastSeen: "10:50", activeTasks: 2, doneTasks: 5 },
-      { id: "w5", name: "سامر", presence: "حضور", lastSeen: "10:20", activeTasks: 1, doneTasks: 2 },
-    ];
-
     return {
       tab: "workers",
       title: "تقرير العمال",
       lastUpdated,
-      filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
+      filtersNote: "لا توجد بيانات للفترة المحددة",
       kpis: [
-        { title: "إجمالي العمال", value: "35", icon: "users", color: palette.blue },
-        { title: "الحضور", value: "28", icon: "check", color: palette.green },
-        { title: "الغياب", value: "7", icon: "alert", color: palette.red },
-        { title: "الالتزام", value: "80%", icon: "speed", color: palette.purple },
+        { title: "إجمالي العمال", value: "0", icon: "users", color: palette.blue },
+        { title: "الحضور", value: "0", icon: "check", color: palette.green },
+        { title: "الغياب", value: "0", icon: "alert", color: palette.red },
+        { title: "الالتزام", value: "0%", icon: "speed", color: palette.purple },
       ],
       chart1: {
         title: "حضور / غياب العمال حسب الفترة",
@@ -1179,63 +1137,47 @@ function buildMockView(tab: TabKey, f: FiltersDraft, lastUpdated: string): ViewM
           { label: "حضور", color: palette.green },
           { label: "غياب", color: palette.red },
         ],
-        points: points.map((p) => ({ label: p.label, a: p.a, b: p.b })),
+        points: emptyPoints.map((p) => ({ label: p.label, a: 0, b: 0 })),
       },
       chart2: {
         title: "أعلى 5 عمّال إنتاجية",
-        items: topWorkload,
+        items: [{ label: "لا توجد بيانات", value: 0, color: palette.gray }],
       },
       table: {
         title: "سجل دوام وأداء العمال",
         columns: ["العامل", "الحالة", "آخر ظهور", "مهام فعّالة", "مهام منجزة"],
-        rows,
+        rows: [],
       },
     };
   }
-
-  const topZones = [
-    { label: "المنطقة 4", value: 18, color: palette.blue },
-    { label: "المنطقة 2", value: 14, color: palette.blue },
-    { label: "المنطقة 1", value: 12, color: palette.blue },
-    { label: "المنطقة 3", value: 10, color: palette.blue },
-    { label: "المنطقة 5", value: 8, color: palette.blue },
-  ];
-
-  const rows: ZoneRow[] = [
-    { id: "z1", zone: "المنطقة 1", total: 12, done: 7, inProgress: 3, delayed: 2, rate: "58%", updatedAt: "10:30" },
-    { id: "z2", zone: "المنطقة 2", total: 14, done: 9, inProgress: 4, delayed: 1, rate: "64%", updatedAt: "10:25" },
-    { id: "z3", zone: "المنطقة 3", total: 10, done: 6, inProgress: 3, delayed: 1, rate: "60%", updatedAt: "10:10" },
-    { id: "z4", zone: "المنطقة 4", total: 18, done: 10, inProgress: 6, delayed: 2, rate: "56%", updatedAt: "10:40" },
-    { id: "z5", zone: "المنطقة 5", total: 8, done: 5, inProgress: 2, delayed: 1, rate: "62%", updatedAt: "09:55" },
-  ];
 
   return {
     tab: "zones",
     title: "تقرير المناطق",
     lastUpdated,
-    filtersNote: "سيتم تنزيل التقرير حسب الفلاتر الحالية",
+    filtersNote: "لا توجد بيانات للفترة المحددة",
     kpis: [
-      { title: "عدد المناطق", value: "12", icon: "users", color: palette.blue },
-      { title: "أعلى ضغط", value: "المنطقة 4", icon: "alert", color: palette.gray },
-      { title: "معدل الإنجاز", value: "61%", icon: "speed", color: palette.green },
-      { title: "بلاغات/تأخير", value: "7", icon: "check", color: palette.purple },
+      { title: "عدد المناطق", value: "0", icon: "users", color: palette.blue },
+      { title: "أعلى ضغط", value: "—", icon: "alert", color: palette.gray },
+      { title: "معدل الإنجاز", value: "0%", icon: "speed", color: palette.green },
+      { title: "بلاغات/تأخير", value: "0", icon: "check", color: palette.purple },
     ],
     chart1: {
       title: "المناطق الأكثر نشاطاً",
-      items: topZones,
+      items: [{ label: "لا توجد بيانات", value: 0, color: palette.gray }],
     },
     chart2: {
       title: "توزيع حالة المناطق",
       parts: [
-        { label: "منجزة", value: 62, color: palette.green },
-        { label: "قيد التنفيذ", value: 28, color: palette.blue },
-        { label: "متأخرة", value: 10, color: palette.red },
+        { label: "منجزة", value: 0, color: palette.green },
+        { label: "قيد التنفيذ", value: 0, color: palette.blue },
+        { label: "متأخرة", value: 0, color: palette.red },
       ],
     },
     table: {
       title: "أداء المناطق التفصيلي",
       columns: ["المنطقة", "الإجمالي", "منجزة", "قيد التنفيذ", "متأخرة", "الإنجاز", "آخر تحديث"],
-      rows,
+      rows: [],
     },
   };
 }

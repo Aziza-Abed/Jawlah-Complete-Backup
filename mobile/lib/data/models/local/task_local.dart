@@ -103,7 +103,7 @@ class TaskLocal extends HiveObject {
     this.progressNotes,
   });
 
-  // Convert to sync DTO for uploading completed tasks
+  // Convert to sync DTO for uploading task updates
   Map<String, dynamic> toSyncDto() {
     return {
       'taskId': taskId,
@@ -113,6 +113,8 @@ class TaskLocal extends HiveObject {
       'completedAt': completedAt?.toIso8601String(),
       'latitude': latitude,
       'longitude': longitude,
+      'progressPercentage': progressPercentage,
+      'progressNotes': progressNotes,
     };
   }
 }

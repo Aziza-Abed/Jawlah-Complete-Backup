@@ -1,5 +1,4 @@
 using FollowUp.Core.Entities;
-using Task = System.Threading.Tasks.Task;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;

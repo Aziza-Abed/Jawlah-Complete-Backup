@@ -8,6 +8,7 @@ using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using FollowUp.Infrastructure.Data;
+using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,7 @@ public class UsersController : BaseApiController
     private readonly INotificationService _notifications;
     private readonly ILogger<UsersController> _logger;
     private readonly IMapper _mapper;
+    private readonly AuditLogService _audit;
 
     // battery threshold for low battery warning
     private const int LowBatteryThreshold = 20;
@@ -38,7 +40,8 @@ public class UsersController : BaseApiController
         IAuthService auth,
         INotificationService notifications,
         ILogger<UsersController> logger,
-        IMapper mapper)
+        IMapper mapper,
+        AuditLogService audit)
     {
         _users = users;
         _zones = zones;
@@ -47,6 +50,7 @@ public class UsersController : BaseApiController
         _notifications = notifications;
         _logger = logger;
         _mapper = mapper;
+        _audit = audit;
     }
 
     // get all users with pagination
@@ -857,16 +861,24 @@ public class UsersController : BaseApiController
 
         await _context.SaveChangesAsync();
 
+        // Get current user info for audit log
+        var currentUserId = GetCurrentUserId();
+        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = Request.Headers.UserAgent.ToString();
+
+        // Create audit log entry for worker transfer (TC-12 requirement)
+        await _audit.LogAsync(
+            currentUserId,
+            currentUser?.Username,
+            "WorkerTransfer",
+            $"نقل {workers.Count} عامل من {oldSupervisor.FullName} إلى {newSupervisor.FullName}",
+            ipAddress,
+            userAgent);
+
         _logger.LogInformation(
             "Admin transferred {WorkerCount} workers from supervisor {OldSupervisorId} to supervisor {NewSupervisorId}",
             workers.Count, oldSupervisorId, request.NewSupervisorId);
-
-        // TODO: Notify new supervisor about new workers
-        // Enhancement: Add SendWorkerTransferNotificationAsync to INotificationService
-        // await _notifications.SendWorkerTransferNotificationAsync(...)
-        _logger.LogInformation(
-            "Workers transferred successfully. New supervisor {NewSupervisorName} should be notified about {WorkerCount} new workers",
-            newSupervisor.FullName, workers.Count);
 
         return Ok(ApiResponse<object>.SuccessResponse(new
         {

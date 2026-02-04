@@ -66,9 +66,17 @@ export async function deleteTeam(id: number): Promise<void> {
   await apiClient.delete(`/teams/${id}`);
 }
 
+// Team member interface
+export interface TeamMember {
+  userId: number;
+  fullName: string;
+  username: string;
+  isTeamLeader?: boolean;
+}
+
 // Get team members
-export async function getTeamMembers(teamId: number): Promise<any[]> {
-  const response = await apiClient.get<{ data: any[] }>(`/teams/${teamId}/members`);
+export async function getTeamMembers(teamId: number): Promise<TeamMember[]> {
+  const response = await apiClient.get<{ data: TeamMember[] }>(`/teams/${teamId}/members`);
   return response.data.data;
 }
 

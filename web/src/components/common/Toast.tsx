@@ -77,8 +77,8 @@ export function ToastContainer() {
       setToasts((prev) => [...prev, { id, ...event.detail }]);
     };
 
-    window.addEventListener("show-toast" as any, handleToast);
-    return () => window.removeEventListener("show-toast" as any, handleToast);
+    window.addEventListener("show-toast", handleToast as EventListener);
+    return () => window.removeEventListener("show-toast", handleToast as EventListener);
   }, []);
 
   const removeToast = (id: string) => {

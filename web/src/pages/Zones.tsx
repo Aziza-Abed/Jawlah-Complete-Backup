@@ -118,7 +118,7 @@ export default function Zones() {
           lng: w.longitude,
           status: w.isOnline ? "online" : "offline",
           timestamp: w.timestamp,
-          zoneName: (w as any).zoneName || "غير محدد",
+          zoneName: w.zoneName || "غير محدد",
           batteryLevel: userInfo?.lastBatteryLevel,
           isLowBattery: userInfo?.isLowBattery,
           accuracy: w.accuracy,

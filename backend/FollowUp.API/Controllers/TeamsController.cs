@@ -188,6 +188,14 @@ public class TeamsController : BaseApiController
             {
                 return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق يجب أن يكون عامل"));
             }
+
+            // Check team leader uniqueness - a worker can only lead ONE team
+            var existingLeadership = await _context.Teams
+                .AnyAsync(t => t.TeamLeaderId == request.TeamLeaderId.Value);
+            if (existingLeadership)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResponse("هذا العامل قائد لفريق آخر بالفعل"));
+            }
         }
 
         var team = new Core.Entities.Team
@@ -278,6 +286,15 @@ public class TeamsController : BaseApiController
             if (teamLeader.Role != Core.Enums.UserRole.Worker)
             {
                 return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق يجب أن يكون عامل"));
+            }
+
+            // Check team leader uniqueness - a worker can only lead ONE team
+            // Exclude current team from check (allow keeping same leader)
+            var existingLeadership = await _context.Teams
+                .AnyAsync(t => t.TeamLeaderId == request.TeamLeaderId.Value && t.TeamId != id);
+            if (existingLeadership)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResponse("هذا العامل قائد لفريق آخر بالفعل"));
             }
         }
 

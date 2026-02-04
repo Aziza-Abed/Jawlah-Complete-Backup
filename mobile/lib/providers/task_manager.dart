@@ -23,6 +23,12 @@ class TaskManager extends BaseController {
   String? filterStatus;
   String? filterPriority;
 
+  // Track last progress update time per task for rate limiting (5-min interval)
+  final Map<int, DateTime> _lastProgressUpdateTime = {};
+
+  // Track which milestones have been notified per task
+  final Map<int, Set<int>> _notifiedMilestones = {};
+
   // pagination stuff
   int _currentPage = 1;
   final int _pageSize = 100;
@@ -490,8 +496,23 @@ class TaskManager extends BaseController {
   }
 
   // update task progress (for multi-day tasks)
-  Future<void> updateTaskProgress(int taskId, int progressPercentage) async {
-    await executeWithErrorHandling(() async {
+  // Rate limited to once every 5 minutes per task
+  Future<bool> updateTaskProgress(int taskId, int progressPercentage) async {
+    // Check rate limit - 5 minutes between updates
+    final lastUpdate = _lastProgressUpdateTime[taskId];
+    if (lastUpdate != null) {
+      final timeSinceLastUpdate = DateTime.now().difference(lastUpdate);
+      if (timeSinceLastUpdate.inMinutes < 5) {
+        final remainingMinutes = 5 - timeSinceLastUpdate.inMinutes;
+        setError('يرجى الانتظار $remainingMinutes دقائق قبل تحديث التقدم مرة أخرى');
+        return false;
+      }
+    }
+
+    // Get old progress before update for milestone check
+    final oldProgress = getTaskById(taskId)?.progressPercentage ?? 0;
+
+    final result = await executeWithErrorHandling(() async {
       // call API to update progress
       final updated = await _tasksService.updateTaskProgress(
         taskId,
@@ -499,6 +520,9 @@ class TaskManager extends BaseController {
       );
 
       if (updated != null) {
+        // Record update time for rate limiting
+        _lastProgressUpdateTime[taskId] = DateTime.now();
+
         // update in myTasks list
         final index = myTasks.indexWhere((t) => t.taskId == taskId);
         if (index != -1) {
@@ -510,11 +534,102 @@ class TaskManager extends BaseController {
           currentTask = updated;
         }
 
+        // Check for milestone notifications (25%, 50%, 75%)
+        _checkMilestoneNotification(taskId, oldProgress, progressPercentage);
+
         notifyListeners();
         return true;
       }
 
       throw ValidationException('فشل تحديث التقدم');
     });
+
+    // If API call failed, save offline
+    if (result == null || result == false) {
+      return await _saveProgressOffline(taskId, progressPercentage, oldProgress);
+    }
+
+    return result;
+  }
+
+  // save progress update when offline
+  Future<bool> _saveProgressOffline(int taskId, int progressPercentage, int oldProgress) async {
+    final task = getTaskById(taskId);
+    if (task == null) return false;
+
+    try {
+      // update task locally
+      final updatedTask = task.copyWith(
+        progressPercentage: progressPercentage,
+        updatedAt: DateTime.now(),
+      );
+
+      // save to local db
+      final taskLocal = updatedTask.toLocal();
+      taskLocal.isSynced = false;
+      await _taskLocalRepo.saveTask(taskLocal);
+
+      // Record update time for rate limiting
+      _lastProgressUpdateTime[taskId] = DateTime.now();
+
+      // tell sync manager to sync later
+      await _syncManager?.newDataAdded();
+
+      // update in memory
+      updateMyTaskInList(updatedTask);
+
+      // Check for milestone notifications
+      _checkMilestoneNotification(taskId, oldProgress, progressPercentage);
+
+      clearError();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('offline progress save failed: $e');
+      return false;
+    }
+  }
+
+  // Check if progress crossed a milestone and trigger notification
+  void _checkMilestoneNotification(int taskId, int oldProgress, int newProgress) {
+    const milestones = [25, 50, 75];
+
+    // Initialize milestone tracking for this task if needed
+    _notifiedMilestones[taskId] ??= {};
+
+    for (final milestone in milestones) {
+      // Check if we just crossed this milestone
+      if (oldProgress < milestone && newProgress >= milestone) {
+        // Only notify if we haven't already for this milestone
+        if (!_notifiedMilestones[taskId]!.contains(milestone)) {
+          _notifiedMilestones[taskId]!.add(milestone);
+          _triggerMilestoneNotification(taskId, milestone);
+        }
+      }
+    }
+  }
+
+  // Trigger a local notification for milestone reached
+  void _triggerMilestoneNotification(int taskId, int milestone) {
+    final task = getTaskById(taskId);
+    final taskTitle = task?.title ?? 'المهمة';
+
+    // Log milestone reached (notification will be shown by the UI layer)
+    if (kDebugMode) {
+      debugPrint('Milestone reached: $taskTitle - $milestone%');
+    }
+
+    // Store milestone message for UI to show
+    _lastMilestoneMessage = 'تم إنجاز $milestone% من "$taskTitle"';
+    notifyListeners();
+  }
+
+  // Last milestone notification message for UI to display
+  String? _lastMilestoneMessage;
+  String? get lastMilestoneMessage => _lastMilestoneMessage;
+
+  // Clear milestone message after showing
+  void clearMilestoneMessage() {
+    _lastMilestoneMessage = null;
   }
 }

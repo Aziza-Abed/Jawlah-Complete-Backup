@@ -1,4 +1,4 @@
-namespace Jawlah.Core.Entities;
+namespace FollowUp.Core.Entities;
 
 /// <summary>
 /// One-Time Password for Two-Factor Authentication

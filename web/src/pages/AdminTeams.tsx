@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Users, Plus, Edit2, Trash2, Search, UserPlus, UserMinus, Shield } from "lucide-react";
-import { getTeams, createTeam, updateTeam, deleteTeam, getTeamMembers, addWorkerToTeam, removeWorkerFromTeam, type Team, type CreateTeamRequest, type UpdateTeamRequest } from "../api/teams";
+import { getTeams, createTeam, updateTeam, deleteTeam, getTeamMembers, addWorkerToTeam, removeWorkerFromTeam, type Team, type TeamMember, type CreateTeamRequest, type UpdateTeamRequest } from "../api/teams";
 import { getDepartments, type Department } from "../api/departments";
 import { getUsers, type User } from "../api/users";
 
@@ -14,7 +14,7 @@ export default function AdminTeams() {
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -87,8 +87,9 @@ export default function AdminTeams() {
       resetForm();
       fetchData();
       setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || "فشل في إنشاء الفريق");
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      setErrorMessage(axiosErr.response?.data?.message || "فشل في إنشاء الفريق");
       setTimeout(() => setErrorMessage(""), 5000);
     }
   };
@@ -115,8 +116,9 @@ export default function AdminTeams() {
       resetForm();
       fetchData();
       setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || "فشل في تحديث الفريق");
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      setErrorMessage(axiosErr.response?.data?.message || "فشل في تحديث الفريق");
       setTimeout(() => setErrorMessage(""), 5000);
     }
   };
@@ -131,8 +133,9 @@ export default function AdminTeams() {
       setSuccessMessage("تم حذف الفريق بنجاح");
       fetchData();
       setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || "فشل في حذف الفريق");
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      setErrorMessage(axiosErr.response?.data?.message || "فشل في حذف الفريق");
       setTimeout(() => setErrorMessage(""), 5000);
     }
   };
@@ -176,8 +179,9 @@ export default function AdminTeams() {
       setTeamMembers(members);
       fetchData();
       setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || "فشل في إضافة العامل");
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      setErrorMessage(axiosErr.response?.data?.message || "فشل في إضافة العامل");
       setTimeout(() => setErrorMessage(""), 5000);
     }
   };
@@ -196,8 +200,9 @@ export default function AdminTeams() {
       setTeamMembers(members);
       fetchData();
       setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || "فشل في إزالة العامل");
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      setErrorMessage(axiosErr.response?.data?.message || "فشل في إزالة العامل");
       setTimeout(() => setErrorMessage(""), 5000);
     }
   };

@@ -13,7 +13,7 @@
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 
-USE FollowUp;
+USE FollowUpNew;
 
 -- Clean existing data
 DELETE FROM [Notifications];

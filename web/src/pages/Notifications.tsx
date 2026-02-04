@@ -58,39 +58,7 @@ export default function Notifications() {
         setError("");
         const notifications = await getNotifications();
         const notices = notifications.map(mapNotificationToNotice);
-        
-        // Mock notifications for demonstration as requested
-        const date = new Date();
-        const mockNotices: Notice[] = [
-             {
-                id: '991',
-                type: 'issue_report',
-                status: 'unread',
-                title: 'تنبيه حرج: تأخير متزايد في منطقة الإرسال',
-                body: 'تم تسجيل 5 حالات تأخير متتالية في منطقة الإرسال للمشرف خالد أبو سعدة. يرجى المراجعة الفورية.',
-                time: String(date.getHours()).padStart(2, '0') + ":" + String(date.getMinutes()).padStart(2, '0'),
-                issueId: '101'
-             },
-             {
-                id: '992',
-                type: 'task_update',
-                status: 'unread',
-                title: 'انخفاض معدل الإنجاز: أحمد الشريف',
-                body: 'معدل الإنجاز اليومي انخفض إلى ما دون 50% لليوم الثاني على التوالي.',
-                time: String(date.getHours() - 1).padStart(2, '0') + ":30",
-                taskId: '202'
-             },
-             {
-                id: '993',
-                type: 'system',
-                status: 'unread',
-                title: 'تنبيه أمني: محاولة دخول مشبوهة',
-                body: 'تم رصد محاولة تسجيل دخول للنظام من جهاز غير معروف (IP: 192.168.1.15).',
-                time: String(date.getHours() - 2).padStart(2, '0') + ":15"
-             }
-        ];
-        
-        setItems([...mockNotices, ...notices]);
+        setItems(notices);
       } catch (err) {
         console.error("Failed to fetch notifications:", err);
         setError("فشل تحميل الإشعارات");

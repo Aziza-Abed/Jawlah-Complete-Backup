@@ -101,8 +101,9 @@ export default function AdminZones() {
       } else {
         setMessage({ type: "error", text: result.message });
       }
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.response?.data?.message || "فشل رفع الملف" });
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setMessage({ type: "error", text: axiosErr.response?.data?.message || "فشل رفع الملف" });
     } finally {
       setUploadingType(null);
       setTimeout(() => setMessage(null), 5000);

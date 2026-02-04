@@ -6,7 +6,7 @@ import { getZones } from "../api/zones";
 import { getDepartments, type Department } from "../api/departments";
 import type { Municipality } from "../api/municipality";
 import type { ZoneResponse } from "../types/zone";
-import type { UserResponse, UserRole, WorkerType } from "../types/user";
+import type { UserResponse, UserRole, UserStatus, WorkerType } from "../types/user";
 import {
   Users,
   Search,
@@ -122,7 +122,7 @@ export default function AdminAccounts() {
     setActionLoading(userId);
     try {
       await updateUserStatus(userId, newStatus);
-      setUsers(users.map(u => u.userId === userId ? { ...u, status: newStatus as any } : u));
+      setUsers(users.map(u => u.userId === userId ? { ...u, status: newStatus as UserStatus } : u));
       setMessage({ type: "success", text: `تم ${actionText} المستخدم بنجاح` });
     } catch (err) {
       setMessage({ type: "error", text: `فشل ${actionText} المستخدم` });
@@ -200,7 +200,7 @@ export default function AdminAccounts() {
         workerType: user.workerType || "Sanitation",
         departmentId: user.departmentId?.toString() || "",
         municipalityId: municipalities[0]?.municipalityId.toString() || "",
-        supervisorId: user.role === 'Worker' ? (user as any).supervisorId?.toString() || "" : "",
+        supervisorId: user.role === 'Worker' ? user.supervisorId?.toString() || "" : "",
         zoneIds: assignedZones
       });
       setShowUserModal(true);
@@ -216,16 +216,16 @@ export default function AdminAccounts() {
 
     setActionLoading("user-form");
     try {
-      const payload: any = {
+      const payload = {
         ...formData,
         municipalityId: parseInt(formData.municipalityId),
-        departmentId: formData.departmentId ? parseInt(formData.departmentId.toString()) : null,
-        supervisorId: formData.role === "Worker" && formData.supervisorId ? parseInt(formData.supervisorId) : null
+        departmentId: formData.departmentId ? parseInt(formData.departmentId.toString()) : undefined,
+        supervisorId: formData.role === "Worker" && formData.supervisorId ? parseInt(formData.supervisorId) : undefined
       };
 
       if (isEditMode && editUserId) {
-          const { password, ...updateData } = payload;
-          if (password) updateData.password = password;
+          const { password, ...updateDataBase } = payload;
+          const updateData = password ? { ...updateDataBase, password } : updateDataBase;
 
           await updateUser(editUserId, updateData);
           if (formData.zoneIds.length > 0) {
@@ -246,8 +246,9 @@ export default function AdminAccounts() {
 
       setShowUserModal(false);
       fetchInitialData().catch(console.error);
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "حدث خطأ أثناء حفظ البيانات" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "حدث خطأ أثناء حفظ البيانات";
+      setMessage({ type: "error", text: message });
     } finally {
       setActionLoading(null);
     }
@@ -429,7 +430,7 @@ export default function AdminAccounts() {
                         <div className="flex items-center gap-2">
                            <div className="w-1.5 h-6 bg-[#AFAFAF]/20 rounded-full hidden md:block"></div>
                            <span className="text-[14px] text-[#2F2F2F] font-bold">
-                             {getSupervisorName((user as any).supervisorId)}
+                             {getSupervisorName(user.supervisorId)}
                            </span>
                         </div>
                       ) : (
@@ -744,7 +745,7 @@ export default function AdminAccounts() {
   );
 }
 
-function ActionBtn({ icon: Icon, color, title, onClick, loading }: any) {
+function ActionBtn({ icon: Icon, color, title, onClick, loading }: { icon: React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>; color: string; title: string; onClick: () => void; loading?: boolean }) {
   return (
     <button
       onClick={onClick}
