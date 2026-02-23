@@ -321,24 +321,6 @@ public class OtpService : IOtpService
     }
 
     /// <summary>
-    /// Clean up expired OTP codes
-    /// </summary>
-    public async Task CleanupExpiredCodesAsync()
-    {
-        var expiredCodes = await _db.TwoFactorCodes
-            .Where(c => c.ExpiresAt < DateTime.UtcNow || c.IsUsed)
-            .Where(c => c.CreatedAt < DateTime.UtcNow.AddDays(-1)) // Keep for 1 day for audit
-            .ToListAsync();
-
-        if (expiredCodes.Any())
-        {
-            _db.TwoFactorCodes.RemoveRange(expiredCodes);
-            await _db.SaveChangesAsync();
-            _logger.LogInformation("Cleaned up {Count} expired OTP codes", expiredCodes.Count);
-        }
-    }
-
-    /// <summary>
     /// Generate random 6-digit OTP
     /// </summary>
     private string GenerateOtpCode()
@@ -374,7 +356,7 @@ public class OtpService : IOtpService
         {
             record.PendingJwtToken = jwtToken;
             await _db.SaveChangesAsync();
-            _logger.LogDebug("Stored pending JWT token for session {SessionToken}", sessionToken);
+            _logger.LogDebug("Stored pending JWT token for 2FA session");
         }
     }
 
@@ -389,7 +371,7 @@ public class OtpService : IOtpService
 
         if (record?.PendingJwtToken == null)
         {
-            _logger.LogWarning("No pending JWT token found for session {SessionToken}", sessionToken);
+            _logger.LogWarning("No pending JWT token found for 2FA session");
             return null;
         }
 
@@ -397,7 +379,7 @@ public class OtpService : IOtpService
         record.PendingJwtToken = null; // Clear after retrieval
         await _db.SaveChangesAsync();
 
-        _logger.LogDebug("Retrieved and cleared pending JWT token for session {SessionToken}", sessionToken);
+        _logger.LogDebug("Retrieved and cleared pending JWT token for 2FA session");
         return token;
     }
 

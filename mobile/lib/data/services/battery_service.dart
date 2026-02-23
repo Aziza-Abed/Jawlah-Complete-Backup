@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
+import '../../core/config/api_config.dart';
 import 'api_service.dart';
 
 class BatteryService {
@@ -78,7 +79,7 @@ class BatteryService {
         await _reportToBackend(level, isCharging);
       }
     } catch (e) {
-      debugPrint('Error checking battery: $e');
+      if (kDebugMode) debugPrint('Error checking battery: $e');
     }
   }
 
@@ -86,7 +87,7 @@ class BatteryService {
   Future<void> _reportToBackend(int level, bool isCharging) async {
     try {
       await _apiService.post(
-        'users/battery-status',
+        ApiConfig.batteryStatus,
         data: {
           'batteryLevel': level,
           'isLowBattery': level <= lowBatteryThreshold,
@@ -98,9 +99,9 @@ class BatteryService {
       _lastReportedLevel = level;
       _lastReportTime = DateTime.now();
 
-      debugPrint('Battery status reported: $level% (charging: $isCharging)');
+      if (kDebugMode) debugPrint('Battery status reported: $level% (charging: $isCharging)');
     } catch (e) {
-      debugPrint('Error reporting battery: $e');
+      if (kDebugMode) debugPrint('Error reporting battery: $e');
     }
   }
 
@@ -109,7 +110,7 @@ class BatteryService {
     try {
       return await _battery.batteryLevel;
     } catch (e) {
-      debugPrint('Error getting battery level: $e');
+      if (kDebugMode) debugPrint('Error getting battery level: $e');
       return 100; // Default to 100 if error
     }
   }
@@ -119,7 +120,7 @@ class BatteryService {
     try {
       return await _battery.batteryState;
     } catch (e) {
-      debugPrint('Error getting battery state: $e');
+      if (kDebugMode) debugPrint('Error getting battery state: $e');
       return BatteryState.unknown;
     }
   }

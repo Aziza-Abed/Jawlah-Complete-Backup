@@ -1,5 +1,6 @@
 import AppRoutes from "./routes/AppRoutes";
 import { MunicipalityProvider } from "./contexts/MunicipalityContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
 export default function App() {
@@ -7,7 +8,9 @@ export default function App() {
     <div className="font-sans">
       <ErrorBoundary>
         <MunicipalityProvider>
-          <AppRoutes />
+          <NotificationProvider>
+            <AppRoutes />
+          </NotificationProvider>
         </MunicipalityProvider>
       </ErrorBoundary>
     </div>

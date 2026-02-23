@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
@@ -880,7 +881,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           ),
         );
       }
-      debugPrint('GPS timeout: $e');
+      if (kDebugMode) debugPrint('GPS timeout: $e');
       return null;
     } catch (e) {
       if (mounted) {
@@ -891,7 +892,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           ),
         );
       }
-      debugPrint('GPS error: $e');
+      if (kDebugMode) debugPrint('GPS error: $e');
       return null;
     }
   }

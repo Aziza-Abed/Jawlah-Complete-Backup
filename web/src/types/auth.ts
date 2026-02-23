@@ -8,6 +8,7 @@ export type LoginRequest = {
 export type LoginResponse = {
   success: boolean;
   token?: string;
+  refreshToken?: string;
   expiresAt?: string;
   user?: UserDto;
   error?: string;
@@ -26,6 +27,7 @@ export type VerifyOtpRequest = {
 export type VerifyOtpResponse = {
   success: boolean;
   token?: string;
+  refreshToken?: string;
   expiresAt?: string;
   user?: UserDto;
   error?: string;
@@ -43,6 +45,25 @@ export type ResendOtpResponse = {
   expiresAt?: string;
   message?: string;
   resendCooldownSeconds?: number;
+};
+
+export type ForgotPasswordRequest = {
+  username: string;
+};
+
+export type ForgotPasswordResponse = {
+  success: boolean;
+  sessionToken?: string;
+  maskedPhone?: string;
+  message?: string;
+  expiresAt?: string;
+  resendCooldownSeconds?: number;
+};
+
+export type ResetPasswordRequest = {
+  sessionToken: string;
+  otpCode: string;
+  newPassword: string;
 };
 
 export type UserDto = {

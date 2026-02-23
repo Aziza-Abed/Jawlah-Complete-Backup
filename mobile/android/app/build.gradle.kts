@@ -53,7 +53,7 @@ android {
                 keyPassword = keyProperties["keyPassword"] as String
             } else {
                 // Fallback to debug signing if no key.properties found (for development/CI without secrets)
-                println("⚠️ Warning: key.properties not found, using debug signing for release build.")
+                println("Warning: key.properties not found, using debug signing for release build.")
                 storeFile = signingConfigs.getByName("debug").storeFile
                 storePassword = signingConfigs.getByName("debug").storePassword
                 keyAlias = signingConfigs.getByName("debug").keyAlias

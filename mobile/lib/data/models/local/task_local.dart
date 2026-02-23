@@ -106,6 +106,7 @@ class TaskLocal extends HiveObject {
   // Convert to sync DTO for uploading task updates
   Map<String, dynamic> toSyncDto() {
     return {
+      'clientId': clientId,
       'taskId': taskId,
       'status': status,
       'completionNotes': completionNotes,
@@ -115,6 +116,7 @@ class TaskLocal extends HiveObject {
       'longitude': longitude,
       'progressPercentage': progressPercentage,
       'progressNotes': progressNotes,
+      'syncVersion': syncVersion,
     };
   }
 }

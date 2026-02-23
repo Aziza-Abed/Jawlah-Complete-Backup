@@ -18,6 +18,8 @@ class TasksListScreen extends StatefulWidget {
 class _TasksListScreenState extends State<TasksListScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -34,6 +36,7 @@ class _TasksListScreenState extends State<TasksListScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -44,6 +47,7 @@ class _TasksListScreenState extends State<TasksListScreen>
       showBackButton: true,
       body: Column(
         children: [
+          _buildSearchBar(),
           _buildTabs(),
           Expanded(
             child: TabBarView(
@@ -57,6 +61,55 @@ class _TasksListScreenState extends State<TasksListScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) => setState(() => _searchQuery = value),
+        textDirection: TextDirection.rtl,
+        decoration: InputDecoration(
+          hintText: 'ابحث عن مهمة...',
+          hintStyle: const TextStyle(
+            fontFamily: 'Cairo',
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
+          prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 20, color: AppColors.textSecondary),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.black.withOpacity(0.05)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          ),
+        ),
+        style: const TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 14,
+          color: AppColors.textPrimary,
+        ),
       ),
     );
   }
@@ -125,6 +178,16 @@ class _TasksListScreenState extends State<TasksListScreen>
             break;
           default:
             filteredTasks = provider.myTasks;
+        }
+
+        // apply search filter
+        if (_searchQuery.isNotEmpty) {
+          final q = _searchQuery.toLowerCase();
+          filteredTasks = filteredTasks
+              .where((t) =>
+                  t.title.toLowerCase().contains(q) ||
+                  t.description.toLowerCase().contains(q))
+              .toList();
         }
 
         if (filteredTasks.isEmpty) {

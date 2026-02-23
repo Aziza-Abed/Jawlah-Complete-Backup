@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../providers/auth_manager.dart';
 import '../../providers/task_manager.dart';
+import '../../providers/sync_manager.dart';
 import '../../data/services/attendance_service.dart';
 import '../../data/models/attendance_model.dart';
 
@@ -62,6 +63,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSettingsSection(
               title: 'التطبيق',
               items: [
+                _SettingItem(
+                  icon: Icons.notifications,
+                  title: 'إعدادات الإشعارات',
+                  subtitle: 'تحكم في أنواع الإشعارات',
+                  onTap: () {
+                    Navigator.of(context).pushNamed(Routes.notificationSettings);
+                  },
+                ),
                 _SettingItem(
                   icon: Icons.language,
                   title: 'اللغة',
@@ -142,6 +151,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showLogoutDialog(BuildContext context) async {
+    // Check for unsynced data
+    final syncManager = context.read<SyncManager>();
+    final pendingCount = syncManager.waitingItems;
+
     // Fetch today's work summary
     final taskManager = context.read<TaskManager>();
     AttendanceModel? todayAttendance;
@@ -156,13 +169,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!context.mounted) return;
 
     // Calculate work stats
+    final now = DateTime.now();
     final completedToday = taskManager.myTasks
-        .where((t) =>
-            t.isCompleted &&
-            t.completedAt != null &&
-            t.completedAt!.day == DateTime.now().day &&
-            t.completedAt!.month == DateTime.now().month &&
-            t.completedAt!.year == DateTime.now().year)
+        .where((t) {
+          if (!t.isCompleted || t.completedAt == null) return false;
+          final local = t.completedAt!.toLocal();
+          return local.day == now.day &&
+                 local.month == now.month &&
+                 local.year == now.year;
+        })
         .length;
 
     String workDuration = 'غير محدد';
@@ -252,6 +267,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+            if (pendingCount > 0) ...[
+              const SizedBox(height: 12),
+              Text(
+                'تحذير: يوجد $pendingCount عنصر غير مرفوع. سيتم فقدانها عند الخروج!',
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.warning,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ],
         ),
         actions: [

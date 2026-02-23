@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 import {
   Users, ClipboardList, AlertTriangle, Activity, Shield,
   MapPin, FileText, BarChart3, History, UserCog, Building,
@@ -20,7 +21,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     try {
-      const userStr = localStorage.getItem("followup_user");
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
       if (userStr) {
         const user = JSON.parse(userStr);
         setUserName(user.fullName?.split(' ')[0] || "مدير");

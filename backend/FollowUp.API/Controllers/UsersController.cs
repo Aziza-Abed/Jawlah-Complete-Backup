@@ -176,7 +176,7 @@ public class UsersController : BaseApiController
             user.Email = request.Email;
         }
         user.PhoneNumber = request.PhoneNumber;
-        user.FullName = request.FullName;
+        user.FullName = Utils.InputSanitizer.SanitizeString(request.FullName, 100);
 
         // save to db
         await _users.UpdateAsync(user);
@@ -217,6 +217,11 @@ public class UsersController : BaseApiController
         await _users.SaveChangesAsync();
 
         _logger.LogInformation("User {UserId} changed password", userId);
+
+        await _audit.LogAsync(userId, user.Username, "PasswordChanged",
+            "تغيير كلمة المرور",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
 
         return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تغيير كلمة المرور بنجاح"));
     }
@@ -262,7 +267,7 @@ public class UsersController : BaseApiController
 
         // Update other fields if provided
         if (!string.IsNullOrEmpty(request.FullName))
-            user.FullName = request.FullName;
+            user.FullName = Utils.InputSanitizer.SanitizeString(request.FullName, 100);
 
         if (!string.IsNullOrEmpty(request.PhoneNumber))
             user.PhoneNumber = request.PhoneNumber;
@@ -273,6 +278,14 @@ public class UsersController : BaseApiController
         await _users.UpdateAsync(user);
         await _users.SaveChangesAsync();
 
+        // UC17: Audit log for user update
+        var currentUserId = GetCurrentUserId();
+        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+        await _audit.LogAsync(currentUserId, currentUser?.Username, "UserUpdated",
+            $"تحديث بيانات المستخدم: {user.Username}",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
         return Ok(ApiResponse<UserResponse>.SuccessResponse(_mapper.Map<UserResponse>(user)));
     }
 
@@ -281,6 +294,10 @@ public class UsersController : BaseApiController
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateUserStatus(int id, [FromBody] UpdateUserStatusRequest request)
     {
+        // UC16: Prevent admin from deactivating themselves
+        if (id == GetCurrentUserId() && request.Status == UserStatus.Inactive)
+            return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكنك تعطيل حسابك الخاص"));
+
         var user = await _users.GetByIdAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
@@ -311,6 +328,10 @@ public class UsersController : BaseApiController
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteUser(int id)
     {
+        // UC16: Prevent admin from deleting themselves
+        if (id == GetCurrentUserId())
+            return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكنك حذف حسابك الخاص"));
+
         var user = await _users.GetByIdAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
@@ -372,6 +393,13 @@ public class UsersController : BaseApiController
         await _users.SaveChangesAsync();
 
         _logger.LogInformation("Admin reset password for user {UserId}", id);
+
+        var currentUserId = GetCurrentUserId();
+        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+        await _audit.LogAsync(currentUserId, currentUser?.Username, "PasswordReset",
+            $"إعادة تعيين كلمة مرور المستخدم #{id} ({user.Username})",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
 
         return Ok(ApiResponse<object?>.SuccessResponse(null, "تم إعادة تعيين كلمة المرور بنجاح"));
     }
@@ -520,6 +548,13 @@ public class UsersController : BaseApiController
         await _users.SaveChangesAsync();
 
         _logger.LogInformation("Device binding reset for user {UserId}. Old device: {OldDeviceId}", id, oldDeviceId ?? "none");
+
+        var currentUserId = GetCurrentUserId();
+        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+        await _audit.LogAsync(currentUserId, currentUser?.Username, "DeviceReset",
+            $"إعادة تعيين جهاز العامل #{id} ({user.Username})",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
 
         return Ok(ApiResponse<object>.SuccessResponse(new
         {
@@ -859,6 +894,21 @@ public class UsersController : BaseApiController
             worker.SupervisorId = request.NewSupervisorId;
         }
 
+        // Chapter 4: Also transfer pending tasks assigned by old supervisor
+        var workerIds = workers.Select(w => w.UserId).ToList();
+        var pendingTasks = await _context.Tasks
+            .Where(t => workerIds.Contains(t.AssignedToUserId) &&
+                       t.AssignedByUserId == oldSupervisorId &&
+                       (t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress))
+            .ToListAsync();
+
+        foreach (var task in pendingTasks)
+        {
+            task.AssignedByUserId = request.NewSupervisorId;
+        }
+
+        _logger.LogInformation("Transferred {TaskCount} pending tasks from old supervisor", pendingTasks.Count);
+
         await _context.SaveChangesAsync();
 
         // Get current user info for audit log
@@ -885,6 +935,123 @@ public class UsersController : BaseApiController
             transferredWorkers = workers.Count,
             message = $"تم نقل {workers.Count} عامل بنجاح من {oldSupervisor.FullName} إلى {newSupervisor.FullName}",
             workerNames = workers.Select(w => w.FullName).ToList()
+        }));
+    }
+
+    /// <summary>
+    /// SR22.5: Bulk role assignment - Admin can assign roles to multiple users at once
+    /// </summary>
+    [HttpPost("bulk-role-assignment")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> BulkRoleAssignment([FromBody] BulkRoleAssignmentRequest request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.ErrorResponse("بيانات غير صالحة"));
+
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+            return Unauthorized();
+
+        // Prevent assigning Admin role (security)
+        if (request.NewRole == UserRole.Admin)
+            return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكن تعيين صلاحية مدير عبر هذه الواجهة"));
+
+        var successCount = 0;
+        var failedUsers = new List<string>();
+
+        foreach (var userId in request.UserIds)
+        {
+            // Prevent changing own role
+            if (userId == currentUserId.Value)
+            {
+                failedUsers.Add("لا يمكنك تغيير صلاحيتك الخاصة");
+                continue;
+            }
+
+            var user = await _users.GetByIdAsync(userId);
+            if (user == null)
+            {
+                failedUsers.Add($"المستخدم {userId} غير موجود");
+                continue;
+            }
+
+            user.Role = request.NewRole;
+            await _users.UpdateAsync(user);
+            successCount++;
+        }
+
+        await _users.SaveChangesAsync();
+
+        // UC17: Audit log
+        var currentUser = await _users.GetByIdAsync(currentUserId.Value);
+        await _audit.LogAsync(currentUserId, currentUser?.Username, "BulkRoleAssignment",
+            $"تغيير صلاحية {successCount} مستخدم إلى {request.NewRole}",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
+        return Ok(ApiResponse<object>.SuccessResponse(new
+        {
+            successCount,
+            failedCount = failedUsers.Count,
+            failedUsers,
+            message = $"تم تغيير صلاحية {successCount} مستخدم بنجاح"
+        }));
+    }
+
+    /// <summary>
+    /// UC16: Bulk enable/disable users
+    /// </summary>
+    [HttpPost("bulk-status")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> BulkStatusChange([FromBody] BulkStatusRequest request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.ErrorResponse("بيانات غير صالحة"));
+
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+            return Unauthorized();
+
+        var successCount = 0;
+        var failedUsers = new List<string>();
+
+        foreach (var userId in request.UserIds)
+        {
+            // UC16: Prevent admin from deactivating themselves
+            if (userId == currentUserId.Value && request.Status == UserStatus.Inactive)
+            {
+                failedUsers.Add("لا يمكنك تعطيل حسابك الخاص");
+                continue;
+            }
+
+            var user = await _users.GetByIdAsync(userId);
+            if (user == null)
+            {
+                failedUsers.Add($"المستخدم {userId} غير موجود");
+                continue;
+            }
+
+            user.Status = request.Status;
+            await _users.UpdateAsync(user);
+            successCount++;
+        }
+
+        await _users.SaveChangesAsync();
+
+        // UC17: Audit log
+        var currentUser = await _users.GetByIdAsync(currentUserId.Value);
+        var action = request.Status == UserStatus.Active ? "تفعيل" : "تعطيل";
+        await _audit.LogAsync(currentUserId, currentUser?.Username, "BulkStatusChange",
+            $"{action} {successCount} مستخدم",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
+        return Ok(ApiResponse<object>.SuccessResponse(new
+        {
+            successCount,
+            failedCount = failedUsers.Count,
+            failedUsers,
+            message = $"تم {action} {successCount} مستخدم بنجاح"
         }));
     }
 }

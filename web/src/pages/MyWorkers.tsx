@@ -6,6 +6,7 @@ import { getTasks, reassignTask } from "../api/tasks";
 import type { UserResponse } from "../types/user";
 import type { ZoneResponse } from "../types/zone";
 import { Users, MapPin, Phone, RefreshCw, X, MapPinned, Check } from "lucide-react";
+import { useConfirm } from "../components/common/ConfirmDialog";
 
 type WorkerWithStats = UserResponse & {
   activeTasks: number;
@@ -16,6 +17,7 @@ type WorkerWithStats = UserResponse & {
 };
 
 export default function MyWorkers() {
+  const [confirm, ConfirmDialog] = useConfirm();
   const navigate = useNavigate();
 
   const [workers, setWorkers] = useState<WorkerWithStats[]>([]);
@@ -125,7 +127,7 @@ export default function MyWorkers() {
     if (!reassignModal.taskId) return;
     const targetWorker = workers.find(w => w.userId === targetWorkerId);
     if (!targetWorker) return;
-    if (!window.confirm(`هل أنت متأكد من إعادة تعيين المهمة "${reassignModal.taskTitle}" إلى ${targetWorker.fullName}؟`)) return;
+    if (!await confirm(`هل أنت متأكد من إعادة تعيين المهمة "${reassignModal.taskTitle}" إلى ${targetWorker.fullName}؟`)) return;
 
     try {
       setReassigning(true);
@@ -373,6 +375,8 @@ export default function MyWorkers() {
           </div>
         </CenterModal>
       )}
+
+      {ConfirmDialog}
     </div>
   );
 }

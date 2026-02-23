@@ -23,8 +23,10 @@ import {
   Briefcase,
   Edit2
 } from "lucide-react";
+import { useConfirm } from "../components/common/ConfirmDialog";
 
 export default function AdminAccounts() {
+  const [confirm, ConfirmDialog] = useConfirm();
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [supervisors, setSupervisors] = useState<UserResponse[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
@@ -66,7 +68,7 @@ export default function AdminAccounts() {
   };
 
   const handleUnbindDevice = async (userId: number) => {
-    if (!window.confirm("هل أنت متأكد من فك ارتباط جهاز هذا المستخدم؟")) return;
+    if (!await confirm("هل أنت متأكد من فك ارتباط جهاز هذا المستخدم؟")) return;
     setActionLoading(userId);
     try {
       await resetDeviceId(userId);
@@ -117,7 +119,7 @@ export default function AdminAccounts() {
     const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
     const actionText = newStatus === "Active" ? "تفعيل" : "تعطيل";
 
-    if (!window.confirm(`هل أنت متأكد من ${actionText} هذا المستخدم؟`)) return;
+    if (!await confirm(`هل أنت متأكد من ${actionText} هذا المستخدم؟`)) return;
 
     setActionLoading(userId);
     try {
@@ -704,6 +706,8 @@ export default function AdminAccounts() {
           </div>
         </div>
       )}
+
+      {ConfirmDialog}
 
       {/* Device Modal */}
       {deviceModalUser && (

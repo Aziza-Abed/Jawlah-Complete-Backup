@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using FollowUp.API.Filters;
 using FollowUp.API.LiveTracking;
 using FollowUp.API.Middleware;
@@ -15,6 +16,7 @@ using FollowUp.Infrastructure.BackgroundServices;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -25,8 +27,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 // setup logging
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
-    .WriteTo.File("logs/followup.log")
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId:l} {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File("logs/followup-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 30,
+        fileSizeLimitBytes: 10 * 1024 * 1024,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}")
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -193,7 +203,6 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IPasswordHasher<FollowUp.Core.Entities.User>, PasswordHasher<FollowUp.Core.Entities.User>>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<IIssueRepository, IssueRepository>();
@@ -205,6 +214,7 @@ builder.Services.AddScoped<IMunicipalityRepository, MunicipalityRepository>();
 builder.Services.AddScoped<IAppealRepository, AppealRepository>();
 builder.Services.AddScoped<ITaskTemplateRepository, TaskTemplateRepository>();
 builder.Services.AddScoped<IGisFileRepository, GisFileRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>(); // ERD Chapter 3
 builder.Services.AddHostedService<TaskGenerationBackgroundService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -220,6 +230,32 @@ builder.Services.AddScoped<AuditLogService>();
 builder.Services.Configure<FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB max
+});
+
+// Rate limiting: protect against brute force and abuse
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Auth endpoints: 10 requests/minute per IP (login, OTP, resend)
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+
+    // Upload endpoints: 5 requests/minute per IP
+    options.AddPolicy("upload", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1)
+            }));
 });
 
 var app = builder.Build();
@@ -263,11 +299,6 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-
-    // remove server info headers
-    context.Response.Headers.Remove("Server");
-    context.Response.Headers.Remove("X-Powered-By");
-
     await next();
 });
 
@@ -279,7 +310,21 @@ if (app.Environment.IsDevelopment())
 else
     app.UseCors("Production");
 
+// CorrelationId middleware: trace requests across logs
+app.Use(async (context, next) =>
+{
+    var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault()
+        ?? Guid.NewGuid().ToString("N")[..12];
+    context.Response.Headers["X-Correlation-Id"] = correlationId;
+    using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
+    {
+        await next();
+    }
+});
+
 app.UseSerilogRequestLogging();
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -380,7 +425,7 @@ using (var scope = app.Services.CreateScope())
                     await gisService.ImportBlocksFromGeoJsonAsync(blocksFile, municipId);
                 }
 
-                Log.Information("✅ GIS Auto-Import Completed.");
+                Log.Information("GIS Auto-Import Completed.");
             }
             else
             {

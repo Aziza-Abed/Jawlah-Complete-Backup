@@ -30,6 +30,7 @@ import {
   ChevronUp
 } from "lucide-react";
 import { useMunicipality } from "../contexts/MunicipalityContext";
+import { useConfirm } from "../components/common/ConfirmDialog";
 
 // Helper to center map
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
@@ -39,6 +40,7 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
 }
 
 export default function AdminZones() {
+  const [confirm, ConfirmDialog] = useConfirm();
   const [zones, setZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -141,7 +143,7 @@ export default function AdminZones() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("هل أنت متأكد من حذف هذه المنطقة؟")) return;
+    if (!await confirm("هل أنت متأكد من حذف هذه المنطقة؟")) return;
     setActionLoading(id);
     try {
       await deleteZone(id);
@@ -461,7 +463,7 @@ export default function AdminZones() {
                       return (
                         <MapContainer center={center} zoom={14} zoomControl={false} dragging={false} scrollWheelZoom={false} className="h-full w-full z-0 opacity-60 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500">
                           <ChangeView center={center} zoom={14} />
-                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                           <Polygon
                             positions={geometry}
                             pathOptions={{ color: '#7895B2', fillColor: '#7895B2', fillOpacity: 0.3, weight: 2 }}
@@ -594,7 +596,7 @@ export default function AdminZones() {
                     <label className="text-sm font-semibold text-[#6B7280] text-right block mb-2">معاينة المنطقة على الخريطة</label>
                     <div className="rounded-[16px] overflow-hidden border border-[#E5E7EB] h-[400px] relative shadow-inner bg-[#F3F1ED]">
                       <MapContainer center={mapCenter} zoom={11} className="h-full w-full">
-                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" className="opacity-80" />
+                        <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" className="opacity-80" />
                         <Polygon
                           positions={getPreviewGeometry(formData.boundaryGeoJson) || []}
                           pathOptions={{ color: '#7895B2', fillColor: '#7895B2', fillOpacity: 0.3, weight: 2 }}
@@ -632,6 +634,8 @@ export default function AdminZones() {
           </div>
         </div>
       )}
+
+      {ConfirmDialog}
     </div>
   );
 }

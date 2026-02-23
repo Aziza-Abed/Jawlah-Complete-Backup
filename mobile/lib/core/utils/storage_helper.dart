@@ -7,7 +7,6 @@ class StorageHelper {
   StorageHelper._();
 
   static const String _keyUser = 'user_data';
-  static const String _keyEmployeeId = 'employee_id';
   static const String _keyRememberMe = 'remember_me';
   static const String _keyLanguage = 'language';
   static const String _keyThemeMode = 'theme_mode';
@@ -111,7 +110,7 @@ class StorageHelper {
 
     final rememberMe = await getRememberMe();
     if (!rememberMe) {
-      await p.remove(_keyEmployeeId);
+      await SecureStorageHelper.removeEmployeeId();
       await p.remove(_keyRememberMe);
     }
     return true;

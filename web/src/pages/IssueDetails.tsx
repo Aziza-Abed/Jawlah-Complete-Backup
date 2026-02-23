@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getIssue, updateIssueStatus } from "../api/issues";
-import { getUsersByRole } from "../api/users";
+import { getIssue, updateIssueStatus, forwardIssue } from "../api/issues";
+import { getDepartments } from "../api/departments";
 import type { IssueResponse } from "../types/issue";
-import type { UserResponse } from "../types/user";
-
-type Severity = "low" | "medium" | "high" | "critical";
-type IssueStatus = "new" | "reviewing" | "converted" | "forwarded" | "rejected" | "closed";
+import type { Department } from "../api/departments";
+import { mapSeverity, mapStatus, mapTypeToArabic, type Severity, type DisplayIssueStatus } from "../utils/issueDisplay";
 
 type IssueDTO = {
   id: string; // رقم البلاغ
@@ -14,7 +12,7 @@ type IssueDTO = {
   description: string; // وصف المشكلة
 
   type: string; // نوع المشكلة
-  severity: Severity; // مستوى الخطورة
+  severity: Severity;
 
   reporterName: string; // اسم العامل المُبلّغ
   zone: string; // Zone
@@ -24,44 +22,10 @@ type IssueDTO = {
   reportedAt: string; // تاريخ ووقت الإبلاغ
   images: string[]; // روابط الصور
 
-  status: IssueStatus;
+  status: DisplayIssueStatus;
 };
 
 
-
-// Map backend severity to frontend severity
-const mapSeverity = (severity: string | undefined | null): Severity => {
-  switch ((severity || "").toLowerCase()) {
-    case "minor": return "low";
-    case "medium": return "medium";
-    case "major": return "high";
-    case "critical": return "critical";
-    default: return "medium";
-  }
-};
-
-// Map backend status to frontend status
-const mapStatus = (status: string): IssueStatus => {
-  switch (status) {
-    case "Reported": return "new";
-    case "UnderReview": return "reviewing";
-    case "Resolved": return "closed";
-    case "Dismissed": return "rejected";
-    default: return "new";
-  }
-};
-
-// Map backend IssueType to Arabic
-const mapTypeToArabic = (type: string): string => {
-  switch (type) {
-    case "Infrastructure": return "بنية تحتية";
-    case "Safety": return "سلامة";
-    case "Sanitation": return "صحة ونظافة";
-    case "Equipment": return "معدات";
-    case "Other": return "أخرى";
-    default: return type;
-  }
-};
 
 // Convert backend IssueResponse to frontend IssueDTO
 const mapIssueResponseToDTO = (issue: IssueResponse): IssueDTO => {
@@ -90,32 +54,34 @@ export default function IssueDetails() {
 
   const [issue, setIssue] = useState<IssueDTO | null>(null);
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState("");
+  const [error, setError] = useState("");
 
-  const [supervisors, setSupervisors] = useState<UserResponse[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [rawIssue, setRawIssue] = useState<IssueResponse | null>(null);
 
   // Modals
   const [forwardOpen, setForwardOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
 
-  // Fetch issue details and supervisors
+  // Fetch issue details and departments
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         setLoading(true);
         setError("");
-        
+
         const numericId = id?.startsWith("i-") ? id.slice(2) : id;
         if (!numericId) throw new Error("Invalid issue ID");
 
-        const [issueData, supervisorData] = await Promise.all([
+        const [issueData, deptData] = await Promise.all([
           getIssue(Number(numericId)),
-          getUsersByRole('Supervisor').catch(() => [])
+          getDepartments(true).catch(() => [])
         ]);
 
         const dto = mapIssueResponseToDTO(issueData);
         setIssue(dto);
-        setSupervisors(supervisorData);
+        setRawIssue(issueData);
+        setDepartments(deptData);
       } catch (err) {
         console.error("Failed to fetch data:", err);
         setError("فشل تحميل بيانات الصفحة");
@@ -126,7 +92,7 @@ export default function IssueDetails() {
     fetchInitialData();
   }, [id]);
 
-  const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("");
   const [note, setNote] = useState<string>("");
   const [rejectReason, setRejectReason] = useState<string>("");
 
@@ -150,32 +116,27 @@ export default function IssueDetails() {
         },
       },
     });
-
-    // Future work: Backend endpoint for converting issues to tasks
-    // POST /issues/:id/convert-to-task (or POST /tasks/from-issue)
   };
 
-  const submitForwardToSupervisor = async () => {
+  const submitForwardToDepartment = async () => {
     if (!issue) return;
-    if (!selectedSupervisorId) return;
+    if (!selectedDepartmentId) return;
 
     try {
       const numericId = id?.startsWith("i-") ? id.slice(2) : id;
       if (!numericId) return;
 
-      const supervisor = supervisors.find(s => s.userId.toString() === selectedSupervisorId);
-      const supervisorName = supervisor?.fullName || selectedSupervisorId;
-
-      // Update status to UnderReview when forwarding
-      await updateIssueStatus(Number(numericId), {
-        status: "UnderReview",
-        resolutionNotes: `تم التحويل للمشرف: ${supervisorName}. ${note || ''}`
+      const updatedIssue = await forwardIssue(Number(numericId), {
+        departmentId: Number(selectedDepartmentId),
+        notes: note || undefined,
       });
 
-      setIssue({ ...issue, status: "reviewing" });
+      const dto = mapIssueResponseToDTO(updatedIssue);
+      setIssue({ ...dto, status: "forwarded" });
+      setRawIssue(updatedIssue);
       setForwardOpen(false);
       setNote("");
-      setSelectedSupervisorId("");
+      setSelectedDepartmentId("");
     } catch (err) {
       console.error("Failed to forward issue:", err);
       alert("فشل في تحويل البلاغ");
@@ -219,7 +180,7 @@ export default function IssueDetails() {
   if (!issue) {
     return (
       <div className="h-full w-full bg-[#F3F1ED] grid place-items-center">
-        <div className="text-[#C86E5D] font-sans font-semibold">فشل في تحميل البيانات</div>
+        <div className="text-[#C86E5D] font-sans font-semibold">{error || "فشل في تحميل البيانات"}</div>
       </div>
     );
   }
@@ -331,6 +292,24 @@ export default function IssueDetails() {
               )}
             </div>
 
+            {/* Forwarding Info (SR15) */}
+            {rawIssue?.forwardedToDepartmentName && (
+              <div className="mt-4 bg-[#7895B2]/10 rounded-[12px] border border-[#7895B2]/20 p-4">
+                <div className="text-right text-[13px] text-[#7895B2] font-sans font-semibold mb-2">
+                  معلومات التحويل
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <InfoBox label="القسم المحوّل إليه" value={rawIssue.forwardedToDepartmentName} />
+                  <InfoBox label="تاريخ التحويل" value={rawIssue.forwardedAt ? new Date(rawIssue.forwardedAt).toLocaleString('ar-PS') : 'غير محدد'} />
+                </div>
+                {rawIssue.forwardingNotes && (
+                  <div className="mt-2 bg-white rounded-[12px] border border-black/10 p-3 text-right text-[13px] text-[#2F2F2F]">
+                    {rawIssue.forwardingNotes}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Actions */}
             <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -339,7 +318,7 @@ export default function IssueDetails() {
                   onClick={() => setForwardOpen(true)}
                   className="h-[44px] px-4 rounded-[12px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[14px] hover:opacity-95"
                 >
-                  تحويل لمشرف آخر
+                  تحويل لقسم آخر
                 </button>
 
                 <button
@@ -364,11 +343,11 @@ export default function IssueDetails() {
           {/* Forward Modal */}
           <Modal
             open={forwardOpen}
-            title="تحويل البلاغ لمشرف آخر"
+            title="تحويل البلاغ لقسم آخر"
             onClose={() => {
               setForwardOpen(false);
               setNote("");
-              setSelectedSupervisorId("");
+              setSelectedDepartmentId("");
             }}
             footer={
               <>
@@ -378,7 +357,7 @@ export default function IssueDetails() {
                   onClick={() => {
                     setForwardOpen(false);
                     setNote("");
-                    setSelectedSupervisorId("");
+                    setSelectedDepartmentId("");
                   }}
                 >
                   إلغاء
@@ -386,24 +365,24 @@ export default function IssueDetails() {
                 <button
                   type="button"
                   className="h-[40px] px-4 rounded-[10px] bg-[#7895B2] text-white font-sans font-semibold disabled:opacity-50"
-                  onClick={submitForwardToSupervisor}
-                  disabled={!selectedSupervisorId}
+                  onClick={submitForwardToDepartment}
+                  disabled={!selectedDepartmentId}
                 >
                   تأكيد التحويل
                 </button>
               </>
             }
           >
-            <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold">اختاري المشرف</div>
+            <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold">اختر القسم</div>
             <select
               className="mt-2 w-full h-[44px] rounded-[12px] bg-white border border-black/10 px-3 text-right"
-              value={selectedSupervisorId}
-              onChange={(e) => setSelectedSupervisorId(e.target.value)}
+              value={selectedDepartmentId}
+              onChange={(e) => setSelectedDepartmentId(e.target.value)}
             >
-              <option value="">— اختر مشرف —</option>
-              {supervisors.map((s) => (
-                <option key={s.userId} value={s.userId}>
-                  {s.fullName}
+              <option value="">— اختر قسم —</option>
+              {departments.map((d) => (
+                <option key={d.departmentId} value={d.departmentId}>
+                  {d.name}
                 </option>
               ))}
             </select>
@@ -413,7 +392,7 @@ export default function IssueDetails() {
               className="mt-2 w-full min-h-[90px] rounded-[12px] bg-white border border-black/10 p-3 text-right"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="اكتبي سبب التحويل أو تفاصيل إضافية..."
+              placeholder="اكتب سبب التحويل أو تفاصيل إضافية..."
             />
           </Modal>
 
@@ -457,13 +436,7 @@ export default function IssueDetails() {
             />
           </Modal>
 
-          <div className="mt-6 text-right text-[12px] text-[#6B7280]">
-            {/* Future work: Additional backend endpoints
-              POST /issues/:id/convert-to-task
-              POST /issues/:id/forward
-              POST /issues/:id/reject
-            */}
-          </div>
+          <div className="mt-6" />
         </div>
       </div>
     </div>
@@ -529,8 +502,8 @@ function SeverityBadge({ severity }: { severity: Severity }) {
   );
 }
 
-function StatusBadge({ status }: { status: IssueStatus }) {
-  const map: Record<IssueStatus, { label: string; bg: string; text: string }> = {
+function StatusBadge({ status }: { status: DisplayIssueStatus }) {
+  const map: Record<string, { label: string; bg: string; text: string }> = {
     new: { label: "جديد", bg: "#E5E7EB", text: "#2F2F2F" },
     reviewing: { label: "قيد المراجعة", bg: "#F3F1ED", text: "#2F2F2F" },
     converted: { label: "تم تحويله لمهمة", bg: "#8FA36A", text: "#FFFFFF" },
@@ -538,7 +511,7 @@ function StatusBadge({ status }: { status: IssueStatus }) {
     rejected: { label: "مرفوض", bg: "#C86E5D", text: "#FFFFFF" },
     closed: { label: "مغلق", bg: "#6B7280", text: "#FFFFFF" },
   };
-  const s = map[status];
+  const s = map[status] || { label: status, bg: "#E5E7EB", text: "#2F2F2F" };
   return (
     <span
       className="text-[12px] px-3 py-2 rounded-full border border-black/10 font-sans font-semibold"

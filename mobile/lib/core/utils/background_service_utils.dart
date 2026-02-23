@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -91,7 +92,7 @@ class BackgroundServiceUtils {
     // check and request location permissions
     bool hasPermission = await _checkLocationPermission();
     if (!hasPermission) {
-      debugPrint('Location permission denied, stopping background service');
+      if (kDebugMode) debugPrint('Location permission denied, stopping background service');
       service.stopSelf();
       return;
     }
@@ -163,8 +164,6 @@ class BackgroundServiceUtils {
             );
           }
 
-          previousPosition = position;
-
           // send location to server
           await trackingService.sendLocation(
             position.latitude,
@@ -185,8 +184,10 @@ class BackgroundServiceUtils {
                   "آخر تحديث: ${DateTime.now().toLocal().toString().split('.')[0]}",
             );
           }
+
+          previousPosition = position;
         } catch (e) {
-          debugPrint('Error in background loop: $e');
+          if (kDebugMode) debugPrint('Error in background loop: $e');
           // Do NOT stop service on temporary errors, just log and retry next tick
         }
 
@@ -219,15 +220,17 @@ class BackgroundServiceUtils {
       // if still denied or denied forever, return false
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        debugPrint(
-            'Location permission denied: ${permission == LocationPermission.deniedForever ? "forever" : "by user"}');
+        if (kDebugMode) {
+          debugPrint(
+              'Location permission denied: ${permission == LocationPermission.deniedForever ? "forever" : "by user"}');
+        }
         return false;
       }
 
       // permission granted (whileInUse or always)
       return true;
     } catch (e) {
-      debugPrint('Error checking location permission: $e');
+      if (kDebugMode) debugPrint('Error checking location permission: $e');
       return false;
     }
   }

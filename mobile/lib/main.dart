@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -19,6 +20,7 @@ import 'data/services/issues_service.dart';
 import 'data/repositories/local/attendance_local_repository.dart';
 import 'data/repositories/local/task_local_repository.dart';
 import 'data/repositories/local/issue_local_repository.dart';
+import 'data/repositories/local/zone_local_repository.dart';
 import 'providers/auth_manager.dart';
 import 'providers/task_manager.dart';
 import 'providers/attendance_manager.dart';
@@ -75,16 +77,17 @@ Future<void> _initializeServices() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
       await FirebaseMessagingService().initialize();
-      debugPrint('Firebase initialized successfully');
+      if (kDebugMode) debugPrint('Firebase initialized successfully');
     } catch (e) {
-      debugPrint(
-          'Firebase initialization error (will continue without notifications): $e');
+      if (kDebugMode) {
+        debugPrint('Firebase initialization error (will continue without notifications): $e');
+      }
     }
 
     // initialize Background Tracking Service
     await BackgroundServiceUtils.initializeService();
   } catch (e) {
-    debugPrint('Error initializing services: $e');
+    if (kDebugMode) debugPrint('Error initializing services: $e');
   }
 }
 
@@ -101,6 +104,7 @@ class FollowUpApp extends StatelessWidget {
     final attendanceLocalRepo = AttendanceLocalRepository();
     final taskLocalRepo = TaskLocalRepository();
     final issueLocalRepo = IssueLocalRepository();
+    final zoneLocalRepo = ZoneLocalRepository(); // Section 3.5.2: Offline zones
 
     // create sync service
     final syncService = SyncService(
@@ -108,6 +112,7 @@ class FollowUpApp extends StatelessWidget {
       attendanceLocalRepo,
       taskLocalRepo,
       issueLocalRepo,
+      zoneLocalRepo,
       TasksService(),
       IssuesService(),
     );

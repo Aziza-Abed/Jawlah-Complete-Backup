@@ -41,9 +41,19 @@ public class Issue
     public DateTime? SyncTime { get; set; }
     public bool IsSynced { get; set; }
     public int SyncVersion { get; set; }
+
+    // Issue forwarding to municipal departments (SR15)
+    public int? ForwardedToDepartmentId { get; set; }
+    public DateTime? ForwardedAt { get; set; }
+    public string? ForwardingNotes { get; set; }
+    public int? ForwardedByUserId { get; set; }
+
+    // Client-generated UUID for idempotent sync (prevents duplicate issues on retry)
+    public string? ClientId { get; set; }
     public User ReportedByUser { get; set; } = null!;
     public User? ResolvedByUser { get; set; }
     public Zone? Zone { get; set; }
+    public Department? ForwardedToDepartment { get; set; }
 
     // helper method to get all photos (both legacy PhotoUrl and Photos collection)
     public IEnumerable<string> GetAllPhotoUrls()

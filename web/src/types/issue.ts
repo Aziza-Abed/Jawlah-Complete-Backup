@@ -1,7 +1,7 @@
 // Issue types matching backend DTOs
 
-export type IssueType = "Infrastructure" | "Safety" | "Sanitation" | "Equipment" | "Other";
-export type IssueSeverity = "Minor" | "Medium" | "Major" | "Critical";
+export type IssueType = "Infrastructure" | "Safety" | "Cleanliness" | "Equipment" | "Other";
+export type IssueSeverity = "Low" | "Medium" | "High" | "Critical";
 export type IssueStatus = "Reported" | "UnderReview" | "Resolved" | "Dismissed";
 
 export type IssueResponse = {
@@ -22,9 +22,20 @@ export type IssueResponse = {
   reportedAt: string;
   resolvedAt?: string;
   resolutionNotes?: string;
+  // Forwarding info
+  forwardedToDepartmentId?: number;
+  forwardedToDepartmentName?: string;
+  forwardedAt?: string;
+  forwardingNotes?: string;
+
   syncTime?: string;
   syncVersion: number;
   priority: string; // Alias for severity (for web dashboard compatibility)
+};
+
+export type ForwardIssueRequest = {
+  departmentId: number;
+  notes?: string;
 };
 
 export type CreateIssueRequest = {

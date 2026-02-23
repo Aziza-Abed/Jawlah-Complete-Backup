@@ -51,8 +51,12 @@ public class FileUploadOperationFilter : IOperationFilter
             }
         }
 
-        // replace operation parameters with request body
+        // remove only form parameters (keep path/query/header params like {id})
+        var formParamNames = formParameters.Select(p => p.Name).ToHashSet();
+        var nonFormParams = operation.Parameters.Where(p => !formParamNames.Contains(p.Name)).ToList();
         operation.Parameters.Clear();
+        foreach (var p in nonFormParams)
+            operation.Parameters.Add(p);
         operation.RequestBody = new OpenApiRequestBody
         {
             Content =

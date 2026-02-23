@@ -6,6 +6,7 @@ import '../../presentation/widgets/base_screen.dart';
 import '../../core/routing/app_router.dart';
 import '../../providers/attendance_manager.dart';
 import '../../providers/auth_manager.dart';
+import '../../providers/sync_manager.dart';
 import '../../core/utils/date_formatter.dart';
 import 'widgets/live_work_duration.dart';
 
@@ -272,6 +273,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _handleLogout(BuildContext context) async {
+    final syncManager = context.read<SyncManager>();
+    final pendingCount = syncManager.waitingItems;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -280,8 +284,27 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         title: const Text('تسجيل الخروج',
             textAlign: TextAlign.right,
             style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
-        content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج من التطبيق؟',
-            textAlign: TextAlign.right, style: TextStyle(fontFamily: 'Cairo')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text('هل أنت متأكد من رغبتك في تسجيل الخروج من التطبيق؟',
+                textAlign: TextAlign.right, style: TextStyle(fontFamily: 'Cairo')),
+            if (pendingCount > 0) ...[
+              const SizedBox(height: 12),
+              Text(
+                'تحذير: $pendingCount عنصر غير مرفوع سيتم فقدانه!',
+                style: const TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.warning,
+                ),
+                textAlign: TextAlign.right,
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

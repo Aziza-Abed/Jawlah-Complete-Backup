@@ -46,7 +46,7 @@ class AttendanceLocalRepository {
       );
     } catch (e) {
       // no attendance found for today - return null instead of throwing
-      debugPrint('No attendance found for user $userId today: $e');
+      if (kDebugMode) debugPrint('No attendance found for user $userId today: $e');
       return null;
     }
   }
@@ -68,7 +68,7 @@ class AttendanceLocalRepository {
       attendance.syncedAt = DateTime.now();
       await attendance.save();
     } catch (e) {
-      debugPrint('Attendance $clientId not found in local DB: $e');
+      if (kDebugMode) debugPrint('Attendance $clientId not found in local DB: $e');
     }
   }
 

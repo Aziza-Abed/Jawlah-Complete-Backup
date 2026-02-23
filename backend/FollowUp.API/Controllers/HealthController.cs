@@ -66,7 +66,6 @@ public class HealthController : ControllerBase
             {
                 status = "غير صحي",
                 message = "فشل فحص الصحة",
-                error = ex.Message,
                 timestamp = DateTime.UtcNow
             });
         }

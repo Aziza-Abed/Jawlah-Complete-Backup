@@ -139,7 +139,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.Property<string>("ApprovalStatus")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("ApprovedAt")
                         .HasColumnType("datetime2");
@@ -149,7 +150,12 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.Property<string>("AttendanceType")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<double?>("CheckInAccuracyMeters")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("float(10)");
 
                     b.Property<DateTime>("CheckInDate")
                         .ValueGeneratedOnAddOrUpdate()
@@ -169,6 +175,10 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.Property<DateTime?>("CheckInSyncTime")
                         .HasColumnType("datetime2");
+
+                    b.Property<double?>("CheckOutAccuracyMeters")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("float(10)");
 
                     b.Property<DateTime?>("CheckOutEventTime")
                         .HasColumnType("datetime2");
@@ -200,7 +210,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ManualReason")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("MunicipalityId")
                         .HasColumnType("int");
@@ -260,29 +271,42 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
 
                     b.Property<string>("Details")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("IpAddress")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
 
                     b.Property<string>("UserAgent")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int?>("UserId")
                         .HasColumnType("int");
 
                     b.Property<string>("Username")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.HasKey("AuditLogId");
 
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_AuditLogs_CreatedAt");
+
                     b.HasIndex("UserId");
+
+                    b.HasIndex("Action", "CreatedAt")
+                        .HasDatabaseName("IX_AuditLogs_Action_CreatedAt");
 
                     b.ToTable("AuditLogs");
                 });
@@ -407,6 +431,10 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IssueId"));
 
+                    b.Property<string>("ClientId")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -414,6 +442,19 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.Property<DateTime>("EventTime")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ForwardedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ForwardedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ForwardedToDepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ForwardingNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<bool>("IsSynced")
                         .HasColumnType("bit");
@@ -483,6 +524,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.HasKey("IssueId");
 
+                    b.HasIndex("ForwardedToDepartmentId");
+
                     b.HasIndex("MunicipalityId");
 
                     b.HasIndex("ReportedAt");
@@ -494,6 +537,11 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.HasIndex("Type");
 
                     b.HasIndex("ZoneId");
+
+                    b.HasIndex("ReportedByUserId", "ClientId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Issue_UniqueClientId")
+                        .HasFilter("[ClientId] IS NOT NULL");
 
                     b.HasIndex("ReportedByUserId", "Status")
                         .HasDatabaseName("IX_Issue_Reporter_Status");
@@ -777,6 +825,58 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasDatabaseName("IX_Photos_EntityType_EntityId");
 
                     b.ToTable("Photos");
+                });
+
+            modelBuilder.Entity("FollowUp.Core.Entities.RefreshToken", b =>
+                {
+                    b.Property<int>("RefreshTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RefreshTokenId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ReplacedByToken")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("RefreshTokenId");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("IX_RefreshToken_ExpiresAt");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RefreshToken_Token");
+
+                    b.HasIndex("UserId", "RevokedAt", "ExpiresAt")
+                        .HasDatabaseName("IX_RefreshToken_User_Active");
+
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("FollowUp.Core.Entities.Task", b =>
@@ -1095,7 +1195,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("PendingJwtToken")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
@@ -1109,7 +1210,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.Property<string>("SessionToken")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
@@ -1180,7 +1282,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("LastWarningReason")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("LockoutEndTime")
                         .HasColumnType("datetime2");
@@ -1198,7 +1301,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("RegisteredDeviceId")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("Role")
                         .HasColumnType("int");
@@ -1346,11 +1450,9 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.HasIndex("IsActive")
                         .HasDatabaseName("IX_Zone_IsActive");
 
-                    b.HasIndex("MunicipalityId");
-
-                    b.HasIndex("ZoneCode")
+                    b.HasIndex("MunicipalityId", "ZoneCode")
                         .IsUnique()
-                        .HasDatabaseName("IX_Zone_ZoneCode_Unique");
+                        .HasDatabaseName("IX_Zone_Municipality_ZoneCode_Unique");
 
                     b.ToTable("Zones");
                 });
@@ -1385,7 +1487,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                 {
                     b.HasOne("FollowUp.Core.Entities.User", "ApprovedByUser")
                         .WithMany()
-                        .HasForeignKey("ApprovedByUserId");
+                        .HasForeignKey("ApprovedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("FollowUp.Core.Entities.Municipality", "Municipality")
                         .WithMany("Attendances")
@@ -1417,7 +1520,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                 {
                     b.HasOne("FollowUp.Core.Entities.User", "User")
                         .WithMany()
-                        .HasForeignKey("UserId");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
                 });
@@ -1446,6 +1550,11 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("FollowUp.Core.Entities.Issue", b =>
                 {
+                    b.HasOne("FollowUp.Core.Entities.Department", "ForwardedToDepartment")
+                        .WithMany()
+                        .HasForeignKey("ForwardedToDepartmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("FollowUp.Core.Entities.Municipality", "Municipality")
                         .WithMany("Issues")
                         .HasForeignKey("MunicipalityId")
@@ -1467,6 +1576,8 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .WithMany("Issues")
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ForwardedToDepartment");
 
                     b.Navigation("Municipality");
 
@@ -1529,6 +1640,17 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Navigation("Task");
 
                     b.Navigation("UploadedByUser");
+                });
+
+            modelBuilder.Entity("FollowUp.Core.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("FollowUp.Core.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FollowUp.Core.Entities.Task", b =>

@@ -186,4 +186,37 @@ class IssuesService {
           'حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.');
     }
   }
+
+  // SR15: Forward issue to a department
+  Future<IssueModel> forwardIssue({
+    required int issueId,
+    required int departmentId,
+    String? notes,
+  }) async {
+    try {
+      final requestData = <String, dynamic>{
+        'departmentId': departmentId,
+      };
+      if (notes != null && notes.isNotEmpty) {
+        requestData['notes'] = notes;
+      }
+
+      final response = await _apiService.post(
+        '${ApiConfig.myIssues}/$issueId/forward',
+        data: requestData,
+      );
+
+      final responseData = response.data;
+      if (responseData['success'] != true) {
+        throw ServerException(
+          responseData['message'] ?? 'فشل تحويل البلاغ.',
+        );
+      }
+      return IssueModel.fromJson(responseData['data']);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw ServerException(
+          'حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.');
+    }
+  }
 }

@@ -4,7 +4,7 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.2.0 <4.0.0"
+  sdk: ">=3.10.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -23,13 +23,14 @@ dependencies:
   # ============ LOCAL STORAGE & SECURITY ============
   shared_preferences: ^2.2.3
   flutter_secure_storage: ^9.2.2 # SECURE storage for JWT tokens
-  crypto: ^3.0.3 # For PIN hashing
+  crypto: ^3.0.3 # For local password hashing
 
   # ============ GPS LOCATION ============
   geolocator: ^14.0.2
   permission_handler: ^12.0.1
   flutter_map: ^7.0.2 # OSM map display (no API key needed)
   latlong2: ^0.9.1 # Latitude/Longitude utilities for flutter_map
+  maps_toolkit: ^3.0.0 # Point-in-polygon for offline zone validation (Section 3.5.2)
 
   # ============ BATTERY MONITORING ============
   battery_plus: ^6.0.3

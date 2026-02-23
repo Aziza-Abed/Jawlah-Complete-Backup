@@ -1,3 +1,5 @@
+import '../../core/utils/date_formatter.dart';
+
 class AppealModel {
   final int appealId;
   final String appealType; // "TaskRejection" or "AttendanceFailure"
@@ -69,10 +71,10 @@ class AppealModel {
       reviewedByUserId: json['reviewedByUserId'] as int?,
       reviewedByName: json['reviewedByName'] as String?,
       reviewedAt: json['reviewedAt'] != null
-          ? DateTime.parse(json['reviewedAt'] as String)
+          ? DateFormatter.parseUtc(json['reviewedAt'] as String)
           : null,
       reviewNotes: json['reviewNotes'] as String?,
-      submittedAt: DateTime.parse(json['submittedAt'] as String),
+      submittedAt: DateFormatter.parseUtc(json['submittedAt'] as String),
       evidencePhotoUrl: json['evidencePhotoUrl'] as String?,
       originalRejectionReason: json['originalRejectionReason'] as String?,
       entityTitle: json['entityTitle'] as String?,

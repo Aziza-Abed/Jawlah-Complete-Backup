@@ -25,6 +25,7 @@ class AttendanceService {
         data: {
           'latitude': position.latitude,
           'longitude': position.longitude,
+          'accuracy': position.accuracy,
         },
       );
 
@@ -55,6 +56,7 @@ class AttendanceService {
         data: {
           'latitude': position.latitude,
           'longitude': position.longitude,
+          'accuracy': position.accuracy,
         },
       );
 

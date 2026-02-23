@@ -10,7 +10,7 @@ public class LoginWithGPSRequest
     public string Username { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "كلمة المرور مطلوبة")]
-    [StringLength(100, ErrorMessage = "كلمة المرور طويلة جداً")]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "كلمة المرور يجب أن تكون بين 8 و 100 حرف")]
     public string Password { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Latitude is required")]

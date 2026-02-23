@@ -1,3 +1,4 @@
+using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Departments;
 using FollowUp.Core.Entities;
@@ -106,10 +107,10 @@ public class DepartmentsController : BaseApiController
         var department = new Department
         {
             MunicipalityId = municipality.MunicipalityId,
-            Name = request.Name.Trim(),
-            NameEnglish = request.NameEnglish?.Trim(),
+            Name = InputSanitizer.SanitizeString(request.Name, 100),
+            NameEnglish = InputSanitizer.SanitizeString(request.NameEnglish, 100),
             Code = request.Code.Trim().ToUpper(),
-            Description = request.Description?.Trim(),
+            Description = InputSanitizer.SanitizeString(request.Description, 500),
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -156,13 +157,13 @@ public class DepartmentsController : BaseApiController
         }
 
         if (!string.IsNullOrWhiteSpace(request.Name))
-            department.Name = request.Name.Trim();
+            department.Name = InputSanitizer.SanitizeString(request.Name, 100);
 
         if (request.NameEnglish != null)
-            department.NameEnglish = request.NameEnglish.Trim();
+            department.NameEnglish = InputSanitizer.SanitizeString(request.NameEnglish, 100);
 
         if (request.Description != null)
-            department.Description = request.Description.Trim();
+            department.Description = InputSanitizer.SanitizeString(request.Description, 500);
 
         if (request.IsActive.HasValue)
             department.IsActive = request.IsActive.Value;

@@ -2,12 +2,14 @@ using AutoMapper;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Notifications;
 using FollowUp.Core.Interfaces.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FollowUp.API.Controllers;
 
 // this controller handle user notifications
 [Route("api/[controller]")]
+[Authorize]
 public class NotificationsController : BaseApiController
 {
     private readonly INotificationRepository _notices;

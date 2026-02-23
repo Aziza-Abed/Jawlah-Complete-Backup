@@ -11,6 +11,7 @@ public class LoginWithGPSResponse
     public UserDto? User { get; set; }
     public AttendanceResponse? Attendance { get; set; }  // Auto-created attendance
     public string Message { get; set; } = string.Empty;
+    public string? RefreshToken { get; set; }
     public string? Error { get; set; }
 
     // Flat fields for mobile compatibility

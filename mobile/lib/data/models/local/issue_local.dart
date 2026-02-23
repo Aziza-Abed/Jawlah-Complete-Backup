@@ -49,6 +49,27 @@ class IssueLocal extends HiveObject {
   @HiveField(14)
   DateTime? syncedAt;
 
+  // Issue forwarding fields (SR15)
+  @HiveField(15)
+  int? forwardedToDepartmentId;
+
+  @HiveField(16)
+  String? forwardedToDepartmentName;
+
+  @HiveField(17)
+  DateTime? forwardedAt;
+
+  @HiveField(18)
+  String? forwardingNotes;
+
+  // Version tracking for conflict resolution (nullable for safe Hive migration)
+  @HiveField(19)
+  int? syncVersion;
+
+  // Issue status from server (Reported, UnderReview, Resolved, Dismissed)
+  @HiveField(20)
+  String? status;
+
   IssueLocal({
     this.clientId,
     this.serverId,
@@ -65,22 +86,12 @@ class IssueLocal extends HiveObject {
     this.isSynced = false,
     required this.createdAt,
     this.syncedAt,
+    this.forwardedToDepartmentId,
+    this.forwardedToDepartmentName,
+    this.forwardedAt,
+    this.forwardingNotes,
+    this.syncVersion,
+    this.status,
   });
 
-  // convert to sync DTO
-  Map<String, dynamic> toSyncDto() {
-    return {
-      'clientId': clientId,
-      'title': title,
-      'description': description,
-      'type': type,
-      'severity': severity,
-      'reportedByUserId': reportedByUserId,
-      'latitude': latitude,
-      'longitude': longitude,
-      'locationDescription': locationDescription,
-      'photoUrl': photoUrl,
-      'reportedAt': reportedAt.toIso8601String(),
-    };
-  }
 }

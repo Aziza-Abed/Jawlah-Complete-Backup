@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using AutoMapper;
 using FollowUp.API.Models;
 using FollowUp.API.Utils;
@@ -8,6 +7,7 @@ using FollowUp.Core.DTOs.Tasks;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
+using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +19,7 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle all task operations
 [Route("api/[controller]")]
+[Authorize]
 public class TasksController : BaseApiController
 {
     private readonly ITaskRepository _tasks;
@@ -30,6 +31,7 @@ public class TasksController : BaseApiController
     private readonly INotificationService _notifications;
     private readonly IMapper _mapper;
     private readonly IConfiguration _config;
+    private readonly AuditLogService _audit;
 
     // max number of active tasks per worker (fair distribution)
     private const int MaxActiveTasksPerWorker = 5;
@@ -47,7 +49,8 @@ public class TasksController : BaseApiController
         IFileStorageService files,
         INotificationService notifications,
         IMapper mapper,
-        IConfiguration config)
+        IConfiguration config,
+        AuditLogService audit)
     {
         _tasks = tasks;
         _photos = photos;
@@ -58,6 +61,7 @@ public class TasksController : BaseApiController
         _notifications = notifications;
         _mapper = mapper;
         _config = config;
+        _audit = audit;
     }
 
     // get tasks for current worker
@@ -236,6 +240,24 @@ public class TasksController : BaseApiController
                 teamId, teamWorkers.Count);
         }
 
+        // validate task coordinates fall within the assigned zone (skip if geofencing disabled)
+        var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
+        if (!disableGeofencing && request.Latitude.HasValue && request.Longitude.HasValue && request.ZoneId.HasValue)
+        {
+            var zone = await _zones.GetByIdAsync(request.ZoneId.Value);
+            if (zone?.Boundary != null)
+            {
+                var taskPoint = NetTopologySuite.Geometries.GeometryFactory.Default.CreatePoint(
+                    new NetTopologySuite.Geometries.Coordinate(request.Longitude.Value, request.Latitude.Value));
+
+                if (!zone.Boundary.Contains(taskPoint))
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResponse(
+                        "موقع المهمة خارج حدود المنطقة المحددة. يرجى اختيار موقع داخل المنطقة."));
+                }
+            }
+        }
+
         // create task entity
         var task = new TaskEntity
         {
@@ -266,6 +288,12 @@ public class TasksController : BaseApiController
 
         await _tasks.AddAsync(task);
         await _tasks.SaveChangesAsync();
+
+        // UC17: Audit log for task creation
+        await _audit.LogAsync(userId, currentUser.Username, "TaskCreated",
+            $"إنشاء مهمة: {task.Title} (#{task.TaskId})",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
 
         // send notification to assigned worker or team members
         try
@@ -314,12 +342,12 @@ public class TasksController : BaseApiController
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 50;
 
-        var currentRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        var currentRole = GetCurrentUserRole();
         var currentUserId = GetCurrentUserId();
 
         // SECURITY FIX: Filter at database level, not in memory
         IEnumerable<TaskEntity> allTasks;
-        if (currentRole?.Equals("Supervisor", StringComparison.OrdinalIgnoreCase) == true && currentUserId.HasValue)
+        if (currentRole == "Supervisor" && currentUserId.HasValue)
         {
             // Get worker IDs assigned to this supervisor
             var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
@@ -491,6 +519,13 @@ public class TasksController : BaseApiController
         await _tasks.UpdateAsync(task);
         await _tasks.SaveChangesAsync();
 
+        // UC17: Audit log for task status update
+        var currentUser = userId.HasValue ? await _users.GetByIdAsync(userId.Value) : null;
+        await _audit.LogAsync(userId, currentUser?.Username, "TaskUpdated",
+            $"تحديث حالة المهمة #{task.TaskId} إلى {request.Status}",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
         return Ok(ApiResponse<TaskResponse>.SuccessResponse(_mapper.Map<TaskResponse>(task)));
     }
 
@@ -589,7 +624,7 @@ public class TasksController : BaseApiController
                 // FIRST ATTEMPT: Issue warning and keep task InProgress for retry
                 if (task.FailedCompletionAttempts == 1)
                 {
-                    var warningMessage = $"⚠️ تحذير: الموقع غير مطابق لموقع المهمة. المسافة: {completionDistanceMeters} متر (الحد الأقصى: {HardRejectDistanceMeters} متر)";
+                    var warningMessage = $"تحذير: الموقع غير مطابق لموقع المهمة. المسافة: {completionDistanceMeters} متر (الحد الأقصى: {HardRejectDistanceMeters} متر)";
 
                     // Keep task as InProgress so worker can retry
                     task.Status = TaskStatus.InProgress;
@@ -658,8 +693,8 @@ public class TasksController : BaseApiController
 
                     return BadRequest(ApiResponse<object>.ErrorResponse(
                         $"{warningMessage}\n\n" +
-                        $"💡 هذه المحاولة الأولى. لديك فرصة أخرى لإعادة المحاولة من الموقع الصحيح.\n" +
-                        $"✅ تم حفظ الصورة التي أرسلتها.\n\n" +
+                        $"هذه المحاولة الأولى. لديك فرصة أخرى لإعادة المحاولة من الموقع الصحيح.\n" +
+                        $"تم حفظ الصورة التي أرسلتها.\n\n" +
                         $"يرجى التأكد من موقعك والمحاولة مرة أخرى."));
                 }
 
@@ -741,10 +776,10 @@ public class TasksController : BaseApiController
                         id, userId, completionDistanceMeters, HardRejectDistanceMeters);
 
                     return BadRequest(ApiResponse<object>.ErrorResponse(
-                        $"⚠️ تم رفض الإثبات تلقائياً\n{rejectionReason}\n\n" +
-                        $"📝 هذا الرفض تقني وليس عقوبة.\n" +
+                        $"تم رفض الإثبات تلقائياً\n{rejectionReason}\n\n" +
+                        $"هذا الرفض تقني وليس عقوبة.\n" +
                         $"إذا كنت قد أنجزت المهمة فعلاً، سيقوم المشرف بمراجعة الصورة واتخاذ القرار المناسب.\n\n" +
-                        $"✅ تم حفظ الصورة التي أرسلتها للمراجعة.\n" +
+                        $"تم حفظ الصورة التي أرسلتها للمراجعة.\n" +
                         $"يرجى الاتصال بالمشرف للمتابعة."));
                 }
             }
@@ -768,7 +803,7 @@ public class TasksController : BaseApiController
             // Add distance warning to notes if applicable
             if (isDistanceWarning && completionDistanceMeters.HasValue)
             {
-                var warningNote = $"⚠️ تنبيه: تم الإنجاز على بعد {completionDistanceMeters}م من موقع المهمة";
+                var warningNote = $"تنبيه: تم الإنجاز على بعد {completionDistanceMeters}م من موقع المهمة";
                 sanitizedNotes = string.IsNullOrEmpty(sanitizedNotes)
                     ? warningNote
                     : $"{warningNote}\n{sanitizedNotes}";
@@ -820,6 +855,20 @@ public class TasksController : BaseApiController
                     task.TaskId,
                     task.Title,
                     workerName);
+
+                // team task: notify other team members that a teammate completed the task
+                if (task.IsTeamTask && task.TeamId.HasValue)
+                {
+                    var allWorkers = await _users.GetByRoleAsync(UserRole.Worker);
+                    var teammates = allWorkers.Where(w => w.TeamId == task.TeamId.Value && w.UserId != userId.Value);
+                    foreach (var mate in teammates)
+                    {
+                        await _notifications.SendTaskUpdatedNotificationAsync(
+                            mate.UserId,
+                            task.TaskId,
+                            $"{task.Title} - أكملها {workerName} نيابة عن الفريق");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -838,6 +887,13 @@ public class TasksController : BaseApiController
 
         _logger.LogInformation("Task {TaskId} completed by user {UserId} with photo {PhotoUrl}",
             id, userId, photoUrl);
+
+        // UC17: Audit log for task completion
+        var completer = await _users.GetByIdAsync(userId!.Value);
+        await _audit.LogAsync(userId, completer?.Username, "TaskCompleted",
+            $"إكمال مهمة: {task.Title} (#{task.TaskId})",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
 
         return Ok(ApiResponse<TaskResponse>.SuccessResponse(_mapper.Map<TaskResponse>(task)));
     }
@@ -869,7 +925,7 @@ public class TasksController : BaseApiController
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 50;
 
-        // workers see only there overdue tasks
+        // workers see only their overdue tasks
         IEnumerable<TaskEntity> tasks;
         if (userRole == "Worker")
         {
@@ -878,6 +934,14 @@ public class TasksController : BaseApiController
         else
         {
             tasks = await _tasks.GetOverdueTasksAsync(null);
+
+            // supervisors see only their workers' overdue tasks
+            if (userRole == "Supervisor" && userId.HasValue)
+            {
+                var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
+                var myWorkerIds = myWorkers.Where(w => w.SupervisorId == userId.Value).Select(w => w.UserId).ToHashSet();
+                tasks = tasks.Where(t => myWorkerIds.Contains(t.AssignedToUserId));
+            }
         }
 
         // paginate results
@@ -1023,7 +1087,7 @@ public class TasksController : BaseApiController
                     await _notifications.SendTaskUpdatedNotificationAsync(
                         member.UserId,
                         task.TaskId,
-                        $"✅ تمت الموافقة: {task.Title}");
+                        $"تمت الموافقة: {task.Title}");
                 }
             }
             else
@@ -1099,7 +1163,7 @@ public class TasksController : BaseApiController
                     await _notifications.SendTaskUpdatedNotificationAsync(
                         member.UserId,
                         task.TaskId,
-                        $"❌ تم رفض: {task.Title}");
+                        $"تم رفض: {task.Title}");
                 }
             }
             else
@@ -1186,11 +1250,13 @@ public class TasksController : BaseApiController
         if (request.ProgressPercentage < 0 || request.ProgressPercentage > 100)
             return BadRequest(ApiResponse<object>.ErrorResponse("نسبة التقدم يجب أن تكون بين 0 و 100"));
 
-        // FIX 4: BACKWARDS PROGRESS WARNING - Log if progress decreased
+        // Chapter 5 Fix: Block backward progress - progress can only increase
         if (request.ProgressPercentage < task.ProgressPercentage)
         {
-            _logger.LogWarning("Task {TaskId} progress decreased from {Old}% to {New}% by user {UserId}",
+            _logger.LogWarning("Task {TaskId} progress decrease blocked: {Old}% to {New}% by user {UserId}",
                 id, task.ProgressPercentage, request.ProgressPercentage, userId);
+            return BadRequest(ApiResponse<object>.ErrorResponse(
+                $"لا يمكن تقليل نسبة التقدم. النسبة الحالية: {task.ProgressPercentage}%"));
         }
 
         // optional location verification for progress updates
@@ -1308,8 +1374,8 @@ public class TasksController : BaseApiController
                 return Forbid();
         }
 
-        // don't allow reassignment if task is already completed
-        if (task.Status == TaskStatus.Completed)
+        // don't allow reassignment if task is already completed or approved
+        if (task.Status == TaskStatus.Completed || task.Status == TaskStatus.Approved)
             return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكن إعادة تعيين مهمة مكتملة"));
 
         var oldAssignedUserId = task.AssignedToUserId;
@@ -1430,6 +1496,16 @@ public class TasksController : BaseApiController
 
         var allTasks = await _tasks.GetAllAsync();
 
+        // supervisors see only their workers' flagged tasks
+        var currentUserId = GetCurrentUserId();
+        var currentRole = GetCurrentUserRole();
+        if (currentRole == "Supervisor" && currentUserId.HasValue)
+        {
+            var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
+            var myWorkerIds = myWorkers.Where(w => w.SupervisorId == currentUserId.Value).Select(w => w.UserId).ToHashSet();
+            allTasks = allTasks.Where(t => myWorkerIds.Contains(t.AssignedToUserId));
+        }
+
         // filter for tasks with distance warnings or auto-rejections
         var flaggedTasks = allTasks
             .Where(t => t.IsDistanceWarning || t.IsAutoRejected)
@@ -1492,8 +1568,8 @@ public class TasksController : BaseApiController
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> ApproveRejectedTask(int id, [FromBody] ApproveOverrideRequest? request)
     {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out var supervisorId))
+        var supervisorId = GetCurrentUserId();
+        if (!supervisorId.HasValue)
             return Unauthorized(ApiResponse<object>.ErrorResponse("غير مصرح"));
 
         var task = await _tasks.GetByIdAsync(id);
@@ -1507,7 +1583,7 @@ public class TasksController : BaseApiController
             return BadRequest(ApiResponse<object>.ErrorResponse("هذه المهمة تم رفضها يدوياً. استخدم إعادة التعيين بدلاً من ذلك."));
 
         // Get supervisor info for logging
-        var supervisor = await _users.GetByIdAsync(supervisorId);
+        var supervisor = await _users.GetByIdAsync(supervisorId.Value);
         var supervisorName = supervisor?.FullName ?? "المشرف";
 
         // Approve task - change status to Completed
@@ -1515,11 +1591,11 @@ public class TasksController : BaseApiController
         task.CompletedAt = DateTime.UtcNow;
 
         // Add supervisor override note to completion notes
-        var overrideNote = $"✅ تمت الموافقة من قبل المشرف: {supervisorName}\nالسبب: العامل أنجز المهمة فعلياً، المشكلة كانت تقنية (GPS)";
+        var overrideNote = $"تمت الموافقة من قبل المشرف: {supervisorName}\nالسبب: العامل أنجز المهمة فعلياً، المشكلة كانت تقنية (GPS)";
 
         if (!string.IsNullOrEmpty(request?.SupervisorNotes))
         {
-            overrideNote += $"\nملاحظات المشرف: {request.SupervisorNotes}";
+            overrideNote += $"\nملاحظات المشرف: {InputSanitizer.SanitizeString(request.SupervisorNotes, 1000)}";
         }
 
         if (string.IsNullOrEmpty(task.CompletionNotes))
@@ -1562,7 +1638,7 @@ public class TasksController : BaseApiController
         {
             await _notifications.SendTaskUpdatedNotificationAsync(
                 task.AssignedToUserId, task.TaskId,
-                $"✅ تمت الموافقة على إنجاز المهمة: {task.Title}\n\nقام المشرف بمراجعة الصورة والموافقة على إنجازك. شكراً على جهودك!");
+                $"تمت الموافقة على إنجاز المهمة: {task.Title}\n\nقام المشرف بمراجعة الصورة والموافقة على إنجازك. شكراً على جهودك!");
         }
         catch (Exception ex)
         {

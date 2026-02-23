@@ -1,4 +1,6 @@
-﻿class AttendanceModel {
+﻿import '../../core/utils/date_formatter.dart';
+
+class AttendanceModel {
   final int attendanceId;
   final int userId;
   final String? employeeName;
@@ -59,15 +61,15 @@
       // backend uses 'checkInEventTime'
       // parse as UTC for correct timezone conversion
       checkInTime: json['checkInEventTime'] != null
-          ? _parseAsUtc(json['checkInEventTime'] as String)
+          ? DateFormatter.parseUtc(json['checkInEventTime'] as String)
           : (json['checkInTime'] != null
-              ? _parseAsUtc(json['checkInTime'] as String)
+              ? DateFormatter.parseUtc(json['checkInTime'] as String)
               : DateTime.now().toUtc()),
       // backend uses 'checkOutEventTime'
       checkOutTime: json['checkOutEventTime'] != null
-          ? _parseAsUtc(json['checkOutEventTime'] as String)
+          ? DateFormatter.parseUtc(json['checkOutEventTime'] as String)
           : (json['checkOutTime'] != null
-              ? _parseAsUtc(json['checkOutTime'] as String)
+              ? DateFormatter.parseUtc(json['checkOutTime'] as String)
               : null),
       checkInLatitude: (json['checkInLatitude'] as num).toDouble(),
       checkInLongitude: (json['checkInLongitude'] as num).toDouble(),
@@ -87,7 +89,7 @@
       // backend uses 'validationMessage'
       notes: json['validationMessage'] as String? ?? json['notes'] as String?,
       createdAt: json['createdAt'] != null
-          ? _parseAsUtc(json['createdAt'] as String)
+          ? DateFormatter.parseUtc(json['createdAt'] as String)
           : DateTime.now().toUtc(),
       // Lateness tracking
       lateMinutes: json['lateMinutes'] as int? ?? 0,
@@ -99,16 +101,6 @@
       manualReason: json['manualReason'] as String?,
       approvalStatus: json['approvalStatus'] as String? ?? 'AutoApproved',
     );
-  }
-
-  // helper to parse DateTime string as UTC regardless of format
-  static DateTime _parseAsUtc(String dateStr) {
-    // if already has Z suffix, parse normally
-    if (dateStr.endsWith('Z')) {
-      return DateTime.parse(dateStr);
-    }
-    // otherwise, add Z to force UTC parsing
-    return DateTime.parse('${dateStr}Z');
   }
 
   Map<String, dynamic> toJson() {
@@ -127,6 +119,13 @@
       'isValid': isValid,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
+      'lateMinutes': lateMinutes,
+      'earlyLeaveMinutes': earlyLeaveMinutes,
+      'overtimeMinutes': overtimeMinutes,
+      'attendanceType': attendanceType,
+      'isManual': isManual,
+      'manualReason': manualReason,
+      'approvalStatus': approvalStatus,
     };
   }
 
@@ -145,6 +144,13 @@
     bool? isValid,
     String? notes,
     DateTime? createdAt,
+    int? lateMinutes,
+    int? earlyLeaveMinutes,
+    int? overtimeMinutes,
+    String? attendanceType,
+    bool? isManual,
+    String? manualReason,
+    String? approvalStatus,
   }) {
     return AttendanceModel(
       attendanceId: attendanceId ?? this.attendanceId,
@@ -161,6 +167,13 @@
       isValid: isValid ?? this.isValid,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      lateMinutes: lateMinutes ?? this.lateMinutes,
+      earlyLeaveMinutes: earlyLeaveMinutes ?? this.earlyLeaveMinutes,
+      overtimeMinutes: overtimeMinutes ?? this.overtimeMinutes,
+      attendanceType: attendanceType ?? this.attendanceType,
+      isManual: isManual ?? this.isManual,
+      manualReason: manualReason ?? this.manualReason,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
     );
   }
 
@@ -190,27 +203,10 @@
     }
   }
 
-  String get checkInTimeFormatted {
-    // convert to local time time before displaying
-    final localTime = checkInTime.toLocal();
-    final hour = localTime.hour;
-    final minute = localTime.minute.toString().padLeft(2, '0');
-    final period = hour < 12 ? 'ص' : 'م';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    return '$displayHour:$minute $period';
-  }
+  String get checkInTimeFormatted => DateFormatter.formatTime12h(checkInTime);
 
-  String? get checkOutTimeFormatted {
-    if (checkOutTime == null) return null;
-
-    // convert to local time time before displaying
-    final localTime = checkOutTime!.toLocal();
-    final hour = localTime.hour;
-    final minute = localTime.minute.toString().padLeft(2, '0');
-    final period = hour < 12 ? 'ص' : 'م';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    return '$displayHour:$minute $period';
-  }
+  String? get checkOutTimeFormatted =>
+      checkOutTime != null ? DateFormatter.formatTime12h(checkOutTime!) : null;
 
   @override
   String toString() {

@@ -1,57 +1,54 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import AuthLayout from "../components/auth/AuthLayout";
-
-function digitsOnly(value: string) {
-  return value.replace(/\D/g, "");
-}
+import { forgotPassword } from "../api/auth";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
 
-  const [phone, setPhone] = useState("");
+  const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
-  const normalizedPhone = useMemo(() => digitsOnly(phone), [phone]);
-
-  const phoneLooksValid = useMemo(() => {
-    // Accept 10 digits local (e.g., 059xxxxxxx) or 12 digits with 970 (e.g., 97059xxxxxxx)
-    const p = normalizedPhone;
-    const isLocal = p.length === 10 && p.startsWith("05");
-    const isIntl = p.length === 12 && p.startsWith("9705");
-    return isLocal || isIntl;
-  }, [normalizedPhone]);
+  const usernameValid = username.trim().length >= 2;
 
   const onSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setInfo("");
 
-    if (!phoneLooksValid) {
-      setError("رقم الهاتف غير صحيح. أدخل رقمًا مثل 059xxxxxxx.");
+    if (!usernameValid) {
+      setError("اسم المستخدم غير صحيح.");
       return;
     }
 
     setLoading(true);
     try {
-      // TODO backend: validate phone exists, then send OTP
-      // POST /auth/forgot-password/send-otp { phone }
-      await new Promise((r) => setTimeout(r, 600));
+      const result = await forgotPassword({ username: username.trim() });
 
-      setInfo("تم إرسال رمز التحقق إلى رقم الهاتف.");
-      navigate("/verify-otp", { state: { phone: normalizedPhone } });
-    } catch (err) {
-      setError("رقم الهاتف غير مسجّل أو غير صحيح.");
+      if (result.success && result.sessionToken) {
+        setInfo("تم إرسال رمز التحقق إلى رقم الهاتف.");
+        navigate("/verify-otp", {
+          state: {
+            sessionToken: result.sessionToken,
+            maskedPhone: result.maskedPhone || "****",
+            username: username.trim(),
+          },
+        });
+      } else {
+        setError(result.message || "فشل إرسال رمز التحقق.");
+      }
+    } catch {
+      setError("حدث خطأ. يرجى المحاولة مرة أخرى.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout title="استعادة كلمة المرور" subtitle="أدخل رقم الهاتف المسجّل">
+    <AuthLayout title="استعادة كلمة المرور" subtitle="أدخل اسم المستخدم الخاص بك">
       {error && (
         <div className="mb-4 p-3 rounded-[12px] bg-red-100 text-red-700 text-right font-sans font-semibold">
           {error}
@@ -64,26 +61,23 @@ export default function ForgotPassword() {
       )}
 
       <form onSubmit={onSendCode} className="space-y-5">
-        <Field label="رقم الهاتف">
+        <Field label="اسم المستخدم">
           <input
-            value={phone}
-            onChange={(e) => setPhone(digitsOnly(e.target.value))}
-            placeholder="مثال: 059xxxxxxx"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="أدخل اسم المستخدم"
             required
             disabled={loading}
-            inputMode="numeric"
-            pattern="\d*"
-            maxLength={12}
             className="w-full h-[46px] rounded-[12px] bg-white border border-black/10 px-4 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
           />
         </Field>
 
         <button
           type="submit"
-          disabled={loading || !phoneLooksValid}
+          disabled={loading || !usernameValid}
           className="w-full h-[52px] rounded-[12px] bg-[#7895B2] text-white font-sans font-semibold text-[16px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 disabled:opacity-50"
         >
-          {loading ? "جاري الإرسال..." : "إرسال الرمز"}
+          {loading ? "جاري الإرسال..." : "إرسال رمز التحقق"}
         </button>
 
         <div className="flex items-center justify-between text-[13px]">
@@ -93,7 +87,7 @@ export default function ForgotPassword() {
           >
             رجوع لتسجيل الدخول
           </Link>
-          <span className="text-[#6B7280]">سيتم إرسال OTP</span>
+          <span className="text-[#6B7280]">سيتم إرسال OTP إلى هاتفك المسجّل</span>
         </div>
       </form>
     </AuthLayout>

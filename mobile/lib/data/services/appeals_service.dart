@@ -1,16 +1,13 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 
+import '../../core/config/api_config.dart';
 import '../../core/errors/app_exception.dart';
 import '../models/appeal_model.dart';
 import 'api_service.dart';
 
 class AppealsService {
   final ApiService _apiService = ApiService();
-
-  // Appeals endpoints (consistent with other services)
-  static const String _appeals = 'appeals';
-  static const String _myAppeals = 'appeals/my-appeals';
 
   /// Submit an appeal against an auto-rejected task
   Future<int> submitAppeal({
@@ -36,7 +33,7 @@ class AppealsService {
       }
 
       final response = await _apiService.post(
-        _appeals,
+        ApiConfig.appeals,
         data: formData,
       );
 
@@ -57,7 +54,7 @@ class AppealsService {
   /// Get all appeals for the current user
   Future<List<AppealModel>> getMyAppeals() async {
     try {
-      final response = await _apiService.get(_myAppeals);
+      final response = await _apiService.get(ApiConfig.myAppeals);
 
       final responseData = response.data;
       if (responseData['success'] != true) {
@@ -77,7 +74,7 @@ class AppealsService {
   /// Get appeal by ID
   Future<AppealModel> getAppealById(int appealId) async {
     try {
-      final response = await _apiService.get('$_appeals/$appealId');
+      final response = await _apiService.get('${ApiConfig.appeals}/$appealId');
 
       final responseData = response.data;
       if (responseData['success'] != true) {

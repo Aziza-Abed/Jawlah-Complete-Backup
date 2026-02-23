@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Enums;
@@ -15,15 +16,18 @@ namespace FollowUp.Infrastructure.Services;
 public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IConfiguration _configuration;
     private readonly IPasswordHasher<User> _passwordHasher;
 
     public AuthService(
         IUserRepository userRepository,
+        IRefreshTokenRepository refreshTokenRepository,
         IConfiguration configuration,
         IPasswordHasher<User> passwordHasher)
     {
         _userRepository = userRepository;
+        _refreshTokenRepository = refreshTokenRepository;
         _configuration = configuration;
         _passwordHasher = passwordHasher;
     }
@@ -130,37 +134,11 @@ public class AuthService : IAuthService
         return (true, user, null);
     }
 
-    public Task<bool> ValidateTokenAsync(string token)
+    public async Task LogoutAsync(int userId)
     {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.UTF8.GetBytes(_configuration["JwtSettings:SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured"));
-
-        try
-        {
-            tokenHandler.ValidateToken(token, new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = _configuration["JwtSettings:Issuer"],
-                ValidAudience = _configuration["JwtSettings:Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ClockSkew = TimeSpan.Zero
-            }, out _);
-
-            return Task.FromResult(true);
-        }
-        catch
-        {
-            return Task.FromResult(false);
-        }
-    }
-
-    public Task LogoutAsync(int userId)
-    {
-        // No refresh tokens to revoke - just return completed task
-        return Task.CompletedTask;
+        // Revoke all active refresh tokens for this user
+        await _refreshTokenRepository.RevokeAllUserTokensAsync(userId);
+        await _refreshTokenRepository.SaveChangesAsync();
     }
 
     public async Task<(bool Success, string? Token, string? Error)> GenerateTokenForUserAsync(User user)
@@ -204,7 +182,74 @@ public class AuthService : IAuthService
 
     public bool VerifyPassword(string password, string passwordHash)
     {
-         throw new NotSupportedException("Use VerifyPassword(User user, string password) instead");
+        var result = _passwordHasher.VerifyHashedPassword(new User(), passwordHash, password);
+        return result != PasswordVerificationResult.Failed;
+    }
+
+    // ERD Chapter 3: Generate and store a refresh token on login
+    public async Task<string> GenerateRefreshTokenAsync(int userId, string? deviceId, string? ipAddress)
+    {
+        // revoke any existing active tokens for this user+device
+        var existing = await _refreshTokenRepository.GetActiveTokenByUserIdAsync(userId, deviceId);
+        if (existing != null)
+        {
+            existing.RevokedAt = DateTime.UtcNow;
+            await _refreshTokenRepository.UpdateAsync(existing);
+        }
+
+        // generate cryptographically secure token
+        var tokenBytes = new byte[64];
+        RandomNumberGenerator.Fill(tokenBytes);
+        var tokenString = Convert.ToBase64String(tokenBytes);
+
+        var refreshToken = new RefreshToken
+        {
+            UserId = userId,
+            Token = tokenString,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow,
+            DeviceId = deviceId,
+            IpAddress = ipAddress
+        };
+
+        await _refreshTokenRepository.AddAsync(refreshToken);
+        await _refreshTokenRepository.SaveChangesAsync();
+
+        return tokenString;
+    }
+
+    // ERD Chapter 3: Exchange a valid refresh token for new access + refresh tokens
+    public async Task<(bool Success, string? AccessToken, string? NewRefreshToken, string? Error)> RefreshAccessTokenAsync(string refreshToken)
+    {
+        var stored = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
+        if (stored == null)
+            return (false, null, null, "رمز التحديث غير صالح");
+
+        if (stored.IsRevoked)
+            return (false, null, null, "رمز التحديث ملغى");
+
+        if (stored.IsExpired)
+            return (false, null, null, "رمز التحديث منتهي الصلاحية");
+
+        // get the user
+        var user = await _userRepository.GetByIdAsync(stored.UserId);
+        if (user == null || user.Status != UserStatus.Active)
+            return (false, null, null, "المستخدم غير نشط");
+
+        // revoke old token (token rotation)
+        stored.RevokedAt = DateTime.UtcNow;
+        await _refreshTokenRepository.UpdateAsync(stored);
+
+        // generate new tokens
+        var newAccessToken = GenerateJwtToken(user);
+        var newRefreshToken = await GenerateRefreshTokenAsync(user.UserId, stored.DeviceId, stored.IpAddress);
+
+        // link old token to new one for audit trail
+        stored.ReplacedByToken = newRefreshToken;
+        await _refreshTokenRepository.UpdateAsync(stored);
+        await _refreshTokenRepository.SaveChangesAsync();
+
+        return (true, newAccessToken, newRefreshToken, null);
     }
 
     private string GenerateJwtToken(User user)

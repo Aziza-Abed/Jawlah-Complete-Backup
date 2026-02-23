@@ -22,6 +22,7 @@ public class AppealsController : BaseApiController
     private readonly IAttendanceRepository _attendance;
     private readonly IUserRepository _users;
     private readonly IFileStorageService _files;
+    private readonly INotificationService _notifications;
     private readonly IMapper _mapper;
     private readonly ILogger<AppealsController> _logger;
 
@@ -31,6 +32,7 @@ public class AppealsController : BaseApiController
         IAttendanceRepository attendance,
         IUserRepository users,
         IFileStorageService files,
+        INotificationService notifications,
         IMapper mapper,
         ILogger<AppealsController> logger)
     {
@@ -39,6 +41,7 @@ public class AppealsController : BaseApiController
         _attendance = attendance;
         _users = users;
         _files = files;
+        _notifications = notifications;
         _mapper = mapper;
         _logger = logger;
     }
@@ -96,15 +99,15 @@ public class AppealsController : BaseApiController
             return BadRequest(ApiResponse<object>.ErrorResponse("طعون الحضور غير مدعومة حالياً"));
         }
 
-        // Upload evidence photo if provided
-        string? evidencePhotoUrl = null;
-        if (request.EvidencePhoto != null)
-        {
-            if (!_files.ValidateImage(request.EvidencePhoto))
-                return BadRequest(ApiResponse<object>.ErrorResponse("ملف الصورة غير صالح"));
+        // Chapter 5 FIX #4: Require evidence photo for appeals
+        if (request.EvidencePhoto == null)
+            return BadRequest(ApiResponse<object>.ErrorResponse("يجب إرفاق صورة كدليل للطعن"));
 
-            evidencePhotoUrl = await _files.UploadImageAsync(request.EvidencePhoto, "appeals");
-        }
+        // Upload evidence photo
+        if (!_files.ValidateImage(request.EvidencePhoto))
+            return BadRequest(ApiResponse<object>.ErrorResponse("ملف الصورة غير صالح"));
+
+        var evidencePhotoUrl = await _files.UploadImageAsync(request.EvidencePhoto, "appeals");
 
         // Create appeal
         var appeal = new Appeal
@@ -114,7 +117,7 @@ public class AppealsController : BaseApiController
             EntityType = entityType,
             EntityId = request.EntityId,
             UserId = userId.Value,
-            WorkerExplanation = request.WorkerExplanation,
+            WorkerExplanation = Utils.InputSanitizer.SanitizeString(request.WorkerExplanation, 1000),
             WorkerLatitude = workerLat,
             WorkerLongitude = workerLng,
             ExpectedLatitude = expectedLat,
@@ -136,6 +139,26 @@ public class AppealsController : BaseApiController
 
             _logger.LogInformation("Appeal {AppealId} submitted by user {UserId} for {EntityType} {EntityId}",
                 appeal.AppealId, userId.Value, entityType, request.EntityId);
+
+            // Chapter 5 FIX #1: Notify supervisors about the new appeal
+            try
+            {
+                var task = await _tasks.GetByIdAsync(request.EntityId);
+                var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
+
+                foreach (var supervisor in supervisors)
+                {
+                    await _notifications.SendSystemAlertAsync(
+                        supervisor.UserId,
+                        $"طعن جديد: قدّم العامل {user.FullName} طعناً على المهمة \"{task?.Title ?? "مهمة"}\"");
+                }
+
+                _logger.LogInformation("Appeal notification sent to {Count} supervisors", supervisors.Count());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send appeal notification for appeal {AppealId}", appeal.AppealId);
+            }
 
             return Ok(ApiResponse<object>.SuccessResponse(new
             {
@@ -170,16 +193,21 @@ public class AppealsController : BaseApiController
 
         var appeals = await _appeals.GetUserAppealsAsync(userId.Value);
         var responses = new List<AppealResponse>();
+        var taskCache = new Dictionary<int, string?>(); // avoid duplicate task queries
 
         foreach (var appeal in appeals)
         {
             var response = _mapper.Map<AppealResponse>(appeal);
 
-            // Set entity title
             if (appeal.EntityType == "Task")
             {
-                var task = await _tasks.GetByIdAsync(appeal.EntityId);
-                response.EntityTitle = task?.Title;
+                if (!taskCache.TryGetValue(appeal.EntityId, out var title))
+                {
+                    var task = await _tasks.GetByIdAsync(appeal.EntityId);
+                    title = task?.Title;
+                    taskCache[appeal.EntityId] = title;
+                }
+                response.EntityTitle = title;
             }
 
             responses.Add(response);
@@ -206,6 +234,14 @@ public class AppealsController : BaseApiController
         // Workers can only see their own appeals
         if (userRole == "Worker" && appeal.UserId != userId.Value)
             return Forbid();
+
+        // Supervisors can only see appeals from their own workers
+        if (userRole == "Supervisor")
+        {
+            var worker = await _users.GetByIdAsync(appeal.UserId);
+            if (worker?.SupervisorId != userId.Value)
+                return Forbid();
+        }
 
         var response = _mapper.Map<AppealResponse>(appeal);
 
@@ -240,6 +276,8 @@ public class AppealsController : BaseApiController
             supervisorWorkerIds = supervisorWorkers.Select(w => w.UserId).ToHashSet();
         }
 
+        var taskCache = new Dictionary<int, string?>(); // avoid duplicate task queries
+
         foreach (var appeal in appeals)
         {
             // Filter: Skip appeals from workers not under this supervisor
@@ -250,11 +288,15 @@ public class AppealsController : BaseApiController
 
             var response = _mapper.Map<AppealResponse>(appeal);
 
-            // Set entity title
             if (appeal.EntityType == "Task")
             {
-                var task = await _tasks.GetByIdAsync(appeal.EntityId);
-                response.EntityTitle = task?.Title;
+                if (!taskCache.TryGetValue(appeal.EntityId, out var title))
+                {
+                    var task = await _tasks.GetByIdAsync(appeal.EntityId);
+                    title = task?.Title;
+                    taskCache[appeal.EntityId] = title;
+                }
+                response.EntityTitle = title;
             }
 
             responses.Add(response);
@@ -296,7 +338,7 @@ public class AppealsController : BaseApiController
         appeal.Status = request.Approved ? AppealStatus.Approved : AppealStatus.Rejected;
         appeal.ReviewedByUserId = supervisorId.Value;
         appeal.ReviewedAt = DateTime.UtcNow;
-        appeal.ReviewNotes = request.ReviewNotes;
+        appeal.ReviewNotes = Utils.InputSanitizer.SanitizeString(request.ReviewNotes, 1000);
         appeal.UpdatedAt = DateTime.UtcNow;
         appeal.SyncVersion++;
 

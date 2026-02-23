@@ -32,13 +32,19 @@ class IssueLocalAdapter extends TypeAdapter<IssueLocal> {
       isSynced: fields[12] as bool,
       createdAt: fields[13] as DateTime,
       syncedAt: fields[14] as DateTime?,
+      forwardedToDepartmentId: fields[15] as int?,
+      forwardedToDepartmentName: fields[16] as String?,
+      forwardedAt: fields[17] as DateTime?,
+      forwardingNotes: fields[18] as String?,
+      syncVersion: fields[19] as int?,
+      status: fields[20] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, IssueLocal obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.clientId)
       ..writeByte(1)
@@ -68,7 +74,19 @@ class IssueLocalAdapter extends TypeAdapter<IssueLocal> {
       ..writeByte(13)
       ..write(obj.createdAt)
       ..writeByte(14)
-      ..write(obj.syncedAt);
+      ..write(obj.syncedAt)
+      ..writeByte(15)
+      ..write(obj.forwardedToDepartmentId)
+      ..writeByte(16)
+      ..write(obj.forwardedToDepartmentName)
+      ..writeByte(17)
+      ..write(obj.forwardedAt)
+      ..writeByte(18)
+      ..write(obj.forwardingNotes)
+      ..writeByte(19)
+      ..write(obj.syncVersion)
+      ..writeByte(20)
+      ..write(obj.status);
   }
 
   @override

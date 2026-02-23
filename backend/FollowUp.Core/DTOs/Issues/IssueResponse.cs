@@ -22,6 +22,12 @@ public class IssueResponse
     public DateTime? ResolvedAt { get; set; }
     public string? ResolutionNotes { get; set; }
 
+    // Forwarding info
+    public int? ForwardedToDepartmentId { get; set; }
+    public string? ForwardedToDepartmentName { get; set; }
+    public DateTime? ForwardedAt { get; set; }
+    public string? ForwardingNotes { get; set; }
+
     // Sync fields for mobile offline support
     public DateTime? SyncTime { get; set; }
     public int SyncVersion { get; set; }

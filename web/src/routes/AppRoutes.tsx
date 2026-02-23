@@ -2,6 +2,9 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 
 import Login from "../pages/Login";
+import ForgotPassword from "../pages/ForgotPassword";
+import VerifyOtp from "../pages/VerifyOtp";
+import ResetPassword from "../pages/ResetPassword";
 import Dashboard from "../pages/Dashboard";
 import Reports from "../pages/Reports";
 import Zones from "../pages/Zones";
@@ -29,11 +32,13 @@ import AdminAppeals from "../pages/AdminAppeals";
 import AdminTaskTemplates from "../pages/AdminTaskTemplates";
 import MyWorkers from "../pages/MyWorkers";
 import LocationHistory from "../pages/LocationHistory";
+import NotFound from "../pages/NotFound";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 
 export default function AppRoutes() {
   const getUserRole = (): string | null => {
     try {
-      const userStr = localStorage.getItem("followup_user");
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
       if (userStr) {
         const user = JSON.parse(userStr);
         return user.role?.toLowerCase() || null;
@@ -50,6 +55,9 @@ export default function AppRoutes() {
     <Routes>
       {/* Public */}
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/verify-otp" element={<VerifyOtp />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected */}
       <Route
@@ -107,8 +115,8 @@ export default function AppRoutes() {
         <Route path="audit-logs" element={<AdminRoute><AdminAuditLogs /></AdminRoute>} />
       </Route>
 
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* 404 */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

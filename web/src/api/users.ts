@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { UserResponse, UsersListResponse, UserRole, CreateUserRequest, User } from "../types/user";
+import type { UserResponse, UsersListResponse, UserRole, User } from "../types/user";
 
 // Re-export User type for convenience
 export type { User };
@@ -66,23 +66,12 @@ export async function resetDeviceId(userId: number): Promise<void> {
   await apiClient.post(`/users/${userId}/reset-device`);
 }
 
-// Update device ID manually
-export async function updateDeviceId(userId: number, deviceId: string): Promise<void> {
-  await apiClient.put(`/users/${userId}/device-id`, { deviceId });
-}
-
 // Admin reset password
 export async function resetUserPassword(
   userId: number,
   newPassword: string,
 ): Promise<void> {
   await apiClient.post(`/users/${userId}/reset-password`, { newPassword });
-}
-
-// Create new user (optional, if needed for Accounts page)
-export async function createUser(data: CreateUserRequest): Promise<UserResponse> {
-  const response = await apiClient.post<{ data: UserResponse }>("/users", data);
-  return response.data.data;
 }
 
 // Update user status
@@ -126,14 +115,3 @@ export async function transferAllWorkers(oldSupervisorId: number, newSupervisorI
   });
 }
 
-// Get users by role
-export async function getUsersByRole(role: 'Admin' | 'Supervisor' | 'Worker'): Promise<UserResponse[]> {
-  const response = await apiClient.get<{ data: UserResponse[] }>(`/users/by-role/${role}`);
-  return response.data.data;
-}
-
-// Get supervisor's workers (admin can query any supervisor)
-export async function getSupervisorWorkers(supervisorId: number): Promise<UserResponse[]> {
-  const data = await getUsers(1, 1000, "Worker");
-  return data.items.filter(w => w.supervisorId === supervisorId);
-}

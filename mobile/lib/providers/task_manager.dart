@@ -131,7 +131,7 @@ class TaskManager extends BaseController {
         setError('وضع عدم الاتصال - عرض ${myTasks.length} مهمة محفوظة');
       }
     } catch (e) {
-      debugPrint('error loading from device: $e');
+      if (kDebugMode) debugPrint('error loading from device: $e');
       setError('خطأ في قاعدة البيانات المحلية');
       myTasks = [];
     }

@@ -48,16 +48,26 @@ class OfflineBanner extends StatelessWidget {
                     onPressed: () async {
                       final result = await connectivity.startSync();
                       if (context.mounted) {
+                        String message;
+                        Color bgColor;
+
+                        if (result.totalFailed > 0) {
+                          message = 'تم رفع ${result.totalSynced}، فشل ${result.totalFailed}';
+                          bgColor = Colors.orange;
+                        } else if (result.success) {
+                          message = result.totalSynced > 0
+                              ? 'تمت المزامنة (${result.totalSynced})'
+                              : 'لا توجد عناصر';
+                          bgColor = Colors.green;
+                        } else {
+                          message = 'فشلت المزامنة';
+                          bgColor = Colors.red;
+                        }
+
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                              result.success
-                                  ? 'تمت المزامنة بنجاح'
-                                  : 'فشلت المزامنة: ${result.errorMessage}',
-                              style: const TextStyle(fontFamily: 'Cairo'),
-                            ),
-                            backgroundColor:
-                                result.success ? Colors.green : Colors.red,
+                            content: Text(message, style: const TextStyle(fontFamily: 'Cairo')),
+                            backgroundColor: bgColor,
                           ),
                         );
                       }

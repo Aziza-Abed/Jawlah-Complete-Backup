@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../api/notifications";
 import type { NotificationResponse } from "../types/notification";
+import { useNotifications } from "../contexts/NotificationContext";
 
 type NoticeType = "task_update" | "task_done" | "issue_report" | "system";
 type NoticeStatus = "unread" | "read";
@@ -44,6 +45,7 @@ const mapNotificationToNotice = (notification: NotificationResponse): Notice => 
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const { decrementCount, resetCount } = useNotifications();
 
   const [items, setItems] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +87,7 @@ export default function Notifications() {
     try {
       await markAllNotificationsAsRead();
       setItems((prev) => prev.map((x) => ({ ...x, status: "read" })));
+      resetCount();
     } catch (err) {
       console.error("Failed to mark all as read:", err);
     }
@@ -92,8 +95,12 @@ export default function Notifications() {
 
   const markOneRead = async (id: string) => {
     try {
+      const item = items.find((x) => x.id === id);
       await markNotificationAsRead(Number(id));
       setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: "read" } : x)));
+      if (item?.status === "unread") {
+        decrementCount();
+      }
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
     }

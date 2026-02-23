@@ -48,6 +48,7 @@ public class MappingProfile : Profile
         CreateMap<Issue, IssueResponse>()
             .ForMember(dest => dest.ReportedByName, opt => opt.MapFrom(src => src.ReportedByUser != null ? src.ReportedByUser.FullName : "غير معروف"))
             .ForMember(dest => dest.ZoneName, opt => opt.MapFrom(src => src.Zone != null ? src.Zone.ZoneName : null))
+            .ForMember(dest => dest.ForwardedToDepartmentName, opt => opt.MapFrom(src => src.ForwardedToDepartment != null ? src.ForwardedToDepartment.Name : null))
             .ForMember(dest => dest.Photos, opt => opt.MapFrom(src => src.Photos.OrderBy(p => p.OrderIndex).Select(p => p.PhotoUrl).ToList()));
 
         // attendance → attendanceResponse (map navigation properties and renamed field)

@@ -100,37 +100,9 @@ export async function getAdminSupervisorsMonitoring(): Promise<AdminSupervisorMo
     const response = await apiClient.get<{ data: AdminSupervisorMonitoringData }>("/reports/admin/supervisors-monitoring");
     return response.data.data;
 }
-// Download attendance report with authentication
-export async function downloadAttendanceReport(
-  format: "excel" | "pdf",
-  filters?: { period?: string; startDate?: string; endDate?: string }
-): Promise<void> {
-  const params = new URLSearchParams();
-  if (filters?.period) params.append("period", filters.period);
-  if (filters?.startDate) params.append("startDate", filters.startDate);
-  if (filters?.endDate) params.append("endDate", filters.endDate);
-
-  const endpoint = format === "pdf" ? "/reports/attendance/pdf" : "/reports/attendance/excel";
-  const url = `${endpoint}?${params.toString()}`;
-
-  const response = await apiClient.get(url, { responseType: "blob" });
-
-  // Create download link
-  const blob = new Blob([response.data], {
-    type: format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  });
-  const downloadUrl = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = downloadUrl;
-  link.download = `attendance_report_${new Date().toISOString().split("T")[0]}.${format === "pdf" ? "pdf" : "xlsx"}`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(downloadUrl);
-}
-
-// Download tasks report with authentication
-export async function downloadTasksReport(
+// Generic report download helper
+async function downloadReport(
+  reportType: string,
   format: "excel" | "pdf",
   filters?: { period?: string; startDate?: string; endDate?: string; status?: string }
 ): Promise<void> {
@@ -140,21 +112,24 @@ export async function downloadTasksReport(
   if (filters?.endDate) params.append("endDate", filters.endDate);
   if (filters?.status && filters.status !== "all") params.append("status", filters.status);
 
-  const endpoint = format === "pdf" ? "/reports/tasks/pdf" : "/reports/tasks/excel";
-  const url = `${endpoint}?${params.toString()}`;
+  const endpoint = `/reports/${reportType}/${format === "pdf" ? "pdf" : "excel"}`;
+  const response = await apiClient.get(`${endpoint}?${params.toString()}`, { responseType: "blob" });
 
-  const response = await apiClient.get(url, { responseType: "blob" });
-
-  // Create download link
   const blob = new Blob([response.data], {
     type: format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   });
   const downloadUrl = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = downloadUrl;
-  link.download = `tasks_report_${new Date().toISOString().split("T")[0]}.${format === "pdf" ? "pdf" : "xlsx"}`;
+  link.download = `${reportType}_report_${new Date().toISOString().split("T")[0]}.${format === "pdf" ? "pdf" : "xlsx"}`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(downloadUrl);
 }
+
+export const downloadAttendanceReport = (format: "excel" | "pdf", filters?: { period?: string; startDate?: string; endDate?: string }) =>
+  downloadReport("attendance", format, filters);
+
+export const downloadTasksReport = (format: "excel" | "pdf", filters?: { period?: string; startDate?: string; endDate?: string; status?: string }) =>
+  downloadReport("tasks", format, filters);

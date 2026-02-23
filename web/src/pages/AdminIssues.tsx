@@ -3,9 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Search, Trash2, Eye, Filter, X } from "lucide-react";
 import { getIssues, deleteIssue } from "../api/issues";
 import type { IssueResponse } from "../types/issue";
-
-type Severity = "low" | "medium" | "high" | "critical";
-type IssueStatus = "new" | "reviewing" | "converted" | "closed";
+import { mapSeverity, mapStatus, mapTypeToArabic, type Severity, type DisplayIssueStatus } from "../utils/issueDisplay";
 
 type IssueListItem = {
   id: number;
@@ -17,41 +15,10 @@ type IssueListItem = {
   zone: string;
   locationText: string;
   reportedAt: string;
-  status: IssueStatus;
+  status: DisplayIssueStatus;
 };
 
 type FilterKey = "all" | "new" | "reviewing" | "converted" | "closed";
-
-const mapSeverity = (severity: string | undefined | null): Severity => {
-  switch ((severity || "").toLowerCase()) {
-    case "minor": return "low";
-    case "medium": return "medium";
-    case "major": return "high";
-    case "critical": return "critical";
-    default: return "medium";
-  }
-};
-
-const mapStatus = (status: string): IssueStatus => {
-  switch (status) {
-    case "Reported": return "new";
-    case "UnderReview": return "reviewing";
-    case "Resolved": return "closed";
-    case "Dismissed": return "closed";
-    default: return "new";
-  }
-};
-
-const mapTypeToArabic = (type: string): string => {
-  switch (type) {
-    case "Infrastructure": return "بنية تحتية";
-    case "Safety": return "سلامة";
-    case "Sanitation": return "صحة ونظافة";
-    case "Equipment": return "معدات";
-    case "Other": return "أخرى";
-    default: return type;
-  }
-};
 
 const mapIssueToListItem = (issue: IssueResponse): IssueListItem => {
   const date = new Date(issue.reportedAt);
@@ -117,8 +84,10 @@ export default function AdminIssues() {
   };
 
   const counts = useMemo(() => {
-    const base = { all: items.length, new: 0, reviewing: 0, converted: 0, closed: 0 };
-    for (const it of items) base[it.status]++;
+    const base: Record<string, number> = { all: items.length, new: 0, reviewing: 0, converted: 0, rejected: 0, forwarded: 0, closed: 0 };
+    for (const it of items) {
+      if (it.status in base) base[it.status]++;
+    }
     return base;
   }, [items]);
 
@@ -160,17 +129,21 @@ export default function AdminIssues() {
     critical: "حرجة",
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     new: "bg-[#7895B2]/10 text-[#7895B2] border-[#7895B2]/30",
     reviewing: "bg-[#F5B300]/10 text-[#D4A100] border-[#F5B300]/30",
     converted: "bg-[#8FA36A] text-white border-[#8FA36A]",
+    rejected: "bg-[#C86E5D]/10 text-[#C86E5D] border-[#C86E5D]/30",
+    forwarded: "bg-[#F5B300]/10 text-[#D4A100] border-[#F5B300]/30",
     closed: "bg-[#6B7280]/10 text-[#6B7280] border-[#6B7280]/30",
   };
 
-  const statusLabels = {
+  const statusLabels: Record<string, string> = {
     new: "جديد",
     reviewing: "قيد المراجعة",
     converted: "تم تحويله لمهمة",
+    rejected: "مرفوض",
+    forwarded: "تم التوجيه",
     closed: "مغلق",
   };
 

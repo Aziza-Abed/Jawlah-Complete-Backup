@@ -16,7 +16,7 @@ public class Notification
     public NotificationType Type { get; set; }
     public bool IsRead { get; set; }
     public bool IsSent { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? SentAt { get; set; }
     public DateTime? ReadAt { get; set; }
     public string? FcmMessageId { get; set; }

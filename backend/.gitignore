@@ -88,6 +88,7 @@ appsettings.Production.json
 *.pfx
 *.key
 firebase-credentials.json
+*-firebase-adminsdk-*.json
 
 # Exclude from initial push (can add later)
 

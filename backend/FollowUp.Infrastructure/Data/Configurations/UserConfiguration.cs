@@ -70,6 +70,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(e => e.CreatedAt)
             .IsRequired();
 
+        builder.Property(e => e.RegisteredDeviceId)
+            .HasMaxLength(200);
+
+        builder.Property(e => e.LastWarningReason)
+            .HasMaxLength(500);
+
         builder.HasIndex(e => e.Username).IsUnique();
         builder.HasIndex(e => e.Email);
     }

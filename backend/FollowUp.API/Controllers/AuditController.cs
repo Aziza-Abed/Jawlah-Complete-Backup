@@ -11,7 +11,7 @@ namespace FollowUp.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin,Supervisor")]
-public class AuditController : ControllerBase
+public class AuditController : BaseApiController
 {
     private readonly AuditLogService _auditService;
     private readonly IUserRepository _users;
@@ -20,17 +20,6 @@ public class AuditController : ControllerBase
     {
         _auditService = auditService;
         _users = users;
-    }
-
-    private int? GetCurrentUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId) ? userId : null;
-    }
-
-    private string? GetCurrentUserRole()
-    {
-        return User.FindFirst(ClaimTypes.Role)?.Value;
     }
 
     private async Task<HashSet<int>> GetSupervisorWorkerIdsAsync(int supervisorId)
@@ -113,17 +102,27 @@ public class AuditController : ControllerBase
         var actions = new[]
         {
             "Login",
+            "Login2FA",
             "LoginFailed",
             "Logout",
             "CheckIn",
             "CheckOut",
+            "ManualAttendanceApproved",
+            "ManualAttendanceRejected",
             "TaskCreated",
             "TaskUpdated",
             "TaskCompleted",
             "IssueReported",
             "IssueUpdated",
             "UserCreated",
-            "UserUpdated"
+            "UserUpdated",
+            "WorkerTransfer",
+            "BulkRoleAssignment",
+            "BulkStatusChange",
+            "FileAccess",
+            "PasswordChanged",
+            "PasswordReset",
+            "DeviceReset"
         };
 
         return Ok(ApiResponse<object>.SuccessResponse(actions));

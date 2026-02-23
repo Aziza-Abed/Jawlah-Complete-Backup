@@ -1,4 +1,5 @@
 using FollowUp.Core.Entities;
+using FollowUp.Core.Enums;
 using Task = System.Threading.Tasks.Task;
 using FollowUp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,15 @@ public class TaskGenerationBackgroundService : BackgroundService
                 _logger.LogError(ex, "Error occurred executing Task Generation.");
             }
 
+            try
+            {
+                await AutoCloseStaleAttendanceAsync(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred executing Attendance Auto-Close.");
+            }
+
             // Check every 15 minutes
             await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
         }
@@ -48,39 +58,46 @@ public class TaskGenerationBackgroundService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
 
-        var now = DateTime.Now; // Use local time or Utc based on requirements. Assuming Local for specific times like 08:00 AM.
-        // If Time property in TaskTemplate is intended to be local time of the municipality
+        var now = DateTime.UtcNow; // Use UTC for consistency with all other DateTime fields in the database
 
         var templates = await dbContext.TaskTemplates
             .Where(t => t.IsActive)
             .ToListAsync(stoppingToken);
 
+        // Get first admin user to use as default assignee (required FK)
+        var defaultAssignee = await dbContext.Users
+            .Where(u => u.MunicipalityId == templates.FirstOrDefault()!.MunicipalityId)
+            .OrderBy(u => u.UserId)
+            .FirstOrDefaultAsync(stoppingToken);
+
+        if (defaultAssignee == null)
+        {
+            _logger.LogWarning("No users found for task generation — skipping");
+            return;
+        }
+
         foreach (var template in templates)
         {
             if (ShouldGenerateTask(template, now))
             {
-                // Create Task
                 var task = new FollowUp.Core.Entities.Task
                 {
                     Title = template.Title,
                     Description = template.Description,
                     MunicipalityId = template.MunicipalityId,
                     ZoneId = template.ZoneId,
-                    Priority = TaskPriority.Medium, // Default
+                    AssignedToUserId = defaultAssignee.UserId, // Required FK — assign to first user, supervisor can reassign
+                    Priority = TaskPriority.Medium,
                     Status = TaskStatus.Pending,
                     CreatedAt = DateTime.UtcNow,
-                    DueDate = DateTime.Now.Date.AddDays(1).Add(template.Time), // Due next day? or same day? Let's say due end of day or specific logic.
-                    // If generated at 8am, maybe due by 4pm?
+                    EventTime = DateTime.UtcNow,
+                    DueDate = DateTime.UtcNow.Date.AddDays(1).Add(template.Time),
                 };
-                
-                // Assign to supervisor or keep unassigned?
-                // Logic: assigning to "system" or specific user?
-                // For V1: leave unassigned, let admin/supervisor assign. Or auto-assign via other logic.
-                
+
                 dbContext.Tasks.Add(task);
                 template.LastGeneratedAt = now;
-                
-                _logger.LogInformation("Generated task from template {TemplateId}", template.Id);
+
+                _logger.LogInformation("Generated task from template {TemplateId} assigned to user {UserId}", template.Id, defaultAssignee.UserId);
             }
         }
 
@@ -140,5 +157,53 @@ public class TaskGenerationBackgroundService : BackgroundService
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Auto-close attendance records that have been open (CheckedIn) for more than 14 hours.
+    /// This handles the case where a worker forgets to check out at end of day.
+    /// Sets status to AutoClosed (3) so supervisors can distinguish from normal checkouts.
+    /// Uses per-user ExpectedEndTime for the auto-close checkout time.
+    /// </summary>
+    private async Task AutoCloseStaleAttendanceAsync(CancellationToken stoppingToken)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
+
+        var cutoff = DateTime.UtcNow.AddHours(-14);
+
+        var staleRecords = await dbContext.Attendances
+            .Include(a => a.User)
+            .Where(a => a.Status == AttendanceStatus.CheckedIn
+                     && a.CheckInEventTime < cutoff
+                     && a.CheckOutEventTime == null)
+            .ToListAsync(stoppingToken);
+
+        if (!staleRecords.Any()) return;
+
+        foreach (var record in staleRecords)
+        {
+            record.Status = AttendanceStatus.AutoClosed;
+
+            // Use per-user ExpectedEndTime if available, fallback to 16:00
+            var endTime = record.User?.ExpectedEndTime ?? new TimeSpan(16, 0, 0);
+            record.CheckOutEventTime = record.CheckInEventTime.Date.Add(endTime);
+
+            record.CheckOutSyncTime = DateTime.UtcNow;
+            record.ValidationMessage = "تم إغلاق الحضور تلقائياً - لم يتم تسجيل الانصراف";
+            record.AttendanceType = record.AttendanceType == "Late" ? "Late" : "AutoClosed";
+
+            // Calculate work duration from check-in to auto-close time
+            var duration = record.CheckOutEventTime.Value - record.CheckInEventTime;
+            if (duration < TimeSpan.Zero)
+                duration = TimeSpan.Zero;
+            if (duration > TimeSpan.FromHours(23))
+                duration = TimeSpan.FromHours(23);
+            record.WorkDuration = duration;
+        }
+
+        await dbContext.SaveChangesAsync(stoppingToken);
+
+        _logger.LogInformation("Auto-closed {Count} stale attendance records", staleRecords.Count);
     }
 }

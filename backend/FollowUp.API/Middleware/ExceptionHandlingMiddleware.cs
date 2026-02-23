@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using FollowUp.Core.DTOs.Common;
+using FollowUp.Core.Exceptions;
 
 namespace FollowUp.API.Middleware;
 
@@ -32,30 +33,21 @@ public class ExceptionHandlingMiddleware
     {
         context.Response.ContentType = "application/json";
 
-        // determine status code and message based on exception type
-        HttpStatusCode statusCode;
-        string message;
+        var statusCode = exception switch
+        {
+            NotFoundException or KeyNotFoundException or FileNotFoundException => HttpStatusCode.NotFound,
+            UnauthorizedException or UnauthorizedAccessException => HttpStatusCode.Unauthorized,
+            Core.Exceptions.ValidationException or ArgumentException or InvalidOperationException or FollowUpException => HttpStatusCode.BadRequest,
+            _ => HttpStatusCode.InternalServerError
+        };
 
-        if (exception is ArgumentException)
+        var message = exception switch
         {
-            statusCode = HttpStatusCode.BadRequest;
-            message = exception.Message;
-        }
-        else if (exception is UnauthorizedAccessException)
-        {
-            statusCode = HttpStatusCode.Unauthorized;
-            message = "غير مصرح";
-        }
-        else if (exception is KeyNotFoundException)
-        {
-            statusCode = HttpStatusCode.NotFound;
-            message = "غير موجود";
-        }
-        else
-        {
-            statusCode = HttpStatusCode.InternalServerError;
-            message = "حدث خطأ داخلي في الخادم";
-        }
+            UnauthorizedAccessException => "غير مصرح",
+            KeyNotFoundException or FileNotFoundException => "غير موجود",
+            _ when statusCode == HttpStatusCode.InternalServerError => "حدث خطأ داخلي في الخادم",
+            _ => exception.Message
+        };
 
         context.Response.StatusCode = (int)statusCode;
 

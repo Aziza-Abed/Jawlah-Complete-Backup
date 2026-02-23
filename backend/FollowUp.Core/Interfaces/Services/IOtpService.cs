@@ -39,11 +39,6 @@ public interface IOtpService
     string MaskPhoneNumber(string phoneNumber);
 
     /// <summary>
-    /// Clean up expired OTP codes (called periodically)
-    /// </summary>
-    System.Threading.Tasks.Task CleanupExpiredCodesAsync();
-
-    /// <summary>
     /// Store pending JWT token for session (for load-balanced environments)
     /// </summary>
     /// <param name="sessionToken">Session token</param>

@@ -1,4 +1,5 @@
 using AutoMapper;
+using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Zones;
 using FollowUp.Core.Entities;
@@ -11,6 +12,7 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle zones and geofencing
 [Route("api/[controller]")]
+[Authorize]
 public class ZonesController : BaseApiController
 {
     private readonly IZoneRepository _zones;
@@ -80,28 +82,28 @@ public class ZonesController : BaseApiController
         try
         {
             // Get municipality ID from current user
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
                 return Unauthorized(ApiResponse<object>.ErrorResponse("غير مصرح"));
 
-            var user = await _users.GetByIdAsync(userId);
+            var user = await _users.GetByIdAsync(userId.Value);
             if (user == null)
                 return Unauthorized(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
-            // Check if zone code already exists
-            var existingZone = await _zones.GetByCodeAsync(request.ZoneCode);
+            // Check if zone code already exists in this municipality
+            var existingZone = await _zones.GetByCodeAndMunicipalityAsync(request.ZoneCode, user.MunicipalityId);
             if (existingZone != null)
                 return BadRequest(ApiResponse<object>.ErrorResponse($"كود المنطقة '{request.ZoneCode}' موجود مسبقاً"));
 
             var zone = new Zone
             {
                 MunicipalityId = user.MunicipalityId,
-                ZoneName = request.ZoneName,
-                ZoneCode = request.ZoneCode,
-                Description = request.Description,
+                ZoneName = InputSanitizer.SanitizeString(request.ZoneName, 100),
+                ZoneCode = request.ZoneCode.Trim(),
+                Description = InputSanitizer.SanitizeString(request.Description, 500),
                 AreaSquareMeters = request.AreaSquareMeters,
                 BoundaryGeoJson = request.BoundaryGeoJson,
-                District = request.District,
+                District = InputSanitizer.SanitizeString(request.District, 100),
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 Version = 1,
@@ -121,7 +123,7 @@ public class ZonesController : BaseApiController
                         var centroid = geometry.Centroid;
                         zone.CenterLatitude = centroid.Y;
                         zone.CenterLongitude = centroid.X;
-                        zone.AreaSquareMeters = geometry.Area * 111319.9 * 111319.9; // Approximate conversion
+                        zone.AreaSquareMeters = geometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180);
                     }
                 }
                 catch (Exception ex)
@@ -133,7 +135,7 @@ public class ZonesController : BaseApiController
             await _zones.AddAsync(zone);
             await _zones.SaveChangesAsync();
 
-            _logger.LogInformation("Zone {ZoneCode} created by user {UserId}", zone.ZoneCode, userId);
+            _logger.LogInformation("Zone {ZoneCode} created by user {UserId}", zone.ZoneCode, userId.Value);
             return CreatedAtAction(nameof(GetZoneById), new { id = zone.ZoneId },
                 ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone), "تم إنشاء المنطقة بنجاح"));
         }
@@ -161,20 +163,20 @@ public class ZonesController : BaseApiController
             // Check if zone code changed and already exists
             if (!string.IsNullOrEmpty(request.ZoneCode) && request.ZoneCode != zone.ZoneCode)
             {
-                var existingZone = await _zones.GetByCodeAsync(request.ZoneCode);
+                var existingZone = await _zones.GetByCodeAndMunicipalityAsync(request.ZoneCode, zone.MunicipalityId);
                 if (existingZone != null && existingZone.ZoneId != id)
                     return BadRequest(ApiResponse<object>.ErrorResponse($"كود المنطقة '{request.ZoneCode}' موجود مسبقاً"));
                 zone.ZoneCode = request.ZoneCode;
             }
 
             if (!string.IsNullOrEmpty(request.ZoneName))
-                zone.ZoneName = request.ZoneName;
+                zone.ZoneName = InputSanitizer.SanitizeString(request.ZoneName, 100);
 
             if (request.Description != null)
-                zone.Description = request.Description;
+                zone.Description = InputSanitizer.SanitizeString(request.Description, 500);
 
             if (request.District != null)
-                zone.District = request.District;
+                zone.District = InputSanitizer.SanitizeString(request.District, 100);
 
             if (request.AreaSquareMeters.HasValue)
                 zone.AreaSquareMeters = request.AreaSquareMeters.Value;
@@ -208,8 +210,7 @@ public class ZonesController : BaseApiController
             await _zones.UpdateAsync(zone);
             await _zones.SaveChangesAsync();
 
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            _logger.LogInformation("Zone {ZoneId} updated by user {UserId}", id, userIdClaim);
+            _logger.LogInformation("Zone {ZoneId} updated by user {UserId}", id, GetCurrentUserId());
             return Ok(ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone), "تم تحديث المنطقة بنجاح"));
         }
         catch (Exception ex)
@@ -235,8 +236,7 @@ public class ZonesController : BaseApiController
             await _zones.UpdateAsync(zone);
             await _zones.SaveChangesAsync();
 
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            _logger.LogInformation("Zone {ZoneId} soft deleted by user {UserId}", id, userIdClaim);
+            _logger.LogInformation("Zone {ZoneId} soft deleted by user {UserId}", id, GetCurrentUserId());
             return Ok(ApiResponse<object>.SuccessResponse(new { }, "تم حذف المنطقة بنجاح"));
         }
         catch (Exception ex)

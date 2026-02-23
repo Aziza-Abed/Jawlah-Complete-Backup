@@ -61,4 +61,9 @@ public class VerifyOtpResponse
     /// Remaining attempts before lockout
     /// </summary>
     public int? RemainingAttempts { get; set; }
+
+    /// <summary>
+    /// Refresh token for obtaining new access tokens
+    /// </summary>
+    public string? RefreshToken { get; set; }
 }

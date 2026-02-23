@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { apiClient } from "../api/client";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [isValidating, setIsValidating] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const token = localStorage.getItem("followup_token");
+  const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
 
   useEffect(() => {
     const validateToken = async () => {
@@ -24,17 +25,17 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
         if (response.data.success) {
           setIsAuthenticated(true);
           // Update user data in localStorage from server
-          localStorage.setItem("followup_user", JSON.stringify(response.data.data));
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.data));
         } else {
           // Token invalid
-          localStorage.removeItem("followup_token");
-          localStorage.removeItem("followup_user");
+          localStorage.removeItem(STORAGE_KEYS.TOKEN);
+          localStorage.removeItem(STORAGE_KEYS.USER);
           setIsAuthenticated(false);
         }
       } catch (error) {
         // Token validation failed
-        localStorage.removeItem("followup_token");
-        localStorage.removeItem("followup_user");
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.USER);
         setIsAuthenticated(false);
       } finally {
         setIsValidating(false);

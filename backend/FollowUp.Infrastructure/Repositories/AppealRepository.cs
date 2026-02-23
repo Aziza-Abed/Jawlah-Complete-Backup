@@ -85,4 +85,11 @@ public class AppealRepository : Repository<Appeal>, IAppealRepository
                           a.EntityId == entityId &&
                           a.Status == AppealStatus.Pending);
     }
+
+    public async Task<Appeal?> GetByEvidencePhotoFilenameAsync(string filename)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.EvidencePhotoUrl != null && a.EvidencePhotoUrl.Contains(filename));
+    }
 }

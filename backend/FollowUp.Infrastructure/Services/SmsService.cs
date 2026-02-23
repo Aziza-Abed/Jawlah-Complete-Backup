@@ -28,13 +28,13 @@ public class SmsService : ISmsService
         if (_useMock)
         {
             // Mock implementation - log the message
-            _logger.LogInformation("📱 [MOCK SMS] To: {Phone}, Message: {Message}", phoneNumber, message);
+            _logger.LogInformation("[MOCK SMS] To: {Phone}, Message: {Message}", phoneNumber, message);
 
             // Also write to a file for easy testing
             var logPath = Path.Combine(Directory.GetCurrentDirectory(), "logs", "sms_log.txt");
             Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
             await File.AppendAllTextAsync(logPath,
-                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] To: {phoneNumber} | Message: {message}\n");
+                $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] To: {phoneNumber} | Message: {message}\n");
 
             return true;
         }

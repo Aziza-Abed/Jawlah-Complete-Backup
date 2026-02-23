@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { X } from "lucide-react";
+import { STORAGE_KEYS } from "../../constants/storageKeys";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -56,7 +57,7 @@ export default function AppLayout() {
 
   const getUserRole = (): UserRole => {
     try {
-      const userStr = localStorage.getItem("followup_user");
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
       if (userStr) {
         const user = JSON.parse(userStr);
         const backendRole = user.role?.toLowerCase();
@@ -76,9 +77,16 @@ export default function AppLayout() {
     return (role === "admin" || role === "manager") ? adminItems : supervisorItems;
   }, [role]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("followup_token");
-    localStorage.removeItem("followup_user");
+  const handleLogout = async () => {
+    try {
+      const { logout } = await import("../../api/auth");
+      await logout();
+    } catch (_) {
+      // even if backend fails, clear local data
+    }
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.USER);
     navigate("/login");
   };
 

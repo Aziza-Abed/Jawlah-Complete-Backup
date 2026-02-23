@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { apiClient } from "../api/client";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -21,7 +22,7 @@ export default function AdminRoute({
   const [isValidating, setIsValidating] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const token = localStorage.getItem("followup_token");
+  const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
 
   useEffect(() => {
     const validateAccess = async () => {
@@ -48,18 +49,18 @@ export default function AdminRoute({
           setIsAuthorized(hasAccess);
 
           // Update user data in localStorage
-          localStorage.setItem("followup_user", JSON.stringify(userData));
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
         } else {
           // Token invalid
-          localStorage.removeItem("followup_token");
-          localStorage.removeItem("followup_user");
+          localStorage.removeItem(STORAGE_KEYS.TOKEN);
+          localStorage.removeItem(STORAGE_KEYS.USER);
           setIsAuthenticated(false);
           setIsAuthorized(false);
         }
       } catch (error) {
         // Token validation failed
-        localStorage.removeItem("followup_token");
-        localStorage.removeItem("followup_user");
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.USER);
         setIsAuthenticated(false);
         setIsAuthorized(false);
       } finally {

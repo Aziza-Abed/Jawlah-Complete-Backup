@@ -47,12 +47,6 @@ export async function deleteTask(id: number): Promise<void> {
   await apiClient.delete(`/tasks/${id}`);
 }
 
-// Update task status
-export async function updateTaskStatus(id: number, status: string): Promise<TaskResponse> {
-  const response = await apiClient.put<{ data: TaskResponse }>(`/tasks/${id}/status`, { status });
-  return response.data.data;
-}
-
 // Approve completed task (supervisor)
 export async function approveTask(id: number, notes?: string): Promise<TaskResponse> {
   const response = await apiClient.put<{ data: TaskResponse }>(`/tasks/${id}/approve`, { notes });
@@ -65,33 +59,9 @@ export async function rejectTask(id: number, reason: string): Promise<TaskRespon
   return response.data.data;
 }
 
-// Assign task to worker
-export async function assignTask(id: number, userId: number): Promise<TaskResponse> {
-  const response = await apiClient.post<{ data: TaskResponse }>(`/tasks/${id}/assign`, { userId });
-  return response.data.data;
-}
-
-// Get overdue tasks
-export async function getOverdueTasks(): Promise<TaskResponse[]> {
-  const response = await apiClient.get<{ data: TaskResponse[] }>("/tasks/overdue");
-  return response.data.data;
-}
-
-// Get pending tasks count
-export async function getPendingTasksCount(): Promise<number> {
-  const response = await apiClient.get<{ data: number }>("/tasks/pending-count");
-  return response.data.data;
-}
-
 // Reassign task to another worker
 export async function reassignTask(id: number, data: { newAssignedToUserId: number, reassignmentReason?: string }): Promise<TaskResponse> {
   const response = await apiClient.put<{ data: TaskResponse }>(`/tasks/${id}/reassign`, data);
-  return response.data.data;
-}
-
-// Approve auto-rejected task (override)
-export async function approveOverride(id: number, notes?: string): Promise<TaskResponse> {
-  const response = await apiClient.put<{ data: TaskResponse }>(`/tasks/${id}/approve-override`, { supervisorNotes: notes });
   return response.data.data;
 }
 

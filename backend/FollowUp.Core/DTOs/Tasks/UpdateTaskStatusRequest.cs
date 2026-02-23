@@ -8,6 +8,7 @@ public class UpdateTaskStatusRequest
     [Required]
     public TaskStatus Status { get; set; }
 
+    [StringLength(1000)]
     public string? CompletionNotes { get; set; }
 
     [Range(-90, 90)]

@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-using System.Security.Claims;
 using AutoMapper;
 using FollowUp.Core.Constants;
 using FollowUp.Core.DTOs.Auth;
@@ -11,6 +9,7 @@ using FollowUp.Core.Interfaces.Services;
 using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace FollowUp.API.Controllers;
@@ -25,7 +24,6 @@ public class AuthController : BaseApiController
     private readonly IOtpService _otp;
     private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _config;
-    private readonly IWebHostEnvironment _env;
     private readonly IMapper _mapper;
     private readonly AuditLogService _audit;
 
@@ -37,7 +35,6 @@ public class AuthController : BaseApiController
         IOtpService otp,
         ILogger<AuthController> logger,
         IConfiguration config,
-        IWebHostEnvironment env,
         IMapper mapper,
         AuditLogService audit)
     {
@@ -48,7 +45,6 @@ public class AuthController : BaseApiController
         _otp = otp;
         _logger = logger;
         _config = config;
-        _env = env;
         _mapper = mapper;
         _audit = audit;
     }
@@ -58,6 +54,7 @@ public class AuthController : BaseApiController
     // For Worker: OTP only on new device
     [AllowAnonymous]
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         if (!ModelState.IsValid)
@@ -138,10 +135,14 @@ public class AuthController : BaseApiController
         // UR23: Log successful login
         await _audit.LogAsync(user.UserId, user.Username, "Login", "تسجيل دخول ناجح", ipAddress, userAgent);
 
+        // ERD Chapter 3: Generate refresh token on login
+        var refreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, deviceId, ipAddress);
+
         var response = new LoginResponse
         {
             Success = true,
             Token = token,
+            RefreshToken = refreshToken,
             ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
             User = _mapper.Map<UserDto>(user)
         };
@@ -154,6 +155,7 @@ public class AuthController : BaseApiController
     /// </summary>
     [AllowAnonymous]
     [HttpPost("verify-otp")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
     {
         if (!ModelState.IsValid)
@@ -220,10 +222,14 @@ public class AuthController : BaseApiController
         // Log successful 2FA login
         await _audit.LogAsync(user.UserId, user.Username, "Login2FA", "تسجيل دخول ناجح مع التحقق الثنائي", ipAddress, userAgent);
 
+        // ERD Chapter 3: Generate refresh token after OTP verification
+        var otpRefreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, deviceId, ipAddress);
+
         var response = new VerifyOtpResponse
         {
             Success = true,
             Token = storedToken,
+            RefreshToken = otpRefreshToken,
             ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
             User = _mapper.Map<UserDto>(user)
         };
@@ -236,6 +242,7 @@ public class AuthController : BaseApiController
     /// </summary>
     [AllowAnonymous]
     [HttpPost("resend-otp")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> ResendOtp([FromBody] SendOtpRequest request)
     {
         if (string.IsNullOrEmpty(request.SessionToken))
@@ -298,6 +305,7 @@ public class AuthController : BaseApiController
     /// </summary>
     [AllowAnonymous]
     [HttpPost("login-gps")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> LoginWithGPS([FromBody] LoginWithGPSRequest request)
     {
         try
@@ -393,12 +401,11 @@ public class AuthController : BaseApiController
                 return BadRequest(ApiResponse<LoginWithGPSResponse>.ErrorResponse(accuracyError));
             }
 
-            // Validate GPS coordinates are not invalid (0,0 or malformed)
-            var coordsError = ValidateGpsCoordinates(request.Latitude, request.Longitude);
-            if (coordsError != null)
+            // Validate GPS coordinates (uses inherited base controller validation)
+            var coordsResult = base.ValidateGpsCoordinates(request.Latitude, request.Longitude);
+            if (coordsResult != null)
             {
-                // 400 BadRequest: Invalid coordinate format
-                return BadRequest(ApiResponse<LoginWithGPSResponse>.ErrorResponse(coordsError));
+                return coordsResult;
             }
 
             // Validate GPS coordinates are within municipality bounds
@@ -456,6 +463,7 @@ public class AuthController : BaseApiController
                     CheckInEventTime = DateTime.UtcNow,
                     CheckInLatitude = request.Latitude,
                     CheckInLongitude = request.Longitude,
+                    CheckInAccuracyMeters = request.Accuracy,
                     ZoneId = matchedZone?.ZoneId, // Geofencing: which zone was the worker in?
                     IsValidated = true,
                     ValidationMessage = "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة",
@@ -485,11 +493,16 @@ public class AuthController : BaseApiController
                 }
             }
 
+            // ERD Chapter 3: Generate refresh token for GPS login (consistency with other login flows)
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var gpsRefreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, request.DeviceId, ipAddress);
+
             // build response object
             var resObj = new LoginWithGPSResponse
             {
                 Success = true,
                 Token = token,
+                RefreshToken = gpsRefreshToken,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
                 User = _mapper.Map<UserDto>(user),
                 Attendance = new AttendanceResponse
@@ -522,182 +535,6 @@ public class AuthController : BaseApiController
         }
     }
 
-    // REMOVED: PIN login is no longer supported.
-    // Workers must use username + password + GPS login instead.
-    // See LoginWithGPS method for the current login implementation.
-
-    // Helper class for check-in results
-    private class CheckInResult
-    {
-        public bool Success { get; set; }
-        public Attendance? Attendance { get; set; }
-        public AttendanceResponse? AttendanceResponse { get; set; }
-        public string? Error { get; set; }
-        public int LateMinutes { get; set; }
-        public string AttendanceType { get; set; } = "OnTime";
-    }
-
-    // Helper class for manual check-in results
-    private class ManualCheckInResult
-    {
-        public int AttendanceId { get; set; }
-        public AttendanceResponse? AttendanceResponse { get; set; }
-        public int LateMinutes { get; set; }
-    }
-
-    // Try auto check-in with GPS location
-    private async Task<CheckInResult> TryAutoCheckIn(User user, double latitude, double longitude, double? accuracy)
-    {
-        var result = new CheckInResult();
-
-        try
-        {
-            // Validate GPS accuracy using helper method
-            var accuracyError = ValidateGpsAccuracy(accuracy);
-            if (accuracyError != null)
-            {
-                result.Error = accuracyError;
-                return result;
-            }
-
-            // Find user's zone based on GPS coordinates using helper method
-            var (matchedZone, zoneError) = await FindUserZoneByGps(user.UserId, latitude, longitude);
-            if (zoneError != null)
-            {
-                result.Error = zoneError;
-                return result;
-            }
-
-            // Calculate lateness
-            var now = DateTime.UtcNow;
-            var todayStart = now.Date.Add(user.ExpectedStartTime);
-            var graceEnd = todayStart.AddMinutes(user.GraceMinutes);
-
-            int lateMinutes = 0;
-            string attendanceType = "OnTime";
-
-            if (now > graceEnd)
-            {
-                // FIX: Calculate late minutes from grace end, not start time
-                // Worker arriving within grace period should be OnTime with 0 late minutes
-                lateMinutes = (int)(now - graceEnd).TotalMinutes;
-                attendanceType = "Late";
-            }
-
-            // Create attendance record
-            var attendance = new Attendance
-            {
-                UserId = user.UserId,
-                MunicipalityId = user.MunicipalityId,
-                CheckInEventTime = now,
-                CheckInLatitude = latitude,
-                CheckInLongitude = longitude,
-                ZoneId = matchedZone?.ZoneId,
-                IsValidated = true,
-                ValidationMessage = "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة",
-                Status = Core.Enums.AttendanceStatus.CheckedIn,
-                LateMinutes = lateMinutes,
-                AttendanceType = attendanceType,
-                ApprovalStatus = "AutoApproved",
-                IsManual = false
-            };
-
-            await _attendance.AddAsync(attendance);
-            await _attendance.SaveChangesAsync();
-
-            result.Success = true;
-            result.Attendance = attendance;
-            result.LateMinutes = lateMinutes;
-            result.AttendanceType = attendanceType;
-            result.AttendanceResponse = new AttendanceResponse
-            {
-                AttendanceId = attendance.AttendanceId,
-                UserId = attendance.UserId,
-                UserName = user.FullName,
-                ZoneId = attendance.ZoneId,
-                ZoneName = matchedZone?.ZoneName,
-                CheckInEventTime = attendance.CheckInEventTime,
-                CheckInLatitude = attendance.CheckInLatitude,
-                CheckInLongitude = attendance.CheckInLongitude,
-                IsValidated = attendance.IsValidated,
-                ValidationMessage = attendance.ValidationMessage,
-                Status = attendance.Status,
-                CreatedAt = attendance.CheckInEventTime,
-                LateMinutes = lateMinutes,
-                AttendanceType = attendanceType,
-                ApprovalStatus = "AutoApproved"
-            };
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during auto check-in for user {UserId}", user.UserId);
-            result.Error = "حدث خطأ أثناء تسجيل الحضور";
-            return result;
-        }
-    }
-
-    // Create manual check-in (GPS failure fallback) - requires supervisor approval
-    private async Task<ManualCheckInResult> CreateManualCheckIn(User user, string reason)
-    {
-        // Calculate lateness
-        var now = DateTime.UtcNow;
-        var todayStart = now.Date.Add(user.ExpectedStartTime);
-        var graceEnd = todayStart.AddMinutes(user.GraceMinutes);
-
-        int lateMinutes = 0;
-        if (now > graceEnd)
-        {
-            // FIX: Calculate late minutes from grace end, not start time
-            // Consistent with auto check-in calculation
-            lateMinutes = (int)(now - graceEnd).TotalMinutes;
-        }
-
-        var attendance = new Attendance
-        {
-            UserId = user.UserId,
-            MunicipalityId = user.MunicipalityId,
-            CheckInEventTime = now,
-            CheckInLatitude = 0, // No GPS
-            CheckInLongitude = 0,
-            ZoneId = null,
-            IsValidated = false, // Needs supervisor validation
-            ValidationMessage = "حضور يدوي - بانتظار موافقة المشرف",
-            Status = Core.Enums.AttendanceStatus.CheckedIn,
-            LateMinutes = lateMinutes,
-            AttendanceType = "Manual",
-            ApprovalStatus = "Pending",
-            IsManual = true,
-            ManualReason = reason
-        };
-
-        await _attendance.AddAsync(attendance);
-        await _attendance.SaveChangesAsync();
-
-        return new ManualCheckInResult
-        {
-            AttendanceId = attendance.AttendanceId,
-            LateMinutes = lateMinutes,
-            AttendanceResponse = new AttendanceResponse
-            {
-                AttendanceId = attendance.AttendanceId,
-                UserId = attendance.UserId,
-                UserName = user.FullName,
-                CheckInEventTime = attendance.CheckInEventTime,
-                IsValidated = false,
-                ValidationMessage = attendance.ValidationMessage,
-                Status = attendance.Status,
-                CreatedAt = attendance.CheckInEventTime,
-                LateMinutes = lateMinutes,
-                AttendanceType = "Manual",
-                ApprovalStatus = "Pending",
-                IsManual = true,
-                ManualReason = reason
-            }
-        };
-    }
-
     #region GPS Validation Helper Methods
 
     /// <summary>
@@ -710,18 +547,6 @@ public class AuthController : BaseApiController
         if (accuracy.HasValue && accuracy.Value > Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters)
         {
             return $"دقة GPS منخفضة جداً ({accuracy.Value:F1}م). يرجى المحاولة في مكان أفضل.";
-        }
-        return null;
-    }
-
-    /// <summary>
-    /// Validates GPS coordinates are not invalid (0,0)
-    /// </summary>
-    private string? ValidateGpsCoordinates(double latitude, double longitude)
-    {
-        if (latitude == 0 && longitude == 0)
-        {
-            return "إحداثيات GPS غير صالحة. يرجى تفعيل GPS.";
         }
         return null;
     }
@@ -881,7 +706,7 @@ public class AuthController : BaseApiController
         var user = new User
         {
             Username = request.Username,
-            FullName = request.FullName,
+            FullName = Utils.InputSanitizer.SanitizeString(request.FullName, 100),
             Email = request.Role != Core.Enums.UserRole.Worker ? request.Email : null,
             PhoneNumber = request.PhoneNumber,
             Role = request.Role,
@@ -896,6 +721,14 @@ public class AuthController : BaseApiController
         if (!success)
             return BadRequest(ApiResponse<UserDto>.ErrorResponse(error ?? "فشل التسجيل"));
 
+        // UC17: Audit log for user creation
+        var currentUserId = GetCurrentUserId();
+        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+        await _audit.LogAsync(currentUserId, currentUser?.Username, "UserCreated",
+            $"إنشاء مستخدم جديد: {createdUser!.Username} ({createdUser.Role})",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
         var userDto = _mapper.Map<UserDto>(createdUser!);
         return CreatedAtAction(nameof(GetProfile), null, ApiResponse<UserDto>.SuccessResponse(userDto, "تم تسجيل المستخدم بنجاح"));
     }
@@ -906,11 +739,11 @@ public class AuthController : BaseApiController
     [Authorize]
     public async Task<IActionResult> GetProfile()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
             return Unauthorized(ApiResponse<UserDto>.ErrorResponse("رمز دخول غير صالح"));
 
-        var user = await _users.GetByIdAsync(userId);
+        var user = await _users.GetByIdAsync(userId.Value);
         if (user == null)
             return NotFound(ApiResponse<UserDto>.ErrorResponse("المستخدم غير موجود"));
 
@@ -918,18 +751,141 @@ public class AuthController : BaseApiController
         return Ok(ApiResponse<UserDto>.SuccessResponse(userDto));
     }
 
+    // ERD Chapter 3: Refresh access token using refresh token
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+    {
+        if (string.IsNullOrEmpty(request?.RefreshToken))
+            return BadRequest(ApiResponse<LoginResponse>.ErrorResponse("رمز التحديث مطلوب"));
+
+        var (success, accessToken, newRefreshToken, error) = await _auth.RefreshAccessTokenAsync(request.RefreshToken);
+
+        if (!success)
+            return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse(error ?? "فشل تحديث الرمز"));
+
+        return Ok(ApiResponse<LoginResponse>.SuccessResponse(new LoginResponse
+        {
+            Success = true,
+            Token = accessToken,
+            RefreshToken = newRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes())
+        }, "تم تحديث الرمز بنجاح"));
+    }
+
     // logout the user
     [HttpPost("logout")]
     [Authorize]
     public async Task<IActionResult> Logout()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (int.TryParse(userIdClaim, out var userId))
+        var userId = GetCurrentUserId();
+        if (userId.HasValue)
         {
-            await _auth.LogoutAsync(userId);
+            await _auth.LogoutAsync(userId.Value);
+
+            // UC17: Audit log for logout
+            var user = await _users.GetByIdAsync(userId.Value);
+            await _audit.LogAsync(userId, user?.Username, "Logout",
+                "تسجيل خروج",
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Request.Headers.UserAgent.ToString());
         }
 
         return Ok(ApiResponse<string>.SuccessResponse("تم تسجيل الخروج بنجاح"));
+    }
+
+    // SR1.6: Forgot password - send OTP to user's phone
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<SendOtpResponse>.ErrorResponse("اسم المستخدم مطلوب"));
+
+        var user = await _users.GetByUsernameAsync(request.Username);
+        if (user == null)
+        {
+            // SECURITY: Don't reveal if username exists - always return success
+            return Ok(ApiResponse<SendOtpResponse>.SuccessResponse(new SendOtpResponse
+            {
+                Success = true,
+                MaskedPhone = "****",
+                Message = "إذا كان الحساب موجوداً، سيتم إرسال رمز التحقق"
+            }));
+        }
+
+        if (string.IsNullOrEmpty(user.PhoneNumber))
+        {
+            return Ok(ApiResponse<SendOtpResponse>.SuccessResponse(new SendOtpResponse
+            {
+                Success = true,
+                MaskedPhone = "****",
+                Message = "إذا كان الحساب موجوداً، سيتم إرسال رمز التحقق"
+            }));
+        }
+
+        var sessionToken = await _otp.GenerateAndSendOtpAsync(user, "PasswordReset");
+        if (sessionToken == null)
+        {
+            return StatusCode(500, ApiResponse<SendOtpResponse>.ErrorResponse("فشل إرسال رمز التحقق"));
+        }
+
+        _logger.LogInformation("Password reset OTP sent to user {UserId}", user.UserId);
+
+        return Ok(ApiResponse<SendOtpResponse>.SuccessResponse(new SendOtpResponse
+        {
+            Success = true,
+            SessionToken = sessionToken,
+            MaskedPhone = _otp.MaskPhoneNumber(user.PhoneNumber),
+            Message = "تم إرسال رمز التحقق",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(Core.Constants.AppConstants.OtpExpirationMinutes),
+            ResendCooldownSeconds = Core.Constants.AppConstants.OtpResendCooldownSeconds
+        }));
+    }
+
+    // SR1.6: Reset password using OTP verification
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+            return BadRequest(ApiResponse<object>.ErrorResponse(string.Join(", ", errors)));
+        }
+
+        // check password strength
+        if (!Utils.InputSanitizer.IsStrongPassword(request.NewPassword))
+            return BadRequest(ApiResponse<object>.ErrorResponse("كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم ورمز خاص"));
+
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+        // verify OTP
+        var (success, userId, error, _) = await _otp.VerifyOtpAsync(request.SessionToken, request.OtpCode, ipAddress);
+        if (!success || !userId.HasValue)
+            return Unauthorized(ApiResponse<object>.ErrorResponse(error ?? "رمز التحقق غير صحيح"));
+
+        var user = await _users.GetByIdAsync(userId.Value);
+        if (user == null)
+            return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
+
+        // update password
+        user.PasswordHash = _auth.HashPassword(request.NewPassword);
+        await _users.UpdateAsync(user);
+        await _users.SaveChangesAsync();
+
+        // audit log
+        await _audit.LogAsync(userId, user.Username, "PasswordReset",
+            "إعادة تعيين كلمة المرور عبر رمز التحقق",
+            ipAddress,
+            Request.Headers.UserAgent.ToString());
+
+        _logger.LogInformation("Password reset completed for user {UserId}", userId.Value);
+
+        return Ok(ApiResponse<object>.SuccessResponse(null, "تم إعادة تعيين كلمة المرور بنجاح"));
     }
 
     // save fcm token for push notifications
@@ -947,11 +903,11 @@ public class AuthController : BaseApiController
                 errors.Any() ? string.Join(", ", errors) : "يرجى التحقق من رمز FCM"));
         }
 
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
             return Unauthorized(ApiResponse<object>.ErrorResponse("رمز مستخدم غير صالح"));
 
-        var user = await _users.GetByIdAsync(userId);
+        var user = await _users.GetByIdAsync(userId.Value);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 

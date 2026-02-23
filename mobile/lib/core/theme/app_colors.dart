@@ -21,7 +21,7 @@ class AppColors {
   // Priority colors using the palette
   static const Color priorityLow = primaryBlue;
   static const Color priorityMedium = accentOrange;
-  static const Color priorityHigh = accentOrange;
+  static const Color priorityHigh = Color(0xFFB74C3B); // darker red for high priority
 
   // Semantic colors
   static const Color success = oliveGreen;
@@ -52,6 +52,9 @@ class AppColors {
       case 'completed':
       case 'مكتملة':
         return statusCompleted;
+      case 'approved':
+      case 'معتمدة':
+        return statusCompleted;
       case 'cancelled':
       case 'rejected':
       case 'ملغاة':
@@ -71,6 +74,8 @@ class AppColors {
         return 'قيد التنفيذ';
       case 'completed':
         return 'مكتملة';
+      case 'approved':
+        return 'معتمدة';
       case 'cancelled':
         return 'ملغاة';
       case 'rejected':

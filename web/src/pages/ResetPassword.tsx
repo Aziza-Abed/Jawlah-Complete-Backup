@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import AuthLayout from "../components/auth/AuthLayout";
+import { resetPassword } from "../api/auth";
+
+interface LocationState {
+  sessionToken?: string;
+  otpCode?: string;
+}
 
 export default function ResetPassword() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const phone = (location.state as { phone?: string } | null)?.phone;
+  const state = location.state as LocationState | null;
+  const sessionToken = state?.sessionToken;
+  const otpCode = state?.otpCode;
 
   const [newPass, setNewPass] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -16,15 +24,15 @@ export default function ResetPassword() {
   const [info, setInfo] = useState("");
 
   useEffect(() => {
-    if (!phone) navigate("/forgot-password");
-  }, [phone, navigate]);
+    if (!sessionToken || !otpCode) navigate("/forgot-password");
+  }, [sessionToken, otpCode, navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setInfo("");
 
-    if (!phone) {
+    if (!sessionToken || !otpCode) {
       setError("الرجاء إكمال خطوات التحقق أولاً.");
       return;
     }
@@ -39,14 +47,20 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      // TODO backend: reset password after OTP verification
-      // POST /auth/forgot-password/reset-password { phone, newPassword }
-      await new Promise((r) => setTimeout(r, 600));
+      const result = await resetPassword({
+        sessionToken,
+        otpCode,
+        newPassword: newPass,
+      });
 
-      setInfo("تم تغيير كلمة المرور بنجاح.");
-      navigate("/login");
-    } catch (err) {
-      setError("فشل تغيير كلمة السر.");
+      if (result.success) {
+        setInfo("تم تغيير كلمة المرور بنجاح.");
+        setTimeout(() => navigate("/login"), 1500);
+      } else {
+        setError(result.message || "فشل تغيير كلمة السر.");
+      }
+    } catch {
+      setError("فشل تغيير كلمة السر. قد يكون رمز التحقق خاطئاً أو منتهي الصلاحية.");
     } finally {
       setLoading(false);
     }

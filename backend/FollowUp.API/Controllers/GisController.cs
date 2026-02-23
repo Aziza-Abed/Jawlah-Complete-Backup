@@ -5,6 +5,7 @@ using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.IO.Compression;
 using System.Text.Json;
 
@@ -87,6 +88,7 @@ public class GisController : BaseApiController
     /// </summary>
     [HttpPost("upload")]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("upload")]
     [RequestSizeLimit(MaxFileSize)]
     public async Task<IActionResult> UploadGisFile(
         IFormFile file,
@@ -228,7 +230,7 @@ public class GisController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to upload GIS file");
-            return BadRequest(new { success = false, message = $"فشل رفع الملف: {ex.Message}" });
+            return BadRequest(new { success = false, message = "فشل رفع الملف. يرجى التحقق من صيغة الملف والمحاولة مرة أخرى" });
         }
     }
 
@@ -278,7 +280,7 @@ public class GisController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to import GIS file {FileId}", fileId);
-            return BadRequest(new { success = false, message = ex.Message });
+            return BadRequest(new { success = false, message = "فشل استيراد الملف. يرجى المحاولة مرة أخرى" });
         }
     }
 

@@ -65,6 +65,16 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
         builder.Property(e => e.SyncVersion)
             .IsRequired();
 
+        // ClientId for idempotent sync (prevents duplicate issues on retry)
+        builder.Property(e => e.ClientId)
+            .HasMaxLength(36);
+
+        // Unique index: same user cannot submit same ClientId twice
+        builder.HasIndex(e => new { e.ReportedByUserId, e.ClientId })
+            .HasDatabaseName("IX_Issue_UniqueClientId")
+            .HasFilter("[ClientId] IS NOT NULL")
+            .IsUnique();
+
         // for handling concurrent updates
         builder.Property(e => e.RowVersion)
             .IsRowVersion();
@@ -93,6 +103,13 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
         builder.HasOne(e => e.Zone)
             .WithMany(z => z.Issues)
             .HasForeignKey(e => e.ZoneId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Issue forwarding to departments (SR15)
+        builder.Property(e => e.ForwardingNotes).HasMaxLength(1000);
+        builder.HasOne(e => e.ForwardedToDepartment)
+            .WithMany()
+            .HasForeignKey(e => e.ForwardedToDepartmentId)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }

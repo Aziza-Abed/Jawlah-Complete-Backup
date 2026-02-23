@@ -1,21 +1,5 @@
-import 'package:flutter/foundation.dart';
-
+import '../../core/utils/date_formatter.dart';
 import 'local/task_local.dart';
-
-/// Safe DateTime parser that handles malformed dates gracefully
-DateTime? _safeParseDateTimeUtc(dynamic value) {
-  if (value == null) return null;
-  try {
-    final str = value.toString();
-    if (str.isEmpty) return null;
-    // Ensure UTC parsing by adding Z if missing
-    final utcStr = str.endsWith('Z') ? str : '${str}Z';
-    return DateTime.parse(utcStr);
-  } catch (e) {
-    if (kDebugMode) debugPrint('Failed to parse DateTime: $value - $e');
-    return null;
-  }
-}
 
 class TaskModel {
   final int taskId;
@@ -140,7 +124,7 @@ class TaskModel {
       estimatedDurationMinutes: json['estimatedDurationMinutes'] as int? ??
           json['EstimatedDurationMinutes'] as int?,
       assignedTo: json['assignedTo'] as String? ??
-          json['AssignedToUserName'] as String?,
+          json['assignedToUserName'] as String?,
       assignedToUserId:
           json['assignedToUserId'] as int? ?? json['AssignedToUserId'] as int?,
       zoneId: json['zoneId'] as int? ?? json['ZoneId'] as int?,
@@ -154,18 +138,18 @@ class TaskModel {
       longitude: (json['longitude'] ?? json['Longitude']) != null
           ? ((json['longitude'] ?? json['Longitude']) as num).toDouble()
           : null,
-      dueDate: _safeParseDateTimeUtc(json['dueDate'] ?? json['DueDate']),
+      dueDate: DateFormatter.tryParseUtc(json['dueDate'] ?? json['DueDate']),
       completedAt:
-          _safeParseDateTimeUtc(json['completedAt'] ?? json['CompletedAt']),
+          DateFormatter.tryParseUtc(json['completedAt'] ?? json['CompletedAt']),
       completionNotes: json['completionNotes'] as String? ??
           json['CompletionNotes'] as String?,
       photoUrl: json['photoUrl'] as String? ?? json['PhotoUrl'] as String?,
       photos:
           (json['photos'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
       createdAt:
-          _safeParseDateTimeUtc(json['createdAt'] ?? json['CreatedAt']) ??
+          DateFormatter.tryParseUtc(json['createdAt'] ?? json['CreatedAt']) ??
               DateTime.now().toUtc(),
-      updatedAt: _safeParseDateTimeUtc(json['updatedAt'] ?? json['SyncTime']) ??
+      updatedAt: DateFormatter.tryParseUtc(json['updatedAt'] ?? json['syncTime']) ??
           DateTime.now().toUtc(),
       syncVersion:
           json['syncVersion'] as int? ?? json['SyncVersion'] as int? ?? 1,
@@ -182,7 +166,7 @@ class TaskModel {
           0,
       progressNotes:
           json['progressNotes'] as String? ?? json['ProgressNotes'] as String?,
-      extendedDeadline: _safeParseDateTimeUtc(
+      extendedDeadline: DateFormatter.tryParseUtc(
           json['extendedDeadline'] ?? json['ExtendedDeadline']),
       isAutoRejected: json['isAutoRejected'] as bool? ??
           json['IsAutoRejected'] as bool? ??
@@ -190,7 +174,7 @@ class TaskModel {
       rejectionReason: json['rejectionReason'] as String? ??
           json['RejectionReason'] as String?,
       rejectedAt:
-          _safeParseDateTimeUtc(json['rejectedAt'] ?? json['RejectedAt']),
+          DateFormatter.tryParseUtc(json['rejectedAt'] ?? json['RejectedAt']),
       rejectionDistanceMeters: json['rejectionDistanceMeters'] as int? ??
           json['RejectionDistanceMeters'] as int?,
     );
@@ -343,7 +327,7 @@ class TaskModel {
 
   bool get isOverdue {
     if (dueDate == null || isCompleted) return false;
-    return DateTime.now().isAfter(dueDate!);
+    return DateTime.now().toUtc().isAfter(dueDate!);
   }
 
   bool get hasLocation => latitude != null && longitude != null;
@@ -359,6 +343,8 @@ class TaskModel {
         return 'قيد التنفيذ';
       case 'completed':
         return 'مكتملة';
+      case 'cancelled':
+        return 'ملغاة';
       case 'approved':
         return 'معتمدة';
       case 'rejected':

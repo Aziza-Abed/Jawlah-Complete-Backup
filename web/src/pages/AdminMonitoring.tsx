@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { getWorkerLocations } from "../api/tracking";
 import { getUsers } from "../api/users";
 import type { WorkerLocation } from "../types/tracking";
@@ -20,6 +20,7 @@ import {
   Radio
 } from "lucide-react";
 import { useMunicipality } from "../contexts/MunicipalityContext";
+import { useTrackingHub } from "../hooks/useTrackingHub";
 
 // Fix Leaflet icons
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -50,9 +51,23 @@ const OfflineIcon = L.divIcon({
   iconAnchor: [8, 8]
 });
 
-function ChangeView({ center }: { center: [number, number] }) {
+function FlyToWorker({
+  worker,
+  markerRefs,
+}: {
+  worker: WorkerLocation | null;
+  markerRefs: React.MutableRefObject<Record<number, L.Marker | null>>;
+}) {
   const map = useMap();
-  map.setView(center, map.getZoom());
+
+  useEffect(() => {
+    if (!worker) return;
+    map.flyTo([worker.latitude, worker.longitude], 16, { duration: 0.8 });
+    window.setTimeout(() => {
+      markerRefs.current[worker.userId]?.openPopup();
+    }, 250);
+  }, [worker, map, markerRefs]);
+
   return null;
 }
 
@@ -62,13 +77,50 @@ export default function AdminMonitoring() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const markerRefs = useRef<Record<number, L.Marker | null>>({});
 
   // Get map center from municipality settings
   const { mapCenter } = useMunicipality();
 
+  // SignalR: receive live location pushes from workers
+  useTrackingHub({
+    onLocationUpdate: useCallback((update) => {
+      setLocations((prev) => {
+        const idx = prev.findIndex((l) => l.userId === update.userId);
+        if (idx === -1) return prev;
+        const copy = [...prev];
+        copy[idx] = {
+          ...copy[idx],
+          latitude: update.latitude,
+          longitude: update.longitude,
+          timestamp: update.timestamp,
+          isOnline: true,
+          status: "Online",
+        };
+        return copy;
+      });
+      setLastUpdate(new Date());
+    }, []),
+    onUserStatus: useCallback((update) => {
+      setLocations((prev) => {
+        const idx = prev.findIndex((l) => l.userId === update.userId);
+        if (idx === -1) return prev;
+        const copy = [...prev];
+        copy[idx] = {
+          ...copy[idx],
+          isOnline: update.status === "online",
+          status: update.status === "online" ? "Online" : "Offline",
+        };
+        return copy;
+      });
+    }, []),
+  });
+
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => fetchData(true), 30000); // Auto refresh every 30s
+    // Fallback poll every 60s for battery info & new workers (SignalR handles locations)
+    const interval = setInterval(() => fetchData(true), 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -143,7 +195,7 @@ export default function AdminMonitoring() {
           {locations.map(loc => {
             const user = userDetails[loc.userId];
             return (
-              <div key={loc.userId} className="bg-[#F3F1ED] hover:bg-[#E8E6E2] p-4 rounded-[12px] border border-[#E5E7EB] transition-all group cursor-pointer">
+              <div key={loc.userId} onClick={() => setSelectedId(loc.userId)} className={`bg-[#F3F1ED] hover:bg-[#E8E6E2] p-4 rounded-[12px] border transition-all group cursor-pointer ${selectedId === loc.userId ? 'border-[#7895B2] shadow-md' : 'border-[#E5E7EB]'}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex flex-col items-start gap-1">
                     <span className={`flex items-center gap-1 text-[10px] font-bold ${loc.status === 'Online' ? 'text-[#8FA36A]' : 'text-[#6B7280]'}`}>
@@ -203,6 +255,9 @@ export default function AdminMonitoring() {
               key={loc.userId}
               position={[loc.latitude, loc.longitude]}
               icon={loc.status === 'Online' ? OnlineIcon : OfflineIcon}
+              ref={(ref) => {
+                markerRefs.current[loc.userId] = (ref as unknown as L.Marker) || null;
+              }}
             >
               <Popup className="glass-popup">
                 <div className="text-right font-sans min-w-[150px]">
@@ -217,7 +272,7 @@ export default function AdminMonitoring() {
               </Popup>
             </Marker>
           ))}
-          {locations.length > 0 && <ChangeView center={[locations[0].latitude, locations[0].longitude]} />}
+          <FlyToWorker worker={locations.find(l => l.userId === selectedId) || null} markerRefs={markerRefs} />
         </MapContainer>
 
         {/* Overlay Info */}

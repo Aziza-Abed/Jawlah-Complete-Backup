@@ -36,8 +36,8 @@ class TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final priorityStyle = _getPriorityStyle();
     final formattedDate = task.dueDate != null
-        ? DateFormat('yyyy-MM-dd').format(task.dueDate!)
-        : '2025-12-21'; // Fallback example date
+        ? DateFormat('yyyy-MM-dd').format(task.dueDate!.toLocal())
+        : 'بدون تاريخ';
 
     return GestureDetector(
       onTap: () {

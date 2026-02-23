@@ -11,6 +11,7 @@ public interface IIssueRepository : IRepository<Issue>
     Task<IEnumerable<Issue>> GetIssuesByTypeAsync(IssueType type);
     Task<IEnumerable<Issue>> GetCriticalIssuesAsync();
     Task<IEnumerable<Issue>> GetIssuesModifiedAfterAsync(int userId, DateTime lastSyncTime);
+    Task<Issue?> GetByClientIdAsync(int userId, string clientId);
 
     // Dashboard optimized methods - use database-level aggregation
     Task<IssueStatsDto> GetIssueStatsAsync(IEnumerable<int> workerIds, DateTime today);

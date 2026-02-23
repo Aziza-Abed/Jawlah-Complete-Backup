@@ -21,6 +21,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.Zone)
             .Include(i => i.ResolvedByUser)
             .Include(i => i.Photos)
+            .Include(i => i.ForwardedToDepartment)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
     }
@@ -32,6 +33,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.Zone)
             .Include(i => i.ResolvedByUser)
             .Include(i => i.Photos)
+            .Include(i => i.ForwardedToDepartment)
             .FirstOrDefaultAsync(i => i.IssueId == id);
     }
 
@@ -43,6 +45,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.Zone)
             .Include(i => i.ResolvedByUser)
             .Include(i => i.Photos)
+            .Include(i => i.ForwardedToDepartment)
             .Where(i => i.ReportedByUserId == userId)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
@@ -55,6 +58,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
             .Include(i => i.Photos)
+            .Include(i => i.ForwardedToDepartment)
             .Where(i => i.Status == status)
             .OrderByDescending(i => i.Severity)
             .ThenByDescending(i => i.ReportedAt)
@@ -68,6 +72,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
             .Include(i => i.Photos)
+            .Include(i => i.ForwardedToDepartment)
             .Where(i => i.Type == type)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
@@ -80,11 +85,19 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
             .Include(i => i.Photos)
+            .Include(i => i.ForwardedToDepartment)
             .Where(i => i.Severity == IssueSeverity.Critical &&
                        i.Status != IssueStatus.Resolved &&
                        i.Status != IssueStatus.Dismissed)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
+    }
+
+    public async Task<Issue?> GetByClientIdAsync(int userId, string clientId)
+    {
+        return await _dbSet
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.ReportedByUserId == userId && i.ClientId == clientId);
     }
 
     public async Task<IEnumerable<Issue>> GetIssuesModifiedAfterAsync(int userId, DateTime lastSyncTime)
@@ -94,6 +107,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
             .Include(i => i.Photos)
+            .Include(i => i.ForwardedToDepartment)
             .Where(i => i.ReportedByUserId == userId && i.SyncTime > lastSyncTime)
             .ToListAsync();
     }

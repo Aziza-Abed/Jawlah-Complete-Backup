@@ -296,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildWorkInfoCard(UserModel? user) {
     String joinDate = 'غير محدد';
     if (user?.createdAt != null) {
-      final date = user!.createdAt;
+      final date = user!.createdAt.toLocal();
       joinDate =
           '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     }

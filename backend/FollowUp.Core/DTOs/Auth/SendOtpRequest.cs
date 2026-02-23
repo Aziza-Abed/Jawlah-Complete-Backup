@@ -30,6 +30,11 @@ public class SendOtpResponse
     public bool Success { get; set; }
 
     /// <summary>
+    /// Session token for OTP verification (used by forgot-password flow)
+    /// </summary>
+    public string? SessionToken { get; set; }
+
+    /// <summary>
     /// Masked phone number for display (e.g., ****1234)
     /// </summary>
     public string MaskedPhone { get; set; } = string.Empty;

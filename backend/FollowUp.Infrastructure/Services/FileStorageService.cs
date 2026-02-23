@@ -57,6 +57,9 @@ public class FileStorageService : IFileStorageService
                 await file.CopyToAsync(stream);
             }
 
+            // strip EXIF/metadata from JPEG images (GPS coordinates, device info, timestamps)
+            StripImageMetadata(filePath, extension);
+
             _logger.LogInformation("File uploaded: {FileName}", uniqueFileName);
 
             // return the url
@@ -253,6 +256,95 @@ public class FileStorageService : IFileStorageService
         // just use localhost
         _logger.LogWarning("Base URL not configured, using localhost default");
         return "http://localhost:5000";
+    }
+
+    /// <summary>
+    /// Strips EXIF metadata (GPS, device info, timestamps) from JPEG images for privacy.
+    /// Removes APP1-APP13 segments (EXIF, XMP, ICC, IPTC) and COM markers.
+    /// Preserves APP0 (JFIF) and all image data segments (SOF, DQT, DHT, SOS).
+    /// </summary>
+    private void StripImageMetadata(string filePath, string extension)
+    {
+        if (extension != ".jpg" && extension != ".jpeg")
+            return; // only JPEG carries significant EXIF from phone cameras
+
+        try
+        {
+            var bytes = File.ReadAllBytes(filePath);
+            if (bytes.Length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8)
+                return; // not a valid JPEG
+
+            using var output = new MemoryStream(bytes.Length);
+            output.WriteByte(0xFF); // SOI
+            output.WriteByte(0xD8);
+
+            int pos = 2;
+            while (pos + 1 < bytes.Length)
+            {
+                if (bytes[pos] != 0xFF)
+                {
+                    pos++;
+                    continue;
+                }
+
+                byte marker = bytes[pos + 1];
+
+                // SOS (Start of Scan) — copy rest of file (actual image data)
+                if (marker == 0xDA)
+                {
+                    output.Write(bytes, pos, bytes.Length - pos);
+                    break;
+                }
+
+                // EOI (End of Image)
+                if (marker == 0xD9)
+                {
+                    output.WriteByte(0xFF);
+                    output.WriteByte(0xD9);
+                    break;
+                }
+
+                // Standalone markers (RST0-RST7, TEM) — no length field
+                if ((marker >= 0xD0 && marker <= 0xD7) || marker == 0x01)
+                {
+                    output.WriteByte(0xFF);
+                    output.WriteByte(marker);
+                    pos += 2;
+                    continue;
+                }
+
+                // All other markers have a 2-byte length field
+                if (pos + 3 >= bytes.Length)
+                    break;
+
+                int segLen = (bytes[pos + 2] << 8) | bytes[pos + 3];
+
+                // Strip APP1-APP13 (EXIF, XMP, ICC profile, IPTC metadata)
+                if (marker >= 0xE1 && marker <= 0xED)
+                {
+                    pos += 2 + segLen;
+                    continue;
+                }
+
+                // Strip COM (comments that may contain metadata)
+                if (marker == 0xFE)
+                {
+                    pos += 2 + segLen;
+                    continue;
+                }
+
+                // Keep everything else (APP0/JFIF, SOF, DQT, DHT, DRI, etc.)
+                output.Write(bytes, pos, 2 + segLen);
+                pos += 2 + segLen;
+            }
+
+            File.WriteAllBytes(filePath, output.ToArray());
+            _logger.LogInformation("EXIF metadata stripped from {FileName}", Path.GetFileName(filePath));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to strip EXIF metadata from {FileName} — file preserved as-is", Path.GetFileName(filePath));
+        }
     }
 
     private static string SanitizeFolder(string folder)

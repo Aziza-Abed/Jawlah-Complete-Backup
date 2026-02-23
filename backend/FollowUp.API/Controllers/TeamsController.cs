@@ -1,3 +1,4 @@
+using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Teams;
 using FollowUp.Infrastructure.Data;
@@ -200,9 +201,9 @@ public class TeamsController : BaseApiController
 
         var team = new Core.Entities.Team
         {
-            Name = request.Name,
-            Code = request.Code,
-            Description = request.Description,
+            Name = InputSanitizer.SanitizeString(request.Name, 100),
+            Code = request.Code.Trim().ToUpper(),
+            Description = InputSanitizer.SanitizeString(request.Description, 500),
             DepartmentId = request.DepartmentId,
             TeamLeaderId = request.TeamLeaderId,
             MaxMembers = request.MaxMembers,
@@ -305,9 +306,9 @@ public class TeamsController : BaseApiController
             return BadRequest(ApiResponse<object>.ErrorResponse($"لا يمكن تقليل الحد الأقصى للأعضاء. العدد الحالي: {currentMemberCount}"));
         }
 
-        team.Name = request.Name;
-        team.Code = request.Code;
-        team.Description = request.Description;
+        team.Name = InputSanitizer.SanitizeString(request.Name, 100);
+        team.Code = request.Code.Trim().ToUpper();
+        team.Description = InputSanitizer.SanitizeString(request.Description, 500);
         team.TeamLeaderId = request.TeamLeaderId;
         team.MaxMembers = request.MaxMembers;
         team.IsActive = request.IsActive;

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 import { Users, ClipboardList, MapPin, Activity, PlusCircle, ArrowRight, CircleHelp } from "lucide-react";
 import { getDashboardOverview, getWorkerStatuses } from "../api/dashboard";
 import type { DashboardOverview, WorkerStatus } from "../types/dashboard";
@@ -28,7 +29,7 @@ const Dashboard: React.FC = () => {
 
     useEffect(() => {
         try {
-            const userStr = localStorage.getItem("followup_user");
+            const userStr = localStorage.getItem(STORAGE_KEYS.USER);
             if (userStr) {
                 const user = JSON.parse(userStr);
                 setUserName(user.fullName?.split(' ')[0] || "مشرف");
@@ -79,7 +80,7 @@ const Dashboard: React.FC = () => {
         fetchData();
 
         // Check for first time visit
-        const hasSeenWelcome = localStorage.getItem("hasSeenWelcome");
+        const hasSeenWelcome = localStorage.getItem(STORAGE_KEYS.HAS_SEEN_WELCOME);
         if (!hasSeenWelcome) {
              // Delay slightly for smoother entrance
              setTimeout(() => setShowWelcome(true), 1000);
@@ -88,7 +89,7 @@ const Dashboard: React.FC = () => {
 
     const handleCloseWelcome = () => {
         setShowWelcome(false);
-        localStorage.setItem("hasSeenWelcome", "true");
+        localStorage.setItem(STORAGE_KEYS.HAS_SEEN_WELCOME, "true");
     };
 
     const tasksTotal = (overview?.tasks.pending ?? 0) + (overview?.tasks.inProgress ?? 0) + (overview?.tasks.completedToday ?? 0);

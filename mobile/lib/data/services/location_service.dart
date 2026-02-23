@@ -121,14 +121,14 @@ class LocationService {
     Position? currentPosition,
     Position? previousPosition,
   ) {
-    if (previousPosition == null) {
+    if (previousPosition == null || currentPosition == null) {
       return movingFastInterval;
     }
 
     final distance = calculateDistance(
       previousPosition.latitude,
       previousPosition.longitude,
-      currentPosition!.latitude,
+      currentPosition.latitude,
       currentPosition.longitude,
     );
 

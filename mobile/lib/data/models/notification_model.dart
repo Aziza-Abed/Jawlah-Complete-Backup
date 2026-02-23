@@ -1,3 +1,5 @@
+import '../../core/utils/date_formatter.dart';
+
 class NotificationModel {
   final int notificationId;
   final String title;
@@ -29,12 +31,12 @@ class NotificationModel {
       type: json['type'] as String,
       isRead: json['isRead'] as bool? ?? false,
       isSent: json['isSent'] as bool? ?? false,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: DateFormatter.parseUtc(json['createdAt'] as String),
       sentAt: json['sentAt'] != null
-          ? DateTime.parse(json['sentAt'] as String)
+          ? DateFormatter.parseUtc(json['sentAt'] as String)
           : null,
       readAt: json['readAt'] != null
-          ? DateTime.parse(json['readAt'] as String)
+          ? DateFormatter.parseUtc(json['readAt'] as String)
           : null,
     );
   }

@@ -124,12 +124,6 @@ public class GisService : IGisService
         return zone.Boundary.Contains(point);
     }
 
-    public Task<double> CalculateDistanceAsync(double lat1, double lon1, double lat2, double lon2)
-    {
-        var distance = CalculateHaversineDistance(lat1, lon1, lat2, lon2);
-        return Task.FromResult(distance);
-    }
-
     public async Task ImportShapefileAsync(string filePath, int municipalityId)
     {
         // Verify municipality exists
@@ -592,32 +586,6 @@ public class GisService : IGisService
             }
         }
         return null;
-    }
-
-    // calculate distance between two GPS points using Haversine formula
-    // source: https://stackoverflow.com/questions/27928/calculate-distance-between-two-latitude-longitude-points-haversine-formula
-    private double CalculateHaversineDistance(double lat1, double lon1, double lat2, double lon2)
-    {
-        const double earthRadiusKm = 6371.0; // earth radius in kilometers
-
-        var dLat = DegreesToRadians(lat2 - lat1);
-        var dLon = DegreesToRadians(lon2 - lon1);
-
-        lat1 = DegreesToRadians(lat1);
-        lat2 = DegreesToRadians(lat2);
-
-        // haversine formula
-        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                Math.Sin(dLon / 2) * Math.Sin(dLon / 2) * Math.Cos(lat1) * Math.Cos(lat2);
-        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-
-        return earthRadiusKm * c * 1000; // convert to meters
-    }
-
-    // helper to convert degrees to radians
-    private double DegreesToRadians(double degrees)
-    {
-        return degrees * Math.PI / 180.0;
     }
 
     // helper to write geometry as GeoJSON string

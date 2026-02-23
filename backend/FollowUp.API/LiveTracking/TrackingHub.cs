@@ -1,6 +1,7 @@
 using FollowUp.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
 using System.Security.Claims;
 
 namespace FollowUp.API.LiveTracking;
@@ -46,8 +47,8 @@ public class TrackingHub : Hub<ITrackingClient>
     private readonly IUserRepository _userRepository;
     private readonly ILocationHistoryRepository _locationHistory;
 
-    // dictionary to track active connections
-    private static readonly Dictionary<string, UserConnection> _connections = new();
+    // thread-safe dictionary to track active connections (SignalR is concurrent)
+    private static readonly ConcurrentDictionary<string, UserConnection> _connections = new();
 
     public TrackingHub(ILogger<TrackingHub> logger, IUserRepository userRepository, ILocationHistoryRepository locationHistory)
     {
@@ -115,10 +116,8 @@ public class TrackingHub : Hub<ITrackingClient>
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // remove the user from our connection list
-        if (_connections.ContainsKey(Context.ConnectionId))
+        if (_connections.TryRemove(Context.ConnectionId, out var connection))
         {
-            var connection = _connections[Context.ConnectionId];
-            _connections.Remove(Context.ConnectionId);
             // tell supervisors that this person went offline
             if (connection.Role == "Worker")
             {
@@ -158,11 +157,11 @@ public class TrackingHub : Hub<ITrackingClient>
         var timestamp = DateTime.UtcNow;
 
         // update the connection info in our memory
-        if (_connections.ContainsKey(Context.ConnectionId))
+        if (_connections.TryGetValue(Context.ConnectionId, out var conn))
         {
-            _connections[Context.ConnectionId].LastLatitude = latitude;
-            _connections[Context.ConnectionId].LastLongitude = longitude;
-            _connections[Context.ConnectionId].LastActivity = timestamp;
+            conn.LastLatitude = latitude;
+            conn.LastLongitude = longitude;
+            conn.LastActivity = timestamp;
         }
 
         // IMPORTANT: Also save to database so REST API can retrieve locations
@@ -209,6 +208,28 @@ public class TrackingHub : Hub<ITrackingClient>
         }
 
         _logger.LogInformation("Received batch location updates from: " + userName);
+
+        // save batch locations to database (same as SendLocationUpdate does)
+        try
+        {
+            foreach (var location in locations.OrderBy(l => l.Timestamp))
+            {
+                var history = new Core.Entities.LocationHistory
+                {
+                    UserId = userId.Value,
+                    Latitude = location.Latitude,
+                    Longitude = location.Longitude,
+                    Timestamp = location.Timestamp,
+                    IsSync = true
+                };
+                await _locationHistory.AddAsync(history);
+            }
+            await _locationHistory.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save batch locations to database for user {UserId}", userId);
+        }
 
         // broadcast each location to supervisors
         foreach (var location in locations.OrderBy(l => l.Timestamp))
@@ -357,9 +378,9 @@ public class TrackingHub : Hub<ITrackingClient>
     public Task Heartbeat()
     {
         // just update when we last heard from the client
-        if (_connections.ContainsKey(Context.ConnectionId))
+        if (_connections.TryGetValue(Context.ConnectionId, out var conn))
         {
-            _connections[Context.ConnectionId].LastActivity = DateTime.UtcNow;
+            conn.LastActivity = DateTime.UtcNow;
         }
 
         return Task.CompletedTask;

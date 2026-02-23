@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 import type { MunicipalitySettings, MunicipalityBasic } from "../api/municipality";
 import {
   getCurrentMunicipalitySettings,
@@ -32,7 +33,7 @@ export function MunicipalityProvider({ children }: { children: ReactNode }) {
 
     try {
       // Check if user is authenticated
-      const token = localStorage.getItem("followup_token");
+      const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
 
       if (token) {
         // Try to get user's municipality settings
@@ -100,42 +101,3 @@ export function useMunicipality() {
   return context;
 }
 
-/**
- * Simple hook for components that just need map center coordinates
- * Can be used without the context provider (uses defaults)
- */
-export function useMapCenter(): { center: [number, number]; zoom: number; loading: boolean } {
-  const [center, setCenter] = useState<[number, number]>([
-    DEFAULT_MUNICIPALITY_SETTINGS.centerLatitude,
-    DEFAULT_MUNICIPALITY_SETTINGS.centerLongitude,
-  ]);
-  const [zoom, setZoom] = useState(DEFAULT_MUNICIPALITY_SETTINGS.defaultZoom);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const token = localStorage.getItem("followup_token");
-        if (token) {
-          const settings = await getCurrentMunicipalitySettings();
-          if (settings) {
-            setCenter([settings.centerLatitude, settings.centerLongitude]);
-            setZoom(settings.defaultZoom);
-          }
-        } else {
-          const settings = await getDefaultMunicipalitySettings();
-          setCenter([settings.centerLatitude, settings.centerLongitude]);
-          setZoom(settings.defaultZoom);
-        }
-      } catch (error) {
-        console.error("Failed to load map settings:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadSettings();
-  }, []);
-
-  return { center, zoom, loading };
-}

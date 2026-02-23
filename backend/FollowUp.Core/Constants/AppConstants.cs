@@ -67,7 +67,7 @@ public static class AppConstants
     public const int MinUsernameLength = 3;
 
     /// <summary>Minimum password length</summary>
-    public const int MinPasswordLength = 6;
+    public const int MinPasswordLength = 8;
 
     /// <summary>OTP code length</summary>
     public const int OtpCodeLength = 6;

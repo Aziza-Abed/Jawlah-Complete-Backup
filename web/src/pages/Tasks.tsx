@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTasks } from "../api/tasks";
 import type { TaskResponse } from "../types/task";
@@ -95,33 +95,28 @@ export default function TasksList() {
     fetchTasks();
   }, []);
 
-  const stats = useMemo(() => {
-    const total = items.length;
-    const submitted = items.filter((x) => x.status === "Submitted").length;
-    const inProgress = items.filter((x) => x.status === "InProgress").length;
-    const open = items.filter((x) => x.status === "Open").length;
-    return { total, submitted, inProgress, open };
-  }, [items]);
+  const stats = {
+    total: items.length,
+    submitted: items.filter((x) => x.status === "Submitted").length,
+    inProgress: items.filter((x) => x.status === "InProgress").length,
+    open: items.filter((x) => x.status === "Open").length,
+  };
 
-  const filtered = useMemo(() => {
-    const byFilter = (x: TaskRow) => {
-      if (filter === "all") return true;
-      if (filter === "open") return x.status === "Open";
-      if (filter === "inprogress") return x.status === "InProgress";
-      if (filter === "submitted") return x.status === "Submitted";
-      if (filter === "approved") return x.status === "Approved";
-      return x.status === "Rejected";
-    };
-
-    const query = q.trim().toLowerCase();
-    const bySearch = (x: TaskRow) => {
-      if (!query) return true;
+  const query = q.trim().toLowerCase();
+  const filtered = items.filter((x) => {
+    if (filter !== "all") {
+      const statusMap: Record<FilterKey, TaskStatus | null> = {
+        all: null, open: "Open", inprogress: "InProgress",
+        submitted: "Submitted", approved: "Approved", rejected: "Rejected"
+      };
+      if (statusMap[filter] && x.status !== statusMap[filter]) return false;
+    }
+    if (query) {
       const hay = `${x.id} ${x.title} ${x.workerName} ${x.zoneName}`.toLowerCase();
-      return hay.includes(query);
-    };
-
-    return items.filter((x) => byFilter(x) && bySearch(x));
-  }, [items, filter, q]);
+      if (!hay.includes(query)) return false;
+    }
+    return true;
+  });
 
   if (loading) {
     return (

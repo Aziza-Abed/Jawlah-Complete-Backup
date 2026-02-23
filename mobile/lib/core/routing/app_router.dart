@@ -2,6 +2,7 @@
 
 import '../../features/splash/splash_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/forgot_password_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/attendance/attendance_screen.dart';
 import '../../features/tasks/tasks_list_screen.dart';
@@ -10,6 +11,7 @@ import '../../features/issues/report_problem_screen.dart';
 import '../../features/tasks/submit_evidence_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/settings/notification_settings_screen.dart';
 import '../../features/appeals/appeals_list_screen.dart';
 import '../../presentation/widgets/bottom_navigation.dart';
 
@@ -18,6 +20,7 @@ class Routes {
 
   static const String splash = '/';
   static const String login = '/login';
+  static const String forgotPassword = '/auth/forgot-password';
 
   static const String home = '/home';
 
@@ -33,6 +36,7 @@ class Routes {
 
   static const String profile = '/profile';
   static const String settings = '/settings';
+  static const String notificationSettings = '/settings/notifications';
   static const String appeals = '/appeals';
 }
 
@@ -49,6 +53,12 @@ class AppRouter {
       case Routes.login:
         return _buildRoute(
           const LoginScreen(),
+          settings,
+        );
+
+      case Routes.forgotPassword:
+        return _buildRoute(
+          const ForgotPasswordScreen(),
           settings,
         );
 
@@ -103,6 +113,12 @@ class AppRouter {
       case Routes.settings:
         return _buildRoute(
           const SettingsScreen(),
+          settings,
+        );
+
+      case Routes.notificationSettings:
+        return _buildRoute(
+          const NotificationSettingsScreen(),
           settings,
         );
 

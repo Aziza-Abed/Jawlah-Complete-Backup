@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { changePassword } from "../api/users";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 import { getMunicipalities, updateMunicipality, createMunicipality, type Municipality } from "../api/municipality";
 import {
   KeyRound,
@@ -13,7 +14,9 @@ import {
   Phone,
   Save,
   Loader2,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 type SettingsTab = "notifications" | "password" | "municipality";
@@ -39,7 +42,7 @@ export default function Settings() {
   // Get user info from localStorage
   const getUserInfo = () => {
     try {
-      const userStr = localStorage.getItem("followup_user");
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
       if (userStr) {
         return JSON.parse(userStr);
       }
@@ -110,6 +113,7 @@ export default function Settings() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [showPasswords, setShowPasswords] = useState({ old: false, new: false, confirm: false });
 
   // Handle password change
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -215,13 +219,16 @@ export default function Settings() {
                 <label className="block text-right text-[10px] text-[#AFAFAF] font-black uppercase tracking-widest mb-1 pr-1">كلمة المرور الحالية</label>
                 <div className="relative">
                   <input
-                    type="password"
+                    type={showPasswords.old ? "text" : "password"}
                     value={passwordForm.oldPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
-                    className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
+                    className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 pl-12 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
                     required
                   />
                   <Lock className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
+                  <button type="button" onClick={() => setShowPasswords(p => ({ ...p, old: !p.old }))} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AFAFAF] hover:text-[#2F2F2F] transition-colors" tabIndex={-1}>
+                    {showPasswords.old ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
 
@@ -229,14 +236,17 @@ export default function Settings() {
                 <label className="block text-right text-[10px] text-[#AFAFAF] font-black uppercase tracking-widest mb-1 pr-1">كلمة المرور الجديدة</label>
                 <div className="relative">
                   <input
-                    type="password"
+                    type={showPasswords.new ? "text" : "password"}
                     value={passwordForm.newPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
+                    className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 pl-12 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
                     required
                     minLength={8}
                   />
                   <ShieldCheck className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
+                  <button type="button" onClick={() => setShowPasswords(p => ({ ...p, new: !p.new }))} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AFAFAF] hover:text-[#2F2F2F] transition-colors" tabIndex={-1}>
+                    {showPasswords.new ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
                 <p className="text-[10px] text-[#6B7280] font-bold text-right mr-1">يجب أن تكون 8 أحرف على الأقل</p>
               </div>
@@ -245,13 +255,16 @@ export default function Settings() {
                 <label className="block text-right text-[10px] text-[#AFAFAF] font-black uppercase tracking-widest mb-1 pr-1">تأكيد كلمة المرور الجديدة</label>
                 <div className="relative">
                   <input
-                    type="password"
+                    type={showPasswords.confirm ? "text" : "password"}
                     value={passwordForm.confirmPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                    className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
+                    className="w-full h-14 rounded-[18px] bg-[#F9F8F6] border-0 px-6 pr-14 pl-12 text-right outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all font-black text-[15px] text-[#2F2F2F]"
                     required
                   />
                   <Lock className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
+                  <button type="button" onClick={() => setShowPasswords(p => ({ ...p, confirm: !p.confirm }))} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AFAFAF] hover:text-[#2F2F2F] transition-colors" tabIndex={-1}>
+                    {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
 

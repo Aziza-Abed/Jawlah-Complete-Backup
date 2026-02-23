@@ -8,15 +8,15 @@ public enum GisFileType
     /// <summary>
     /// Quarters/Neighborhoods boundaries
     /// </summary>
-    Quarters,
+    Quarters = 0,
 
     /// <summary>
     /// Municipality borders/boundaries
     /// </summary>
-    Borders,
+    Borders = 1,
 
     /// <summary>
     /// Blocks within quarters
     /// </summary>
-    Blocks
+    Blocks = 2
 }

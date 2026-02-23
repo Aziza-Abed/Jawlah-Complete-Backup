@@ -21,8 +21,10 @@ public class Attendance
     public DateTime? CheckOutSyncTime { get; set; }
     public double CheckInLatitude { get; set; }
     public double CheckInLongitude { get; set; }
+    public double? CheckInAccuracyMeters { get; set; }
     public double? CheckOutLatitude { get; set; }
     public double? CheckOutLongitude { get; set; }
+    public double? CheckOutAccuracyMeters { get; set; }
     public bool IsValidated { get; set; }
     public string? ValidationMessage { get; set; }
     public TimeSpan? WorkDuration { get; set; }

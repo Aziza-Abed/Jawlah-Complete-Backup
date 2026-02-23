@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 import { getWorkers, getMyWorkers } from "../api/users";
 import { getZones } from "../api/zones";
 import { getTeams, type Team } from "../api/teams";
@@ -73,7 +74,7 @@ export default function CreateTask() {
   // Get user role to determine which workers to show
   const isAdmin = (): boolean => {
     try {
-      const userStr = localStorage.getItem("followup_user");
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
       if (userStr) {
         const user = JSON.parse(userStr);
         return user.role?.toLowerCase() === "admin";

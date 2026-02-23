@@ -3,9 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getIssues } from "../api/issues";
 import type { IssueResponse } from "../types/issue";
 import { RefreshCw, ChevronLeft } from "lucide-react";
-
-type Severity = "low" | "medium" | "high" | "critical";
-type IssueStatus = "new" | "reviewing" | "converted" | "closed";
+import { mapSeverity, mapStatus, mapTypeToArabic, type Severity, type DisplayIssueStatus } from "../utils/issueDisplay";
 
 type IssueListItem = {
   id: string;
@@ -16,43 +14,10 @@ type IssueListItem = {
   zone: string;
   locationText: string;
   reportedAt: string;
-  status: IssueStatus;
+  status: DisplayIssueStatus;
 };
 
 type FilterKey = "all" | "new" | "reviewing" | "converted" | "closed";
-
-const mapSeverity = (severity: string | null | undefined): Severity => {
-  if (!severity) return "medium";
-  switch (severity.toLowerCase()) {
-    case "minor": return "low";
-    case "medium": return "medium";
-    case "major": return "high";
-    case "critical": return "critical";
-    default: return "medium";
-  }
-};
-
-const mapStatus = (status: string | null | undefined): IssueStatus => {
-  if (!status) return "new";
-  switch (status) {
-    case "Reported": return "new";
-    case "UnderReview": return "reviewing";
-    case "Resolved": return "closed";
-    case "Dismissed": return "closed";
-    default: return "new";
-  }
-};
-
-const mapTypeToArabic = (type: string): string => {
-  switch (type) {
-    case "Infrastructure": return "بنية تحتية";
-    case "Safety": return "سلامة";
-    case "Sanitation": return "صحة ونظافة";
-    case "Equipment": return "معدات";
-    case "Other": return "أخرى";
-    default: return type;
-  }
-};
 
 const mapIssueToListItem = (issue: IssueResponse): IssueListItem => {
   const date = issue.reportedAt ? new Date(issue.reportedAt) : new Date();
@@ -102,8 +67,10 @@ export default function Issues() {
   }, []);
 
   const counts = useMemo(() => {
-    const base = { all: items.length, new: 0, reviewing: 0, converted: 0, closed: 0 };
-    for (const it of items) base[it.status]++;
+    const base: Record<string, number> = { all: items.length, new: 0, reviewing: 0, converted: 0, rejected: 0, forwarded: 0, closed: 0 };
+    for (const it of items) {
+      if (it.status in base) base[it.status]++;
+    }
     return base;
   }, [items]);
 
@@ -265,24 +232,28 @@ function MetaSmallPill({ label, value, color }: { label: string; value: string; 
   );
 }
 
-function formatStatusLabel(s: IssueStatus) {
-  const map: Record<IssueStatus, string> = {
+function formatStatusLabel(s: DisplayIssueStatus) {
+  const map: Record<string, string> = {
     new: "جديد",
     reviewing: "قيد المراجعة",
     converted: "محول لمهمة",
+    rejected: "مرفوض",
+    forwarded: "تم التوجيه",
     closed: "مغلق",
   };
-  return map[s];
+  return map[s] || s;
 }
 
-function getStatusColor(s: IssueStatus) {
-  const map: Record<IssueStatus, string> = {
+function getStatusColor(s: DisplayIssueStatus) {
+  const map: Record<string, string> = {
     new: "#7895B2",
     reviewing: "#F3E7C8",
     converted: "#8FA36A",
+    rejected: "#C86E5D",
+    forwarded: "#F5B300",
     closed: "#6B7280",
   };
-  return map[s];
+  return map[s] || "#6B7280";
 }
 
 function formatSeverityLabel(s: Severity) {

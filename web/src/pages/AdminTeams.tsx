@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Users, Plus, Edit2, Trash2, Search, UserPlus, UserMinus, Shield } from "lucide-react";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 import { getTeams, createTeam, updateTeam, deleteTeam, getTeamMembers, addWorkerToTeam, removeWorkerFromTeam, type Team, type TeamMember, type CreateTeamRequest, type UpdateTeamRequest } from "../api/teams";
 import { getDepartments, type Department } from "../api/departments";
 import { getUsers, type User } from "../api/users";
+import { useConfirm } from "../components/common/ConfirmDialog";
 
 export default function AdminTeams() {
+  const [confirm, ConfirmDialog] = useConfirm();
   const [teams, setTeams] = useState<Team[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [workers, setWorkers] = useState<User[]>([]);
@@ -21,7 +24,7 @@ export default function AdminTeams() {
   // Get user role for permission checking
   const getUserRole = (): string => {
     try {
-      const userStr = localStorage.getItem("followup_user");
+      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
       if (userStr) {
         const user = JSON.parse(userStr);
         return user.role?.toLowerCase() || '';
@@ -124,7 +127,7 @@ export default function AdminTeams() {
   };
 
   const handleDelete = async (team: Team) => {
-    if (!window.confirm(`هل أنت متأكد من حذف الفريق "${team.name}"؟`)) {
+    if (!await confirm(`هل أنت متأكد من حذف الفريق "${team.name}"؟`)) {
       return;
     }
 
@@ -168,7 +171,7 @@ export default function AdminTeams() {
   const handleAddWorker = async (workerId: number) => {
     if (!selectedTeam) return;
 
-    if (!window.confirm("هل أنت متأكد من إضافة هذا العامل إلى الفريق؟")) {
+    if (!await confirm("هل أنت متأكد من إضافة هذا العامل إلى الفريق؟")) {
       return;
     }
 
@@ -189,7 +192,7 @@ export default function AdminTeams() {
   const handleRemoveWorker = async (workerId: number) => {
     if (!selectedTeam) return;
 
-    if (!window.confirm("هل أنت متأكد من إزالة هذا العامل من الفريق؟")) {
+    if (!await confirm("هل أنت متأكد من إزالة هذا العامل من الفريق؟")) {
       return;
     }
 
@@ -668,6 +671,8 @@ export default function AdminTeams() {
           </div>
         </div>
       )}
+
+      {ConfirmDialog}
     </div>
   );
 }

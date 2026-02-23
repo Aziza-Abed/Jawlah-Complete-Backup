@@ -63,7 +63,17 @@ public class ReportsController : BaseApiController
 
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
             var workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
-            var todayAttendance = await _attendance.GetFilteredAttendanceAsync(null, null, DateTime.Today, DateTime.Today.AddDays(1));
+            var todayAttendance = await _attendance.GetFilteredAttendanceAsync(null, null, DateTime.UtcNow.Date, DateTime.UtcNow.Date.AddDays(1));
+
+            // SECURITY: Supervisors should only see their workers' data
+            var currentUserId = GetCurrentUserId();
+            var currentRole = GetCurrentUserRole();
+            if (currentRole?.Equals("Supervisor", StringComparison.OrdinalIgnoreCase) == true && currentUserId.HasValue)
+            {
+                var workerIds = workers.Where(w => w.SupervisorId == currentUserId.Value).Select(w => w.UserId).ToHashSet();
+                workers = workers.Where(w => workerIds.Contains(w.UserId)).ToList();
+                tasks = tasks.Where(t => workerIds.Contains(t.AssignedToUserId)).ToList();
+            }
 
             var data = new TasksReportData
             {
@@ -139,7 +149,7 @@ public class ReportsController : BaseApiController
                 .Where(t => workerIds.Contains(t.AssignedToUserId))
                 .ToList();
 
-            var todayAttendance = attendance.Where(a => a.CheckInEventTime.Date == DateTime.Today).ToList();
+            var todayAttendance = attendance.Where(a => a.CheckInEventTime.Date == DateTime.UtcNow.Date).ToList();
             var checkedInIds = todayAttendance.Select(a => a.UserId).Distinct().ToHashSet();
 
             // compliance = actual attendance days / expected work days
@@ -205,6 +215,16 @@ public class ReportsController : BaseApiController
             var zones = (await _zones.GetActiveZonesAsync()).ToList();
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, null)).ToList();
 
+            // SECURITY: Supervisors should only see their workers' tasks
+            var currentUserId = GetCurrentUserId();
+            var currentRole = GetCurrentUserRole();
+            if (currentRole?.Equals("Supervisor", StringComparison.OrdinalIgnoreCase) == true && currentUserId.HasValue)
+            {
+                var allWorkers = await _users.GetByRoleAsync(UserRole.Worker);
+                var workerIds = allWorkers.Where(w => w.SupervisorId == currentUserId.Value).Select(w => w.UserId).ToHashSet();
+                tasks = tasks.Where(t => workerIds.Contains(t.AssignedToUserId)).ToList();
+            }
+
             var tasksByZone = tasks.Where(t => t.ZoneId.HasValue)
                 .GroupBy(t => t.ZoneId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -219,7 +239,7 @@ public class ReportsController : BaseApiController
                     Total = zoneTasks.Count,
                     Completed = zoneTasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved),
                     InProgress = zoneTasks.Count(t => t.Status == TaskStatus.InProgress),
-                    Delayed = zoneTasks.Count(t => t.DueDate < DateTime.Now &&
+                    Delayed = zoneTasks.Count(t => t.DueDate < DateTime.UtcNow &&
                         t.Status != TaskStatus.Completed && t.Status != TaskStatus.Approved && t.Status != TaskStatus.Cancelled),
                     LastUpdate = zoneTasks.Any() ? zoneTasks.Max(t => t.CompletedAt ?? t.CreatedAt) : null
                 };
@@ -233,7 +253,7 @@ public class ReportsController : BaseApiController
                 TotalTasks = tasks.Count,
                 TotalCompleted = tasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved),
                 TotalInProgress = tasks.Count(t => t.Status == TaskStatus.InProgress),
-                TotalDelayed = tasks.Count(t => t.DueDate < DateTime.Now &&
+                TotalDelayed = tasks.Count(t => t.DueDate < DateTime.UtcNow &&
                     t.Status != TaskStatus.Completed && t.Status != TaskStatus.Approved && t.Status != TaskStatus.Cancelled),
                 HighestPressureZone = highestPressure?.Name ?? "",
                 Zones = zoneItems
@@ -268,6 +288,15 @@ public class ReportsController : BaseApiController
 
             if (worker.Role != UserRole.Worker)
                 return BadRequest(ApiResponse<object>.ErrorResponse("هذا التقرير للعمال فقط"));
+
+            // SECURITY: Supervisors can only view reports for their own workers
+            var currentUserId = GetCurrentUserId();
+            var currentRole = GetCurrentUserRole();
+            if (currentRole == "Supervisor" && currentUserId.HasValue)
+            {
+                if (worker.SupervisorId != currentUserId.Value)
+                    return Forbid();
+            }
 
             var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
 
@@ -389,6 +418,7 @@ public class ReportsController : BaseApiController
     // ========== SUPERVISOR REPORT ==========
 
     [HttpGet("supervisors")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetSupervisorsPerformance()
     {
         try
@@ -396,8 +426,8 @@ public class ReportsController : BaseApiController
             var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
             var result = new List<SupervisorStatsItem>();
 
-            var fromDate = DateTime.Today.AddDays(-30);
-            var toDate = DateTime.Today.AddDays(1);
+            var fromDate = DateTime.UtcNow.Date.AddDays(-30);
+            var toDate = DateTime.UtcNow.Date.AddDays(1);
             var workDays = GetWorkDays(fromDate, toDate);
 
             // optimization: fetch all tasks and issues in range if possible, but for now loop is safer for explicit logic
@@ -661,7 +691,12 @@ public class ReportsController : BaseApiController
     {
         try
         {
-            var records = await _attendance.GetFilteredAttendanceAsync(workerId, zoneId, startDate, endDate);
+            var records = (await _attendance.GetFilteredAttendanceAsync(workerId, zoneId, startDate, endDate)).ToList();
+
+            // filter for supervisor data isolation
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            if (visibleWorkerIds != null)
+                records = records.Where(a => visibleWorkerIds.Contains(a.UserId)).ToList();
 
             if (format.Equals("excel", StringComparison.OrdinalIgnoreCase))
             {
@@ -729,7 +764,12 @@ public class ReportsController : BaseApiController
     {
         try
         {
-            var tasks = await _tasks.GetFilteredTasksAsync(workerId, zoneId, startDate, endDate, status);
+            var tasks = (await _tasks.GetFilteredTasksAsync(workerId, zoneId, startDate, endDate, status)).ToList();
+
+            // filter for supervisor data isolation
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            if (visibleWorkerIds != null)
+                tasks = tasks.Where(t => visibleWorkerIds.Contains(t.AssignedToUserId)).ToList();
 
             if (format.Equals("excel", StringComparison.OrdinalIgnoreCase))
             {
@@ -790,9 +830,24 @@ public class ReportsController : BaseApiController
 
     // ========== HELPERS ==========
 
+    // get worker IDs visible to the current user (null = admin sees all)
+    private async Task<HashSet<int>?> GetVisibleWorkerIdsAsync()
+    {
+        var role = GetCurrentUserRole();
+        if (role?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true)
+            return null;
+
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+            return new HashSet<int>();
+
+        var workers = await _users.GetByRoleAsync(UserRole.Worker);
+        return workers.Where(w => w.SupervisorId == userId.Value).Select(w => w.UserId).ToHashSet();
+    }
+
     private static (DateTime from, DateTime to) GetDateRange(string period, DateTime? start, DateTime? end)
     {
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
         return period.ToLower() switch
         {
             "daily" => (now.Date.AddDays(-7), now.Date.AddDays(1)),
@@ -848,7 +903,7 @@ public class ReportsController : BaseApiController
 
     private static (DateTime start, DateTime end) GetLabelDateRange(string label, string period)
     {
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
 
         if (period.Equals("daily", StringComparison.OrdinalIgnoreCase) && int.TryParse(label, out int day))
             return (now.Date.AddDays(-7 + day - 1), now.Date.AddDays(-7 + day));
@@ -900,6 +955,19 @@ public class ReportsController : BaseApiController
             var attendance = (await _attendance.GetFilteredAttendanceAsync(null, null, fromDate, toDate)).ToList();
             var workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
 
+            // UC14: Get supervisor name for report metadata
+            var currentUserId = GetCurrentUserId();
+            var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+            var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
+
+            // filter for supervisor data isolation
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            if (visibleWorkerIds != null)
+            {
+                attendance = attendance.Where(a => visibleWorkerIds.Contains(a.UserId)).ToList();
+                workers = workers.Where(w => visibleWorkerIds.Contains(w.UserId)).ToList();
+            }
+
             // Configure QuestPDF license
             QuestPDF.Settings.License = LicenseType.Community;
 
@@ -912,13 +980,14 @@ public class ReportsController : BaseApiController
                     page.Margin(40);
                     page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
 
-                    // Header
+                    // Header with supervisor name
                     page.Header().Element(c =>
                     {
                         c.Column(col =>
                         {
                             col.Item().AlignCenter().Text("تقرير الحضور والغياب").FontSize(18).Bold();
                             col.Item().AlignCenter().Text($"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}").FontSize(12);
+                            col.Item().AlignCenter().Text($"أنشأه: {supervisorName}").FontSize(10);
                             col.Item().PaddingVertical(10).LineHorizontal(1);
                         });
                     });
@@ -986,13 +1055,13 @@ public class ReportsController : BaseApiController
                     page.Footer().AlignCenter().Text(text =>
                     {
                         text.Span("تم إنشاء هذا التقرير بواسطة نظام جولة - ");
-                        text.Span(DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+                        text.Span(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"));
                     });
                 });
             });
 
             var pdfBytes = document.GeneratePdf();
-            var fileName = $"attendance_report_{DateTime.Now:yyyyMMdd}.pdf";
+            var fileName = $"attendance_report_{DateTime.UtcNow:yyyyMMdd}.pdf";
             return File(pdfBytes, "application/pdf", fileName);
         }
         catch (Exception ex)
@@ -1026,6 +1095,16 @@ public class ReportsController : BaseApiController
 
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
 
+            // UC14: Get supervisor name for report metadata
+            var currentUserId = GetCurrentUserId();
+            var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+            var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
+
+            // filter for supervisor data isolation
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            if (visibleWorkerIds != null)
+                tasks = tasks.Where(t => visibleWorkerIds.Contains(t.AssignedToUserId)).ToList();
+
             // Configure QuestPDF license
             QuestPDF.Settings.License = LicenseType.Community;
 
@@ -1049,13 +1128,14 @@ public class ReportsController : BaseApiController
                     page.Margin(40);
                     page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
 
-                    // Header
+                    // Header with supervisor name
                     page.Header().Element(c =>
                     {
                         c.Column(col =>
                         {
                             col.Item().AlignCenter().Text("تقرير المهام").FontSize(18).Bold();
                             col.Item().AlignCenter().Text($"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}").FontSize(12);
+                            col.Item().AlignCenter().Text($"أنشأه: {supervisorName}").FontSize(10);
                             col.Item().PaddingVertical(10).LineHorizontal(1);
                         });
                     });
@@ -1118,13 +1198,13 @@ public class ReportsController : BaseApiController
                     page.Footer().AlignCenter().Text(text =>
                     {
                         text.Span("تم إنشاء هذا التقرير بواسطة نظام جولة - ");
-                        text.Span(DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+                        text.Span(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"));
                     });
                 });
             });
 
             var pdfBytes = document.GeneratePdf();
-            var fileName = $"tasks_report_{DateTime.Now:yyyyMMdd}.pdf";
+            var fileName = $"tasks_report_{DateTime.UtcNow:yyyyMMdd}.pdf";
             return File(pdfBytes, "application/pdf", fileName);
         }
         catch (Exception ex)
@@ -1151,6 +1231,19 @@ public class ReportsController : BaseApiController
             var attendance = (await _attendance.GetFilteredAttendanceAsync(null, null, fromDate, toDate)).ToList();
             var workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
 
+            // UC14: Get supervisor name for report metadata
+            var currentUserId = GetCurrentUserId();
+            var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+            var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
+
+            // filter for supervisor data isolation
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            if (visibleWorkerIds != null)
+            {
+                attendance = attendance.Where(a => visibleWorkerIds.Contains(a.UserId)).ToList();
+                workers = workers.Where(w => visibleWorkerIds.Contains(w.UserId)).ToList();
+            }
+
             using var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add("تقرير الحضور");
 
@@ -1163,8 +1256,12 @@ public class ReportsController : BaseApiController
             worksheet.Cell(2, 1).Value = $"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}";
             worksheet.Range(2, 1, 2, 6).Merge();
 
+            // UC14: Add supervisor name
+            worksheet.Cell(3, 1).Value = $"أنشأه: {supervisorName}";
+            worksheet.Range(3, 1, 3, 6).Merge();
+
             // Headers
-            var headerRow = 4;
+            var headerRow = 5;
             worksheet.Cell(headerRow, 1).Value = "#";
             worksheet.Cell(headerRow, 2).Value = "الاسم";
             worksheet.Cell(headerRow, 3).Value = "التاريخ";
@@ -1205,7 +1302,7 @@ public class ReportsController : BaseApiController
             using var stream = new MemoryStream();
             workbook.SaveAs(stream);
             var content = stream.ToArray();
-            var fileName = $"attendance_report_{DateTime.Now:yyyyMMdd}.xlsx";
+            var fileName = $"attendance_report_{DateTime.UtcNow:yyyyMMdd}.xlsx";
 
             return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
@@ -1240,6 +1337,16 @@ public class ReportsController : BaseApiController
 
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
 
+            // UC14: Get supervisor name for report metadata
+            var currentUserId = GetCurrentUserId();
+            var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+            var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
+
+            // filter for supervisor data isolation
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            if (visibleWorkerIds != null)
+                tasks = tasks.Where(t => visibleWorkerIds.Contains(t.AssignedToUserId)).ToList();
+
             // Status mapping
             var statusMap = new Dictionary<TaskStatus, string>
             {
@@ -1263,8 +1370,12 @@ public class ReportsController : BaseApiController
             worksheet.Cell(2, 1).Value = $"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}";
             worksheet.Range(2, 1, 2, 7).Merge();
 
+            // UC14: Add supervisor name
+            worksheet.Cell(3, 1).Value = $"أنشأه: {supervisorName}";
+            worksheet.Range(3, 1, 3, 7).Merge();
+
             // Headers
-            var headerRow = 4;
+            var headerRow = 5;
             worksheet.Cell(headerRow, 1).Value = "#";
             worksheet.Cell(headerRow, 2).Value = "العنوان";
             worksheet.Cell(headerRow, 3).Value = "الوصف";
@@ -1302,7 +1413,7 @@ public class ReportsController : BaseApiController
             using var stream = new MemoryStream();
             workbook.SaveAs(stream);
             var content = stream.ToArray();
-            var fileName = $"tasks_report_{DateTime.Now:yyyyMMdd}.xlsx";
+            var fileName = $"tasks_report_{DateTime.UtcNow:yyyyMMdd}.xlsx";
 
             return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }

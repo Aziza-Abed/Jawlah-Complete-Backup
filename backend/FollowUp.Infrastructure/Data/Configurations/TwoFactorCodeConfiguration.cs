@@ -40,6 +40,13 @@ public class TwoFactorCodeConfiguration : IEntityTypeConfiguration<TwoFactorCode
         builder.Property(e => e.DeviceId)
             .HasMaxLength(100);
 
+        builder.Property(e => e.SessionToken)
+            .IsRequired()
+            .HasMaxLength(100);
+
+        builder.Property(e => e.PendingJwtToken)
+            .HasMaxLength(2000);
+
         // Indexes for efficient querying
         builder.HasIndex(e => new { e.UserId, e.IsUsed, e.ExpiresAt })
             .HasDatabaseName("IX_TwoFactorCode_User_Active");

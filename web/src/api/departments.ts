@@ -33,12 +33,6 @@ export async function getDepartments(activeOnly?: boolean): Promise<Department[]
   return response.data.data;
 }
 
-// Get department by ID
-export async function getDepartment(id: number): Promise<Department> {
-  const response = await apiClient.get<{ data: Department }>(`/departments/${id}`);
-  return response.data.data;
-}
-
 // Create department
 export async function createDepartment(request: CreateDepartmentRequest): Promise<Department> {
   const response = await apiClient.post<{ data: Department }>("/departments", request);

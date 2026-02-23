@@ -339,7 +339,7 @@ public class NotificationService : INotificationService
 
     public async Task SendTaskAutoRejectedToWorkerAsync(int workerId, int taskId, string taskTitle, string reason, int distanceMeters)
     {
-        var title = "⚠️ تم رفض إثبات المهمة";
+        var title = "تم رفض إثبات المهمة";
         var body = $"تم رفض إثبات المهمة \"{taskTitle}\" تلقائياً.\n{reason}\nالمسافة من موقع المهمة: {distanceMeters} متر";
         var data = new Dictionary<string, string>
         {
@@ -379,7 +379,7 @@ public class NotificationService : INotificationService
 
     public async Task SendTaskAutoRejectedToSupervisorsAsync(int taskId, string taskTitle, string workerName, string reason, int distanceMeters)
     {
-        var title = "⚠️ رفض تلقائي لإثبات مهمة";
+        var title = "رفض تلقائي لإثبات مهمة";
         var body = $"تم رفض إثبات العامل {workerName} للمهمة \"{taskTitle}\" تلقائياً.\n{reason}\nالمسافة: {distanceMeters} متر";
         var data = new Dictionary<string, string>
         {
@@ -416,7 +416,7 @@ public class NotificationService : INotificationService
 
     public async Task SendWarningIssuedToWorkerAsync(int workerId, string reason, int totalWarnings)
     {
-        var title = "⚠️ تحذير";
+        var title = "تحذير";
         var body = $"تم إصدار تحذير: {reason}\nإجمالي التحذيرات: {totalWarnings}";
         var data = new Dictionary<string, string>
         {
@@ -455,7 +455,7 @@ public class NotificationService : INotificationService
 
     public async Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings)
     {
-        var title = totalWarnings >= 3 ? "🚨 عامل وصل للحد الأقصى من التحذيرات" : "⚠️ تحذير لعامل";
+        var title = totalWarnings >= 3 ? "عامل وصل للحد الأقصى من التحذيرات" : "تحذير لعامل";
         var body = $"تم إصدار تحذير للعامل {workerName}.\nالسبب: {reason}\nإجمالي التحذيرات: {totalWarnings}";
         var data = new Dictionary<string, string>
         {
@@ -608,7 +608,7 @@ public class NotificationService : INotificationService
             return;
         }
 
-        var title = $"🎯 تم إنجاز {milestone}% من المهمة";
+        var title = $"تم إنجاز {milestone}% من المهمة";
         var body = $"أحسنت! لقد أنجزت {milestone}% من المهمة \"{taskTitle}\"";
         var data = new Dictionary<string, string>
         {

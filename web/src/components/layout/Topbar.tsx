@@ -1,28 +1,11 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import { Menu, Bell, User, Settings } from "lucide-react";
-import { getUnreadNotificationsCount } from "../../api/notifications";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const navigate = useNavigate();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        const count = await getUnreadNotificationsCount();
-        setUnreadCount(count);
-      } catch (err) {
-        console.error("Failed to fetch unread count:", err);
-      }
-    };
-    fetchUnreadCount();
-
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  const { unreadCount } = useNotifications();
 
 
 

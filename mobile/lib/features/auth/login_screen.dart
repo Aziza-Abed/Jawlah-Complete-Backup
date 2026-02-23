@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -50,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      debugPrint('Error loading saved credentials: $e');
+      if (kDebugMode) debugPrint('Error loading saved credentials: $e');
     }
   }
 
@@ -79,25 +80,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _LogoFloater(
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.6),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          width: 100,
-                          height: 100,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.account_balance,
-                              size: 100,
-                              color: AppColors.primary,
-                            );
-                          },
-                        ),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 100,
+                        height: 100,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.account_balance,
+                            size: 100,
+                            color: AppColors.primary,
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -246,26 +245,47 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 20),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Checkbox(
-                          value: _rememberMe,
-                          onChanged: (value) {
-                            setState(() => _rememberMe = value ?? false);
+                        // Forgot password link
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context)
+                                .pushNamed(Routes.forgotPassword);
                           },
-                          activeColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
+                          child: const Text(
+                            'نسيت كلمة المرور؟',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.primary,
+                              fontFamily: 'Cairo',
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Text(
-                          'تذكر بياناتي',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: AppColors.secondaryText,
-                            fontFamily: 'Cairo',
-                          ),
+                        // Remember me
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Checkbox(
+                              value: _rememberMe,
+                              onChanged: (value) {
+                                setState(() => _rememberMe = value ?? false);
+                              },
+                              activeColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'تذكر بياناتي',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: AppColors.secondaryText,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -397,7 +417,7 @@ class _LoginScreenState extends State<LoginScreen> {
         timeLimit: const Duration(seconds: 10),
       );
     } catch (e) {
-      debugPrint('Error getting location: $e');
+      if (kDebugMode) debugPrint('Error getting location: $e');
       return null;
     }
   }
@@ -693,16 +713,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-}
-
-// Simple wrapper widget - just displays the child (no animation needed)
-class _LogoFloater extends StatelessWidget {
-  final Widget child;
-  const _LogoFloater({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return child;
   }
 }

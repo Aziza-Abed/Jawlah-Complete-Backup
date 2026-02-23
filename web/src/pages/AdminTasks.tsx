@@ -20,8 +20,10 @@ import {
   Save,
   Edit3
 } from "lucide-react";
+import { useConfirm } from "../components/common/ConfirmDialog";
 
 export default function AdminTasks() {
+  const [confirm, ConfirmDialog] = useConfirm();
   const [tasks, setTasks] = useState<TaskResponse[]>([]);
   const [zones, setZones] = useState<ZoneResponse[]>([]);
   const [workers, setWorkers] = useState<UserResponse[]>([]);
@@ -79,7 +81,7 @@ export default function AdminTasks() {
   };
 
   const handleDeleteTask = async (taskId: number) => {
-    if (!window.confirm("هل أنت متأكد من حذف (إلغاء) هذه المهمة نهائياً؟")) return;
+    if (!await confirm("هل أنت متأكد من حذف (إلغاء) هذه المهمة نهائياً؟")) return;
     setActionLoading(taskId);
     try {
       await deleteTask(taskId);
@@ -113,7 +115,7 @@ export default function AdminTasks() {
   };
 
   const handleDeleteTemplate = async (id: number) => {
-      if(!window.confirm("هل أنت متأكد من حذف هذا القالب؟")) return;
+      if(!await confirm("هل أنت متأكد من حذف هذا القالب؟")) return;
       try {
           await deleteTaskTemplate(id);
           setTemplates(templates.filter(t => t.id !== id));
@@ -617,6 +619,8 @@ export default function AdminTasks() {
           </div>
         </div>
       )}
+
+      {ConfirmDialog}
     </div>
   );
 }

@@ -1,17 +1,16 @@
+using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Tasks;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace FollowUp.API.Controllers;
 
-[ApiController]
 [Route("api/task-templates")]
-[Authorize(Roles = "Admin,Manager")]
-public class TaskTemplatesController : ControllerBase
+[Authorize(Roles = "Admin,Supervisor")]
+public class TaskTemplatesController : BaseApiController
 {
     private readonly ITaskTemplateRepository _repository;
     private readonly IUserRepository _userRepository;
@@ -25,9 +24,10 @@ public class TaskTemplatesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TaskTemplateDto>>> GetAll()
     {
-        var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-        var currentUser = await _userRepository.GetByIdAsync(currentUserId);
-        
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        var currentUser = await _userRepository.GetByIdAsync(currentUserId.Value);
         if (currentUser == null) return Unauthorized();
 
         var templates = await _repository.GetAllAsync(currentUser.MunicipalityId);
@@ -51,9 +51,10 @@ public class TaskTemplatesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<TaskTemplateDto>> Create(CreateTaskTemplateDto dto)
     {
-        var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-        var currentUser = await _userRepository.GetByIdAsync(currentUserId);
-        
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        var currentUser = await _userRepository.GetByIdAsync(currentUserId.Value);
         if (currentUser == null) return Unauthorized();
 
         // Parse time string to TimeSpan
@@ -67,8 +68,8 @@ public class TaskTemplatesController : ControllerBase
 
         var template = new TaskTemplate
         {
-            Title = dto.Title,
-            Description = dto.Description,
+            Title = InputSanitizer.SanitizeString(dto.Title, 200),
+            Description = InputSanitizer.SanitizeString(dto.Description, 2000),
             MunicipalityId = currentUser.MunicipalityId,
             ZoneId = dto.ZoneId == 0 ? null : dto.ZoneId,
             Frequency = dto.Frequency,
@@ -98,9 +99,10 @@ public class TaskTemplatesController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-        var currentUser = await _userRepository.GetByIdAsync(currentUserId);
-        
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        var currentUser = await _userRepository.GetByIdAsync(currentUserId.Value);
         if (currentUser == null) return Unauthorized();
 
         var template = await _repository.GetByIdAsync(id);

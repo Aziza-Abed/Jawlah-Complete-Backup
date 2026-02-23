@@ -1,4 +1,5 @@
 using FollowUp.Core.Interfaces.Repositories;
+using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +15,9 @@ public class FilesController : BaseApiController
     private readonly IPhotoRepository _photos;
     private readonly ITaskRepository _tasks;
     private readonly IIssueRepository _issues;
+    private readonly IAppealRepository _appeals;
     private readonly IUserRepository _users;
+    private readonly AuditLogService _audit;
     private const string SecureStorageFolder = "Storage";
     private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".gif" };
 
@@ -24,14 +27,18 @@ public class FilesController : BaseApiController
         IPhotoRepository photos,
         ITaskRepository tasks,
         IIssueRepository issues,
-        IUserRepository users)
+        IAppealRepository appeals,
+        IUserRepository users,
+        AuditLogService audit)
     {
         _env = env;
         _logger = logger;
         _photos = photos;
         _tasks = tasks;
         _issues = issues;
+        _appeals = appeals;
         _users = users;
+        _audit = audit;
     }
 
     // get file by folder and filename
@@ -60,55 +67,83 @@ public class FilesController : BaseApiController
                     return Unauthorized();
                 }
 
-                // find photo in db
-                var photo = await _photos.GetByFilenameAsync(filename);
-
-                if (photo == null)
-                {
-                    _logger.LogWarning("Photo with filename {Filename} not found in database", filename);
-                    return NotFound(new { error = "الملف غير موجود" });
-                }
-
-                // check if photo belongs to user or their supervised workers
                 bool hasAccess = false;
-                if (photo.EntityType == "Task")
+
+                // Appeal photos are stored in Appeal entity (not Photo table)
+                if (folder.Equals("appeals", StringComparison.OrdinalIgnoreCase))
                 {
-                    var task = await _tasks.GetByIdAsync(photo.EntityId);
-                    if (task != null)
+                    var appeal = await _appeals.GetByEvidencePhotoFilenameAsync(filename);
+
+                    if (appeal == null)
                     {
-                        // Worker: can only see own tasks
-                        if (task.AssignedToUserId == userId.Value)
+                        return NotFound(new { error = "الملف غير موجود" });
+                    }
+
+                    // Worker: can only see own appeal photos
+                    if (appeal.UserId == userId.Value)
+                    {
+                        hasAccess = true;
+                    }
+                    // Supervisor: can see appeal photos from workers under their supervision
+                    else if (userRole == "Supervisor")
+                    {
+                        var worker = await _users.GetByIdAsync(appeal.UserId);
+                        if (worker != null && worker.SupervisorId == userId.Value)
                         {
                             hasAccess = true;
-                        }
-                        // Supervisor: can see tasks of workers under their supervision
-                        else if (userRole == "Supervisor")
-                        {
-                            var worker = await _users.GetByIdAsync(task.AssignedToUserId);
-                            if (worker != null && worker.SupervisorId == userId.Value)
-                            {
-                                hasAccess = true;
-                            }
                         }
                     }
                 }
-                else if (photo.EntityType == "Issue")
+                else
                 {
-                    var issue = await _issues.GetByIdAsync(photo.EntityId);
-                    if (issue != null)
+                    // Task/Issue photos are in Photo table
+                    var photo = await _photos.GetByFilenameAsync(filename);
+
+                    if (photo == null)
                     {
-                        // Worker: can only see own issues
-                        if (issue.ReportedByUserId == userId.Value)
+                        _logger.LogWarning("Photo with filename {Filename} not found in database", filename);
+                        return NotFound(new { error = "الملف غير موجود" });
+                    }
+
+                    if (photo.EntityType == "Task")
+                    {
+                        var task = await _tasks.GetByIdAsync(photo.EntityId);
+                        if (task != null)
                         {
-                            hasAccess = true;
-                        }
-                        // Supervisor: can see issues from workers under their supervision
-                        else if (userRole == "Supervisor")
-                        {
-                            var worker = await _users.GetByIdAsync(issue.ReportedByUserId);
-                            if (worker != null && worker.SupervisorId == userId.Value)
+                            // Worker: can only see own tasks
+                            if (task.AssignedToUserId == userId.Value)
                             {
                                 hasAccess = true;
+                            }
+                            // Supervisor: can see tasks of workers under their supervision
+                            else if (userRole == "Supervisor")
+                            {
+                                var worker = await _users.GetByIdAsync(task.AssignedToUserId);
+                                if (worker != null && worker.SupervisorId == userId.Value)
+                                {
+                                    hasAccess = true;
+                                }
+                            }
+                        }
+                    }
+                    else if (photo.EntityType == "Issue")
+                    {
+                        var issue = await _issues.GetByIdAsync(photo.EntityId);
+                        if (issue != null)
+                        {
+                            // Worker: can only see own issues
+                            if (issue.ReportedByUserId == userId.Value)
+                            {
+                                hasAccess = true;
+                            }
+                            // Supervisor: can see issues from workers under their supervision
+                            else if (userRole == "Supervisor")
+                            {
+                                var worker = await _users.GetByIdAsync(issue.ReportedByUserId);
+                                if (worker != null && worker.SupervisorId == userId.Value)
+                                {
+                                    hasAccess = true;
+                                }
                             }
                         }
                     }
@@ -116,7 +151,7 @@ public class FilesController : BaseApiController
 
                 if (!hasAccess)
                 {
-                    _logger.LogWarning("User {UserId} ({Role}) attempted to access unauthorized file: {PhotoUrl}", userId.Value, userRole, photo.PhotoUrl);
+                    _logger.LogWarning("User {UserId} ({Role}) attempted to access unauthorized file in {Folder}", userId.Value, userRole, folder);
                     return Forbid();
                 }
             }
@@ -163,6 +198,19 @@ public class FilesController : BaseApiController
                 ".gif" => "image/gif",
                 _ => "application/octet-stream"
             };
+
+            // audit log for file access
+            await _audit.LogAsync(
+                userId,
+                null,
+                "FileAccess",
+                $"ملف: {folder}/{filename}",
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Request.Headers.UserAgent.ToString());
+
+            // prevent caching of sensitive photos by browsers and proxies
+            Response.Headers["Cache-Control"] = "private, no-store";
+            Response.Headers["Pragma"] = "no-cache";
 
             // return file
             var fileStream = System.IO.File.OpenRead(filePath);

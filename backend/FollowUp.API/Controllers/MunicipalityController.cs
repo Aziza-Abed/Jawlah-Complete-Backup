@@ -1,3 +1,4 @@
+using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Municipality;
 using FollowUp.Core.DTOs.Zones;
@@ -262,13 +263,13 @@ public class MunicipalityController : BaseApiController
             var municipality = new Municipality
             {
                 Code = request.Code.ToUpperInvariant(),
-                Name = request.Name,
-                NameEnglish = request.NameEnglish,
-                Country = request.Country,
-                Region = request.Region,
+                Name = InputSanitizer.SanitizeString(request.Name, 200),
+                NameEnglish = InputSanitizer.SanitizeString(request.NameEnglish, 200),
+                Country = InputSanitizer.SanitizeString(request.Country, 100),
+                Region = InputSanitizer.SanitizeString(request.Region, 100),
                 ContactEmail = request.ContactEmail,
-                ContactPhone = request.ContactPhone,
-                Address = request.Address,
+                ContactPhone = InputSanitizer.SanitizeString(request.ContactPhone, 50),
+                Address = InputSanitizer.SanitizeString(request.Address, 500),
                 MinLatitude = request.MinLatitude,
                 MaxLatitude = request.MaxLatitude,
                 MinLongitude = request.MinLongitude,
@@ -322,17 +323,17 @@ public class MunicipalityController : BaseApiController
 
             // Update fields if provided
             if (!string.IsNullOrEmpty(request.Name))
-                municipality.Name = request.Name;
+                municipality.Name = InputSanitizer.SanitizeString(request.Name, 200);
             if (request.NameEnglish != null)
-                municipality.NameEnglish = request.NameEnglish;
+                municipality.NameEnglish = InputSanitizer.SanitizeString(request.NameEnglish, 200);
             if (request.Region != null)
-                municipality.Region = request.Region;
+                municipality.Region = InputSanitizer.SanitizeString(request.Region, 100);
             if (request.ContactEmail != null)
                 municipality.ContactEmail = request.ContactEmail;
             if (request.ContactPhone != null)
-                municipality.ContactPhone = request.ContactPhone;
+                municipality.ContactPhone = InputSanitizer.SanitizeString(request.ContactPhone, 50);
             if (request.Address != null)
-                municipality.Address = request.Address;
+                municipality.Address = InputSanitizer.SanitizeString(request.Address, 500);
             if (request.LogoUrl != null)
                 municipality.LogoUrl = request.LogoUrl;
 

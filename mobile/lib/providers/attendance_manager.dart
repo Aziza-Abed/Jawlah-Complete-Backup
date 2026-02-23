@@ -5,7 +5,9 @@ import '../data/models/attendance_model.dart';
 import '../data/models/local/attendance_local.dart';
 import '../data/services/attendance_service.dart';
 import '../data/services/location_service.dart';
+import '../data/services/zone_validation_service.dart';
 import '../data/repositories/local/attendance_local_repository.dart';
+import '../data/repositories/local/zone_local_repository.dart';
 import '../core/utils/background_service_utils.dart';
 import 'sync_manager.dart';
 import 'auth_manager.dart';
@@ -124,8 +126,8 @@ class AttendanceManager extends BaseController {
           _authManager?.updateCheckInStatus(true, attendanceId: result.attendanceId);
 
           return;
-        } catch (e) {
-          if (kDebugMode) debugPrint('Online check-in failed: $e');
+        } catch (_) {
+          // online failed - fall through to offline check-in
         }
       }
 
@@ -141,6 +143,18 @@ class AttendanceManager extends BaseController {
       final position = await LocationService.getCurrentLocation();
       if (position == null) {
         throw Exception('يجب تفعيل تحديد الموقع (GPS)');
+      }
+
+      // Section 3.5.2: Offline zone validation using cached zones
+      final zoneValidation = ZoneValidationService(ZoneLocalRepository());
+      if (await zoneValidation.hasOfflineZones()) {
+        final zone = await zoneValidation.validateLocationOffline(
+          position.latitude,
+          position.longitude,
+        );
+        if (zone == null) {
+          throw Exception('أنت خارج منطقة العمل المخصصة لك');
+        }
       }
 
       final localAttendance = AttendanceLocal(
@@ -200,8 +214,8 @@ class AttendanceManager extends BaseController {
           _authManager?.updateCheckInStatus(false);
 
           return;
-        } catch (e) {
-          if (kDebugMode) debugPrint('Online check-out failed: $e');
+        } catch (_) {
+          // online failed - fall through to offline check-out
         }
       }
 
@@ -218,22 +232,17 @@ class AttendanceManager extends BaseController {
         throw Exception('يجب تفعيل تحديد الموقع (GPS)');
       }
 
-      try {
-        final localAttendance = await _localRepo.getTodayAttendance(userId);
-
-        if (localAttendance != null) {
-          localAttendance.checkOutTime = DateTime.now();
-          localAttendance.checkOutLatitude = position.latitude;
-          localAttendance.checkOutLongitude = position.longitude;
-
-          await _localRepo.updateAttendance(localAttendance);
-          await _syncManager?.newDataAdded();
-        } else {
-          throw Exception('يجب تسجيل الحضور أولاً');
-        }
-      } catch (e) {
+      final localAttendance = await _localRepo.getTodayAttendance(userId);
+      if (localAttendance == null) {
         throw Exception('يجب تسجيل الحضور أولاً');
       }
+
+      localAttendance.checkOutTime = DateTime.now();
+      localAttendance.checkOutLatitude = position.latitude;
+      localAttendance.checkOutLongitude = position.longitude;
+
+      await _localRepo.updateAttendance(localAttendance);
+      await _syncManager?.newDataAdded();
 
       // update ui
       if (todayRecord != null) {

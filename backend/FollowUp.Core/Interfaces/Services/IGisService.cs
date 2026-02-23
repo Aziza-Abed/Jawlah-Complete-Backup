@@ -22,11 +22,6 @@ public interface IGisService
     Task<bool> IsPointInZoneAsync(double latitude, double longitude, int zoneId);
 
     /// <summary>
-    /// Calculates the distance between two coordinates in meters
-    /// </summary>
-    Task<double> CalculateDistanceAsync(double lat1, double lon1, double lat2, double lon2);
-
-    /// <summary>
     /// Imports zones from a shapefile for a specific municipality
     /// </summary>
     /// <param name="filePath">Path to the shapefile (.shp)</param>

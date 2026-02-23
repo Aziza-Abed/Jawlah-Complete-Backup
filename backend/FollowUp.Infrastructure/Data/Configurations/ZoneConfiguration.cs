@@ -62,9 +62,9 @@ public class ZoneConfiguration : IEntityTypeConfiguration<Zone>
         builder.Property(e => e.CreatedAt)
             .IsRequired();
 
-        builder.HasIndex(e => e.ZoneCode)
+        builder.HasIndex(e => new { e.MunicipalityId, e.ZoneCode })
             .IsUnique()
-            .HasDatabaseName("IX_Zone_ZoneCode_Unique");
+            .HasDatabaseName("IX_Zone_Municipality_ZoneCode_Unique");
 
         builder.HasIndex(e => e.IsActive)
             .HasDatabaseName("IX_Zone_IsActive");

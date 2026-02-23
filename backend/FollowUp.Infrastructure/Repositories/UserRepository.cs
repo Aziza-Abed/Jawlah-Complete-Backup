@@ -41,7 +41,7 @@ public class UserRepository : Repository<User>, IUserRepository
             .Include(u => u.Supervisor)
             .Include(u => u.AssignedZones)
                 .ThenInclude(uz => uz.Zone)
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
+            .FirstOrDefaultAsync(u => u.Username == username);
     }
 
     public async Task<User?> GetByEmailAsync(string email)
@@ -52,7 +52,7 @@ public class UserRepository : Repository<User>, IUserRepository
             .Include(u => u.Supervisor)
             .Include(u => u.AssignedZones)
                 .ThenInclude(uz => uz.Zone)
-            .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == email.ToLower());
+            .FirstOrDefaultAsync(u => u.Email != null && u.Email == email);
     }
 
     public async Task<IEnumerable<User>> GetByRoleAsync(UserRole role)

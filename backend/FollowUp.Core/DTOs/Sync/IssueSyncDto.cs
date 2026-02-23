@@ -18,4 +18,9 @@ public class IssueSyncDto
     public string? PhotoUrl { get; set; }
     public DateTime ReportedAt { get; set; }
     public int SyncVersion { get; set; }
+
+    // Forwarding fields (SR15)
+    public int? ForwardedToDepartmentId { get; set; }
+    public DateTime? ForwardedAt { get; set; }
+    public string? ForwardingNotes { get; set; }
 }

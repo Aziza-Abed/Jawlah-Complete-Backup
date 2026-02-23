@@ -9,6 +9,7 @@ import type { WorkerLocation } from "../types/tracking";
 import type { UserResponse } from "../types/user";
 import type { TaskResponse } from "../types/task";
 import { ArrowRight, RefreshCw, AlertCircle, Phone, Users, X } from "lucide-react";
+import { useConfirm } from "../components/common/ConfirmDialog";
 import "leaflet/dist/leaflet.css";
 
 // Fix Leaflet marker icon issue
@@ -58,6 +59,7 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
 }
 
 export default function LocationHistory() {
+  const [confirm, ConfirmDialog] = useConfirm();
   const { workerId } = useParams<{ workerId: string }>();
   const navigate = useNavigate();
 
@@ -66,7 +68,7 @@ export default function LocationHistory() {
   const [workerTasks, setWorkerTasks] = useState<TaskResponse[]>([]);
   const [history, setHistory] = useState<WorkerLocation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState("");
+  const [error, setError] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split("T")[0];
@@ -153,7 +155,7 @@ export default function LocationHistory() {
     if (!reassignModal.taskId) return;
     const target = allWorkers.find(w => w.userId === targetWorkerId);
     if (!target) return;
-    if (!window.confirm(`هل أنت متأكد من إعادة تعيين المهمة "${reassignModal.taskTitle}" إلى ${target.fullName}؟`)) return;
+    if (!await confirm(`هل أنت متأكد من إعادة تعيين المهمة "${reassignModal.taskTitle}" إلى ${target.fullName}؟`)) return;
 
     try {
       setReassigning(true);
@@ -195,7 +197,13 @@ export default function LocationHistory() {
     <div className="h-full w-full bg-[#F3F1ED] overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1100px] mx-auto space-y-6">
-          
+
+          {error && (
+            <div className="bg-[#C86E5D]/10 border border-[#C86E5D]/30 rounded-[12px] p-4 text-[#C86E5D] text-center font-medium" dir="rtl">
+              {error}
+            </div>
+          )}
+
           {/* Header & Worker Info */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-start gap-5 text-right">
@@ -306,7 +314,7 @@ export default function LocationHistory() {
                   </div>
                 ) : (
                   <MapContainer center={positions[0] || defaultCenter} zoom={15} className="h-full w-full">
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     <FitBounds positions={positions} />
                     <Polyline positions={positions} color="#7895B2" weight={4} opacity={0.8} />
                     {positions.length > 0 && (
@@ -384,6 +392,8 @@ export default function LocationHistory() {
            </div>
         </CenterModal>
       )}
+
+      {ConfirmDialog}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, GeoJSON } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -9,6 +9,7 @@ import type { WorkerLocation as ApiWorkerLocation } from "../types/tracking";
 import type { UserResponse } from "../types/user";
 import { Battery, BatteryLow, BatteryMedium, BatteryFull, Wifi, WifiOff, RefreshCcw, MapPin, Clock } from "lucide-react";
 import { useMunicipality } from "../contexts/MunicipalityContext";
+import { useTrackingHub } from "../hooks/useTrackingHub";
 
 type WorkerLocation = {
   id: string;
@@ -139,11 +140,40 @@ export default function Zones() {
     }
   };
 
+  // SignalR: receive live location pushes from workers
+  useTrackingHub({
+    onLocationUpdate: useCallback((update) => {
+      setWorkers((prev) => {
+        const idx = prev.findIndex((w) => w.id === update.userId.toString());
+        if (idx === -1) return prev; // unknown worker, wait for next full fetch
+        const copy = [...prev];
+        copy[idx] = {
+          ...copy[idx],
+          lat: update.latitude,
+          lng: update.longitude,
+          status: "online",
+          timestamp: update.timestamp,
+        };
+        return copy;
+      });
+      setLastUpdate(new Date());
+    }, []),
+    onUserStatus: useCallback((update) => {
+      setWorkers((prev) => {
+        const idx = prev.findIndex((w) => w.id === update.userId.toString());
+        if (idx === -1) return prev;
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], status: update.status };
+        return copy;
+      });
+    }, []),
+  });
+
   useEffect(() => {
     fetchMapData();
 
-    // Poll every 10 seconds for updates (Live feel)
-    const interval = setInterval(() => fetchMapData(true), 10000);
+    // Fallback poll every 30s for battery info & new workers (SignalR handles locations)
+    const interval = setInterval(() => fetchMapData(true), 30000);
     return () => clearInterval(interval);
   }, []);
 

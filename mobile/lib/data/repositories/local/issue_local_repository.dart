@@ -50,7 +50,7 @@ class IssueLocalRepository {
       issue.syncedAt = DateTime.now();
       await issue.save();
     } catch (e) {
-      debugPrint('Issue $clientId not found in local DB: $e');
+      if (kDebugMode) debugPrint('Issue $clientId not found in local DB: $e');
     }
   }
 
@@ -74,6 +74,51 @@ class IssueLocalRepository {
       // add new from server
       await box.add(issue);
     }
+  }
+
+  /// Merge server data with local data using field-level ownership.
+  ///
+  /// Field ownership (non-overlapping):
+  /// - Worker fields (never overwritten by server unless fully synced):
+  ///   title, description, type, severity, latitude, longitude,
+  ///   locationDescription, photoUrl
+  /// - Supervisor fields (always accepted from server):
+  ///   status, forwardedToDepartmentId, forwardedToDepartmentName,
+  ///   forwardedAt, forwardingNotes
+  Future<void> mergeFromServer(IssueLocal serverIssue) async {
+    final box = await _openBox();
+    final existingIndex =
+        box.values.toList().indexWhere((i) => i.serverId == serverIssue.serverId);
+
+    if (existingIndex < 0) {
+      // new issue from server - just add it
+      await box.add(serverIssue);
+      return;
+    }
+
+    final existing = box.getAt(existingIndex)!;
+
+    if (existing.isSynced) {
+      // no local changes - safe to overwrite entirely
+      await box.putAt(existingIndex, serverIssue);
+      return;
+    }
+
+    // FIELD-LEVEL MERGE: local has unsynced worker changes
+    // Accept supervisor-owned fields from server
+    existing.status = serverIssue.status;
+    existing.forwardedToDepartmentId = serverIssue.forwardedToDepartmentId;
+    existing.forwardedToDepartmentName = serverIssue.forwardedToDepartmentName;
+    existing.forwardedAt = serverIssue.forwardedAt;
+    existing.forwardingNotes = serverIssue.forwardingNotes;
+
+    // Worker fields (title, description, type, severity, latitude,
+    // longitude, locationDescription, photoUrl) stay as-is
+
+    // Update version so next upload sends correct syncVersion
+    existing.syncVersion = serverIssue.syncVersion;
+    // Keep isSynced = false - worker changes still need uploading
+    await existing.save();
   }
 
   // clear all data (for logout)

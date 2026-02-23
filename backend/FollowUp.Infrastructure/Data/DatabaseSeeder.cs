@@ -156,6 +156,7 @@ public class DatabaseSeeder
         };
         supervisor.PasswordHash = _passwordHasher.HashPassword(supervisor, "Supervisor@123");
         _context.Users.Add(supervisor);
+        await _context.SaveChangesAsync(); // Save supervisor first to get UserId for worker assignment
 
         var workers = new List<User>
         {
@@ -169,6 +170,7 @@ public class DatabaseSeeder
                 WorkerType = WorkerType.Sanitation,
                 Status = UserStatus.Active,
                 MunicipalityId = municipality.MunicipalityId,
+                SupervisorId = supervisor.UserId,
                 DepartmentId = sanitationDept.DepartmentId,
                 TeamId = sanitationTeam1.TeamId, // Part of sanitation team 1
                 ExpectedStartTime = new TimeSpan(6, 0, 0),
@@ -185,6 +187,7 @@ public class DatabaseSeeder
                 WorkerType = WorkerType.Maintenance,
                 Status = UserStatus.Active,
                 MunicipalityId = municipality.MunicipalityId,
+                SupervisorId = supervisor.UserId,
                 DepartmentId = maintenanceDept.DepartmentId,
                 TeamId = maintenanceTeam1.TeamId, // Part of maintenance team 1
                 ExpectedStartTime = new TimeSpan(6, 0, 0),
@@ -201,8 +204,9 @@ public class DatabaseSeeder
                 WorkerType = WorkerType.Agriculture,
                 Status = UserStatus.Active,
                 MunicipalityId = municipality.MunicipalityId,
+                SupervisorId = supervisor.UserId,
                 DepartmentId = agricultureDept.DepartmentId,
-                TeamId = null, // Agriculture worker
+                TeamId = null, // Individual agriculture worker
                 ExpectedStartTime = new TimeSpan(7, 0, 0),
                 ExpectedEndTime = new TimeSpan(15, 0, 0),
                 CreatedAt = DateTime.UtcNow
@@ -217,6 +221,6 @@ public class DatabaseSeeder
 
         await _context.SaveChangesAsync();
 
-        Console.WriteLine("✅ Database seeded successfully with proper UTF-8 encoding!");
+        Console.WriteLine("Database seeded successfully with proper UTF-8 encoding!");
     }
 }

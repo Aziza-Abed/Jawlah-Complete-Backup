@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { login, verifyOtp, resendOtp } from "../api/auth";
 import { useMunicipality } from "../contexts/MunicipalityContext";
 import AuthLayout from "../components/auth/AuthLayout";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -13,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // OTP state
   const [showOtp, setShowOtp] = useState(false);
@@ -67,9 +70,12 @@ export default function Login() {
 
         // No OTP required - complete login
         if (response.token) {
-          localStorage.setItem("followup_token", response.token);
+          localStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
+          if (response.refreshToken) {
+            localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
+          }
           if (response.user) {
-            localStorage.setItem("followup_user", JSON.stringify(response.user));
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
           }
           navigate("/dashboard");
         }
@@ -126,9 +132,12 @@ export default function Login() {
       });
 
       if (response.success && response.token) {
-        localStorage.setItem("followup_token", response.token);
+        localStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
+        if (response.refreshToken) {
+          localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
+        }
         if (response.user) {
-          localStorage.setItem("followup_user", JSON.stringify(response.user));
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
         }
         navigate("/dashboard");
       } else {
@@ -256,15 +265,25 @@ export default function Login() {
         </Field>
 
         <Field label="كلمة المرور">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            disabled={loading}
-            className="w-full h-[46px] rounded-[12px] bg-white border border-black/10 px-4 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              disabled={loading}
+              className="w-full h-[46px] rounded-[12px] bg-white border border-black/10 px-4 pl-11 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#2F2F2F] transition-colors"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </Field>
 
         <div className="flex items-center justify-between gap-3 flex-wrap">

@@ -102,11 +102,6 @@ export async function getMunicipalities(): Promise<Municipality[]> {
   return response.data.data;
 }
 
-export async function getMunicipalityById(id: number): Promise<Municipality> {
-  const response = await apiClient.get<{ data: Municipality }>(`/municipality/${id}`);
-  return response.data.data;
-}
-
 export async function createMunicipality(data: Partial<Municipality>): Promise<Municipality> {
   const response = await apiClient.post<{ data: Municipality }>("/municipality", data);
   return response.data.data;
@@ -117,6 +112,3 @@ export async function updateMunicipality(id: number, data: Partial<Municipality>
   return response.data.data;
 }
 
-export async function deleteMunicipality(id: number): Promise<void> {
-  await apiClient.delete(`/municipality/${id}`);
-}

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/task_model.dart';
 
@@ -11,7 +10,10 @@ class TaskDetailsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formattedDate = task.dueDate != null
-        ? '${task.dueDate!.year}-${task.dueDate!.month.toString().padLeft(2, '0')}-${task.dueDate!.day.toString().padLeft(2, '0')}'
+        ? () {
+            final local = task.dueDate!.toLocal();
+            return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+          }()
         : 'لا يوجد تاريخ';
 
     return Container(
@@ -171,42 +173,4 @@ class TaskDetailsCard extends StatelessWidget {
     }
   }
 
-  Widget _buildNavigateButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _openInMaps,
-        icon: const Icon(Icons.navigation_rounded, size: 20),
-        label: const Text(
-          'الانتقال إلى الموقع',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Cairo',
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openInMaps() async {
-    if (task.latitude == null || task.longitude == null) return;
-
-    // Try Google Maps first, fallback to Apple Maps on iOS
-    final googleMapsUrl = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${task.latitude},${task.longitude}&travelmode=driving'
-    );
-
-    if (await canLaunchUrl(googleMapsUrl)) {
-      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
-    }
-  }
 }

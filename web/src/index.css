@@ -64,35 +64,6 @@ a {
   text-decoration: none;
 }
 
-/* Glassmorphism Utility - Updated for premium feel */
-.glass {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
-}
-
-.glass-card {
-  background: rgba(
-    255,
-    255,
-    255,
-    0.85
-  ); /* Slightly more opaque for better readability */
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
-  border-radius: 1.5rem; /* Larger radius for modern feel */
-  transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.glass-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
-}
-
 /* Improved Form Inputs */
 input:focus {
   outline: none;

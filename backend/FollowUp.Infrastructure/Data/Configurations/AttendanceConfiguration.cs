@@ -40,6 +40,13 @@ public class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
         builder.Property(e => e.CheckOutLongitude)
             .HasPrecision(18, 15);
 
+        // GPS accuracy stored for audit trail (raw meters from device)
+        builder.Property(e => e.CheckInAccuracyMeters)
+            .HasPrecision(10, 2);
+
+        builder.Property(e => e.CheckOutAccuracyMeters)
+            .HasPrecision(10, 2);
+
         builder.Property(e => e.IsValidated)
             .IsRequired();
 
@@ -81,6 +88,24 @@ public class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
         builder.HasOne(e => e.Zone)
             .WithMany(z => z.AttendanceRecords)
             .HasForeignKey(e => e.ZoneId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Manual attendance fields
+        builder.Property(e => e.ManualReason)
+            .HasMaxLength(500);
+
+        builder.Property(e => e.AttendanceType)
+            .IsRequired()
+            .HasMaxLength(50);
+
+        builder.Property(e => e.ApprovalStatus)
+            .IsRequired()
+            .HasMaxLength(50);
+
+        // ApprovedByUser relationship (supervisor who approved manual attendance)
+        builder.HasOne(e => e.ApprovedByUser)
+            .WithMany()
+            .HasForeignKey(e => e.ApprovedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }

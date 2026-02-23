@@ -5,6 +5,7 @@ using FollowUp.Core.Entities;
 using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
+using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace FollowUp.API.Controllers;
 
 // this controller handles checkin and checkout for workers
 [Route("api/[controller]")]
+[Authorize]
 public class AttendanceController : BaseApiController
 {
     private readonly IAttendanceRepository _attendance;
@@ -20,19 +22,22 @@ public class AttendanceController : BaseApiController
     private readonly IGisService _gis;
     private readonly ILogger<AttendanceController> _logger;
     private readonly IMapper _mapper;
+    private readonly AuditLogService _audit;
 
     public AttendanceController(
         IAttendanceRepository attendance,
         IUserRepository users,
         IGisService gis,
         ILogger<AttendanceController> logger,
-        IMapper mapper)
+        IMapper mapper,
+        AuditLogService audit)
     {
         _attendance = attendance;
         _users = users;
         _gis = gis;
         _logger = logger;
         _mapper = mapper;
+        _audit = audit;
     }
 
     // worker checkin at the start of day
@@ -63,19 +68,39 @@ public class AttendanceController : BaseApiController
         if (zone == null)
             return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور"));
 
+        // Chapter 5 FIX #2: Calculate late arrival
+        var now = DateTime.UtcNow;
+        var expectedStart = now.Date.Add(user.ExpectedStartTime); // e.g., 08:00
+        var graceEnd = expectedStart.AddMinutes(user.GraceMinutes); // e.g., 08:15
+
+        int lateMinutes = 0;
+        string attendanceType = "OnTime";
+        string validationMessage = "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة";
+
+        if (now > graceEnd)
+        {
+            lateMinutes = (int)(now - graceEnd).TotalMinutes;
+            attendanceType = "Late";
+            validationMessage = $"تسجيل حضور متأخر بـ {lateMinutes} دقيقة";
+            _logger.LogInformation("Worker {UserId} checked in late by {LateMinutes} minutes", userId.Value, lateMinutes);
+        }
+
         // create new attendance record
         var attendance = new Attendance
         {
             UserId = userId.Value,
             MunicipalityId = user.MunicipalityId,
             ZoneId = zone.ZoneId,
-            CheckInEventTime = DateTime.UtcNow,
-            CheckInSyncTime = DateTime.UtcNow,
+            CheckInEventTime = now,
+            CheckInSyncTime = now,
             CheckInLatitude = request.Latitude,
             CheckInLongitude = request.Longitude,
+            CheckInAccuracyMeters = request.Accuracy,
             IsValidated = true,
-            ValidationMessage = "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة",
+            ValidationMessage = validationMessage,
             Status = AttendanceStatus.CheckedIn,
+            LateMinutes = lateMinutes,
+            AttendanceType = attendanceType,
             IsSynced = true,
             SyncVersion = 1
         };
@@ -91,6 +116,12 @@ public class AttendanceController : BaseApiController
             _logger.LogWarning("Duplicate check-in attempt for user {UserId}", userId);
             return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لديك تسجيل حضور نشط بالفعل"));
         }
+
+        // UC17: Audit log for check-in
+        await _audit.LogAsync(userId, user.Username, "CheckIn",
+            $"تسجيل حضور في المنطقة {zone.ZoneName}",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
 
         var response = _mapper.Map<AttendanceResponse>(attendance);
         return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم تسجيل الحضور بنجاح"));
@@ -114,9 +145,12 @@ public class AttendanceController : BaseApiController
         if (attendance == null)
             return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لا يوجد تسجيل حضور نشط"));
 
-        // make sure user is checked in
+        // make sure user is checked in and hasn't already checked out
         if (attendance.Status != AttendanceStatus.CheckedIn)
             return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت لست مسجلاً للحضور حالياً"));
+
+        if (attendance.CheckOutEventTime.HasValue)
+            return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لقد قمت بتسجيل الانصراف مسبقاً"));
 
         // update attendance with checkout data
         var checkOutTime = DateTime.UtcNow;
@@ -124,6 +158,7 @@ public class AttendanceController : BaseApiController
         attendance.CheckOutSyncTime = checkOutTime;
         attendance.CheckOutLatitude = request.Latitude;
         attendance.CheckOutLongitude = request.Longitude;
+        attendance.CheckOutAccuracyMeters = request.Accuracy;
         attendance.Status = AttendanceStatus.CheckedOut;
 
         // calculate work duration - ensure it's not negative (can happen due to timezone issues)
@@ -164,7 +199,12 @@ public class AttendanceController : BaseApiController
             {
                 // Worker left more than 30 min early
                 attendance.EarlyLeaveMinutes = (int)(expectedEnd - checkOutTime).TotalMinutes;
-                attendance.AttendanceType = "EarlyLeave";
+
+                // Keep "Late" if worker arrived late AND left early (don't overwrite)
+                if (attendance.AttendanceType != "Late")
+                {
+                    attendance.AttendanceType = "EarlyLeave";
+                }
             }
             else if (attendance.AttendanceType != "Late" && attendance.AttendanceType != "Overtime")
             {
@@ -175,6 +215,12 @@ public class AttendanceController : BaseApiController
 
         await _attendance.UpdateAsync(attendance);
         await _attendance.SaveChangesAsync();
+
+        // UC17: Audit log for check-out
+        await _audit.LogAsync(userId, user?.Username, "CheckOut",
+            $"تسجيل انصراف - مدة العمل: {attendance.WorkDuration?.ToString(@"hh\:mm") ?? "غير محدد"}",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
 
         var response = _mapper.Map<AttendanceResponse>(attendance);
         return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم تسجيل الانصراف بنجاح"));
@@ -209,23 +255,23 @@ public class AttendanceController : BaseApiController
             return Unauthorized(ApiResponse<List<AttendanceResponse>>.ErrorResponse("رمز غير صالح"));
 
         // default to last month if no date given
-        var from = fromDate ?? DateTime.Today.AddMonths(-1);
-        var to = toDate ?? DateTime.Today.AddDays(1);
+        var from = fromDate ?? DateTime.UtcNow.Date.AddMonths(-1);
+        var to = toDate ?? DateTime.UtcNow.Date.AddDays(1);
 
         // fix bad pagination values
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > 100) pageSize = 50;
 
-        var attendances = await _attendance.GetUserAttendanceHistoryAsync(userId.Value, from, to);
+        var attendances = (await _attendance.GetUserAttendanceHistoryAsync(userId.Value, from, to))
+            .OrderByDescending(a => a.CheckInEventTime)
+            .ToList();
 
         // paginate the results
-        var totalCount = attendances.Count();
-        var pagedAttendances = attendances
-            .OrderByDescending(a => a.CheckInEventTime)
+        var responses = attendances
             .Skip((page - 1) * pageSize)
-            .Take(pageSize);
-
-        var responses = pagedAttendances.Select(a => _mapper.Map<AttendanceResponse>(a)).ToList();
+            .Take(pageSize)
+            .Select(a => _mapper.Map<AttendanceResponse>(a))
+            .ToList();
         return Ok(ApiResponse<List<AttendanceResponse>>.SuccessResponse(responses));
     }
 
@@ -260,7 +306,8 @@ public class AttendanceController : BaseApiController
             ValidationMessage = "في انتظار موافقة المشرف",
             Status = AttendanceStatus.CheckedIn,
             IsManual = true,
-            ManualReason = request.Reason,
+            ManualReason = Utils.InputSanitizer.SanitizeString(request.Reason, 500),
+            ApprovalStatus = "Pending",
             IsSynced = true,
             SyncVersion = 1
         };
@@ -281,6 +328,16 @@ public class AttendanceController : BaseApiController
     {
         // query database directly instead of loading all records
         var pending = await _attendance.GetPendingManualAttendanceAsync();
+
+        // supervisors can only see their workers' pending requests
+        var currentRole = GetCurrentUserRole();
+        var currentUserId = GetCurrentUserId();
+        if (currentRole == "Supervisor" && currentUserId.HasValue)
+        {
+            var myWorkers = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
+            var myWorkerIds = myWorkers.Select(w => w.UserId).ToHashSet();
+            pending = pending.Where(a => myWorkerIds.Contains(a.UserId));
+        }
 
         var response = pending.Select(a => new
         {
@@ -313,12 +370,22 @@ public class AttendanceController : BaseApiController
         if (!attendance.IsManual)
             return BadRequest(ApiResponse<object>.ErrorResponse("هذا السجل ليس حضوراً يدوياً"));
 
+        // supervisors can only approve their own workers' attendance
+        var currentRole = GetCurrentUserRole();
+        if (currentRole == "Supervisor")
+        {
+            var worker = await _users.GetByIdAsync(attendance.UserId);
+            if (worker?.SupervisorId != supervisorId.Value)
+                return Forbid();
+        }
+
         attendance.IsValidated = request.Approved;
+        attendance.ApprovalStatus = request.Approved ? "Approved" : "Rejected";
         attendance.ApprovedByUserId = supervisorId.Value;
         attendance.ApprovedAt = DateTime.UtcNow;
         attendance.ValidationMessage = request.Approved
             ? "تمت الموافقة من قبل المشرف"
-            : $"تم الرفض: {request.RejectionReason}";
+            : $"تم الرفض: {Utils.InputSanitizer.SanitizeString(request.RejectionReason, 500)}";
 
         if (!request.Approved)
         {
@@ -331,6 +398,14 @@ public class AttendanceController : BaseApiController
 
         _logger.LogInformation("Manual attendance {Id} {Action} by supervisor {SupervisorId}",
             id, request.Approved ? "approved" : "rejected", supervisorId);
+
+        // UC17: Audit log for manual attendance approval/rejection
+        var supervisor = await _users.GetByIdAsync(supervisorId.Value);
+        await _audit.LogAsync(supervisorId, supervisor?.Username,
+            request.Approved ? "ManualAttendanceApproved" : "ManualAttendanceRejected",
+            $"حضور يدوي #{id} للعامل {attendance.UserId} - {(request.Approved ? "موافقة" : "رفض")}",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
 
         return Ok(ApiResponse<object?>.SuccessResponse(null,
             request.Approved ? "تمت الموافقة على الحضور" : "تم رفض الحضور"));

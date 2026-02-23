@@ -332,6 +332,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final diff = now.difference(date);
     if (diff.inMinutes < 60) return '${diff.inMinutes} دقيقة';
     if (diff.inHours < 24) return '${diff.inHours} ساعة';
-    return '${date.year}-${date.month}-${date.day}';
+    final local = date.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
   }
 }

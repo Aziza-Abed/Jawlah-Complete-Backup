@@ -11,8 +11,10 @@ import {
   CheckCircle,
   AlertCircle
 } from "lucide-react";
+import { useConfirm } from "../components/common/ConfirmDialog";
 
 export default function Accounts() {
+  const [confirm, ConfirmDialog] = useConfirm();
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -41,7 +43,7 @@ export default function Accounts() {
   };
 
   const handleResetDevice = async (userId: number) => {
-    if (!window.confirm("هل أنت متأكد من رغبتك في إعادة تعيين جهاز هذا المستخدم؟")) return;
+    if (!await confirm("هل أنت متأكد من رغبتك في إعادة تعيين جهاز هذا المستخدم؟")) return;
 
     setActionLoading(userId);
     try {
@@ -59,7 +61,7 @@ export default function Accounts() {
     const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
     const actionText = newStatus === "Active" ? "تفعيل" : "تعطيل";
 
-    if (!window.confirm(`هل أنت متأكد من ${actionText} هذا المستخدم؟`)) return;
+    if (!await confirm(`هل أنت متأكد من ${actionText} هذا المستخدم؟`)) return;
 
     setActionLoading(userId);
     try {
@@ -276,6 +278,8 @@ export default function Accounts() {
           </div>
         </div>
       )}
+
+      {ConfirmDialog}
     </div>
   );
 }

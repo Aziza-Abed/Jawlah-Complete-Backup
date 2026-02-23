@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import AuthLayout from "../components/auth/AuthLayout";
+import { forgotPassword } from "../api/auth";
 
 function digitsOnly(value: string) {
   return value.replace(/\D/g, "");
@@ -8,10 +9,19 @@ function digitsOnly(value: string) {
 
 const OTP_LEN = 6;
 
+interface LocationState {
+  sessionToken?: string;
+  maskedPhone?: string;
+  username?: string;
+}
+
 export default function VerifyOtp() {
   const navigate = useNavigate();
   const location = useLocation();
-  const phone = (location.state as { phone?: string } | null)?.phone;
+  const state = location.state as LocationState | null;
+  const sessionToken = state?.sessionToken;
+  const maskedPhone = state?.maskedPhone;
+  const username = state?.username;
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,8 +30,8 @@ export default function VerifyOtp() {
   const [info, setInfo] = useState("");
 
   useEffect(() => {
-    if (!phone) navigate("/forgot-password");
-  }, [phone, navigate]);
+    if (!sessionToken) navigate("/forgot-password");
+  }, [sessionToken, navigate]);
 
   const otpValid = otp.length === OTP_LEN;
 
@@ -30,8 +40,8 @@ export default function VerifyOtp() {
     setError("");
     setInfo("");
 
-    if (!phone) {
-      setError("الرجاء إدخال رقم الهاتف أولاً.");
+    if (!sessionToken) {
+      setError("الرجاء البدء من صفحة استعادة كلمة المرور.");
       return;
     }
     if (!otpValid) {
@@ -39,33 +49,29 @@ export default function VerifyOtp() {
       return;
     }
 
-    setLoading(true);
-    try {
-      // TODO backend: verify OTP for phone
-      // POST /auth/forgot-password/verify-otp { phone, otp }
-      await new Promise((r) => setTimeout(r, 600));
-
-      navigate("/reset-password", { state: { phone } });
-    } catch (err) {
-      setError("رمز التحقق غير صحيح.");
-    } finally {
-      setLoading(false);
-    }
+    // Pass sessionToken and OTP to the reset password page
+    navigate("/reset-password", {
+      state: { sessionToken, otpCode: otp },
+    });
   };
 
   const onResend = async () => {
     setError("");
     setInfo("");
-    if (!phone) return;
+    if (!username) {
+      setError("لا يمكن إعادة الإرسال. الرجاء البدء من جديد.");
+      return;
+    }
 
     setLoading(true);
     try {
-      // TODO backend: resend OTP with rate limit
-      // POST /auth/forgot-password/resend-otp { phone }
-      await new Promise((r) => setTimeout(r, 500));
-
-      setInfo("تمت إعادة إرسال رمز التحقق.");
-    } catch (err) {
+      const result = await forgotPassword({ username });
+      if (result.success) {
+        setInfo("تمت إعادة إرسال رمز التحقق.");
+      } else {
+        setError(result.message || "فشل إعادة إرسال الرمز.");
+      }
+    } catch {
       setError("فشل إعادة إرسال الرمز.");
     } finally {
       setLoading(false);
@@ -88,7 +94,7 @@ export default function VerifyOtp() {
       <form onSubmit={onVerify} className="space-y-5">
         <Field label="رقم الهاتف">
           <input
-            value={phone || ""}
+            value={maskedPhone || "****"}
             readOnly
             className="w-full h-[46px] rounded-[12px] bg-[#F3F4F6] border border-black/10 px-4 text-right outline-none opacity-90 cursor-not-allowed"
           />
@@ -118,14 +124,14 @@ export default function VerifyOtp() {
           disabled={loading || !otpValid}
           className="w-full h-[52px] rounded-[12px] bg-[#7895B2] text-white font-sans font-semibold text-[16px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 disabled:opacity-50"
         >
-          {loading ? "جاري التحقق..." : "تحقق"}
+          {loading ? "جاري التحقق..." : "متابعة"}
         </button>
 
         <div className="flex items-center justify-between text-[13px]">
           <button
             type="button"
             onClick={onResend}
-            disabled={loading || !phone}
+            disabled={loading}
             className="text-[#7895B2] font-sans font-semibold hover:opacity-80 disabled:opacity-50"
           >
             إعادة إرسال الرمز

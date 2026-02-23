@@ -30,18 +30,19 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   File? _photo3;
   bool _isSubmitting = false;
 
+  // Chapter 4: Updated to match report terminology
   final Map<String, String> _problemTypes = {
     'Infrastructure': 'بنية تحتية',
     'Safety': 'سلامة',
-    'Sanitation': 'نظافة',
+    'Cleanliness': 'نظافة',
     'Equipment': 'معدات',
     'Other': 'أخرى',
   };
 
   final Map<String, String> _severityLevels = {
-    'Minor': 'بسيطة',
+    'Low': 'منخفضة',
     'Medium': 'متوسطة',
-    'Major': 'كبيرة',
+    'High': 'عالية',
     'Critical': 'حرجة',
   };
 
@@ -602,7 +603,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     setState(() => _isSubmitting = true);
 
     // send the report with precise location
-    final success = await context.read<IssueManager>().sendIssueReportWithPosition(
+    final success = await context.read<IssueManager>().sendIssueReport(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           type: _selectedProblemType,

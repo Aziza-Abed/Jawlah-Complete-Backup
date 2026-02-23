@@ -106,7 +106,7 @@ class _SubmitAppealScreenState extends State<SubmitAppealScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ تم إرسال الطعن بنجاح'),
+          content: Text('تم إرسال الطعن بنجاح'),
           backgroundColor: Colors.green,
         ),
       );
@@ -167,7 +167,6 @@ class _SubmitAppealScreenState extends State<SubmitAppealScreen> {
                     hintText:
                         'مثال: كنت في الموقع الصحيح ولكن إشارة GPS كانت ضعيفة بسبب المباني العالية',
                     border: OutlineInputBorder(),
-                    counterText: '',
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -178,15 +177,6 @@ class _SubmitAppealScreenState extends State<SubmitAppealScreen> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${_explanationController.text.length}/1000 حرف',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                  textAlign: TextAlign.left,
                 ),
                 const SizedBox(height: 24),
 

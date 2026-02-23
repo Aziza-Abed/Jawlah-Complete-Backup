@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FollowUp.Infrastructure", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FollowUp.API", "FollowUp.API\FollowUp.API.csproj", "{C3333333-3333-3333-3333-333333333333}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FollowUp.Tests", "FollowUp.Tests\FollowUp.Tests.csproj", "{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,18 +55,6 @@ Global
 		{C3333333-3333-3333-3333-333333333333}.Release|x64.Build.0 = Release|Any CPU
 		{C3333333-3333-3333-3333-333333333333}.Release|x86.ActiveCfg = Release|Any CPU
 		{C3333333-3333-3333-3333-333333333333}.Release|x86.Build.0 = Release|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Debug|x64.Build.0 = Debug|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Debug|x86.Build.0 = Debug|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Release|x64.ActiveCfg = Release|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Release|x64.Build.0 = Release|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Release|x86.ActiveCfg = Release|Any CPU
-		{4833C9E2-5872-4367-ABAA-0F36C81DE5EA}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

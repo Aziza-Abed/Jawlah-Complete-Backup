@@ -26,14 +26,14 @@ class ApiConfig {
   }
 
   // authentication endpoints
-  static const String loginWithPin = 'auth/login-pin';
-  static const String loginWithGPS =
-      'auth/login-gps'; // legacy: login + auto check-in
+  static const String loginWithGPS = 'auth/login-gps';
   static const String verifyOtp = 'auth/verify-otp';
   static const String resendOtp = 'auth/resend-otp';
   static const String profile = 'auth/profile';
   static const String logout = 'auth/logout';
   static const String registerFcmToken = 'auth/register-fcm-token';
+  static const String forgotPassword = 'auth/forgot-password';
+  static const String resetPassword = 'auth/reset-password';
 
   // tasks endpoints
   static const String myTasks = 'tasks/my-tasks';
@@ -51,6 +51,18 @@ class ApiConfig {
   // issues endpoints
   static const String reportIssue = 'issues/report-with-photo';
   static const String myIssues = 'issues';
+
+  // appeals endpoints
+  static const String appeals = 'appeals';
+  static const String myAppeals = 'appeals/my-appeals';
+
+  // battery endpoints
+  static const String batteryStatus = 'users/battery-status';
+
+  // sync endpoints
+  static const String syncAttendanceBatch = 'sync/attendance/batch';
+  static const String syncTasksBatch = 'sync/tasks/batch';
+  static const String syncChanges = 'sync/changes';
 
   // zones endpoints
   static const String activeZones = 'zones';
@@ -77,12 +89,8 @@ class ApiConfig {
   static const int onlineThresholdMinutes = 15;      // Consider worker online
 
   static String getHubUrl(String endpoint) {
-    // hubs are mapped at root level, not under /api
-    final rootUrl = baseUrl.endsWith('/api/')
-        ? baseUrl.substring(0, baseUrl.length - 5)
-        : (baseUrl.endsWith('/api')
-            ? baseUrl.substring(0, baseUrl.length - 4)
-            : baseUrl);
+    // hubs are mapped at root level, not under /api - strip /api/ suffix
+    final rootUrl = baseUrl.replaceAll(RegExp(r'/api/?$'), '');
     return '$rootUrl$endpoint';
   }
 

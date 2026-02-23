@@ -1,5 +1,6 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { STORAGE_KEYS } from "../../constants/storageKeys";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -18,6 +19,7 @@ import {
   Bell,
   FileText,
 } from "lucide-react";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 type UserRole = "admin" | "manager" | "supervisor";
 
@@ -54,11 +56,19 @@ const adminItems: NavItem[] = [
 
 export default function Sidebar({ role = "supervisor" }: { role?: UserRole }) {
   const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
   const items = (role === "admin" || role === "manager") ? adminItems : supervisorItems;
 
-  const handleLogout = () => {
-    localStorage.removeItem("followup_token");
-    localStorage.removeItem("followup_user");
+  const handleLogout = async () => {
+    try {
+      const { logout } = await import("../../api/auth");
+      await logout();
+    } catch (_) {
+      // even if backend fails, clear local data
+    }
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.USER);
     navigate("/login");
   };
 
@@ -68,7 +78,13 @@ export default function Sidebar({ role = "supervisor" }: { role?: UserRole }) {
 
       <nav className="px-3 py-4 flex flex-col gap-2 overflow-y-auto flex-1">
         {items.map((it) => (
-          <SideItem key={it.to} to={it.to} icon={it.icon} end={it.end}>
+          <SideItem
+            key={it.to}
+            to={it.to}
+            icon={it.icon}
+            end={it.end}
+            badge={it.to === "/notifications" ? unreadCount : undefined}
+          >
             {it.label}
           </SideItem>
         ))}
@@ -112,11 +128,13 @@ function SideItem({
   to,
   icon: Icon,
   end,
+  badge,
   children,
 }: {
   to: string;
   icon?: React.ElementType;
   end?: boolean;
+  badge?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -137,6 +155,11 @@ function SideItem({
     >
       {Icon && <Icon size={18} className="shrink-0" />}
       <span className="flex-1 text-right">{children}</span>
+      {badge != null && badge > 0 && (
+        <span className="min-w-[20px] h-[20px] bg-[#C86E5D] text-white text-[11px] font-black rounded-full flex items-center justify-center px-1.5 shadow-sm">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </NavLink>
   );
 }

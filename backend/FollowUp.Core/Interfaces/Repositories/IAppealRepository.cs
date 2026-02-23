@@ -35,4 +35,9 @@ public interface IAppealRepository : IRepository<Appeal>
     /// Check if an appeal already exists for an entity
     /// </summary>
     Task<bool> HasAppealForEntityAsync(string entityType, int entityId);
+
+    /// <summary>
+    /// Find appeal by evidence photo filename (for file access authorization)
+    /// </summary>
+    Task<Appeal?> GetByEvidencePhotoFilenameAsync(string filename);
 }

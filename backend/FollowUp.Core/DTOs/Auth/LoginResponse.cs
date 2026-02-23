@@ -25,4 +25,10 @@ public class LoginResponse
     /// Only set when RequiresOtp is true
     /// </summary>
     public string? MaskedPhone { get; set; }
+
+    /// <summary>
+    /// Refresh token for obtaining new access tokens without re-login
+    /// ERD Chapter 3: RefreshToken table
+    /// </summary>
+    public string? RefreshToken { get; set; }
 }

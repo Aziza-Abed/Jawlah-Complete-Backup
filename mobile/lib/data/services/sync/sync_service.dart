@@ -2,35 +2,26 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/config/api_config.dart';
 import '../../../core/errors/app_exception.dart';
 import '../device_service.dart';
 import '../../models/local/task_local.dart';
 import '../../models/local/issue_local.dart';
+import '../../models/local/zone_local.dart';
 import '../../repositories/local/attendance_local_repository.dart';
 import '../../repositories/local/task_local_repository.dart';
 import '../../repositories/local/issue_local_repository.dart';
+import '../../repositories/local/zone_local_repository.dart';
+import '../../../core/utils/date_formatter.dart';
 import '../tasks_service.dart';
 import '../issues_service.dart';
-
-// safe datetime parser that handles malformed dates gracefuly
-DateTime? _safeParseDateTimeUtc(dynamic value) {
-  if (value == null) return null;
-  try {
-    final str = value.toString();
-    if (str.isEmpty) return null;
-    final utcStr = str.endsWith('Z') ? str : '${str}Z';
-    return DateTime.parse(utcStr);
-  } catch (e) {
-    if (kDebugMode) debugPrint('Sync: Failed to parse DateTime: $value - $e');
-    return null;
-  }
-}
 
 class SyncService {
   final Dio _dio;
   final AttendanceLocalRepository _attendanceLocalRepo;
   final TaskLocalRepository _taskLocalRepo;
   final IssueLocalRepository _issueLocalRepo;
+  final ZoneLocalRepository _zoneLocalRepo;
   final TasksService _tasksService;
   final IssuesService _issuesService;
 
@@ -39,6 +30,7 @@ class SyncService {
     this._attendanceLocalRepo,
     this._taskLocalRepo,
     this._issueLocalRepo,
+    this._zoneLocalRepo,
     this._tasksService,
     this._issuesService,
   );
@@ -128,7 +120,7 @@ class SyncService {
 
       final response = await _retryRequest(() async {
         return await _dio.post(
-          'sync/attendance/batch',
+          ApiConfig.syncAttendanceBatch,
           data: {
             'deviceId': await _getDeviceId(),
             'clientTime': DateTime.now().toIso8601String(),
@@ -207,7 +199,7 @@ class SyncService {
 
         final response = await _retryRequest(() async {
           return await _dio.post(
-            'sync/tasks/batch',
+            ApiConfig.syncTasksBatch,
             data: {
               'deviceId': await _getDeviceId(),
               'clientTime': DateTime.now().toIso8601String(),
@@ -221,11 +213,20 @@ class SyncService {
           final results = data?['results'] as List? ?? [];
 
           for (var syncResult in results) {
-            if (syncResult['success']) {
+            if (syncResult['success'] == true) {
               final taskId = syncResult['serverId'];
-              final serverVersion = syncResult['serverVersion'];
+              final serverVersion = syncResult['serverVersion'] ?? 1;
               await _taskLocalRepo.markAsSynced(taskId, serverVersion);
               result.success++;
+            } else if (syncResult['conflictResolution'] == 'ServerWins') {
+              // Server has newer version - update local syncVersion so next
+              // upload sends correct version instead of retrying forever
+              final taskId = syncResult['serverId'] as int?;
+              final serverVersion = syncResult['serverVersion'] as int? ?? 1;
+              if (taskId != null) {
+                await _taskLocalRepo.updateSyncVersion(taskId, serverVersion);
+              }
+              result.failed++;
             } else {
               result.failed++;
             }
@@ -306,7 +307,7 @@ class SyncService {
       final lastSyncTime = await _getLastSyncTime();
 
       final response = await _dio.get(
-        'sync/changes',
+        ApiConfig.syncChanges,
         queryParameters: {
           'lastSyncTime': lastSyncTime?.toIso8601String(),
         },
@@ -316,75 +317,107 @@ class SyncService {
         final data = response.data['data'];
         if (data == null) return;
 
-        // update tasks from server
+        // update tasks from server using field-level merge
         final tasks = data['tasks'] as List? ?? [];
         for (var taskJson in tasks) {
-          final existingTask =
-              await _taskLocalRepo.getTaskById(taskJson['taskId']);
-
-          // skip if local task has unsynced changes
-          if (existingTask != null && !existingTask.isSynced) {
-            continue;
-          }
-
           final task = TaskLocal(
             taskId: taskJson['taskId'],
             title: taskJson['title'],
             status: taskJson['status'],
             completionNotes: taskJson['completionNotes'],
             photoUrl: taskJson['photoUrl'],
-            completedAt: _safeParseDateTimeUtc(taskJson['completedAt']),
-            syncVersion: taskJson['syncVersion'],
+            completedAt: DateFormatter.tryParseUtc(taskJson['completedAt']),
+            syncVersion: taskJson['syncVersion'] ?? 1,
             isSynced: true,
             updatedAt: DateTime.now(),
             syncedAt: DateTime.now(),
             description: taskJson['description'],
             priority: taskJson['priority'] ?? 'Medium',
-            dueDate: _safeParseDateTimeUtc(taskJson['dueDate']),
+            dueDate: DateFormatter.tryParseUtc(taskJson['dueDate']),
             zoneId: taskJson['zoneId'],
+            zoneName: taskJson['zoneName'],
             latitude: (taskJson['latitude'] as num?)?.toDouble(),
             longitude: (taskJson['longitude'] as num?)?.toDouble(),
             locationDescription: taskJson['locationDescription'],
+            taskType: taskJson['taskType'],
+            requiresPhotoProof: taskJson['requiresPhotoProof'] ?? false,
+            estimatedDurationMinutes: taskJson['estimatedDurationMinutes'],
+            progressPercentage: taskJson['progressPercentage'] ?? 0,
+            progressNotes: taskJson['progressNotes'],
           );
-          await _taskLocalRepo.updateFromServer(task);
+          // mergeFromServer handles conflict: if local has unsynced worker
+          // changes, it keeps them and only takes supervisor fields from server
+          await _taskLocalRepo.mergeFromServer(task);
         }
 
-        // update issues from server
+        // update issues from server using field-level merge
         final issues = data['issues'] as List? ?? [];
         for (var issueJson in issues) {
-          final existingIssue =
-              await _issueLocalRepo.getIssueByServerId(issueJson['issueId']);
-
-          if (existingIssue != null && !existingIssue.isSynced) {
-            continue;
-          }
-
           final issue = IssueLocal(
             serverId: issueJson['issueId'],
             title: issueJson['title'],
             description: issueJson['description'],
             type: issueJson['type'],
             severity: issueJson['severity'],
+            status: issueJson['status'] as String?,
             reportedByUserId: issueJson['reportedByUserId'],
             latitude: (issueJson['latitude'] as num?)?.toDouble() ?? 0.0,
             longitude: (issueJson['longitude'] as num?)?.toDouble() ?? 0.0,
             locationDescription: issueJson['locationDescription'],
             photoUrl: issueJson['photoUrl'],
-            reportedAt: _safeParseDateTimeUtc(issueJson['reportedAt']) ??
+            reportedAt: DateFormatter.tryParseUtc(issueJson['reportedAt']) ??
                 DateTime.now(),
             isSynced: true,
             createdAt: DateTime.now(),
             syncedAt: DateTime.now(),
+            syncVersion: issueJson['syncVersion'] as int? ?? 1,
+            forwardedToDepartmentId: issueJson['forwardedToDepartmentId'] as int?,
+            forwardedToDepartmentName: issueJson['forwardedToDepartmentName'] as String?,
+            forwardedAt: DateFormatter.tryParseUtc(issueJson['forwardedAt']),
+            forwardingNotes: issueJson['forwardingNotes'] as String?,
           );
-          await _issueLocalRepo.updateFromServer(issue);
+          // mergeFromServer handles conflict: if local has unsynced worker
+          // changes, it keeps them and only takes supervisor fields from server
+          await _issueLocalRepo.mergeFromServer(issue);
         }
 
-        // save new sync time
-        await _saveLastSyncTime(DateTime.now());
+        // save server time for accurate sync (avoids clock drift)
+        final serverTimeStr = data['currentServerTime'];
+        final serverTime = DateFormatter.tryParseUtc(serverTimeStr) ?? DateTime.now();
+        await _saveLastSyncTime(serverTime);
       }
+
+      // Section 3.5.2: Sync zones for offline validation
+      await syncZones();
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Sync failed: $e');
+      }
+    }
+  }
+
+  /// Section 3.5.2: Download user's assigned zones for offline validation
+  /// "validation is executed locally using preloaded shapefiles"
+  Future<void> syncZones() async {
+    try {
+      final response = await _dio.get(ApiConfig.myZones);
+
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+        if (responseData['success'] != true) return;
+
+        final zonesJson = responseData['data'] as List? ?? [];
+        final zones = zonesJson.map((json) => ZoneLocal.fromJson(json)).toList();
+
+        await _zoneLocalRepo.saveZones(zones);
+
+        if (kDebugMode) {
+          debugPrint('Sync: Downloaded ${zones.length} zones for offline validation');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Zone sync failed: $e');
       }
     }
   }

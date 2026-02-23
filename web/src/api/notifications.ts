@@ -1,13 +1,6 @@
 import { apiClient } from "./client";
 import type { NotificationResponse } from "../types/notification";
-
-// Backend returns ApiResponse wrapper
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  errors?: string[];
-}
+import type { ApiResponse } from "../types/api";
 
 // Get all notifications
 export async function getNotifications(): Promise<NotificationResponse[]> {

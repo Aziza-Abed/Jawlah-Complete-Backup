@@ -36,7 +36,7 @@ public class AuditLogService
     // Get recent logs (for admin dashboard)
     public async Task<List<AuditLog>> GetRecentLogsAsync(int count = 100, int? userId = null, string? action = null)
     {
-        var query = _context.AuditLogs.AsQueryable();
+        var query = _context.AuditLogs.AsNoTracking().AsQueryable();
 
         if (userId.HasValue)
             query = query.Where(l => l.UserId == userId);
@@ -55,7 +55,8 @@ public class AuditLogService
     public async Task<List<AuditLog>> GetLogsByDateRangeAsync(DateTime from, DateTime to)
     {
         return await _context.AuditLogs
-            .Include(l => l.User)  // FIXED: Include BEFORE query execution
+            .AsNoTracking()
+            .Include(l => l.User)
             .Where(l => l.CreatedAt >= from && l.CreatedAt <= to)
             .OrderByDescending(l => l.CreatedAt)
             .Take(1000)  // ADDED: Limit to prevent memory issues
