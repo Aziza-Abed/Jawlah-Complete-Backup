@@ -348,7 +348,7 @@ public class SyncController : BaseApiController
                     Description = InputSanitizer.SanitizeString(item.Description, 2000),
                     Type = item.Type,
                     Severity = item.Severity,
-                    Status = Core.Enums.IssueStatus.Reported,
+                    Status = Core.Enums.IssueStatus.New,
                     ReportedByUserId = userId.Value,
                     Latitude = item.Latitude,
                     Longitude = item.Longitude,

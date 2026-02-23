@@ -31,6 +31,9 @@ public class TaskSyncDto
 
     public string? LocationDescription { get; set; }
 
+    // Photos URLs (ordered by OrderIndex)
+    public List<string> Photos { get; set; } = new();
+
     [Required(ErrorMessage = "sync version is required")]
     [Range(0, int.MaxValue, ErrorMessage = "sync version must be non-negative")]
     public int SyncVersion { get; set; }

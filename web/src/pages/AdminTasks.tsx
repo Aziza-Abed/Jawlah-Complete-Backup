@@ -272,10 +272,9 @@ export default function AdminTasks() {
                     <option value="all">كل الحالات</option>
                     <option value="Pending">إنتظار</option>
                     <option value="InProgress">تنفيذ</option>
-                    <option value="Completed">اعتماد</option>
-                    <option value="Approved">مكتمل</option>
+                    <option value="UnderReview">بانتظار اعتماد</option>
+                    <option value="Completed">مكتمل</option>
                     <option value="Rejected">مرفوض</option>
-                    <option value="Cancelled">ملغى</option>
                   </select>
                   <select
                     value={priorityFilter}

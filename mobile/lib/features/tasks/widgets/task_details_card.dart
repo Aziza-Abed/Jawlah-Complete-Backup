@@ -150,9 +150,11 @@ class TaskDetailsCard extends StatelessWidget {
         return AppColors.info;
       case 'inprogress':
         return AppColors.statusInProgress;
+      case 'underreview':
+        return AppColors.statusInProgress;
       case 'completed':
         return AppColors.success;
-      case 'cancelled':
+      case 'rejected':
         return AppColors.error;
       default:
         return AppColors.textSecondary;

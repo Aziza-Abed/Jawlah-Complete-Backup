@@ -7,7 +7,6 @@ import '../../presentation/widgets/offline_banner.dart';
 import '../../presentation/widgets/not_checked_in_banner.dart';
 import '../../presentation/widgets/fade_in_animation.dart';
 import '../../providers/attendance_manager.dart';
-import '../../providers/auth_manager.dart';
 import '../../providers/task_manager.dart';
 import '../../providers/sync_manager.dart';
 import '../../providers/notice_manager.dart';
@@ -34,11 +33,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // load all data when screen starts
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final syncManager = context.read<SyncManager>();
-      final authManager = context.read<AuthManager>();
       final attendanceManager = context.read<AttendanceManager>();
 
       attendanceManager.setSyncManager(syncManager);
-      attendanceManager.setAuthManager(authManager);
 
       attendanceManager.loadTodayRecord();
       context.read<TaskManager>().loadTasks();

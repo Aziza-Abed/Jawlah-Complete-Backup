@@ -16,6 +16,7 @@ public class IssueSyncDto
     public double Longitude { get; set; }
     public string? LocationDescription { get; set; }
     public string? PhotoUrl { get; set; }
+    public List<string> Photos { get; set; } = new();
     public DateTime ReportedAt { get; set; }
     public int SyncVersion { get; set; }
 

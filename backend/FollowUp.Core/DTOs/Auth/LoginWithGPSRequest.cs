@@ -2,7 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Auth;
 
-// request for GPS-based login (auto check-in) using Username + Password + GPS + DeviceID
+// Request for GPS-based login (mobile workers) using Username + Password + DeviceID
+// UC2: Login is pure authentication. GPS is optional and not used for attendance.
+// Attendance is handled automatically via geofencing (UC4).
 public class LoginWithGPSRequest
 {
     [Required(ErrorMessage = "اسم المستخدم مطلوب")]
@@ -13,20 +15,17 @@ public class LoginWithGPSRequest
     [StringLength(100, MinimumLength = 8, ErrorMessage = "كلمة المرور يجب أن تكون بين 8 و 100 حرف")]
     public string Password { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Latitude is required")]
+    // GPS fields are optional - kept for future use but not required for login
     [Range(-90, 90, ErrorMessage = "Latitude must be between -90 and 90")]
-    public double Latitude { get; set; }
+    public double? Latitude { get; set; }
 
-    [Required(ErrorMessage = "Longitude is required")]
     [Range(-180, 180, ErrorMessage = "Longitude must be between -180 and 180")]
-    public double Longitude { get; set; }
+    public double? Longitude { get; set; }
 
-    // GPS accuracy in meters (optional but recommended for validation)
     [Range(0, 1000, ErrorMessage = "Accuracy must be between 0 and 1000 meters")]
     public double? Accuracy { get; set; }
 
     // Device ID for device binding security (2FA)
-    // On first login, the device is registered. Subsequent logins must be from the same device.
     [Required(ErrorMessage = "معرف الجهاز مطلوب")]
     [StringLength(100, ErrorMessage = "معرف الجهاز طويل جداً")]
     public string DeviceId { get; set; } = string.Empty;

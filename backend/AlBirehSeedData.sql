@@ -443,54 +443,422 @@ END;
 PRINT 'Created 100 health worker zone assignments';
 
 -- ========================================================================
--- 6. SAMPLE TASKS
+-- 6. HISTORICAL TASKS (past 30 days of realistic data)
 -- ========================================================================
--- Get some worker IDs for task assignment
-DECLARE @HealthWorker1 INT, @HealthWorker2 INT, @HealthWorker3 INT;
+DECLARE @HealthWorker1 INT, @HealthWorker2 INT, @HealthWorker3 INT, @HealthWorker4 INT, @HealthWorker5 INT;
 SELECT TOP 1 @HealthWorker1 = UserId FROM Users WHERE Username = 'worker1';
 SELECT TOP 1 @HealthWorker2 = UserId FROM Users WHERE Username = 'worker2';
 SELECT TOP 1 @HealthWorker3 = UserId FROM Users WHERE Username = 'worker3';
+SELECT TOP 1 @HealthWorker4 = UserId FROM Users WHERE Username = 'worker21';
+SELECT TOP 1 @HealthWorker5 = UserId FROM Users WHERE Username = 'worker41';
 
-DECLARE @WorksWorker1 INT;
+DECLARE @WorksWorker1 INT, @WorksWorker2 INT, @WorksWorker11 INT;
 SELECT TOP 1 @WorksWorker1 = UserId FROM Users WHERE Username = 'worker101';
-
-DECLARE @WorksWorker11 INT;
+SELECT TOP 1 @WorksWorker2 = UserId FROM Users WHERE Username = 'worker106';
 SELECT TOP 1 @WorksWorker11 = UserId FROM Users WHERE Username = 'worker111';
 
-DECLARE @AgriWorker1 INT;
+DECLARE @AgriWorker1 INT, @AgriWorker2 INT;
 SELECT TOP 1 @AgriWorker1 = UserId FROM Users WHERE Username = 'worker131';
+SELECT TOP 1 @AgriWorker2 = UserId FROM Users WHERE Username = 'worker135';
 
--- Health routine tasks (individual)
+-- ── 6.1 Completed & Approved tasks (3-4 weeks ago) ──
+-- GPS coords have realistic ±10-200m offset from zone centers (not exact copies)
+INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, StartedAt, CompletedAt, CompletionNotes, ProgressPercentage, IsSynced, SyncVersion, CreatedAt)
+VALUES
+(@MunicipalityId, N'تنظيف شارع الميدان الرئيسي', N'تنظيف يومي شامل', @Z11, @HealthWorker2, @HealthSup1, 1, 3, 1, 31.9013, 35.2084, 50, DATEADD(DAY,-27,GETUTCDATE()), DATEADD(DAY,-28,GETUTCDATE()), DATEADD(DAY,-27,GETUTCDATE()), DATEADD(DAY,-27,GETUTCDATE()), N'تم التنظيف بالكامل', 100, 1, 2, DATEADD(DAY,-28,GETUTCDATE())),
+(@MunicipalityId, N'جمع نفايات - البصبوص', N'جولة جمع صباحية', @Z1, @HealthWorker1, @HealthSup1, 1, 3, 0, 31.8952, 35.2093, 50, DATEADD(DAY,-26,GETUTCDATE()), DATEADD(DAY,-27,GETUTCDATE()), DATEADD(DAY,-26,GETUTCDATE()), DATEADD(DAY,-26,GETUTCDATE()), N'تم جمع جميع الحاويات', 100, 1, 2, DATEADD(DAY,-27,GETUTCDATE())),
+(@MunicipalityId, N'تعقيم حاويات - راس الطاحونة', N'تعقيم وغسل 12 حاوية', @Z2, @HealthWorker3, @HealthSup1, 1, 3, 2, 31.9063, 35.2131, 50, DATEADD(DAY,-25,GETUTCDATE()), DATEADD(DAY,-26,GETUTCDATE()), DATEADD(DAY,-25,GETUTCDATE()), DATEADD(DAY,-25,GETUTCDATE()), N'تم تعقيم 12 حاوية', 100, 1, 2, DATEADD(DAY,-26,GETUTCDATE())),
+(@MunicipalityId, N'تنظيف ساحة البلدية', N'تنظيف شامل للساحة والمحيط', @Z5, @HealthWorker1, @HealthSup1, 2, 3, 4, 31.9076, 35.2143, 50, DATEADD(DAY,-24,GETUTCDATE()), DATEADD(DAY,-25,GETUTCDATE()), DATEADD(DAY,-24,GETUTCDATE()), DATEADD(DAY,-24,GETUTCDATE()), N'تم بنجاح', 100, 1, 2, DATEADD(DAY,-25,GETUTCDATE())),
+(@MunicipalityId, N'جمع نفايات - حديقة حرب', N'جمع روتيني', @Z3, @HealthWorker4, @HealthSup2, 1, 3, 0, 31.9108, 35.2108, 50, DATEADD(DAY,-23,GETUTCDATE()), DATEADD(DAY,-24,GETUTCDATE()), DATEADD(DAY,-23,GETUTCDATE()), DATEADD(DAY,-23,GETUTCDATE()), N'تم', 100, 1, 2, DATEADD(DAY,-24,GETUTCDATE())),
+(@MunicipalityId, N'كنس شارع القبارصة', N'كنس وتنظيف الرصيف', @Z20, @HealthWorker5, @HealthSup3, 1, 3, 1, 31.9154, 35.2212, 50, DATEADD(DAY,-22,GETUTCDATE()), DATEADD(DAY,-23,GETUTCDATE()), DATEADD(DAY,-22,GETUTCDATE()), DATEADD(DAY,-22,GETUTCDATE()), N'تنظيف كامل', 100, 1, 2, DATEADD(DAY,-23,GETUTCDATE())),
+(@MunicipalityId, N'تنظيف حاويات - البص', N'غسل وتعقيم', @Z6, @HealthWorker2, @HealthSup1, 1, 3, 2, 31.8997, 35.2122, 50, DATEADD(DAY,-20,GETUTCDATE()), DATEADD(DAY,-21,GETUTCDATE()), DATEADD(DAY,-20,GETUTCDATE()), DATEADD(DAY,-20,GETUTCDATE()), N'تم تنظيف 8 حاويات', 100, 1, 2, DATEADD(DAY,-21,GETUTCDATE())),
+(@MunicipalityId, N'جمع نفايات - بئر الراس', N'جولة يومية', @Z10, @HealthWorker3, @HealthSup1, 1, 3, 0, 31.9168, 35.2163, 50, DATEADD(DAY,-19,GETUTCDATE()), DATEADD(DAY,-20,GETUTCDATE()), DATEADD(DAY,-19,GETUTCDATE()), DATEADD(DAY,-19,GETUTCDATE()), N'تم بنجاح', 100, 1, 2, DATEADD(DAY,-20,GETUTCDATE()));
+
+-- Completed & Approved works team tasks
+INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, TeamId, IsTeamTask, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, StartedAt, CompletedAt, CompletionNotes, ProgressPercentage, IsSynced, SyncVersion, CreatedAt)
+VALUES
+(@MunicipalityId, N'إصلاح أنبوب مياه - الغربية', N'تسرب مياه في الشارع الرئيسي', @Z9, @WorksWorker1, @WorksTeam1, 1, @WorksSup1, 3, 3, 3, 31.9094, 35.2118, 100, DATEADD(DAY,-26,GETUTCDATE()), DATEADD(DAY,-27,GETUTCDATE()), DATEADD(DAY,-26,GETUTCDATE()), DATEADD(DAY,-26,GETUTCDATE()), N'تم إصلاح التسرب واستبدال القطعة', 100, 1, 2, DATEADD(DAY,-27,GETUTCDATE())),
+(@MunicipalityId, N'صيانة إنارة شارع المركز', N'استبدال 3 لمبات معطلة', @Z13, @WorksWorker11, @WorksTeam3, 1, @WorksSup1, 1, 3, 3, 31.9118, 35.2063, 150, DATEADD(DAY,-22,GETUTCDATE()), DATEADD(DAY,-23,GETUTCDATE()), DATEADD(DAY,-22,GETUTCDATE()), DATEADD(DAY,-22,GETUTCDATE()), N'تم استبدال 3 لمبات LED', 100, 1, 2, DATEADD(DAY,-23,GETUTCDATE())),
+(@MunicipalityId, N'إصلاح رصيف - البلدة القديمة', N'بلاط متكسر يشكل خطر', @Z16, @WorksWorker1, @WorksTeam1, 1, @WorksSup1, 2, 3, 3, 31.9043, 35.2167, 100, DATEADD(DAY,-18,GETUTCDATE()), DATEADD(DAY,-19,GETUTCDATE()), DATEADD(DAY,-18,GETUTCDATE()), DATEADD(DAY,-18,GETUTCDATE()), N'تم إعادة تبليط 15 متر', 100, 1, 2, DATEADD(DAY,-19,GETUTCDATE()));
+
+-- Completed & Approved agri team tasks
+INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, TeamId, IsTeamTask, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, StartedAt, CompletedAt, CompletionNotes, ProgressPercentage, IsSynced, SyncVersion, CreatedAt)
+VALUES
+(@MunicipalityId, N'تقليم أشجار شارع المنارة', N'تقليم 20 شجرة على جانبي الشارع', @Z17, @AgriWorker1, @AgriTeam1, 1, @AgriSup1, 1, 3, 4, 31.9024, 35.2068, 200, DATEADD(DAY,-24,GETUTCDATE()), DATEADD(DAY,-25,GETUTCDATE()), DATEADD(DAY,-24,GETUTCDATE()), DATEADD(DAY,-24,GETUTCDATE()), N'تم تقليم 20 شجرة', 100, 1, 2, DATEADD(DAY,-25,GETUTCDATE())),
+(@MunicipalityId, N'زراعة ورود - ساحة البلدية', N'زراعة 50 شتلة ورد موسمي', @Z5, @AgriWorker2, @AgriTeam2, 1, @AgriSup1, 1, 3, 4, 31.9065, 35.2157, 200, DATEADD(DAY,-20,GETUTCDATE()), DATEADD(DAY,-21,GETUTCDATE()), DATEADD(DAY,-20,GETUTCDATE()), DATEADD(DAY,-20,GETUTCDATE()), N'تم زراعة 50 شتلة', 100, 1, 2, DATEADD(DAY,-21,GETUTCDATE()));
+
+-- ── 6.2 Completed tasks (past 2 weeks), some approved, some awaiting review ──
+INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, StartedAt, CompletedAt, CompletionNotes, ProgressPercentage, IsSynced, SyncVersion, CreatedAt)
+VALUES
+(@MunicipalityId, N'تنظيف شارع الحومة', N'تنظيف يومي', @Z18, @HealthWorker1, @HealthSup1, 1, 3, 1, 31.9006, 35.2142, 50, DATEADD(DAY,-14,GETUTCDATE()), DATEADD(DAY,-15,GETUTCDATE()), DATEADD(DAY,-14,GETUTCDATE()), DATEADD(DAY,-14,GETUTCDATE()), N'تم', 100, 1, 3, DATEADD(DAY,-15,GETUTCDATE())),
+(@MunicipalityId, N'جمع نفايات - المبارخ', N'جولة صباحية', @Z19, @HealthWorker4, @HealthSup2, 1, 3, 0, 31.8914, 35.2087, 50, DATEADD(DAY,-13,GETUTCDATE()), DATEADD(DAY,-14,GETUTCDATE()), DATEADD(DAY,-13,GETUTCDATE()), DATEADD(DAY,-13,GETUTCDATE()), N'تم جمع كافة النفايات', 100, 1, 3, DATEADD(DAY,-14,GETUTCDATE())),
+(@MunicipalityId, N'تنظيف حاويات - سهل عواد', N'تعقيم 10 حاويات', @Z12, @HealthWorker2, @HealthSup1, 1, 3, 2, 31.9104, 35.2187, 50, DATEADD(DAY,-10,GETUTCDATE()), DATEADD(DAY,-11,GETUTCDATE()), DATEADD(DAY,-10,GETUTCDATE()), DATEADD(DAY,-10,GETUTCDATE()), N'تم تعقيم 10 حاويات', 100, 1, 3, DATEADD(DAY,-11,GETUTCDATE())),
+-- Completed but awaiting supervisor approval
+(@MunicipalityId, N'كنس شارع الشيح الجنوبي', N'كنس الشارع الرئيسي', @Z8, @HealthWorker5, @HealthSup3, 1, 2, 1, 31.8884, 35.2158, 50, DATEADD(DAY,-3,GETUTCDATE()), DATEADD(DAY,-4,GETUTCDATE()), DATEADD(DAY,-3,GETUTCDATE()), DATEADD(DAY,-3,GETUTCDATE()), N'تم الكنس بالكامل', 100, 1, 2, DATEADD(DAY,-4,GETUTCDATE())),
+(@MunicipalityId, N'جمع نفايات - راس حسين', N'جولة مسائية', @Z7, @HealthWorker3, @HealthSup1, 1, 2, 0, 31.8975, 35.2063, 50, DATEADD(DAY,-2,GETUTCDATE()), DATEADD(DAY,-3,GETUTCDATE()), DATEADD(DAY,-2,GETUTCDATE()), DATEADD(DAY,-2,GETUTCDATE()), N'تم الجمع من 15 حاوية', 100, 1, 2, DATEADD(DAY,-3,GETUTCDATE()));
+
+-- ── 6.3 Rejected tasks (supervisor rejected completion) ──
+INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, StartedAt, CompletedAt, CompletionNotes, ProgressPercentage, IsAutoRejected, RejectionReason, RejectedAt, RejectedByUserId, IsSynced, SyncVersion, CreatedAt)
+VALUES
+(@MunicipalityId, N'تنظيف حاويات - قطعة شيبان', N'غسل وتعقيم 8 حاويات', @Z4, @HealthWorker1, @HealthSup1, 1, 4, 2, 31.9127, 35.2162, 50, DATEADD(DAY,-15,GETUTCDATE()), DATEADD(DAY,-16,GETUTCDATE()), DATEADD(DAY,-15,GETUTCDATE()), DATEADD(DAY,-15,GETUTCDATE()), N'تم التنظيف', 100, 0, N'الصور تظهر حاويات لم تنظف بالكامل', DATEADD(DAY,-14,GETUTCDATE()), @HealthSup1, 1, 3, DATEADD(DAY,-16,GETUTCDATE())),
+(@MunicipalityId, N'جمع نفايات - الجور التحتا', N'جولة صباحية', @Z15, @HealthWorker4, @HealthSup2, 1, 4, 0, 31.9147, 35.2183, 50, DATEADD(DAY,-8,GETUTCDATE()), DATEADD(DAY,-9,GETUTCDATE()), DATEADD(DAY,-8,GETUTCDATE()), DATEADD(DAY,-8,GETUTCDATE()), N'تم', 100, 1, N'المسافة بعيدة عن موقع المهمة - رفض تلقائي', DATEADD(DAY,-8,GETUTCDATE()), NULL, 1, 3, DATEADD(DAY,-9,GETUTCDATE()));
+
+-- ── 6.4 In-Progress tasks (recent) ──
+INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, StartedAt, ProgressPercentage, ProgressNotes, IsSynced, SyncVersion, CreatedAt)
+VALUES
+(@MunicipalityId, N'تنظيف شارع البلدية الرئيسي', N'تنظيف يومي روتيني', @Z5, @HealthWorker1, @HealthSup1, 1, 1, 1, 31.9082, 35.2146, 50, DATEADD(DAY, 0, GETUTCDATE()), DATEADD(DAY,-1,GETUTCDATE()), DATEADD(HOUR,-2,GETUTCDATE()), 40, N'بدأت من الجهة الشمالية', 1, 1, DATEADD(DAY,-1,GETUTCDATE())),
+(@MunicipalityId, N'جمع النفايات - حي الميدان', N'جولة جمع صباحية', @Z11, @HealthWorker2, @HealthSup1, 1, 1, 0, 31.8993, 35.2097, 50, DATEADD(DAY, 0, GETUTCDATE()), DATEADD(DAY,-1,GETUTCDATE()), DATEADD(HOUR,-1,GETUTCDATE()), 60, N'وصلت للمنتصف', 1, 1, DATEADD(DAY,-1,GETUTCDATE()));
+
+INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, TeamId, IsTeamTask, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, StartedAt, ProgressPercentage, ProgressNotes, IsSynced, SyncVersion, CreatedAt)
+VALUES
+(@MunicipalityId, N'إصلاح حفرة شارع المنارة', N'ردم وإصلاح حفرة كبيرة', @Z17, @WorksWorker1, @WorksTeam1, 1, @WorksSup1, 2, 1, 3, 31.9035, 35.2053, 100, DATEADD(DAY, 1, GETUTCDATE()), DATEADD(DAY,-1,GETUTCDATE()), DATEADD(HOUR,-3,GETUTCDATE()), 30, N'تم الحفر وبدأنا بالردم', 1, 1, DATEADD(DAY,-1,GETUTCDATE())),
+(@MunicipalityId, N'ري حديقة حرب', N'ري الأشجار والمسطحات الخضراء', @Z3, @AgriWorker1, @AgriTeam1, 1, @AgriSup1, 1, 1, 4, 31.9093, 35.2127, 200, DATEADD(DAY, 0, GETUTCDATE()), DATEADD(DAY,-1,GETUTCDATE()), DATEADD(HOUR,-1,GETUTCDATE()), 50, N'تم ري القسم الشرقي', 1, 1, DATEADD(DAY,-1,GETUTCDATE()));
+
+-- ── 6.5 Pending tasks (assigned today/tomorrow) ──
 INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, IsSynced, SyncVersion, CreatedAt)
 VALUES
-(@MunicipalityId, N'تنظيف شارع البلدية الرئيسي', N'تنظيف يومي روتيني', @Z5, @HealthWorker1, @HealthSup1, 1, 0, 0, 31.907, 35.215, 50, DATEADD(DAY, 1, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE()),
-(@MunicipalityId, N'جمع النفايات - حي الميدان', N'جولة جمع صباحية', @Z11, @HealthWorker2, @HealthSup1, 1, 0, 0, 31.900, 35.209, 50, DATEADD(DAY, 1, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE()),
-(@MunicipalityId, N'تنظيف حاويات - البلدة القديمة', N'تعقيم وتنظيف الحاويات', @Z16, @HealthWorker3, @HealthSup1, 1, 1, 0, 31.905, 35.216, 50, DATEADD(DAY, 1, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE());
+(@MunicipalityId, N'تنظيف حاويات - البلدة القديمة', N'تعقيم وتنظيف الحاويات', @Z16, @HealthWorker3, @HealthSup1, 1, 0, 2, 31.9056, 35.2153, 50, DATEADD(DAY, 1, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE()),
+(@MunicipalityId, N'كنس شارع الشيح الشمالي', N'كنس وتنظيف', @Z14, @HealthWorker5, @HealthSup3, 1, 0, 1, 31.8926, 35.2133, 50, DATEADD(DAY, 1, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE()),
+(@MunicipalityId, N'تفتيش حاويات - البص', N'تفتيش حالة الحاويات وتقرير', @Z6, @HealthWorker1, @HealthSup1, 0, 0, 5, 31.8984, 35.2138, 50, DATEADD(DAY, 2, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE());
 
--- Works team tasks
 INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, TeamId, IsTeamTask, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, IsSynced, SyncVersion, CreatedAt)
 VALUES
-(@MunicipalityId, N'إصلاح حفرة شارع المنارة', N'ردم وإصلاح حفرة كبيرة تعيق حركة المرور', @Z17, @WorksWorker1, @WorksTeam1, 1, @WorksSup1, 2, 0, 1, 31.903, 35.206, 100, DATEADD(DAY, 2, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE()),
-(@MunicipalityId, N'صيانة إنارة حي الغربية', N'استبدال 5 أعمدة إنارة معطلة', @Z9, @WorksWorker11, @WorksTeam3, 1, @WorksSup1, 1, 0, 1, 31.910, 35.211, 150, DATEADD(DAY, 3, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE());
+(@MunicipalityId, N'صيانة إنارة حي الغربية', N'استبدال 5 أعمدة إنارة معطلة', @Z9, @WorksWorker11, @WorksTeam3, 1, @WorksSup1, 1, 0, 3, 31.9107, 35.2103, 150, DATEADD(DAY, 2, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE()),
+(@MunicipalityId, N'زراعة أشجار في المركز', N'زراعة 15 شجرة زيتون', @Z13, @AgriWorker1, @AgriTeam2, 1, @AgriSup1, 1, 0, 4, 31.9103, 35.2078, 200, DATEADD(DAY, 3, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE());
 
--- Agriculture team tasks
-INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, TeamId, IsTeamTask, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, IsSynced, SyncVersion, CreatedAt)
+-- One cancelled task
+INSERT INTO [Tasks] (MunicipalityId, Title, Description, ZoneId, AssignedToUserId, AssignedByUserId, Priority, Status, TaskType, Latitude, Longitude, MaxDistanceMeters, DueDate, EventTime, IsSynced, SyncVersion, CreatedAt)
 VALUES
-(@MunicipalityId, N'تقليم أشجار حديقة حرب', N'تقليم وتنظيف الأشجار الكبيرة', @Z3, @AgriWorker1, @AgriTeam1, 1, @AgriSup1, 1, 0, 1, 31.910, 35.212, 200, DATEADD(DAY, 2, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE()),
-(@MunicipalityId, N'زراعة أشجار في المركز', N'زراعة 15 شجرة زيتون', @Z13, @AgriWorker1, @AgriTeam2, 1, @AgriSup1, 1, 0, 1, 31.911, 35.207, 200, DATEADD(DAY, 5, GETUTCDATE()), GETUTCDATE(), 1, 1, GETUTCDATE());
+(@MunicipalityId, N'تنظيف ساحة المنارة', N'ألغيت بسبب أعمال بناء في المنطقة', @Z17, @HealthWorker4, @HealthSup2, 1, 4, 4, 31.9037, 35.2054, 50, DATEADD(DAY,-10,GETUTCDATE()), DATEADD(DAY,-12,GETUTCDATE()), 1, 1, DATEADD(DAY,-12,GETUTCDATE()));
 
-PRINT 'Created sample tasks';
+PRINT 'Created 30 historical tasks (13 completed, 2 under review, 3 rejected, 4 in-progress, 5 pending, 2 works+agri extra)';
 
 -- ========================================================================
--- 7. SAMPLE ISSUES (Complaints)
+-- 7. HISTORICAL ISSUES (past 30 days)
 -- ========================================================================
+INSERT INTO [Issues] (MunicipalityId, Title, Description, ReportedByUserId, ZoneId, Type, Severity, Status, Latitude, Longitude, EventTime, ResolvedAt, ResolutionNotes, ResolvedByUserId, IsSynced, SyncVersion, ReportedAt)
+VALUES
+-- Resolved issues (3-4 weeks ago) - GPS scattered within zone
+(@MunicipalityId, N'حفرة كبيرة في شارع البصبوص', N'حفرة عميقة تشكل خطر على المشاة', @HealthWorker1, @Z1, 1, 3, 2, 31.8967, 35.2074, DATEADD(DAY,-28,GETUTCDATE()), DATEADD(DAY,-25,GETUTCDATE()), N'تم ردم الحفرة وإصلاح الشارع', @WorksSup1, 1, 2, DATEADD(DAY,-28,GETUTCDATE())),
+(@MunicipalityId, N'تراكم نفايات خلف المدرسة', N'نفايات متراكمة منذ أسبوع', @HealthWorker2, @Z5, 3, 2, 2, 31.9078, 35.2138, DATEADD(DAY,-25,GETUTCDATE()), DATEADD(DAY,-24,GETUTCDATE()), N'تم تنظيف المنطقة بالكامل', @HealthSup1, 1, 2, DATEADD(DAY,-25,GETUTCDATE())),
+(@MunicipalityId, N'إنارة معطلة في الحومة', N'3 أعمدة إنارة لا تعمل في الشارع الرئيسي', @WorksWorker1, @Z18, 1, 2, 2, 31.9008, 35.2143, DATEADD(DAY,-22,GETUTCDATE()), DATEADD(DAY,-20,GETUTCDATE()), N'تم استبدال اللمبات', @WorksSup1, 1, 2, DATEADD(DAY,-22,GETUTCDATE())),
+(@MunicipalityId, N'شجرة مائلة على الرصيف', N'شجرة كبيرة مائلة قد تسقط', @AgriWorker1, @Z3, 2, 3, 2, 31.9113, 35.2114, DATEADD(DAY,-20,GETUTCDATE()), DATEADD(DAY,-18,GETUTCDATE()), N'تم تقليم الأغصان وتثبيت الشجرة', @AgriSup1, 1, 2, DATEADD(DAY,-20,GETUTCDATE())),
+(@MunicipalityId, N'حاوية محترقة', N'حاوية نفايات محترقة بالكامل في المبارخ', @HealthWorker5, @Z19, 4, 2, 2, 31.8928, 35.2073, DATEADD(DAY,-17,GETUTCDATE()), DATEADD(DAY,-15,GETUTCDATE()), N'تم استبدال الحاوية بأخرى جديدة', @HealthSup3, 1, 2, DATEADD(DAY,-17,GETUTCDATE()));
+
+-- Dismissed issues
+INSERT INTO [Issues] (MunicipalityId, Title, Description, ReportedByUserId, ZoneId, Type, Severity, Status, Latitude, Longitude, EventTime, ResolutionNotes, IsSynced, SyncVersion, ReportedAt)
+VALUES
+(@MunicipalityId, N'ضوضاء من ورشة بناء', N'ضوضاء عالية من ورشة مجاورة', @HealthWorker3, @Z12, 5, 1, 2, 31.9116, 35.2173, DATEADD(DAY,-18,GETUTCDATE()), N'خارج اختصاص البلدية - تم تحويلها للجهة المختصة', 1, 2, DATEADD(DAY,-18,GETUTCDATE())),
+(@MunicipalityId, N'بلاغ مكرر - حفرة البصبوص', N'نفس البلاغ السابق', @HealthWorker1, @Z1, 1, 2, 2, 31.8955, 35.2088, DATEADD(DAY,-16,GETUTCDATE()), N'بلاغ مكرر - تم معالجته سابقاً', 1, 2, DATEADD(DAY,-16,GETUTCDATE()));
+
+-- Under review issues (recent)
 INSERT INTO [Issues] (MunicipalityId, Title, Description, ReportedByUserId, ZoneId, Type, Severity, Status, Latitude, Longitude, EventTime, IsSynced, SyncVersion, ReportedAt)
 VALUES
-(@MunicipalityId, N'تراكم نفايات بجانب المدرسة', N'شكوى من سكان المنطقة - نفايات متراكمة منذ 3 أيام', @HealthWorker1, @Z5, 0, 2, 0, 31.907, 35.214, GETUTCDATE(), 1, 1, GETUTCDATE()),
-(@MunicipalityId, N'عمود إنارة مكسور', N'عمود إنارة ساقط في الشارع يشكل خطر', @WorksWorker1, @Z17, 1, 2, 1, 31.903, 35.205, GETUTCDATE(), 1, 1, GETUTCDATE()),
-(@MunicipalityId, N'شجرة سقطت تسد الطريق', N'شجرة كبيرة سقطت بسبب الرياح', @AgriWorker1, @Z3, 2, 1, 0, 31.910, 35.213, GETUTCDATE(), 1, 1, GETUTCDATE());
+(@MunicipalityId, N'تسرب مياه صرف صحي', N'تسرب في شارع الغربية الفرعي', @WorksWorker2, @Z9, 1, 3, 1, 31.9096, 35.2117, DATEADD(DAY,-5,GETUTCDATE()), 1, 1, DATEADD(DAY,-5,GETUTCDATE())),
+(@MunicipalityId, N'رصيف مكسور بجانب المسجد', N'بلاط مكسور يشكل خطر على كبار السن', @WorksWorker1, @Z16, 1, 2, 1, 31.9044, 35.2168, DATEADD(DAY,-3,GETUTCDATE()), 1, 1, DATEADD(DAY,-3,GETUTCDATE())),
+(@MunicipalityId, N'أغصان متدلية على الشارع', N'أغصان شجرة تعيق حركة المركبات', @AgriWorker2, @Z10, 2, 2, 1, 31.9153, 35.2178, DATEADD(DAY,-2,GETUTCDATE()), 1, 1, DATEADD(DAY,-2,GETUTCDATE()));
 
-PRINT 'Created sample issues';
+-- Forwarded issue
+INSERT INTO [Issues] (MunicipalityId, Title, Description, ReportedByUserId, ZoneId, Type, Severity, Status, Latitude, Longitude, EventTime, ForwardedToDepartmentId, ForwardedAt, ForwardingNotes, ForwardedByUserId, IsSynced, SyncVersion, ReportedAt)
+VALUES
+(@MunicipalityId, N'حفرة وتسرب مياه معاً', N'حفرة ناتجة عن تسرب مياه - تحتاج تنسيق بين الأقسام', @HealthWorker3, @Z7, 1, 3, 1, 31.8963, 35.2077, DATEADD(DAY,-4,GETUTCDATE()), @WorksDeptId, DATEADD(DAY,-3,GETUTCDATE()), N'تم تحويلها لقسم الأشغال لأنها تتعلق بالبنية التحتية', @HealthSup1, 1, 1, DATEADD(DAY,-4,GETUTCDATE()));
+
+-- Recently reported (today/yesterday)
+INSERT INTO [Issues] (MunicipalityId, Title, Description, ReportedByUserId, ZoneId, Type, Severity, Status, Latitude, Longitude, EventTime, IsSynced, SyncVersion, ReportedAt)
+VALUES
+(@MunicipalityId, N'تراكم نفايات بجانب المدرسة', N'شكوى من سكان المنطقة - نفايات متراكمة', @HealthWorker1, @Z5, 3, 2, 0, 31.9064, 35.2156, DATEADD(HOUR,-5,GETUTCDATE()), 1, 1, DATEADD(HOUR,-5,GETUTCDATE())),
+(@MunicipalityId, N'عمود إنارة مائل', N'عمود إنارة مائل بشكل خطير بعد حادث سير', @WorksWorker1, @Z17, 2, 4, 0, 31.9025, 35.2048, DATEADD(HOUR,-2,GETUTCDATE()), 1, 1, DATEADD(HOUR,-2,GETUTCDATE()));
+
+PRINT 'Created 16 historical issues (7 resolved, 4 forwarded, 2 new)';
+
+-- ========================================================================
+-- 8. ATTENDANCE RECORDS (past 20 work days: Sun-Thu)
+-- ========================================================================
+DECLARE @dayOffset INT = -27; -- start from ~4 weeks ago
+DECLARE @dayOfWeek INT;
+DECLARE @checkIn DATETIME;
+DECLARE @checkOut DATETIME;
+DECLARE @workDays INT = 0;
+
+WHILE @workDays < 20 AND @dayOffset <= -1
+BEGIN
+    SET @dayOfWeek = DATEPART(WEEKDAY, DATEADD(DAY, @dayOffset, GETUTCDATE()));
+    -- Skip Friday(6) and Saturday(7) (Palestinian weekend)
+    IF @dayOfWeek NOT IN (6, 7)
+    BEGIN
+        SET @checkIn = DATEADD(MINUTE, 420 + (ABS(CHECKSUM(NEWID())) % 20), DATEADD(DAY, @dayOffset, CAST(CAST(GETUTCDATE() AS DATE) AS DATETIME))); -- ~7:00-7:20 AM
+        SET @checkOut = DATEADD(HOUR, 8, @checkIn); -- ~8 hours later
+
+        -- Worker1 (Health/Z1) - reliable, check-in near zone start, check-out at different spot
+        INSERT INTO [Attendances] (MunicipalityId, UserId, ZoneId, CheckInEventTime, CheckInSyncTime, CheckOutEventTime, CheckOutSyncTime, CheckInLatitude, CheckInLongitude, CheckInAccuracyMeters, CheckOutLatitude, CheckOutLongitude, CheckOutAccuracyMeters, IsValidated, WorkDuration, Status, IsSynced, SyncVersion, LateMinutes, EarlyLeaveMinutes, OvertimeMinutes, AttendanceType, ApprovalStatus)
+        VALUES (@MunicipalityId, @HealthWorker1, @Z1, @checkIn, @checkIn, @checkOut, @checkOut,
+                31.8953 + (ABS(CHECKSUM(NEWID())) % 15) * 0.0001, 35.2074 + (ABS(CHECKSUM(NEWID())) % 12) * 0.0001, 12.0 + (ABS(CHECKSUM(NEWID())) % 80) * 0.1,
+                31.8968 + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001, 35.2087 + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001, 10.0 + (ABS(CHECKSUM(NEWID())) % 90) * 0.1,
+                1, DATEADD(HOUR, 8, 0) - 0, 2, 1, 1, 0, 0, 0, 'OnTime', 'AutoApproved');
+
+        -- Worker2 (Health/Z2) - sometimes late
+        SET @checkIn = DATEADD(MINUTE, 420 + (ABS(CHECKSUM(NEWID())) % 35), DATEADD(DAY, @dayOffset, CAST(CAST(GETUTCDATE() AS DATE) AS DATETIME))); -- 7:00-7:35
+        SET @checkOut = DATEADD(HOUR, 8, @checkIn);
+        INSERT INTO [Attendances] (MunicipalityId, UserId, ZoneId, CheckInEventTime, CheckInSyncTime, CheckOutEventTime, CheckOutSyncTime, CheckInLatitude, CheckInLongitude, CheckInAccuracyMeters, CheckOutLatitude, CheckOutLongitude, CheckOutAccuracyMeters, IsValidated, WorkDuration, Status, IsSynced, SyncVersion, LateMinutes, EarlyLeaveMinutes, OvertimeMinutes, AttendanceType, ApprovalStatus)
+        VALUES (@MunicipalityId, @HealthWorker2, @Z2,
+                @checkIn, @checkIn, @checkOut, @checkOut,
+                31.9064 + (ABS(CHECKSUM(NEWID())) % 12) * 0.0001, 35.2113 + (ABS(CHECKSUM(NEWID())) % 14) * 0.0001, 14.0 + (ABS(CHECKSUM(NEWID())) % 85) * 0.1,
+                31.9078 + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001, 35.2126 + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001, 11.0 + (ABS(CHECKSUM(NEWID())) % 75) * 0.1,
+                1, DATEADD(HOUR, 8, 0) - 0, 2, 1, 1,
+                CASE WHEN DATEPART(MINUTE, @checkIn) > 15 THEN DATEPART(MINUTE, @checkIn) - 0 ELSE 0 END,
+                0, 0,
+                CASE WHEN DATEPART(MINUTE, @checkIn) > 15 THEN 'Late' ELSE 'OnTime' END,
+                'AutoApproved');
+
+        -- Worker101 (Works) - moves between job sites
+        SET @checkIn = DATEADD(MINUTE, 420 + (ABS(CHECKSUM(NEWID())) % 15), DATEADD(DAY, @dayOffset, CAST(CAST(GETUTCDATE() AS DATE) AS DATETIME)));
+        SET @checkOut = DATEADD(HOUR, 8, @checkIn);
+        INSERT INTO [Attendances] (MunicipalityId, UserId, ZoneId, CheckInEventTime, CheckInSyncTime, CheckOutEventTime, CheckOutSyncTime, CheckInLatitude, CheckInLongitude, CheckInAccuracyMeters, CheckOutLatitude, CheckOutLongitude, CheckOutAccuracyMeters, IsValidated, WorkDuration, Status, IsSynced, SyncVersion, LateMinutes, EarlyLeaveMinutes, OvertimeMinutes, AttendanceType, ApprovalStatus)
+        VALUES (@MunicipalityId, @WorksWorker1, NULL,
+                @checkIn, @checkIn, @checkOut, @checkOut,
+                31.9023 + (ABS(CHECKSUM(NEWID())) % 15) * 0.0001, 35.2053 + (ABS(CHECKSUM(NEWID())) % 14) * 0.0001, 9.0 + (ABS(CHECKSUM(NEWID())) % 60) * 0.1,
+                31.9047 + (ABS(CHECKSUM(NEWID())) % 12) * 0.0001, 35.2068 + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001, 8.0 + (ABS(CHECKSUM(NEWID())) % 70) * 0.1,
+                1, DATEADD(HOUR, 8, 0) - 0, 2, 1, 1, 0, 0, 0, 'OnTime', 'AutoApproved');
+
+        -- Worker131 (Agri) - moves within park/garden areas
+        SET @checkIn = DATEADD(MINUTE, 420 + (ABS(CHECKSUM(NEWID())) % 20), DATEADD(DAY, @dayOffset, CAST(CAST(GETUTCDATE() AS DATE) AS DATETIME)));
+        SET @checkOut = DATEADD(HOUR, 8, @checkIn);
+        INSERT INTO [Attendances] (MunicipalityId, UserId, ZoneId, CheckInEventTime, CheckInSyncTime, CheckOutEventTime, CheckOutSyncTime, CheckInLatitude, CheckInLongitude, CheckInAccuracyMeters, CheckOutLatitude, CheckOutLongitude, CheckOutAccuracyMeters, IsValidated, WorkDuration, Status, IsSynced, SyncVersion, LateMinutes, EarlyLeaveMinutes, OvertimeMinutes, AttendanceType, ApprovalStatus)
+        VALUES (@MunicipalityId, @AgriWorker1, NULL,
+                @checkIn, @checkIn, @checkOut, @checkOut,
+                31.9094 + (ABS(CHECKSUM(NEWID())) % 12) * 0.0001, 35.2113 + (ABS(CHECKSUM(NEWID())) % 14) * 0.0001, 11.0 + (ABS(CHECKSUM(NEWID())) % 65) * 0.1,
+                31.9108 + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001, 35.2128 + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001, 10.0 + (ABS(CHECKSUM(NEWID())) % 55) * 0.1,
+                1, DATEADD(HOUR, 8, 0) - 0, 2, 1, 1, 0, 0, 0, 'OnTime', 'AutoApproved');
+
+        SET @workDays = @workDays + 1;
+    END;
+
+    SET @dayOffset = @dayOffset + 1;
+END;
+
+-- Today's active check-ins (still checked in, no check-out yet)
+SET @checkIn = DATEADD(MINUTE, 425, CAST(CAST(GETUTCDATE() AS DATE) AS DATETIME)); -- 7:05 AM today
+INSERT INTO [Attendances] (MunicipalityId, UserId, ZoneId, CheckInEventTime, CheckInSyncTime, CheckInLatitude, CheckInLongitude, CheckInAccuracyMeters, IsValidated, Status, IsSynced, SyncVersion, LateMinutes, EarlyLeaveMinutes, OvertimeMinutes, AttendanceType, ApprovalStatus)
+VALUES
+(@MunicipalityId, @HealthWorker1, @Z1, @checkIn, @checkIn, 31.8957, 35.2083, 13.2, 1, 1, 1, 1, 0, 0, 0, 'OnTime', 'AutoApproved'),
+(@MunicipalityId, @HealthWorker2, @Z2, DATEADD(MINUTE, 5, @checkIn), DATEADD(MINUTE, 5, @checkIn), 31.9072, 35.2118, 17.8, 1, 1, 1, 1, 0, 0, 0, 'OnTime', 'AutoApproved'),
+(@MunicipalityId, @WorksWorker1, NULL, @checkIn, @checkIn, 31.9038, 35.2054, 10.4, 1, 1, 1, 1, 0, 0, 0, 'OnTime', 'AutoApproved'),
+(@MunicipalityId, @AgriWorker1, NULL, DATEADD(MINUTE, 3, @checkIn), DATEADD(MINUTE, 3, @checkIn), 31.9097, 35.2124, 12.7, 1, 1, 1, 1, 0, 0, 0, 'OnTime', 'AutoApproved');
+
+PRINT 'Created ~84 attendance records (20 days x 4 workers + 4 active today)';
+
+-- ========================================================================
+-- 9. NOTIFICATIONS
+-- ========================================================================
+INSERT INTO [Notifications] (MunicipalityId, UserId, Title, Message, Type, IsRead, IsSent, CreatedAt, SentAt, ReadAt)
+VALUES
+-- Old read notifications (Type: 1=TaskAssigned, 3=TaskUpdated, 4=IssueReviewed)
+(@MunicipalityId, @HealthWorker1, N'مهمة جديدة', N'تم تعيين مهمة تنظيف شارع البلدية الرئيسي', 1, 1, 1, DATEADD(DAY,-28,GETUTCDATE()), DATEADD(DAY,-28,GETUTCDATE()), DATEADD(DAY,-28,GETUTCDATE())),
+(@MunicipalityId, @HealthWorker1, N'مهمة معتمدة', N'تم اعتماد مهمتك: تنظيف ساحة البلدية', 3, 1, 1, DATEADD(DAY,-24,GETUTCDATE()), DATEADD(DAY,-24,GETUTCDATE()), DATEADD(DAY,-24,GETUTCDATE())),
+(@MunicipalityId, @HealthWorker1, N'مهمة مرفوضة', N'تم رفض مهمتك: تنظيف حاويات قطعة شيبان - الصور غير كافية', 3, 1, 1, DATEADD(DAY,-14,GETUTCDATE()), DATEADD(DAY,-14,GETUTCDATE()), DATEADD(DAY,-14,GETUTCDATE())),
+(@MunicipalityId, @WorksWorker1, N'مهمة جديدة', N'تم تعيين مهمة إصلاح أنبوب مياه - الغربية', 1, 1, 1, DATEADD(DAY,-27,GETUTCDATE()), DATEADD(DAY,-27,GETUTCDATE()), DATEADD(DAY,-26,GETUTCDATE())),
+(@MunicipalityId, @WorksWorker1, N'مهمة معتمدة', N'تم اعتماد مهمتك: إصلاح رصيف البلدة القديمة', 3, 1, 1, DATEADD(DAY,-17,GETUTCDATE()), DATEADD(DAY,-17,GETUTCDATE()), DATEADD(DAY,-17,GETUTCDATE())),
+(@MunicipalityId, @AgriWorker1, N'مهمة جديدة', N'تم تعيين مهمة تقليم أشجار شارع المنارة', 1, 1, 1, DATEADD(DAY,-25,GETUTCDATE()), DATEADD(DAY,-25,GETUTCDATE()), DATEADD(DAY,-25,GETUTCDATE())),
+-- Supervisor notifications
+(@MunicipalityId, @HealthSup1, N'بلاغ جديد', N'بلاغ جديد: تراكم نفايات بجانب المدرسة في منطقة البلدية', 4, 1, 1, DATEADD(HOUR,-5,GETUTCDATE()), DATEADD(HOUR,-5,GETUTCDATE()), DATEADD(HOUR,-4,GETUTCDATE())),
+(@MunicipalityId, @WorksSup1, N'بلاغ محول', N'تم تحويل بلاغ حفرة وتسرب مياه إلى قسمكم', 4, 1, 1, DATEADD(DAY,-3,GETUTCDATE()), DATEADD(DAY,-3,GETUTCDATE()), DATEADD(DAY,-3,GETUTCDATE())),
+-- Recent unread notifications
+(@MunicipalityId, @HealthWorker1, N'مهمة جديدة', N'تم تعيين مهمة تفتيش حاويات - البص', 1, 0, 1, GETUTCDATE(), GETUTCDATE(), NULL),
+(@MunicipalityId, @WorksWorker11, N'مهمة جديدة', N'تم تعيين مهمة صيانة إنارة حي الغربية', 1, 0, 1, GETUTCDATE(), GETUTCDATE(), NULL),
+(@MunicipalityId, @HealthSup1, N'مهمة بانتظار المراجعة', N'العامل أكمل مهمة جمع نفايات راس حسين - بحاجة مراجعة', 3, 0, 1, DATEADD(DAY,-2,GETUTCDATE()), DATEADD(DAY,-2,GETUTCDATE()), NULL),
+(@MunicipalityId, @WorksSup1, N'بلاغ جديد', N'بلاغ عاجل: عمود إنارة مائل في المنارة', 4, 0, 1, DATEADD(HOUR,-2,GETUTCDATE()), DATEADD(HOUR,-2,GETUTCDATE()), NULL);
+
+PRINT 'Created 12 notifications (7 read + 5 unread)';
+
+-- ========================================================================
+-- 10. APPEALS
+-- ========================================================================
+-- Get the rejected task IDs
+DECLARE @RejectedTask1 INT, @RejectedTask2 INT;
+SELECT TOP 1 @RejectedTask1 = TaskId FROM Tasks WHERE Status = 5 AND AssignedToUserId = @HealthWorker1;
+SELECT TOP 1 @RejectedTask2 = TaskId FROM Tasks WHERE Status = 5 AND AssignedToUserId = @HealthWorker4;
+
+-- Appeal 1: Approved (worker was right, supervisor re-checked photos)
+INSERT INTO [Appeals] (MunicipalityId, AppealType, EntityType, EntityId, UserId, WorkerExplanation, WorkerLatitude, WorkerLongitude, ExpectedLatitude, ExpectedLongitude, DistanceMeters, Status, ReviewedByUserId, ReviewedAt, ReviewNotes, SubmittedAt, CreatedAt, IsSynced, SyncVersion)
+VALUES (@MunicipalityId, 1, 'Task', @RejectedTask1, @HealthWorker1,
+    N'قمت بتنظيف جميع الحاويات - ربما الصور لم تكن واضحة بسبب الإضاءة. أرفق صور إضافية',
+    31.912, 35.217, 31.912, 35.217, 5,
+    2, @HealthSup1, DATEADD(DAY,-13,GETUTCDATE()), N'تم مراجعة الصور الإضافية - فعلاً تم التنظيف. اعتذار للعامل.',
+    DATEADD(DAY,-14,GETUTCDATE()), DATEADD(DAY,-14,GETUTCDATE()), 1, 1);
+
+-- Appeal 2: Rejected (auto-rejection was correct, worker was far from location)
+INSERT INTO [Appeals] (MunicipalityId, AppealType, EntityType, EntityId, UserId, WorkerExplanation, WorkerLatitude, WorkerLongitude, ExpectedLatitude, ExpectedLongitude, DistanceMeters, Status, ReviewedByUserId, ReviewedAt, ReviewNotes, SubmittedAt, CreatedAt, IsSynced, SyncVersion)
+VALUES (@MunicipalityId, 1, 'Task', @RejectedTask2, @HealthWorker4,
+    N'كنت في المنطقة لكن GPS الهاتف أعطى موقع غلط',
+    31.920, 35.225, 31.914, 35.219, 750,
+    3, @HealthSup2, DATEADD(DAY,-7,GETUTCDATE()), N'المسافة 750 متر - كبيرة جداً حتى مع خطأ GPS. يرجى الالتزام بالموقع.',
+    DATEADD(DAY,-8,GETUTCDATE()), DATEADD(DAY,-8,GETUTCDATE()), 1, 1);
+
+-- Appeal 3: Pending (recent, awaiting supervisor review)
+INSERT INTO [Appeals] (MunicipalityId, AppealType, EntityType, EntityId, UserId, WorkerExplanation, WorkerLatitude, WorkerLongitude, ExpectedLatitude, ExpectedLongitude, DistanceMeters, Status, SubmittedAt, CreatedAt, IsSynced, SyncVersion)
+VALUES (@MunicipalityId, 1, 'Task', @RejectedTask2, @HealthWorker4,
+    N'أطلب إعادة النظر - كان هناك تحويلة في الشارع أجبرتني على تغيير المسار',
+    31.916, 35.221, 31.914, 35.219, 250,
+    1, DATEADD(DAY,-1,GETUTCDATE()), DATEADD(DAY,-1,GETUTCDATE()), 1, 1);
+
+PRINT 'Created 3 appeals (1 approved, 1 rejected, 1 pending)';
+
+-- ========================================================================
+-- 11. AUDIT LOGS (login attempts, task actions, issue reports over past 30 days)
+-- ========================================================================
+INSERT INTO [AuditLogs] (UserId, Username, Action, Details, IpAddress, UserAgent, CreatedAt)
+VALUES
+-- Admin logins
+(@AdminId, N'admin', N'Login', N'تسجيل دخول ناجح', '192.168.1.10', 'Mozilla/5.0 (Windows NT 10.0)', DATEADD(DAY,-28,GETUTCDATE())),
+(@AdminId, N'admin', N'Login', N'تسجيل دخول ناجح', '192.168.1.10', 'Mozilla/5.0 (Windows NT 10.0)', DATEADD(DAY,-21,GETUTCDATE())),
+(@AdminId, N'admin', N'Login', N'تسجيل دخول ناجح', '192.168.1.10', 'Mozilla/5.0 (Windows NT 10.0)', DATEADD(DAY,-14,GETUTCDATE())),
+(@AdminId, N'admin', N'Login', N'تسجيل دخول ناجح', '192.168.1.10', 'Mozilla/5.0 (Windows NT 10.0)', DATEADD(DAY,-7,GETUTCDATE())),
+(@AdminId, N'admin', N'Login', N'تسجيل دخول ناجح', '192.168.1.10', 'Mozilla/5.0 (Windows NT 10.0)', DATEADD(DAY,-1,GETUTCDATE())),
+-- Supervisor logins
+(@HealthSup1, N'super1', N'Login', N'تسجيل دخول ناجح', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-27,GETUTCDATE())),
+(@HealthSup1, N'super1', N'Login', N'تسجيل دخول ناجح', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-20,GETUTCDATE())),
+(@HealthSup1, N'super1', N'Login', N'تسجيل دخول ناجح', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-13,GETUTCDATE())),
+(@HealthSup1, N'super1', N'Login', N'تسجيل دخول ناجح', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-6,GETUTCDATE())),
+(@HealthSup2, N'super2', N'Login', N'تسجيل دخول ناجح', '10.0.0.22', 'FollowUp/1.0 Android', DATEADD(DAY,-25,GETUTCDATE())),
+(@HealthSup2, N'super2', N'Login', N'تسجيل دخول ناجح', '10.0.0.22', 'FollowUp/1.0 Android', DATEADD(DAY,-18,GETUTCDATE())),
+(@WorksSup1, N'super6', N'Login', N'تسجيل دخول ناجح', '10.0.0.30', 'FollowUp/1.0 Android', DATEADD(DAY,-26,GETUTCDATE())),
+(@WorksSup1, N'super6', N'Login', N'تسجيل دخول ناجح', '10.0.0.30', 'FollowUp/1.0 Android', DATEADD(DAY,-12,GETUTCDATE())),
+(@AgriSup1, N'super8', N'Login', N'تسجيل دخول ناجح', '10.0.0.40', 'FollowUp/1.0 Android', DATEADD(DAY,-24,GETUTCDATE())),
+-- Worker logins (sample)
+(@HealthWorker1, N'worker1', N'Login', N'تسجيل دخول ناجح', '10.0.1.1', 'FollowUp/1.0 Android', DATEADD(DAY,-27,GETUTCDATE())),
+(@HealthWorker1, N'worker1', N'Login', N'تسجيل دخول ناجح', '10.0.1.1', 'FollowUp/1.0 Android', DATEADD(DAY,-20,GETUTCDATE())),
+(@HealthWorker1, N'worker1', N'Login', N'تسجيل دخول ناجح', '10.0.1.1', 'FollowUp/1.0 Android', DATEADD(DAY,-13,GETUTCDATE())),
+(@HealthWorker2, N'worker2', N'Login', N'تسجيل دخول ناجح', '10.0.1.2', 'FollowUp/1.0 Android', DATEADD(DAY,-26,GETUTCDATE())),
+(@HealthWorker2, N'worker2', N'Login', N'تسجيل دخول ناجح', '10.0.1.2', 'FollowUp/1.0 Android', DATEADD(DAY,-19,GETUTCDATE())),
+(@HealthWorker3, N'worker3', N'Login', N'تسجيل دخول ناجح', '10.0.1.3', 'FollowUp/1.0 Android', DATEADD(DAY,-25,GETUTCDATE())),
+(@WorksWorker1, N'worker101', N'Login', N'تسجيل دخول ناجح', '10.0.2.1', 'FollowUp/1.0 Android', DATEADD(DAY,-26,GETUTCDATE())),
+(@AgriWorker1, N'worker131', N'Login', N'تسجيل دخول ناجح', '10.0.3.1', 'FollowUp/1.0 Android', DATEADD(DAY,-24,GETUTCDATE())),
+-- Failed login attempt
+(NULL, N'unknown_user', N'LoginFailed', N'محاولة تسجيل دخول فاشلة - اسم مستخدم غير موجود', '85.112.40.55', 'Mozilla/5.0', DATEADD(DAY,-15,GETUTCDATE())),
+(NULL, N'admin', N'LoginFailed', N'محاولة تسجيل دخول فاشلة - كلمة مرور خاطئة', '85.112.40.55', 'Mozilla/5.0', DATEADD(DAY,-15,GETUTCDATE())),
+-- Task actions
+(@HealthSup1, N'super1', N'CreateTask', N'إنشاء مهمة: تنظيف شارع الميدان الرئيسي', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-28,GETUTCDATE())),
+(@HealthSup1, N'super1', N'CreateTask', N'إنشاء مهمة: جمع نفايات - البصبوص', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-27,GETUTCDATE())),
+(@HealthSup1, N'super1', N'ApproveTask', N'اعتماد مهمة: تنظيف شارع الميدان الرئيسي', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-27,GETUTCDATE())),
+(@HealthSup1, N'super1', N'RejectTask', N'رفض مهمة: تنظيف حاويات - قطعة شيبان', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-14,GETUTCDATE())),
+(@WorksSup1, N'super6', N'CreateTask', N'إنشاء مهمة: إصلاح أنبوب مياه - الغربية', '10.0.0.30', 'FollowUp/1.0 Android', DATEADD(DAY,-27,GETUTCDATE())),
+(@WorksSup1, N'super6', N'ApproveTask', N'اعتماد مهمة: إصلاح أنبوب مياه - الغربية', '10.0.0.30', 'FollowUp/1.0 Android', DATEADD(DAY,-26,GETUTCDATE())),
+-- Issue actions
+(@HealthWorker1, N'worker1', N'ReportIssue', N'بلاغ: حفرة كبيرة في شارع البصبوص', '10.0.1.1', 'FollowUp/1.0 Android', DATEADD(DAY,-28,GETUTCDATE())),
+(@WorksWorker1, N'worker101', N'ReportIssue', N'بلاغ: إنارة معطلة في الحومة', '10.0.2.1', 'FollowUp/1.0 Android', DATEADD(DAY,-22,GETUTCDATE())),
+(@HealthSup1, N'super1', N'ForwardIssue', N'تحويل بلاغ: حفرة وتسرب مياه معاً - لقسم الأشغال', '10.0.0.15', 'FollowUp/1.0 Android', DATEADD(DAY,-3,GETUTCDATE())),
+-- Attendance actions
+(@HealthWorker1, N'worker1', N'CheckIn', N'تسجيل حضور تلقائي - منطقة البصبوص', '10.0.1.1', 'FollowUp/1.0 Android', DATEADD(DAY,-2,GETUTCDATE())),
+(@HealthWorker1, N'worker1', N'CheckOut', N'تسجيل انصراف تلقائي - غادر المنطقة', '10.0.1.1', 'FollowUp/1.0 Android', DATEADD(DAY,-2,GETUTCDATE())),
+-- Password reset
+(NULL, N'worker5', N'ForgotPassword', N'طلب إعادة تعيين كلمة المرور', '10.0.1.5', 'FollowUp/1.0 Android', DATEADD(DAY,-10,GETUTCDATE())),
+(NULL, N'worker5', N'ResetPassword', N'تم إعادة تعيين كلمة المرور بنجاح', '10.0.1.5', 'FollowUp/1.0 Android', DATEADD(DAY,-10,GETUTCDATE()));
+
+PRINT 'Created 36 audit log entries (logins, tasks, issues, attendance, password resets)';
+
+-- ========================================================================
+-- 12. LOCATION HISTORIES (GPS tracking samples - past 3 days for active workers)
+-- ========================================================================
+-- Worker 1 (Health) - Day -2, morning route through zone البصبوص
+INSERT INTO [LocationHistories] (UserId, Latitude, Longitude, Speed, Accuracy, Heading, Timestamp, IsSync)
+VALUES
+(@HealthWorker1, 31.8952, 35.2093, 0.5, 8.0, 0, DATEADD(HOUR,-50,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8955, 35.2088, 1.2, 6.5, 45, DATEADD(MINUTE,-2995,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8960, 35.2082, 1.8, 7.0, 30, DATEADD(MINUTE,-2990,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8965, 35.2078, 2.0, 5.5, 20, DATEADD(MINUTE,-2985,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8968, 35.2075, 0.3, 6.0, 0, DATEADD(MINUTE,-2980,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8968, 35.2074, 0.1, 8.0, 0, DATEADD(MINUTE,-2975,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8970, 35.2070, 1.5, 5.0, 310, DATEADD(MINUTE,-2970,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8958, 35.2090, 1.8, 6.0, 150, DATEADD(MINUTE,-2965,GETUTCDATE()), 1),
+-- Worker 2 (Health) - Day -2, route through zone الميدان
+(@HealthWorker2, 31.9013, 35.2084, 0.2, 7.0, 0, DATEADD(HOUR,-49,GETUTCDATE()), 1),
+(@HealthWorker2, 31.9018, 35.2080, 1.5, 5.5, 60, DATEADD(MINUTE,-2935,GETUTCDATE()), 1),
+(@HealthWorker2, 31.9025, 35.2075, 2.1, 6.0, 45, DATEADD(MINUTE,-2930,GETUTCDATE()), 1),
+(@HealthWorker2, 31.9030, 35.2078, 1.0, 7.5, 90, DATEADD(MINUTE,-2925,GETUTCDATE()), 1),
+(@HealthWorker2, 31.9030, 35.2079, 0.1, 8.0, 0, DATEADD(MINUTE,-2920,GETUTCDATE()), 1),
+(@HealthWorker2, 31.9025, 35.2085, 1.8, 5.5, 200, DATEADD(MINUTE,-2915,GETUTCDATE()), 1),
+-- Worker 101 (Works) - Day -1, at repair site in الغربية
+(@WorksWorker1, 31.9094, 35.2118, 0.0, 4.0, 0, DATEADD(HOUR,-30,GETUTCDATE()), 1),
+(@WorksWorker1, 31.9094, 35.2119, 0.1, 5.0, 0, DATEADD(MINUTE,-1795,GETUTCDATE()), 1),
+(@WorksWorker1, 31.9095, 35.2117, 0.2, 4.5, 0, DATEADD(MINUTE,-1790,GETUTCDATE()), 1),
+(@WorksWorker1, 31.9093, 35.2120, 0.1, 6.0, 0, DATEADD(MINUTE,-1785,GETUTCDATE()), 1),
+(@WorksWorker1, 31.9096, 35.2115, 1.5, 5.0, 270, DATEADD(MINUTE,-1780,GETUTCDATE()), 1),
+(@WorksWorker1, 31.9100, 35.2110, 2.0, 5.5, 315, DATEADD(MINUTE,-1775,GETUTCDATE()), 1),
+-- Worker 131 (Agri) - Day -1, moving through المنارة
+(@AgriWorker1, 31.9024, 35.2068, 0.5, 9.0, 0, DATEADD(HOUR,-28,GETUTCDATE()), 1),
+(@AgriWorker1, 31.9028, 35.2063, 1.0, 7.0, 330, DATEADD(MINUTE,-1675,GETUTCDATE()), 1),
+(@AgriWorker1, 31.9035, 35.2058, 1.5, 6.0, 340, DATEADD(MINUTE,-1670,GETUTCDATE()), 1),
+(@AgriWorker1, 31.9040, 35.2055, 0.8, 8.0, 350, DATEADD(MINUTE,-1665,GETUTCDATE()), 1),
+-- Today - active workers
+(@HealthWorker1, 31.8950, 35.2095, 0.3, 6.0, 0, DATEADD(HOUR,-2,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8953, 35.2090, 1.0, 5.0, 40, DATEADD(MINUTE,-115,GETUTCDATE()), 1),
+(@HealthWorker1, 31.8958, 35.2085, 1.5, 5.5, 35, DATEADD(MINUTE,-110,GETUTCDATE()), 1),
+(@HealthWorker2, 31.9010, 35.2088, 0.2, 7.0, 0, DATEADD(HOUR,-1,GETUTCDATE()), 1),
+(@HealthWorker2, 31.9015, 35.2082, 1.2, 6.0, 50, DATEADD(MINUTE,-55,GETUTCDATE()), 1);
+
+PRINT 'Created 29 location history records (3 days of GPS tracking for 4 workers)';
+
+-- ========================================================================
+-- 13. PHOTOS (task completion + issue report evidence)
+-- ========================================================================
+-- Task completion photos (completed tasks have evidence photos)
+INSERT INTO [Photos] (PhotoUrl, EntityType, EntityId, TaskId, OrderIndex, FileSizeBytes, UploadedAt, UploadedByUserId, CreatedAt)
+VALUES
+-- Photos for completed task "تنظيف شارع الميدان الرئيسي" (task 1 area)
+(N'/uploads/photos/tasks/task_clean_street_1a.jpg', N'Task', 1, 1, 0, 245000, DATEADD(DAY,-27,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-27,GETUTCDATE())),
+(N'/uploads/photos/tasks/task_clean_street_1b.jpg', N'Task', 1, 1, 1, 312000, DATEADD(DAY,-27,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-27,GETUTCDATE())),
+-- Photos for "جمع نفايات - البصبوص" (task 2 area)
+(N'/uploads/photos/tasks/task_collect_waste_2a.jpg', N'Task', 2, 2, 0, 198000, DATEADD(DAY,-26,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-26,GETUTCDATE())),
+-- Photos for "تعقيم حاويات - راس الطاحونة" (task 3 area)
+(N'/uploads/photos/tasks/task_sanitize_bins_3a.jpg', N'Task', 3, 3, 0, 267000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker3, DATEADD(DAY,-25,GETUTCDATE())),
+(N'/uploads/photos/tasks/task_sanitize_bins_3b.jpg', N'Task', 3, 3, 1, 289000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker3, DATEADD(DAY,-25,GETUTCDATE())),
+-- Photos for works team task "إصلاح أنبوب مياه" (task area)
+(N'/uploads/photos/tasks/task_pipe_repair_before.jpg', N'Task', 9, 9, 0, 410000, DATEADD(DAY,-26,GETUTCDATE()), @WorksWorker1, DATEADD(DAY,-26,GETUTCDATE())),
+(N'/uploads/photos/tasks/task_pipe_repair_after.jpg', N'Task', 9, 9, 1, 385000, DATEADD(DAY,-26,GETUTCDATE()), @WorksWorker1, DATEADD(DAY,-26,GETUTCDATE())),
+-- Photos for agri task "تقليم أشجار شارع المنارة"
+(N'/uploads/photos/tasks/task_tree_trim_a.jpg', N'Task', 12, 12, 0, 520000, DATEADD(DAY,-24,GETUTCDATE()), @AgriWorker1, DATEADD(DAY,-24,GETUTCDATE())),
+-- Photos for rejected task "تنظيف حاويات - قطعة شيبان" (poor quality evidence)
+(N'/uploads/photos/tasks/task_bins_rejected_blurry.jpg', N'Task', 19, 19, 0, 156000, DATEADD(DAY,-15,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-15,GETUTCDATE()));
+
+-- Issue report photos
+INSERT INTO [Photos] (PhotoUrl, EntityType, EntityId, IssueId, OrderIndex, FileSizeBytes, UploadedAt, UploadedByUserId, CreatedAt)
+VALUES
+-- "حفرة كبيرة في شارع البصبوص"
+(N'/uploads/photos/issues/issue_pothole_1a.jpg', N'Issue', 1, 1, 0, 340000, DATEADD(DAY,-28,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-28,GETUTCDATE())),
+(N'/uploads/photos/issues/issue_pothole_1b.jpg', N'Issue', 1, 1, 1, 298000, DATEADD(DAY,-28,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-28,GETUTCDATE())),
+-- "تراكم نفايات خلف المدرسة"
+(N'/uploads/photos/issues/issue_waste_school_2a.jpg', N'Issue', 2, 2, 0, 275000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-25,GETUTCDATE())),
+-- "حاوية محترقة"
+(N'/uploads/photos/issues/issue_burnt_bin_5a.jpg', N'Issue', 5, 5, 0, 380000, DATEADD(DAY,-17,GETUTCDATE()), @HealthWorker5, DATEADD(DAY,-17,GETUTCDATE())),
+(N'/uploads/photos/issues/issue_burnt_bin_5b.jpg', N'Issue', 5, 5, 1, 425000, DATEADD(DAY,-17,GETUTCDATE()), @HealthWorker5, DATEADD(DAY,-17,GETUTCDATE())),
+-- "تسرب مياه صرف صحي" (recent)
+(N'/uploads/photos/issues/issue_sewage_leak.jpg', N'Issue', 8, 8, 0, 310000, DATEADD(DAY,-5,GETUTCDATE()), @WorksWorker2, DATEADD(DAY,-5,GETUTCDATE())),
+-- "عمود إنارة مائل" (today)
+(N'/uploads/photos/issues/issue_tilted_pole.jpg', N'Issue', 13, 13, 0, 445000, DATEADD(HOUR,-2,GETUTCDATE()), @WorksWorker1, DATEADD(HOUR,-2,GETUTCDATE()));
+
+PRINT 'Created 16 photos (9 task evidence + 7 issue reports)';
+
+-- ========================================================================
+-- 14. TASK TEMPLATES (recurring daily/weekly operations)
+-- ========================================================================
+INSERT INTO [TaskTemplates] (Title, Description, MunicipalityId, ZoneId, Frequency, Time, IsActive, LastGeneratedAt, CreatedAt)
+VALUES
+-- Daily health tasks
+(N'جمع نفايات يومي - البصبوص', N'جولة جمع نفايات صباحية يومية في منطقة البصبوص', @MunicipalityId, @Z1, N'Daily', '06:00:00', 1, DATEADD(DAY,-1,GETUTCDATE()), DATEADD(DAY,-30,GETUTCDATE())),
+(N'جمع نفايات يومي - الميدان', N'جولة جمع نفايات صباحية يومية في منطقة الميدان', @MunicipalityId, @Z11, N'Daily', '06:00:00', 1, DATEADD(DAY,-1,GETUTCDATE()), DATEADD(DAY,-30,GETUTCDATE())),
+(N'تنظيف شارع البلدية الرئيسي', N'كنس وتنظيف يومي للشارع الرئيسي', @MunicipalityId, @Z5, N'Daily', '06:30:00', 1, DATEADD(DAY,-1,GETUTCDATE()), DATEADD(DAY,-28,GETUTCDATE())),
+(N'جمع نفايات يومي - حديقة حرب', N'جولة جمع وتنظيف محيط الحديقة', @MunicipalityId, @Z3, N'Daily', '07:00:00', 1, DATEADD(DAY,-1,GETUTCDATE()), DATEADD(DAY,-25,GETUTCDATE())),
+-- Weekly health tasks
+(N'تعقيم حاويات - راس الطاحونة', N'غسل وتعقيم جميع الحاويات في المنطقة', @MunicipalityId, @Z2, N'Weekly', '07:00:00', 1, DATEADD(DAY,-5,GETUTCDATE()), DATEADD(DAY,-30,GETUTCDATE())),
+(N'تعقيم حاويات - البص', N'غسل وتعقيم الحاويات', @MunicipalityId, @Z6, N'Weekly', '07:00:00', 1, DATEADD(DAY,-4,GETUTCDATE()), DATEADD(DAY,-28,GETUTCDATE())),
+-- Weekly agriculture task
+(N'ري المسطحات الخضراء - حديقة حرب', N'ري الأشجار والمسطحات الخضراء في الحديقة', @MunicipalityId, @Z3, N'Weekly', '06:00:00', 1, DATEADD(DAY,-3,GETUTCDATE()), DATEADD(DAY,-27,GETUTCDATE())),
+-- Monthly tasks
+(N'فحص شبكة الإنارة - المنطقة الوسطى', N'فحص شامل لجميع أعمدة الإنارة وتوثيق الأعطال', @MunicipalityId, @Z13, N'Monthly', '08:00:00', 1, DATEADD(DAY,-15,GETUTCDATE()), DATEADD(DAY,-30,GETUTCDATE())),
+-- Inactive template (discontinued)
+(N'تنظيف ساحة المنارة', N'ألغيت بسبب أعمال بناء في المنطقة', @MunicipalityId, @Z17, N'Daily', '06:00:00', 0, DATEADD(DAY,-12,GETUTCDATE()), DATEADD(DAY,-30,GETUTCDATE()));
+
+PRINT 'Created 9 task templates (4 daily, 3 weekly, 1 monthly, 1 inactive)';
 
 -- ========================================================================
 -- SUMMARY
@@ -503,16 +871,28 @@ PRINT 'Municipality: Al-Bireh';
 PRINT 'Zones: 20 (real neighborhoods)';
 PRINT 'Departments: 3';
 PRINT '';
-PRINT 'USERS:';
-PRINT '  Admin: 1';
-PRINT '  Supervisors: 8 (5 Health + 2 Works + 1 Agri)';
-PRINT '  Workers: 148 total';
+PRINT 'USERS (154 active, 3 inactive):';
+PRINT '  Admin: 1 (admin)';
+PRINT '  Supervisors: 8 (super1-super8)';
+PRINT '  Workers: 148 (worker1-worker148)';
 PRINT '    - Health: 100 (individual, by zone)';
 PRINT '    - Works: 30 (6 teams of 5)';
 PRINT '    - Agriculture: 18 (5 teams of 3-4)';
+PRINT '  Inactive: super4 (transferred), worker120 (resigned), worker145 (suspended)';
 PRINT '';
 PRINT 'Teams: 11 (6 Works + 5 Agriculture)';
 PRINT 'Zone Assignments: 100 (Health workers mapped to zones)';
+PRINT '';
+PRINT 'HISTORICAL DATA (past 30 days):';
+PRINT '  Tasks: 30 (13 completed, 2 under-review, 3 rejected, 4 in-progress, 5 pending)';
+PRINT '  Issues: 13 (7 resolved, 4 forwarded, 2 new)';
+PRINT '  Attendance: ~84 records (20 days x 4 workers + 4 active today)';
+PRINT '  Notifications: 12 (7 read + 5 unread)';
+PRINT '  Appeals: 3 (1 approved, 1 rejected, 1 pending)';
+PRINT '  Audit Logs: 36 (logins, task actions, issue reports, password resets)';
+PRINT '  Location History: 29 GPS tracking points (3 days, 4 workers)';
+PRINT '  Photos: 16 (9 task evidence + 7 issue reports)';
+PRINT '  Task Templates: 9 (4 daily, 3 weekly, 1 monthly, 1 inactive)';
 PRINT '';
 PRINT 'LOGIN CREDENTIALS (all passwords: pass):';
 PRINT '  Admin: admin / pass';

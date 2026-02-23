@@ -2,7 +2,7 @@
 // Maps backend enum values to frontend display values
 
 export type Severity = "low" | "medium" | "high" | "critical";
-export type DisplayIssueStatus = "new" | "reviewing" | "converted" | "forwarded" | "rejected" | "closed";
+export type DisplayIssueStatus = "new" | "forwarded" | "closed";
 
 export const mapSeverity = (severity: string | undefined | null): Severity => {
   switch ((severity || "").toLowerCase()) {
@@ -17,10 +17,13 @@ export const mapSeverity = (severity: string | undefined | null): Severity => {
 export const mapStatus = (status: string | null | undefined): DisplayIssueStatus => {
   if (!status) return "new";
   switch (status) {
-    case "Reported": return "new";
-    case "UnderReview": return "reviewing";
+    case "New": return "new";
+    case "Forwarded": return "forwarded";
     case "Resolved": return "closed";
-    case "Dismissed": return "rejected";
+    // legacy support
+    case "Reported": return "new";
+    case "UnderReview": return "forwarded";
+    case "Dismissed": return "closed";
     default: return "new";
   }
 };

@@ -4,7 +4,7 @@ import { getTasks } from "../api/tasks";
 import type { TaskResponse } from "../types/task";
 import { Plus, RefreshCw, ChevronLeft } from "lucide-react";
 
-type TaskStatus = "Open" | "InProgress" | "Submitted" | "Approved" | "Rejected";
+type TaskStatus = "Pending" | "InProgress" | "UnderReview" | "Completed" | "Rejected";
 type TaskPriority = "Low" | "Medium" | "High";
 
 type TaskRow = {
@@ -21,16 +21,16 @@ type TaskRow = {
   teamName?: string;
 };
 
-type FilterKey = "all" | "open" | "inprogress" | "submitted" | "approved" | "rejected";
+type FilterKey = "all" | "pending" | "inprogress" | "underreview" | "completed" | "rejected";
 
 const mapStatus = (backendStatus: string): TaskStatus => {
   switch (backendStatus) {
-    case "Pending": return "Open";
+    case "Pending": return "Pending";
     case "InProgress": return "InProgress";
-    case "Completed": return "Submitted";
-    case "Approved": return "Approved";
+    case "UnderReview": return "UnderReview";
+    case "Completed": return "Completed";
     case "Rejected": return "Rejected";
-    default: return "Open";
+    default: return "Pending";
   }
 };
 
@@ -46,7 +46,7 @@ const mapTaskToRow = (task: TaskResponse): TaskRow => {
   const minutes = date.getMinutes().toString().padStart(2, "0");
 
   let progress = task.progressPercentage || 0;
-  if (task.status === "Completed" || task.status === "Approved") {
+  if (task.status === "UnderReview" || task.status === "Completed") {
     progress = 100;
   } else if (task.status === "InProgress" && progress === 0) {
     progress = 50;
@@ -97,17 +97,17 @@ export default function TasksList() {
 
   const stats = {
     total: items.length,
-    submitted: items.filter((x) => x.status === "Submitted").length,
+    underReview: items.filter((x) => x.status === "UnderReview").length,
     inProgress: items.filter((x) => x.status === "InProgress").length,
-    open: items.filter((x) => x.status === "Open").length,
+    pending: items.filter((x) => x.status === "Pending").length,
   };
 
   const query = q.trim().toLowerCase();
   const filtered = items.filter((x) => {
     if (filter !== "all") {
       const statusMap: Record<FilterKey, TaskStatus | null> = {
-        all: null, open: "Open", inprogress: "InProgress",
-        submitted: "Submitted", approved: "Approved", rejected: "Rejected"
+        all: null, pending: "Pending", inprogress: "InProgress",
+        underreview: "UnderReview", completed: "Completed", rejected: "Rejected"
       };
       if (statusMap[filter] && x.status !== statusMap[filter]) return false;
     }
@@ -163,9 +163,9 @@ export default function TasksList() {
           {/* Mini Stats Grid */}
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
             <MiniStat title="إجمالي المهام" value={String(stats.total)} />
-            <MiniStat title="بانتظار اعتماد" value={String(stats.submitted)} />
+            <MiniStat title="بانتظار اعتماد" value={String(stats.underReview)} />
             <MiniStat title="قيد التنفيذ" value={String(stats.inProgress)} />
-            <MiniStat title="مفتوحة" value={String(stats.open)} />
+            <MiniStat title="مفتوحة" value={String(stats.pending)} />
           </div>
 
           {/* Filter Bar */}
@@ -182,9 +182,9 @@ export default function TasksList() {
 
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label="الكل" count={stats.total} />
-                <FilterChip active={filter === "open"} onClick={() => setFilter("open")} label="مفتوحة" count={stats.open} />
+                <FilterChip active={filter === "pending"} onClick={() => setFilter("pending")} label="مفتوحة" count={stats.pending} />
                 <FilterChip active={filter === "inprogress"} onClick={() => setFilter("inprogress")} label="قيد التنفيذ" count={stats.inProgress} />
-                <FilterChip active={filter === "submitted"} onClick={() => setFilter("submitted")} label="بانتظار اعتماد" count={stats.submitted} />
+                <FilterChip active={filter === "underreview"} onClick={() => setFilter("underreview")} label="بانتظار اعتماد" count={stats.underReview} />
               </div>
             </div>
           </div>
@@ -276,10 +276,10 @@ function MetaSmallPill({ label, value, color }: { label: string; value: string; 
 
 function formatStatusLabel(s: TaskStatus) {
   const map: Record<TaskStatus, string> = {
-    Open: "مفتوحة",
+    Pending: "مفتوحة",
     InProgress: "قيد التنفيذ",
-    Submitted: "بانتظار اعتماد",
-    Approved: "معتمدة",
+    UnderReview: "بانتظار اعتماد",
+    Completed: "مكتملة",
     Rejected: "مرفوضة",
   };
   return map[s];
@@ -287,10 +287,10 @@ function formatStatusLabel(s: TaskStatus) {
 
 function getStatusColor(s: TaskStatus) {
   const map: Record<TaskStatus, string> = {
-    Open: "#6B7280",
+    Pending: "#6B7280",
     InProgress: "#7895B2",
-    Submitted: "#C86E5D",
-    Approved: "#8FA36A",
+    UnderReview: "#C86E5D",
+    Completed: "#8FA36A",
     Rejected: "#C86E5D",
   };
   return map[s];

@@ -6,7 +6,7 @@ class IssueModel {
   final String description;
   final String type; // Type of issue (e.g., "Equipment", "Road")
   final String severity; // How serious is it? (e.g., "High", "Low")
-  final String status; // Current status (e.g., "Reported", "Resolved")
+  final String status; // Current status (e.g., "New", "Forwarded", "Resolved")
   final int reportedByUserId; // Who reported it
   final String? reportedByName; // Worker's name (optional)
   final String? location; // Text description of location (optional)
@@ -57,7 +57,7 @@ class IssueModel {
       description: local.description,
       type: local.type,
       severity: local.severity,
-      status: local.status ?? 'Reported',
+      status: local.status ?? 'New',
       reportedByUserId: local.reportedByUserId,
       latitude: local.latitude,
       longitude: local.longitude,
@@ -83,7 +83,7 @@ class IssueModel {
           json['Severity'] as String? ??
           'Medium',
       status:
-          json['status'] as String? ?? json['Status'] as String? ?? 'Reported',
+          json['status'] as String? ?? json['Status'] as String? ?? 'New',
       reportedByUserId:
           json['reportedByUserId'] as int? ?? json['ReportedByUserId'] as int? ?? 0,
       reportedByName: json['reportedByName'] as String? ??
@@ -223,14 +223,15 @@ class IssueModel {
 
   bool get isResolved => status.toLowerCase() == 'resolved';
 
-  bool get isDismissed => status.toLowerCase() == 'dismissed';
-  
+  bool get isNew => status.toLowerCase() == 'new';
+
+  bool get isForwarded => status.toLowerCase() == 'forwarded';
+
   // legacy support
+  bool get isDismissed => status.toLowerCase() == 'dismissed';
   bool get isRejected => status.toLowerCase() == 'rejected' || status.toLowerCase() == 'dismissed';
-
   bool get isInProgress => status.toLowerCase() == 'inprogress';
-
-  bool get isUnderReview => status.toLowerCase() == 'underreview';
+  bool get isUnderReview => status.toLowerCase() == 'underreview' || status.toLowerCase() == 'forwarded';
 
   String get typeArabic {
     // Chapter 4: Updated to match report terminology
@@ -285,19 +286,23 @@ class IssueModel {
   String get statusArabic {
     // map to correct enum that match backend IssueStatus enum
     switch (status.toLowerCase()) {
-      case 'reported':
-        return 'تم التبليغ';
-      case 'underreview':
-        return 'قيد المراجعة';
+      case 'new':
+        return 'جديدة';
+      case 'forwarded':
+        return 'محولة';
       case 'resolved':
         return 'تم الحل';
-      case 'dismissed':
-        return 'مرفوضة';
       // legacy support for old values
+      case 'reported':
+        return 'جديدة';
+      case 'underreview':
+        return 'محولة';
+      case 'dismissed':
+        return 'تم الحل';
       case 'inprogress':
-        return 'قيد المعالجة'; // Map to UnderReview if needed
+        return 'محولة';
       case 'rejected':
-        return 'مرفوضة'; // Map to Dismissed
+        return 'تم الحل';
       default:
         return status;
     }

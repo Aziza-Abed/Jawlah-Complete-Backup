@@ -489,7 +489,7 @@ public class TasksController : BaseApiController
         // workers have limited status changes
         if (userRole == "Worker" &&
             request.Status != TaskStatus.InProgress &&
-            request.Status != TaskStatus.Completed &&
+            request.Status != TaskStatus.UnderReview &&
             request.Status != TaskStatus.Pending)
         {
             return Forbid();
@@ -506,8 +506,8 @@ public class TasksController : BaseApiController
             task.StartedAt = DateTime.UtcNow;
         }
 
-        // set completion data if task is done
-        if (request.Status == TaskStatus.Completed)
+        // set completion data if worker is submitting for review
+        if (request.Status == TaskStatus.UnderReview)
         {
             task.CompletedAt = DateTime.UtcNow;
             task.CompletionNotes = InputSanitizer.SanitizeString(request.CompletionNotes, 1000);
@@ -548,8 +548,8 @@ public class TasksController : BaseApiController
             return Forbid();
 
         // STATUS LOCK: Prevent double-submission for team tasks
-        // If task is already Completed or Approved, another team member already submitted
-        if (task.Status == TaskStatus.Completed || task.Status == TaskStatus.Approved)
+        // If task is already UnderReview or Completed, another team member already submitted
+        if (task.Status == TaskStatus.UnderReview || task.Status == TaskStatus.Completed)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse(
                 "تم إرسال هذه المهمة بالفعل من قبل عضو آخر في الفريق. المهمة قيد المراجعة."));
@@ -809,8 +809,8 @@ public class TasksController : BaseApiController
                     : $"{warningNote}\n{sanitizedNotes}";
             }
 
-            // update task with completion data
-            task.Status = TaskStatus.Completed;
+            // update task with completion data - moves to UnderReview for supervisor approval
+            task.Status = TaskStatus.UnderReview;
             task.CompletedAt = DateTime.UtcNow;
             task.CompletionNotes = sanitizedNotes;
             task.Latitude = request.Latitude;
@@ -1056,14 +1056,14 @@ public class TasksController : BaseApiController
             }
         }
 
-        // can only approve completed tasks
-        if (task.Status != TaskStatus.Completed)
+        // can only approve tasks that are under review (submitted by worker)
+        if (task.Status != TaskStatus.UnderReview)
         {
-            return BadRequest(ApiResponse<object>.ErrorResponse("يمكن الموافقة على المهام المكتملة فقط"));
+            return BadRequest(ApiResponse<object>.ErrorResponse("يمكن الموافقة على المهام قيد المراجعة فقط"));
         }
 
-        // update status and add supervisor notes
-        task.Status = TaskStatus.Approved;
+        // update status and add supervisor notes - approved by supervisor means task is completed
+        task.Status = TaskStatus.Completed;
         if (!string.IsNullOrWhiteSpace(request?.Comments))
         {
             var sanitizedComments = InputSanitizer.SanitizeString(request.Comments, 500);
@@ -1132,10 +1132,10 @@ public class TasksController : BaseApiController
             }
         }
 
-        // can only reject completed tasks
-        if (task.Status != TaskStatus.Completed)
+        // can only reject tasks that are under review (submitted by worker)
+        if (task.Status != TaskStatus.UnderReview)
         {
-            return BadRequest(ApiResponse<object>.ErrorResponse("يمكن رفض المهام المكتملة فقط"));
+            return BadRequest(ApiResponse<object>.ErrorResponse("يمكن رفض المهام قيد المراجعة فقط"));
         }
 
         // update status with rejection reason
@@ -1314,10 +1314,10 @@ public class TasksController : BaseApiController
             }
         }
 
-        // auto-set status based on progress
+        // auto-set status based on progress - 100% moves to UnderReview for supervisor approval
         if (request.ProgressPercentage == 100)
         {
-            task.Status = TaskStatus.Completed;
+            task.Status = TaskStatus.UnderReview;
             task.CompletedAt = DateTime.UtcNow;
         }
         else if (request.ProgressPercentage > 0 && task.Status == TaskStatus.Pending)
@@ -1374,9 +1374,9 @@ public class TasksController : BaseApiController
                 return Forbid();
         }
 
-        // don't allow reassignment if task is already completed or approved
-        if (task.Status == TaskStatus.Completed || task.Status == TaskStatus.Approved)
-            return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكن إعادة تعيين مهمة مكتملة"));
+        // don't allow reassignment if task is under review or already completed
+        if (task.Status == TaskStatus.UnderReview || task.Status == TaskStatus.Completed)
+            return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكن إعادة تعيين مهمة قيد المراجعة أو مكتملة"));
 
         var oldAssignedUserId = task.AssignedToUserId;
         var oldWorkerName = (await _users.GetByIdAsync(oldAssignedUserId))?.FullName ?? "غير معروف";

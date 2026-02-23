@@ -6,7 +6,6 @@ import '../core/utils/hive_init.dart';
 import '../core/utils/background_service_utils.dart';
 import '../data/models/user_model.dart';
 import '../data/services/auth_service.dart';
-import '../data/services/attendance_service.dart';
 import '../data/services/storage_service.dart';
 import '../data/services/api_service.dart';
 import '../data/services/firebase_messaging_service.dart';
@@ -21,17 +20,6 @@ class AuthManager extends BaseController {
 
   UserModel? currentUser;
   String? jwtToken;
-  bool _isCheckedIn = false;
-  int? _activeAttendanceId;
-
-  // Last login check-in result details
-  String _lastCheckInStatus = 'NotAttempted';
-  String? _lastCheckInFailureReason;
-  bool _lastLoginRequiresApproval = false;
-  bool _lastLoginIsLate = false;
-  int _lastLoginLateMinutes = 0;
-  String _lastLoginAttendanceType = 'OnTime';
-  String? _lastLoginMessage;
 
   // OTP (Two-Factor Authentication) state
   bool _requiresOtp = false;
@@ -42,31 +30,11 @@ class AuthManager extends BaseController {
   String? get token => jwtToken;
   bool get isAuthenticated => jwtToken != null && currentUser != null;
   String get userName => currentUser?.fullName ?? 'موظف';
-  bool get isCheckedIn => _isCheckedIn;
-  int? get activeAttendanceId => _activeAttendanceId;
-
-  // Expose last login check-in details
-  String get lastCheckInStatus => _lastCheckInStatus;
-  String? get lastCheckInFailureReason => _lastCheckInFailureReason;
-  bool get lastLoginRequiresApproval => _lastLoginRequiresApproval;
-  bool get lastLoginIsLate => _lastLoginIsLate;
-  int get lastLoginLateMinutes => _lastLoginLateMinutes;
-  String get lastLoginAttendanceType => _lastLoginAttendanceType;
-  String? get lastLoginMessage => _lastLoginMessage;
-  bool get checkInFailed => _lastCheckInStatus == 'Failed';
-  bool get needsManualCheckIn => !_isCheckedIn && _lastCheckInStatus != 'Success';
 
   // OTP (Two-Factor Authentication) getters
   bool get requiresOtp => _requiresOtp;
   String? get otpSessionToken => _otpSessionToken;
   String? get otpMaskedPhone => _otpMaskedPhone;
-
-  // method to update check-in status (called by AttendanceManager)
-  void updateCheckInStatus(bool isCheckedIn, {int? attendanceId}) {
-    _isCheckedIn = isCheckedIn;
-    _activeAttendanceId = attendanceId;
-    notifyListeners();
-  }
 
   AuthManager(this._authService, this._storageService) {
     _loadSavedSession();
@@ -88,7 +56,7 @@ class AuthManager extends BaseController {
           final user = await _authService.getProfile();
           currentUser = user;
         } catch (e) {
-          // token maybe old so clear evrything
+          // token maybe old so clear everything
           jwtToken = null;
           currentUser = null;
           ApiService().updateToken(null);
@@ -101,21 +69,10 @@ class AuthManager extends BaseController {
         if (jwtToken != null) {
           await _registerFcmToken();
 
-          // check if user has active attendance to decide on background tracking
-          // background tracking should only start after check-in, not just login
-          try {
-            final attendanceService = AttendanceService();
-            final todayAttendance = await attendanceService.getTodayAttendance();
-            if (todayAttendance != null && todayAttendance.isActive) {
-              _isCheckedIn = true;
-              _activeAttendanceId = todayAttendance.attendanceId;
-              BackgroundServiceUtils.startService();
-              BatteryService().startMonitoring();
-            }
-          } catch (e) {
-            // ignore - will be handled when home screen loads attendance
-            if (kDebugMode) debugPrint('Could not check attendance status: $e');
-          }
+          // UC4: Start background service for GPS tracking and auto-geofencing
+          // Background service handles automatic check-in/out via geofencing
+          BackgroundServiceUtils.startService();
+          BatteryService().startMonitoring();
         }
       }
     } catch (e) {
@@ -124,30 +81,24 @@ class AuthManager extends BaseController {
   }
 
   // Offline password hashing using SHA256 with salt
-  // Salt prevents rainbow table attacks on stored passwords
   static const int _saltLength = 16;
 
-  // Generate a random salt for password hashing
   String _generateSalt() {
     final random = Random.secure();
     final salt = List<int>.generate(_saltLength, (_) => random.nextInt(256));
     return base64Encode(salt);
   }
 
-  // Hash password with salt using SHA256
   String _hashPasswordWithSalt(String password) {
     final salt = _generateSalt();
     final hash = sha256.convert(utf8.encode(salt + password)).toString();
-    // Store salt:hash format
     return '$salt:$hash';
   }
 
-  // Verify password against stored salted hash
   bool _verifyPasswordHash(String password, String storedHash) {
     try {
       final parts = storedHash.split(':');
       if (parts.length != 2) {
-        // Old format without salt - direct comparison
         return sha256.convert(utf8.encode(password)).toString() == storedHash;
       }
       final salt = parts[0];
@@ -160,43 +111,21 @@ class AuthManager extends BaseController {
     }
   }
 
-  // Login with Username + Password + GPS + DeviceID for auto check-in
-  // If location is provided and valid, worker is automatically checked in
-  // GPS failure fallback: If allowManualCheckIn=true and manualReason provided,
-  // creates pending attendance that requires supervisor approval
+  // UC2: Login is pure authentication. No attendance check-in.
+  // UC4: Attendance is handled automatically via geofencing in background service.
   Future<bool> doLogin(
     String username, {
     required String password,
-    double? latitude,
-    double? longitude,
-    double? accuracy,
-    bool allowManualCheckIn = false,
-    String? manualCheckInReason,
   }) async {
-    // Reset check-in status before login attempt
-    _lastCheckInStatus = 'NotAttempted';
-    _lastCheckInFailureReason = null;
-    _lastLoginRequiresApproval = false;
-    _lastLoginIsLate = false;
-    _lastLoginLateMinutes = 0;
-    _lastLoginAttendanceType = 'OnTime';
-    _lastLoginMessage = null;
-
     // Reset OTP state
     _requiresOtp = false;
     _otpSessionToken = null;
     _otpMaskedPhone = null;
 
     final result = await executeWithErrorHandling(() async {
-      // try to login with Username + Password + GPS + DeviceID
       final loginResult = await _authService.loginWithGPS(
         username: username,
         password: password,
-        latitude: latitude,
-        longitude: longitude,
-        accuracy: accuracy,
-        allowManualCheckIn: allowManualCheckIn,
-        manualCheckInReason: manualCheckInReason,
       );
 
       // Check if OTP is required (Two-Factor Authentication)
@@ -210,20 +139,8 @@ class AuthManager extends BaseController {
 
       currentUser = loginResult.user;
       jwtToken = loginResult.token;
-      _isCheckedIn = loginResult.isCheckedIn;
-      _activeAttendanceId = loginResult.activeAttendanceId;
-
-      // Store check-in result details
-      _lastCheckInStatus = loginResult.checkInStatus;
-      _lastCheckInFailureReason = loginResult.checkInFailureReason;
-      _lastLoginRequiresApproval = loginResult.requiresApproval;
-      _lastLoginIsLate = loginResult.isLate;
-      _lastLoginLateMinutes = loginResult.lateMinutes;
-      _lastLoginAttendanceType = loginResult.attendanceType;
-      _lastLoginMessage = loginResult.message;
 
       // Clear old local data on fresh login (server is source of truth)
-      // This prevents stale "pending sync" indicators
       try {
         await HiveInit.clearAllData();
         if (kDebugMode) debugPrint('Cleared old local data on fresh login');
@@ -243,12 +160,9 @@ class AuthManager extends BaseController {
 
       notifyListeners();
 
-      // start gps tracking only if already checked in
-      // otherwise wait for user to check in
-      if (_isCheckedIn) {
-        BackgroundServiceUtils.startService();
-        BatteryService().startMonitoring();
-      }
+      // UC4: Start background service for GPS tracking and auto-geofencing
+      BackgroundServiceUtils.startService();
+      BatteryService().startMonitoring();
 
       try {
         await _registerFcmToken();
@@ -269,7 +183,7 @@ class AuthManager extends BaseController {
 
   Future<bool> _attemptOfflineLogin(String password) async {
     try {
-      final savedHashedPassword = await _storageService.getHashedPin(); // Method name stays same for backward compat
+      final savedHashedPassword = await _storageService.getHashedPin();
       final savedUserProfile = await _storageService.getUserProfile();
 
       if (savedHashedPassword == null || savedUserProfile == null) {
@@ -336,25 +250,12 @@ class AuthManager extends BaseController {
     // stop battery monitoring
     BatteryService().stopMonitoring();
 
-    // auto-checkout if still checked in
-    if (_isCheckedIn) {
-      try {
-        final attendanceService = AttendanceService();
-        await attendanceService.checkOut();
-        if (kDebugMode) debugPrint('Auto-checkout on logout successful');
-      } catch (e) {
-        // ignore checkout errors during logout
-        if (kDebugMode) debugPrint('Auto-checkout on logout failed (ignored): $e');
-      }
-    }
-
     // unregister FCM token before logout
     try {
       final fcmService = FirebaseMessagingService();
       await fcmService.unregisterFcmToken();
       if (kDebugMode) debugPrint('FCM token unregistered on logout');
     } catch (e) {
-      // ignore FCM errors during logout
       if (kDebugMode) debugPrint('FCM unregister failed (ignored): $e');
     }
 
@@ -376,8 +277,6 @@ class AuthManager extends BaseController {
 
     currentUser = null;
     jwtToken = null;
-    _isCheckedIn = false;
-    _activeAttendanceId = null;
     _requiresOtp = false;
     _otpSessionToken = null;
     _otpMaskedPhone = null;
@@ -392,9 +291,6 @@ class AuthManager extends BaseController {
   Future<bool> verifyOtp({
     required String sessionToken,
     required String otpCode,
-    double? latitude,
-    double? longitude,
-    double? accuracy,
   }) async {
     final result = await executeWithErrorHandling(() async {
       final verifyResult = await _authService.verifyOtp(
@@ -405,17 +301,6 @@ class AuthManager extends BaseController {
       // OTP verified successfully - complete login
       currentUser = verifyResult.user;
       jwtToken = verifyResult.token;
-      _isCheckedIn = verifyResult.isCheckedIn;
-      _activeAttendanceId = verifyResult.activeAttendanceId;
-
-      // Store check-in result details
-      _lastCheckInStatus = verifyResult.checkInStatus;
-      _lastCheckInFailureReason = verifyResult.checkInFailureReason;
-      _lastLoginRequiresApproval = verifyResult.requiresApproval;
-      _lastLoginIsLate = verifyResult.isLate;
-      _lastLoginLateMinutes = verifyResult.lateMinutes;
-      _lastLoginAttendanceType = verifyResult.attendanceType;
-      _lastLoginMessage = verifyResult.message;
 
       // Reset OTP state
       _requiresOtp = false;
@@ -432,11 +317,9 @@ class AuthManager extends BaseController {
 
       notifyListeners();
 
-      // start gps tracking only if already checked in
-      if (_isCheckedIn) {
-        BackgroundServiceUtils.startService();
-        BatteryService().startMonitoring();
-      }
+      // UC4: Start background service for GPS tracking and auto-geofencing
+      BackgroundServiceUtils.startService();
+      BatteryService().startMonitoring();
 
       try {
         await _registerFcmToken();

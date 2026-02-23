@@ -90,7 +90,7 @@ public class IssuesController : BaseApiController
             Longitude = request.Longitude,
             LocationDescription = sanitizedLocation,
             PhotoUrl = request.PhotoUrl,
-            Status = IssueStatus.Reported,
+            Status = IssueStatus.New,
             ReportedAt = DateTime.UtcNow,
             EventTime = DateTime.UtcNow,
             SyncTime = DateTime.UtcNow,
@@ -226,7 +226,7 @@ public class IssuesController : BaseApiController
                 Longitude = request.Longitude.Value,
                 LocationDescription = sanitizedLocation,
                 PhotoUrl = photoUrl,
-                Status = IssueStatus.Reported,
+                Status = IssueStatus.New,
                 ReportedAt = DateTime.UtcNow,
                 EventTime = DateTime.UtcNow,
                 SyncTime = DateTime.UtcNow,
@@ -473,7 +473,7 @@ public class IssuesController : BaseApiController
         issue.ForwardedAt = DateTime.UtcNow;
         issue.ForwardingNotes = InputSanitizer.SanitizeString(request.Notes, 1000);
         issue.ForwardedByUserId = userId.Value;
-        issue.Status = IssueStatus.UnderReview;
+        issue.Status = IssueStatus.Forwarded;
         issue.SyncVersion++;
         issue.SyncTime = DateTime.UtcNow;
 
@@ -514,7 +514,7 @@ public class IssuesController : BaseApiController
             issues = issues.Where(i => myWorkerIds.Contains(i.ReportedByUserId));
         }
 
-        var unresolvedCount = issues.Count(i => i.Status != IssueStatus.Resolved && i.Status != IssueStatus.Dismissed);
+        var unresolvedCount = issues.Count(i => i.Status != IssueStatus.Resolved);
 
         return Ok(ApiResponse<int>.SuccessResponse(unresolvedCount));
     }
@@ -610,10 +610,9 @@ public class IssuesController : BaseApiController
 
         var statusMap = new Dictionary<IssueStatus, string>
         {
-            { IssueStatus.Reported, "تم الإبلاغ" },
-            { IssueStatus.UnderReview, "قيد المراجعة" },
-            { IssueStatus.Resolved, "تم الحل" },
-            { IssueStatus.Dismissed, "تم الرفض" }
+            { IssueStatus.New, "جديدة" },
+            { IssueStatus.Forwarded, "محولة" },
+            { IssueStatus.Resolved, "تم الحل" }
         };
 
         var typeMap = new Dictionary<IssueType, string>

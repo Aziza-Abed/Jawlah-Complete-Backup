@@ -165,7 +165,7 @@ class SyncService {
 
       for (var task in unsynced) {
         // use case insensitive comparison for status
-        if (task.status.toLowerCase() == 'completed' &&
+        if (task.status.toLowerCase() == 'underreview' &&
             task.photoUrl != null &&
             task.photoUrl!.isNotEmpty &&
             !task.photoUrl!.startsWith('http')) {
@@ -344,6 +344,7 @@ class SyncService {
             estimatedDurationMinutes: taskJson['estimatedDurationMinutes'],
             progressPercentage: taskJson['progressPercentage'] ?? 0,
             progressNotes: taskJson['progressNotes'],
+            photos: (taskJson['photos'] as List?)?.map((e) => e.toString()).toList() ?? [],
           );
           // mergeFromServer handles conflict: if local has unsynced worker
           // changes, it keeps them and only takes supervisor fields from server
@@ -364,7 +365,10 @@ class SyncService {
             latitude: (issueJson['latitude'] as num?)?.toDouble() ?? 0.0,
             longitude: (issueJson['longitude'] as num?)?.toDouble() ?? 0.0,
             locationDescription: issueJson['locationDescription'],
-            photoUrl: issueJson['photoUrl'],
+            // Use photos array from server (joined with semicolons for IssueLocal compatibility)
+            photoUrl: (issueJson['photos'] as List?)?.isNotEmpty == true
+                ? (issueJson['photos'] as List).map((e) => e.toString()).join(';')
+                : issueJson['photoUrl'],
             reportedAt: DateFormatter.tryParseUtc(issueJson['reportedAt']) ??
                 DateTime.now(),
             isSynced: true,

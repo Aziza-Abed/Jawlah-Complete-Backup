@@ -28,8 +28,8 @@ type Priority = "Low" | "Medium" | "High";
 type TaskStatus =
   | "open"
   | "in_progress"
-  | "pending_approval"
-  | "approved"
+  | "under_review"
+  | "completed"
   | "rejected";
 
 type TaskUpdate = {
@@ -101,11 +101,11 @@ export default function TaskDetails() {
 
   const progress = useMemo(() => {
     if (latestUpdate) return clamp(latestUpdate.progressPercent, 0, 100);
-    if (task?.status === "approved") return 100;
+    if (task?.status === "completed") return 100;
     return 0;
   }, [latestUpdate, task?.status]);
 
-  const canDecide = task?.status === "pending_approval";
+  const canDecide = task?.status === "under_review";
 
   const onApprove = async () => {
     if (!task) return;
@@ -463,7 +463,7 @@ export default function TaskDetails() {
               <div className="mt-3 text-right text-[12px] text-[#6B7280]">
                 {task.status === "in_progress"
                   ? "المهمة قيد التنفيذ."
-                  : task.status === "approved"
+                  : task.status === "completed"
                   ? "تم اعتماد المهمة."
                   : task.status === "rejected"
                   ? "تم رفض المهمة."
@@ -566,8 +566,8 @@ function StatusBadge({ status }: { status: TaskStatus }) {
   const map: Record<TaskStatus, { label: string; bg: string; text: string }> = {
     open: { label: "مفتوحة", bg: "#E5E7EB", text: "#2F2F2F" },
     in_progress: { label: "قيد التنفيذ", bg: "#F3F1ED", text: "#2F2F2F" },
-    pending_approval: { label: "بانتظار الاعتماد", bg: "#7895B2", text: "#FFFFFF" },
-    approved: { label: "معتمدة", bg: "#8FA36A", text: "#FFFFFF" },
+    under_review: { label: "بانتظار الاعتماد", bg: "#7895B2", text: "#FFFFFF" },
+    completed: { label: "معتمدة", bg: "#8FA36A", text: "#FFFFFF" },
     rejected: { label: "مرفوضة", bg: "#C86E5D", text: "#FFFFFF" },
   };
   const s = map[status];
@@ -669,8 +669,8 @@ const mapBackendStatus = (status: string): TaskStatus => {
   switch (status) {
     case "Pending": return "open";
     case "InProgress": return "in_progress";
-    case "Completed": return "pending_approval";
-    case "Approved": return "approved";
+    case "UnderReview": return "under_review";
+    case "Completed": return "completed";
     case "Rejected": return "rejected";
     default: return "open";
   }
@@ -690,8 +690,8 @@ const mapBackendTaskToDTO = (task: TaskResponse): TaskDTO => {
     updates.push({
       id: "completion-" + task.taskId,
       createdAt: task.completedAt || task.startedAt || task.createdAt,
-      statusSnapshot: task.status === "Completed" || task.status === "Approved" ? "completed" : "in_progress",
-      progressPercent: task.progressPercentage || (task.status === "Approved" ? 100 : task.status === "Completed" ? 100 : 50),
+      statusSnapshot: task.status === "UnderReview" || task.status === "Completed" ? "completed" : "in_progress",
+      progressPercent: task.progressPercentage || (task.status === "Completed" ? 100 : task.status === "UnderReview" ? 100 : 50),
       note: task.completionNotes || task.progressNotes,
       images: task.photos,
       locationText: task.locationDescription,

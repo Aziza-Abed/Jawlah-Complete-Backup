@@ -11,21 +11,11 @@ import '../../providers/auth_manager.dart';
 class OtpVerificationScreen extends StatefulWidget {
   final String sessionToken;
   final String maskedPhone;
-  final String username;
-  final String password;
-  final double? latitude;
-  final double? longitude;
-  final double? accuracy;
 
   const OtpVerificationScreen({
     super.key,
     required this.sessionToken,
     required this.maskedPhone,
-    required this.username,
-    required this.password,
-    this.latitude,
-    this.longitude,
-    this.accuracy,
   });
 
   @override
@@ -120,9 +110,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       final success = await authManager.verifyOtp(
         sessionToken: widget.sessionToken,
         otpCode: _otpCode,
-        latitude: widget.latitude,
-        longitude: widget.longitude,
-        accuracy: widget.accuracy,
       );
 
       if (!mounted) return;

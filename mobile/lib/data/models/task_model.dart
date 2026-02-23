@@ -202,7 +202,7 @@ class TaskModel {
       completedAt: local.completedAt,
       completionNotes: local.completionNotes,
       photoUrl: local.photoUrl,
-      photos: local.photoUrl != null ? [local.photoUrl!] : [],
+      photos: local.photos.isNotEmpty ? local.photos : (local.photoUrl != null ? [local.photoUrl!] : []),
       createdAt: local.updatedAt, // Use updatedAt as createdAt fallback
       updatedAt: local.updatedAt,
       syncVersion: local.syncVersion,
@@ -318,15 +318,13 @@ class TaskModel {
 
   bool get isInProgress => status.toLowerCase() == 'inprogress';
 
-  bool get isCompleted => status.toLowerCase() == 'completed';
+  bool get isUnderReview => status.toLowerCase() == 'underreview';
 
-  // note: isCancelled removed - workers cannot cancel tasks per project decision
-  // supervisors can set Approved/Rejected status instead
-  bool get isApproved => status.toLowerCase() == 'approved';
+  bool get isCompleted => status.toLowerCase() == 'completed';
   bool get isRejected => status.toLowerCase() == 'rejected';
 
   bool get isOverdue {
-    if (dueDate == null || isCompleted) return false;
+    if (dueDate == null || isUnderReview || isCompleted) return false;
     return DateTime.now().toUtc().isAfter(dueDate!);
   }
 
@@ -341,12 +339,10 @@ class TaskModel {
         return 'جديد';
       case 'inprogress':
         return 'قيد التنفيذ';
+      case 'underreview':
+        return 'قيد المراجعة';
       case 'completed':
         return 'مكتملة';
-      case 'cancelled':
-        return 'ملغاة';
-      case 'approved':
-        return 'معتمدة';
       case 'rejected':
         return 'مرفوضة';
       default:
@@ -421,6 +417,7 @@ class TaskModel {
       estimatedDurationMinutes: estimatedDurationMinutes,
       completionNotes: completionNotes,
       photoUrl: photoUrl,
+      photos: photos,
       completedAt: completedAt,
       updatedAt: updatedAt,
       dueDate: dueDate,

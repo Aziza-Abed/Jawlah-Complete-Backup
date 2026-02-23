@@ -76,6 +76,10 @@ class TaskLocal extends HiveObject {
   @HiveField(23)
   String? progressNotes;
 
+  // Multiple photo URLs from server (ordered by OrderIndex)
+  @HiveField(24)
+  List<String> photos;
+
   TaskLocal({
     this.clientId,
     required this.taskId,
@@ -101,6 +105,7 @@ class TaskLocal extends HiveObject {
     this.estimatedDurationMinutes,
     this.progressPercentage = 0,
     this.progressNotes,
+    this.photos = const [],
   });
 
   // Convert to sync DTO for uploading task updates

@@ -151,13 +151,13 @@ export default function IssueDetails() {
       const numericId = id?.startsWith("i-") ? id.slice(2) : id;
       if (!numericId) return;
 
-      // Update status to Dismissed when rejecting
+      // Update status to Resolved when rejecting
       await updateIssueStatus(Number(numericId), {
-        status: "Dismissed",
+        status: "Resolved",
         resolutionNotes: rejectReason
       });
 
-      setIssue({ ...issue, status: "rejected" });
+      setIssue({ ...issue, status: "closed" });
       setRejectOpen(false);
       setRejectReason("");
     } catch (err) {

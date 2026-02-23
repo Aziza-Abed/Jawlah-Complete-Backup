@@ -10,44 +10,22 @@ import 'device_service.dart';
 class AuthService {
   final ApiService _apiService = ApiService();
 
-  // Login with Username + Password + GPS + DeviceID for auto check-in
-  // If location is provided and valid, worker is automatically checked in
-  // GPS failure fallback: If allowManualCheckIn=true and manualReason provided,
-  // creates pending attendance that requires supervisor approval
+  // UC2: Login is pure authentication with device binding
+  // Attendance is handled automatically via geofencing (UC4)
   Future<AuthResult> loginWithGPS({
     required String username,
     required String password,
-    double? latitude,
-    double? longitude,
-    double? accuracy,
-    bool allowManualCheckIn = false,
-    String? manualCheckInReason,
   }) async {
     try {
       // get unique device ID for device binding security (2FA)
       final deviceId = await DeviceService.getDeviceId();
 
-      // build request data
+      // build request data - authentication only, no GPS needed
       final requestData = <String, dynamic>{
         'username': username,
         'password': password,
         'deviceId': deviceId,
       };
-
-      // add location if provided
-      if (latitude != null && longitude != null) {
-        requestData['latitude'] = latitude;
-        requestData['longitude'] = longitude;
-        if (accuracy != null) {
-          requestData['accuracy'] = accuracy;
-        }
-      }
-
-      // add manual check-in request if GPS failed
-      if (allowManualCheckIn && manualCheckInReason != null) {
-        requestData['allowManualCheckIn'] = true;
-        requestData['manualCheckInReason'] = manualCheckInReason;
-      }
 
       // send the data to the server
       final response = await _apiService.post(
@@ -93,14 +71,6 @@ class AuthService {
       return AuthResult(
         user: UserModel.fromJson(data['user'] as Map<String, dynamic>),
         token: data['token'] as String,
-        isCheckedIn: data['isCheckedIn'] as bool? ?? false,
-        activeAttendanceId: data['activeAttendanceId'] as int?,
-        checkInStatus: data['checkInStatus'] as String? ?? 'NotAttempted',
-        checkInFailureReason: data['checkInFailureReason'] as String?,
-        requiresApproval: data['requiresApproval'] as bool? ?? false,
-        isLate: data['isLate'] as bool? ?? false,
-        lateMinutes: data['lateMinutes'] as int? ?? 0,
-        attendanceType: data['attendanceType'] as String? ?? 'OnTime',
         message: data['message'] as String?,
       );
     } catch (e) {
@@ -187,14 +157,6 @@ class AuthService {
       return AuthResult(
         user: UserModel.fromJson(data['user'] as Map<String, dynamic>),
         token: data['token'] as String,
-        isCheckedIn: data['isCheckedIn'] as bool? ?? false,
-        activeAttendanceId: data['activeAttendanceId'] as int?,
-        checkInStatus: data['checkInStatus'] as String? ?? 'NotAttempted',
-        checkInFailureReason: data['checkInFailureReason'] as String?,
-        requiresApproval: data['requiresApproval'] as bool? ?? false,
-        isLate: data['isLate'] as bool? ?? false,
-        lateMinutes: data['lateMinutes'] as int? ?? 0,
-        attendanceType: data['attendanceType'] as String? ?? 'OnTime',
         message: data['message'] as String?,
       );
     } catch (e) {
@@ -329,7 +291,7 @@ class AuthService {
     try {
       await _apiService.post(ApiConfig.logout);
     } catch (e) {
-      // ignore logout errors as user is alredy logged out locally
+      // ignore logout errors as user is already logged out locally
       if (kDebugMode) debugPrint('Logout error (ignored): $e');
     }
   }
@@ -365,23 +327,10 @@ class OtpResendResult {
   });
 }
 
+// UC2: Authentication result - no attendance data
 class AuthResult {
   final UserModel? user;
   final String? token;
-  final bool isCheckedIn;
-  final int? activeAttendanceId;
-
-  // Check-in status details
-  final String checkInStatus; // NotAttempted, Success, PendingApproval, Failed
-  final String? checkInFailureReason;
-  final bool requiresApproval; // Manual check-in needs supervisor approval
-
-  // Lateness tracking
-  final bool isLate;
-  final int lateMinutes;
-  final String attendanceType; // OnTime, Late, Manual
-
-  // Server message
   final String? message;
 
   // OTP (Two-Factor Authentication) fields
@@ -392,23 +341,9 @@ class AuthResult {
   AuthResult({
     this.user,
     this.token,
-    this.isCheckedIn = false,
-    this.activeAttendanceId,
-    this.checkInStatus = 'NotAttempted',
-    this.checkInFailureReason,
-    this.requiresApproval = false,
-    this.isLate = false,
-    this.lateMinutes = 0,
-    this.attendanceType = 'OnTime',
     this.message,
     this.requiresOtp = false,
     this.sessionToken,
     this.maskedPhone,
   });
-
-  // Helper to check if check-in was attempted but failed
-  bool get checkInFailed => checkInStatus == 'Failed';
-
-  // Helper to check if we need to show GPS failure dialog
-  bool get needsManualCheckIn => !isCheckedIn && checkInStatus != 'Success';
 }

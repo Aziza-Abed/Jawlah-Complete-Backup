@@ -49,15 +49,13 @@ class AppColors {
       case 'inprogress':
       case 'قيد التنفيذ':
         return statusInProgress;
+      case 'underreview':
+      case 'قيد المراجعة':
+        return statusInProgress;
       case 'completed':
       case 'مكتملة':
         return statusCompleted;
-      case 'approved':
-      case 'معتمدة':
-        return statusCompleted;
-      case 'cancelled':
       case 'rejected':
-      case 'ملغاة':
       case 'مرفوضة':
         return statusRejected;
       default:
@@ -72,12 +70,10 @@ class AppColors {
         return 'جديد';
       case 'inprogress':
         return 'قيد التنفيذ';
+      case 'underreview':
+        return 'قيد المراجعة';
       case 'completed':
         return 'مكتملة';
-      case 'approved':
-        return 'معتمدة';
-      case 'cancelled':
-        return 'ملغاة';
       case 'rejected':
         return 'مرفوضة';
       default:

@@ -127,7 +127,7 @@ export default function LocationHistory() {
 
   const stats = useMemo(() => {
     const activeTasks = workerTasks.filter(t => t.status === "Pending" || t.status === "InProgress").length;
-    const completedTasks = workerTasks.filter(t => t.status === "Approved" || t.status === "Completed").length;
+    const completedTasks = workerTasks.filter(t => t.status === "UnderReview" || t.status === "Completed").length;
 
     if (history.length < 2) {
       return { distance: 0, duration: 0, activeTasks, completedTasks, points: history.length };

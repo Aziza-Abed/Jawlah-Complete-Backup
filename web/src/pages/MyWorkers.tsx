@@ -71,7 +71,7 @@ export default function MyWorkers() {
         ).length;
         const completedToday = workerTasks.filter(
           (t) =>
-            (t.status === "Completed" || t.status === "Approved") &&
+            t.status === "Completed" &&
             t.completedAt?.startsWith(today)
         ).length;
 

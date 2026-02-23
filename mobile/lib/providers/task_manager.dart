@@ -42,25 +42,25 @@ class TaskManager extends BaseController {
       myTasks.where((task) => task.isPending).toList();
   List<TaskModel> get inProgressTasks =>
       myTasks.where((task) => task.isInProgress).toList();
+  List<TaskModel> get underReviewTasks =>
+      myTasks.where((task) => task.isUnderReview).toList();
   List<TaskModel> get completedTasks =>
       myTasks.where((task) => task.isCompleted).toList();
-  List<TaskModel> get approvedTasks =>
-      myTasks.where((task) => task.isApproved).toList();
   List<TaskModel> get rejectedTasks =>
       myTasks.where((task) => task.isRejected).toList();
-  // reviewed = approved + rejected (tasks that supervisor has reviewed)
+  // reviewed = completed + rejected (tasks that supervisor has reviewed)
   List<TaskModel> get reviewedTasks =>
-      myTasks.where((task) => task.isApproved || task.isRejected).toList();
+      myTasks.where((task) => task.isCompleted || task.isRejected).toList();
 
   int get totalTasks => myTasks.length;
   int get pendingCount => pendingTasks.length;
   int get inProgressCount => inProgressTasks.length;
+  int get underReviewCount => underReviewTasks.length;
   int get completedCount => completedTasks.length;
-  int get approvedCount => approvedTasks.length;
   int get rejectedCount => rejectedTasks.length;
   int get reviewedCount => reviewedTasks.length;
-  // actionable = pending + inProgress + completed (excludes reviewed)
-  int get actionableCount => pendingCount + inProgressCount + completedCount;
+  // actionable = pending + inProgress + underReview (excludes reviewed)
+  int get actionableCount => pendingCount + inProgressCount + underReviewCount;
 
   bool get hasTasks => myTasks.isNotEmpty;
   bool get isEmpty => myTasks.isEmpty;
@@ -393,7 +393,7 @@ class TaskManager extends BaseController {
 
       // update task
       final updatedTask = task.copyWith(
-        status: 'Completed',
+        status: 'UnderReview',
         completionNotes: notes,
         photoUrl: permanentPhotoPath,
         completedAt: DateTime.now(),

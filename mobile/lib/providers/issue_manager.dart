@@ -152,7 +152,7 @@ class IssueManager extends BaseController {
         description: issueLocal.description,
         type: issueLocal.type,
         severity: issueLocal.severity,
-        status: 'Reported',
+        status: 'New',
         reportedByUserId: issueLocal.reportedByUserId,
         latitude: issueLocal.latitude,
         longitude: issueLocal.longitude,

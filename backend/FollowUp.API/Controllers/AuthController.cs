@@ -287,21 +287,15 @@ public class AuthController : BaseApiController
     /// GPS-Based Login and Attendance - Mobile Worker Authentication Flow
     ///
     /// This endpoint handles worker login with automatic attendance check-in.
-    /// It validates the worker's location to ensure they are physically present
-    /// at their assigned work zone before allowing login.
+    /// Per UC2: Login is pure authentication. Attendance is handled separately via geofencing (UC4).
     ///
     /// Security Features:
     /// - Device binding: Workers can only login from their registered device
-    /// - Geofencing: GPS coordinates must be within assigned work zone
-    /// - Location validation: GPS accuracy and bounds checking
     ///
     /// Flow:
     /// 1. Authenticate credentials (username + password)
     /// 2. Validate device ID matches registered device
-    /// 3. Validate GPS accuracy and coordinates
-    /// 4. Check if user is inside their assigned work zone
-    /// 5. Create attendance record automatically
-    /// 6. Return JWT token + attendance details
+    /// 3. Return JWT token
     /// </summary>
     [AllowAnonymous]
     [HttpPost("login-gps")]
@@ -392,112 +386,19 @@ public class AuthController : BaseApiController
                 }
             }
 
-            // Validate GPS accuracy (client-side issue - bad GPS signal quality)
-            var accuracyError = ValidateGpsAccuracy(request.Accuracy);
-            if (accuracyError != null)
-            {
-                _logger.LogWarning("GPS login rejected - Poor GPS accuracy: {Accuracy}m", request.Accuracy);
-                // 400 BadRequest: GPS data quality is insufficient (client needs to improve GPS signal)
-                return BadRequest(ApiResponse<LoginWithGPSResponse>.ErrorResponse(accuracyError));
-            }
-
-            // Validate GPS coordinates (uses inherited base controller validation)
-            var coordsResult = base.ValidateGpsCoordinates(request.Latitude, request.Longitude);
-            if (coordsResult != null)
-            {
-                return coordsResult;
-            }
-
-            // Validate GPS coordinates are within municipality bounds
-            var boundsError = ValidateGpsBounds(request.Latitude, request.Longitude);
-            if (boundsError != null)
-            {
-                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse(boundsError));
-            }
-
-            // Find user's zone based on GPS coordinates
-            var (matchedZone, zoneError) = await FindUserZoneByGps(user.UserId, request.Latitude, request.Longitude);
-            if (zoneError != null)
-            {
-                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse(zoneError));
-            }
-
-            // token already generated during auth, use it
+            // UC2: Login is authentication only. No attendance check-in here.
+            // Attendance is handled automatically via geofencing (UC4) in the mobile background service.
 
             // update user last login and save device registration if new
             user.LastLoginAt = DateTime.UtcNow;
             await _users.UpdateAsync(user);
             await _users.SaveChangesAsync();
 
-            // Check if user already has attendance for today
-            var existingAttendance = await _attendance.GetTodayAttendanceAsync(user.UserId);
-
-            Attendance attendance;
-            if (existingAttendance != null)
-            {
-                // User already checked in today - use existing attendance
-                attendance = existingAttendance;
-                _logger.LogInformation("User {UserId} already has attendance for today, using existing record {AttendanceId}",
-                    user.UserId, attendance.AttendanceId);
-            }
-            else
-            {
-                /*
-                 * ATTENDANCE RECORD CREATION
-                 *
-                 * Creates a new attendance record for the worker's check-in.
-                 *
-                 * Multi-Municipality Support:
-                 * - MunicipalityId ensures data isolation between different municipalities
-                 * - Each municipality can only access their own attendance records
-                 * - Admins/Supervisors are scoped to their municipality
-                 *
-                 * Geofencing:
-                 * - ZoneId links attendance to the specific work zone where user checked in
-                 * - GPS coordinates are stored for audit trail and reporting
-                 */
-                attendance = new Attendance
-                {
-                    UserId = user.UserId,
-                    MunicipalityId = user.MunicipalityId, // Data isolation: municipality-specific records
-                    CheckInEventTime = DateTime.UtcNow,
-                    CheckInLatitude = request.Latitude,
-                    CheckInLongitude = request.Longitude,
-                    CheckInAccuracyMeters = request.Accuracy,
-                    ZoneId = matchedZone?.ZoneId, // Geofencing: which zone was the worker in?
-                    IsValidated = true,
-                    ValidationMessage = "تم تسجيل الحضور بنجاح داخل المنطقة المخصصة",
-                    Status = Core.Enums.AttendanceStatus.CheckedIn
-                };
-
-                try
-                {
-                    await _attendance.AddAsync(attendance);
-                    await _attendance.SaveChangesAsync();
-                }
-                catch (DbUpdateException)
-                {
-                    // Race condition: another request created attendance record between check and insert
-                    // Retrieve the existing record instead
-                    _logger.LogWarning("Race condition detected for user {UserId} attendance - retrieving existing record", user.UserId);
-                    existingAttendance = await _attendance.GetTodayAttendanceAsync(user.UserId);
-                    if (existingAttendance != null)
-                    {
-                        attendance = existingAttendance;
-                    }
-                    else
-                    {
-                        // This should never happen, but handle gracefully
-                        throw;
-                    }
-                }
-            }
-
             // ERD Chapter 3: Generate refresh token for GPS login (consistency with other login flows)
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
             var gpsRefreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, request.DeviceId, ipAddress);
 
-            // build response object
+            // build response object - authentication only, no attendance
             var resObj = new LoginWithGPSResponse
             {
                 Success = true,
@@ -505,28 +406,10 @@ public class AuthController : BaseApiController
                 RefreshToken = gpsRefreshToken,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
                 User = _mapper.Map<UserDto>(user),
-                Attendance = new AttendanceResponse
-                {
-                    AttendanceId = attendance.AttendanceId,
-                    UserId = attendance.UserId,
-                    UserName = user.FullName,
-                    ZoneId = attendance.ZoneId,
-                    ZoneName = matchedZone?.ZoneName,
-                    CheckInEventTime = attendance.CheckInEventTime,
-                    CheckInLatitude = attendance.CheckInLatitude,
-                    CheckInLongitude = attendance.CheckInLongitude,
-                    IsValidated = attendance.IsValidated,
-                    ValidationMessage = attendance.ValidationMessage,
-                    Status = attendance.Status,
-                    CreatedAt = attendance.CheckInEventTime,
-                    AttendanceType = "OnTime"
-                },
-                Message = "تم تسجيل الدخول والحضور بنجاح",
-                CheckInStatus = "Success",
-                RequiresApproval = false
+                Message = "تم تسجيل الدخول بنجاح"
             };
 
-            return Ok(ApiResponse<LoginWithGPSResponse>.SuccessResponse(resObj, "تم تسجيل الدخول والحضور بنجاح"));
+            return Ok(ApiResponse<LoginWithGPSResponse>.SuccessResponse(resObj, "تم تسجيل الدخول بنجاح"));
         }
         catch (Exception ex)
         {

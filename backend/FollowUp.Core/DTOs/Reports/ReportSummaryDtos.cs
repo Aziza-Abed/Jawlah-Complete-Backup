@@ -8,7 +8,7 @@ public class TasksReportData
     public int Completed { get; set; }
     public int InProgress { get; set; }
     public int Pending { get; set; }
-    public int Cancelled { get; set; }
+    public int UnderReview { get; set; }
     public int ActiveWorkers { get; set; }
     public int TotalWorkers { get; set; }
     public List<TasksByPeriod> ByPeriod { get; set; } = new();
@@ -128,7 +128,7 @@ public class TaskSummary
 {
     public int TotalAssigned { get; set; }
     public int Completed { get; set; }
-    public int Approved { get; set; }
+    public int UnderReview { get; set; }
     public int Rejected { get; set; }
     public int AutoRejected { get; set; }
     public int InProgress { get; set; }

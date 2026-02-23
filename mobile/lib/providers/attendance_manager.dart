@@ -8,9 +8,7 @@ import '../data/services/location_service.dart';
 import '../data/services/zone_validation_service.dart';
 import '../data/repositories/local/attendance_local_repository.dart';
 import '../data/repositories/local/zone_local_repository.dart';
-import '../core/utils/background_service_utils.dart';
 import 'sync_manager.dart';
-import 'auth_manager.dart';
 import 'base_controller.dart';
 
 // manager for check in and check out
@@ -18,7 +16,6 @@ class AttendanceManager extends BaseController {
   final AttendanceService _attendanceService = AttendanceService();
   final AttendanceLocalRepository _localRepo = AttendanceLocalRepository();
   SyncManager? _syncManager;
-  AuthManager? _authManager;
 
   AttendanceModel? todayRecord;
   List<AttendanceModel> myHistory = [];
@@ -39,10 +36,6 @@ class AttendanceManager extends BaseController {
     _syncManager = manager;
   }
 
-  // set auth manager (for updating check-in status)
-  void setAuthManager(AuthManager manager) {
-    _authManager = manager;
-  }
 
   // load today attendace from server or local
   Future<void> loadTodayRecord() async {
@@ -119,12 +112,6 @@ class AttendanceManager extends BaseController {
             await _cacheTodayRecord(result, userId);
           }
 
-          // start background tracking after successful check-in
-          BackgroundServiceUtils.startService();
-
-          // update auth manager check-in status
-          _authManager?.updateCheckInStatus(true, attendanceId: result.attendanceId);
-
           return;
         } catch (_) {
           // online failed - fall through to offline check-in
@@ -179,12 +166,6 @@ class AttendanceManager extends BaseController {
         createdAt: DateTime.now(),
       );
 
-      // start background tracking after check-in (even offline)
-      BackgroundServiceUtils.startService();
-
-      // update auth manager check-in status
-      _authManager?.updateCheckInStatus(true);
-
       notifyListeners();
     });
 
@@ -206,12 +187,6 @@ class AttendanceManager extends BaseController {
           if (userId != null) {
             await _cacheTodayRecord(result, userId);
           }
-
-          // stop background tracking after check-out
-          await BackgroundServiceUtils.stopService();
-
-          // update auth manager check-in status
-          _authManager?.updateCheckInStatus(false);
 
           return;
         } catch (_) {
@@ -259,12 +234,6 @@ class AttendanceManager extends BaseController {
           createdAt: todayRecord!.createdAt,
         );
       }
-
-      // stop background tracking after check-out (even offline)
-      await BackgroundServiceUtils.stopService();
-
-      // update auth manager check-in status
-      _authManager?.updateCheckInStatus(false);
 
       notifyListeners();
     });

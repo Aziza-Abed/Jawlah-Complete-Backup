@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -21,7 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
-  String _loadingMessage = 'جاري تسجيل الدخول...';
 
   @override
   void initState() {
@@ -41,8 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final authProvider = context.read<AuthManager>();
       final rememberMe = await authProvider.getRememberMe();
       if (rememberMe) {
-        final savedUsername = await authProvider
-            .getSavedEmployeeId(); // Will rename this method later
+        final savedUsername = await authProvider.getSavedEmployeeId();
         if (savedUsername != null && savedUsername.isNotEmpty) {
           setState(() {
             _usernameController.text = savedUsername;
@@ -67,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
             end: Alignment.bottomCenter,
             colors: [
               AppColors.mainBackground,
-              Color(0xFFE8E6E1), // slightly darker shade of background
+              Color(0xFFE8E6E1),
             ],
           ),
         ),
@@ -314,10 +311,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           elevation: 0,
                         ),
                         child: _isLoading
-                            ? Row(
+                            ? const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const SizedBox(
+                                  SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
@@ -325,20 +322,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                       strokeWidth: 2,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  SizedBox(width: 12),
                                   Text(
-                                    _loadingMessage,
-                                    style: const TextStyle(
+                                    'جاري تسجيل الدخول...',
+                                    style: TextStyle(
                                       fontSize: 14,
                                       fontFamily: 'Cairo',
                                     ),
                                   ),
                                 ],
                               )
-                            : Row(
+                            : const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'دخول للنظام',
                                     style: TextStyle(
                                       fontSize: 18,
@@ -346,8 +343,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       fontFamily: 'Cairo',
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  const Icon(Icons.arrow_forward_rounded),
+                                  SizedBox(width: 12),
+                                  Icon(Icons.arrow_forward_rounded),
                                 ],
                               ),
                       ),
@@ -377,7 +374,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Icon(Icons.info_outline_rounded, size: 18, color: AppColors.primary),
           SizedBox(width: 8),
           Text(
-            'تأكد من تفعيل الـ GPS بالهاتف',
+            'تسجيل الحضور يتم تلقائياً عبر GPS',
             style: TextStyle(
               fontSize: 13,
               color: AppColors.secondaryText,
@@ -389,47 +386,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Get current location with timeout
-  Future<Position?> _getLocation() async {
-    try {
-      // Check location permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return null;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        return null;
-      }
-
-      // Check if location service is enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        return null;
-      }
-
-      // Get position with timeout
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
-    } catch (e) {
-      if (kDebugMode) debugPrint('Error getting location: $e');
-      return null;
-    }
-  }
-
-  // Login to the app with optional auto check-in
+  // UC2: Simple login - authenticate only, no check-in
   Future<void> _login() async {
-    // check form is valid
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() {
       _isLoading = true;
-      _loadingMessage = 'جاري تحديد الموقع...';
     });
 
     try {
@@ -437,22 +399,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final password = _passwordController.text.trim();
       final authProvider = context.read<AuthManager>();
 
-      // Try to get location for auto check-in
-      final position = await _getLocation();
-
-      if (!mounted) return;
-
-      setState(() {
-        _loadingMessage = 'جاري تسجيل الدخول...';
-      });
-
-      // Try to login with location - Now passing username and password
       final success = await authProvider.doLogin(
         username,
-        password: password, // NEW: password parameter
-        latitude: position?.latitude,
-        longitude: position?.longitude,
-        accuracy: position?.accuracy,
+        password: password,
       );
 
       if (!mounted) return;
@@ -460,19 +409,13 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         // Check if OTP is required (Two-Factor Authentication)
         if (authProvider.requiresOtp) {
-          // Navigate to OTP verification screen
+          setState(() => _isLoading = false);
           if (mounted) {
-            setState(() => _isLoading = false);
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => OtpVerificationScreen(
                   sessionToken: authProvider.otpSessionToken!,
                   maskedPhone: authProvider.otpMaskedPhone ?? '****',
-                  username: username,
-                  password: password,
-                  latitude: position?.latitude,
-                  longitude: position?.longitude,
-                  accuracy: position?.accuracy,
                 ),
               ),
             );
@@ -489,71 +432,12 @@ class _LoginScreenState extends State<LoginScreen> {
           await authProvider.setRememberMe(false);
         }
 
-        // Check if check-in was successful or needs manual fallback
-        if (authProvider.isCheckedIn) {
-          // Show success message with lateness info if applicable
-          if (authProvider.lastLoginIsLate) {
-            _showWarningMessage(
-              'تم تسجيل الدخول والحضور (متأخر ${authProvider.lastLoginLateMinutes} دقيقة)',
-            );
-          } else if (authProvider.lastLoginRequiresApproval) {
-            _showWarningMessage(
-              'تم تسجيل الدخول - الحضور بانتظار موافقة المشرف',
-            );
-          } else {
-            _showSuccessMessage('تم تسجيل الدخول والحضور بنجاح');
-          }
-
-          // go to home
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed(Routes.home);
-          }
-        } else if (authProvider.checkInFailed) {
-          // GPS check-in failed - offer manual check-in option
-          if (mounted) {
-            setState(() => _isLoading = false);
-            final shouldUseManual = await _showGpsFailureDialog(
-              authProvider.lastCheckInFailureReason ?? 'فشل تحديد الموقع',
-            );
-
-            if (shouldUseManual != null && shouldUseManual.isNotEmpty) {
-              // Retry login with manual check-in
-              setState(() {
-                _isLoading = true;
-                _loadingMessage = 'جاري تسجيل الحضور اليدوي...';
-              });
-
-              await authProvider.doLogin(
-                username,
-                password: password, // NEW: password parameter
-                allowManualCheckIn: true,
-                manualCheckInReason: shouldUseManual,
-              );
-
-              if (mounted) {
-                _showWarningMessage(
-                    'تم تسجيل الدخول - الحضور بانتظار موافقة المشرف');
-                Navigator.of(context).pushReplacementNamed(Routes.home);
-              }
-            } else {
-              // User cancelled - still logged in but without check-in
-              if (mounted) {
-                _showWarningMessage(
-                    'تم تسجيل الدخول - يرجى تسجيل الحضور من الشاشة الرئيسية');
-                Navigator.of(context).pushReplacementNamed(Routes.home);
-              }
-            }
-          }
-        } else {
-          // No location provided - logged in but without check-in
-          _showWarningMessage(
-              'تم تسجيل الدخول - يرجى تسجيل الحضور للبدء بالعمل');
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed(Routes.home);
-          }
+        // Navigate to home
+        _showSuccessMessage('تم تسجيل الدخول بنجاح');
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed(Routes.home);
         }
       } else {
-        // show error
         _showErrorMessage(authProvider.errorMessage ?? 'فشل تسجيل الدخول');
       }
     } catch (e) {
@@ -565,105 +449,6 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  // Show dialog when GPS check-in fails
-  Future<String?> _showGpsFailureDialog(String failureReason) async {
-    final reasonController = TextEditingController();
-
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.location_off, color: AppColors.warning),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'فشل تسجيل الحضور التلقائي',
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              failureReason,
-              style: const TextStyle(
-                fontFamily: 'Cairo',
-                color: AppColors.secondaryText,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'يمكنك إدخال سبب للحضور اليدوي (يتطلب موافقة المشرف):',
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: reasonController,
-              maxLines: 2,
-              decoration: InputDecoration(
-                hintText: 'مثال: GPS لا يعمل في الموقع',
-                hintStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 13),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-              ),
-              style: const TextStyle(fontFamily: 'Cairo'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
-            child: const Text(
-              'تخطي',
-              style: TextStyle(fontFamily: 'Cairo'),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final reason = reasonController.text.trim();
-              if (reason.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'يرجى إدخال سبب الحضور اليدوي',
-                      style: TextStyle(fontFamily: 'Cairo'),
-                    ),
-                  ),
-                );
-                return;
-              }
-              Navigator.of(context).pop(reason);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-            ),
-            child: const Text(
-              'تسجيل يدوي',
-              style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showErrorMessage(String message) {
@@ -691,23 +476,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    );
-  }
-
-  void _showWarningMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(fontFamily: 'Cairo'),
-        ),
-        backgroundColor: AppColors.warning,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),

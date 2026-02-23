@@ -139,11 +139,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         ),
                       ],
 
-                      if (statusLower == 'completed') ...[
+                      if (statusLower == 'underreview') ...[
                         _buildCompletedSection(task),
                       ],
 
-                      if (statusLower == 'approved') ...[
+                      if (statusLower == 'completed') ...[
                         _buildApprovalStatus(true),
                       ],
 

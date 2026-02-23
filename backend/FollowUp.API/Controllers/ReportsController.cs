@@ -58,6 +58,7 @@ public class ReportsController : BaseApiController
                 "pending" => TaskStatus.Pending,
                 "in_progress" => TaskStatus.InProgress,
                 "completed" => TaskStatus.Completed,
+                "underreview" => TaskStatus.UnderReview,
                 _ => null
             };
 
@@ -78,10 +79,10 @@ public class ReportsController : BaseApiController
             var data = new TasksReportData
             {
                 Total = tasks.Count,
-                Completed = tasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved),
+                Completed = tasks.Count(t => t.Status == TaskStatus.Completed),
                 InProgress = tasks.Count(t => t.Status == TaskStatus.InProgress),
                 Pending = tasks.Count(t => t.Status == TaskStatus.Pending),
-                Cancelled = tasks.Count(t => t.Status == TaskStatus.Cancelled),
+                UnderReview = tasks.Count(t => t.Status == TaskStatus.UnderReview),
                 ActiveWorkers = todayAttendance.Select(a => a.UserId).Distinct().Count(),
                 TotalWorkers = workers.Count,
                 ByPeriod = BuildTasksByPeriod(tasks, period),
@@ -188,7 +189,7 @@ public class ReportsController : BaseApiController
                         IsPresent = checkedInIds.Contains(w.UserId),
                         LastCheckIn = lastCheckIn?.CheckInEventTime,
                         ActiveTasks = workerTasks.Count(t => t.Status == TaskStatus.InProgress || t.Status == TaskStatus.Pending),
-                        CompletedTasks = workerTasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved)
+                        CompletedTasks = workerTasks.Count(t => t.Status == TaskStatus.Completed)
                     };
                 }).ToList()
             };
@@ -237,10 +238,10 @@ public class ReportsController : BaseApiController
                     Id = z.ZoneId,
                     Name = z.ZoneName,
                     Total = zoneTasks.Count,
-                    Completed = zoneTasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved),
+                    Completed = zoneTasks.Count(t => t.Status == TaskStatus.Completed),
                     InProgress = zoneTasks.Count(t => t.Status == TaskStatus.InProgress),
                     Delayed = zoneTasks.Count(t => t.DueDate < DateTime.UtcNow &&
-                        t.Status != TaskStatus.Completed && t.Status != TaskStatus.Approved && t.Status != TaskStatus.Cancelled),
+                        t.Status != TaskStatus.UnderReview && t.Status != TaskStatus.Completed),
                     LastUpdate = zoneTasks.Any() ? zoneTasks.Max(t => t.CompletedAt ?? t.CreatedAt) : null
                 };
             }).ToList();
@@ -251,10 +252,10 @@ public class ReportsController : BaseApiController
             {
                 TotalZones = zones.Count,
                 TotalTasks = tasks.Count,
-                TotalCompleted = tasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved),
+                TotalCompleted = tasks.Count(t => t.Status == TaskStatus.Completed),
                 TotalInProgress = tasks.Count(t => t.Status == TaskStatus.InProgress),
                 TotalDelayed = tasks.Count(t => t.DueDate < DateTime.UtcNow &&
-                    t.Status != TaskStatus.Completed && t.Status != TaskStatus.Approved && t.Status != TaskStatus.Cancelled),
+                    t.Status != TaskStatus.UnderReview && t.Status != TaskStatus.Completed),
                 HighestPressureZone = highestPressure?.Name ?? "",
                 Zones = zoneItems
             };
@@ -324,7 +325,7 @@ public class ReportsController : BaseApiController
             var avgWorkHours = daysPresent > 0 ? totalWorkMinutes / daysPresent / 60 : 0;
 
             // Task statistics
-            var completedTasks = tasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved);
+            var completedTasks = tasks.Count(t => t.Status == TaskStatus.Completed);
             var rejectedTasks = tasks.Count(t => t.Status == TaskStatus.Rejected);
             var autoRejectedTasks = tasks.Count(t => t.IsAutoRejected);
             var inProgressTasks = tasks.Count(t => t.Status == TaskStatus.InProgress);
@@ -361,7 +362,7 @@ public class ReportsController : BaseApiController
                 {
                     TotalAssigned = tasks.Count,
                     Completed = completedTasks,
-                    Approved = tasks.Count(t => t.Status == TaskStatus.Approved),
+                    UnderReview = tasks.Count(t => t.Status == TaskStatus.UnderReview),
                     Rejected = rejectedTasks,
                     AutoRejected = autoRejectedTasks,
                     InProgress = inProgressTasks,
@@ -444,12 +445,12 @@ public class ReportsController : BaseApiController
                 // Tasks (Assigned TO this supervisor) - Supervisors might perform tasks themselves
                 var tasks = await _tasks.GetFilteredTasksAsync(supervisor.UserId, null, fromDate, toDate, null);
                 var totalTasks = tasks.Count();
-                var completedTasks = tasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved);
+                var completedTasks = tasks.Count(t => t.Status == TaskStatus.Completed);
                 var completionRate = totalTasks > 0 ? (int)Math.Round((double)completedTasks / totalTasks * 100) : 0;
 
                 // Issues (Reported by supervisor)
                 var issues = await _issues.GetUserIssuesAsync(supervisor.UserId);
-                var openIssues = issues.Count(i => i.Status != IssueStatus.Resolved && i.Status != IssueStatus.Dismissed);
+                var openIssues = issues.Count(i => i.Status != IssueStatus.Resolved);
 
                 result.Add(new SupervisorStatsItem
                 {
@@ -533,16 +534,16 @@ public class ReportsController : BaseApiController
                 // Tasks for workers under this supervisor
                 var supervisorWorkerTasks = monthTasks.Where(t => workerIds.Contains(t.AssignedToUserId)).ToList();
                 var tasksAssigned = supervisorWorkerTasks.Count;
-                var tasksCompleted = supervisorWorkerTasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved);
-                var tasksPendingReview = supervisorWorkerTasks.Count(t => t.Status == TaskStatus.Completed); // Completed but not yet Approved
+                var tasksCompleted = supervisorWorkerTasks.Count(t => t.Status == TaskStatus.Completed);
+                var tasksPendingReview = supervisorWorkerTasks.Count(t => t.Status == TaskStatus.UnderReview); // Submitted, awaiting supervisor review
                 var tasksDelayed = supervisorWorkerTasks.Count(t =>
                     t.DueDate.HasValue && t.DueDate < DateTime.UtcNow &&
-                    t.Status != TaskStatus.Completed && t.Status != TaskStatus.Approved && t.Status != TaskStatus.Cancelled);
+                    t.Status != TaskStatus.UnderReview && t.Status != TaskStatus.Completed);
                 var completionRate = tasksAssigned > 0 ? Math.Round((double)tasksCompleted / tasksAssigned * 100, 1) : 0;
 
                 // Calculate average task completion time (time from assignment to completion)
                 var completedTasksList = supervisorWorkerTasks
-                    .Where(t => (t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved) && t.CompletedAt.HasValue)
+                    .Where(t => t.Status == TaskStatus.Completed && t.CompletedAt.HasValue)
                     .ToList();
                 var avgResponseTime = completedTasksList.Any()
                     ? completedTasksList.Average(t => (t.CompletedAt!.Value - t.CreatedAt).TotalHours)
@@ -551,7 +552,7 @@ public class ReportsController : BaseApiController
                 // Issues reported by workers under this supervisor
                 var workerIssues = allIssues.Where(i => workerIds.Contains(i.ReportedByUserId)).ToList();
                 var issuesResolved = workerIssues.Count(i => i.Status == IssueStatus.Resolved);
-                var issuesPending = workerIssues.Count(i => i.Status != IssueStatus.Resolved && i.Status != IssueStatus.Dismissed);
+                var issuesPending = workerIssues.Count(i => i.Status != IssueStatus.Resolved);
 
                 // Determine performance status
                 var performanceStatus = "Good";
@@ -648,7 +649,7 @@ public class ReportsController : BaseApiController
 
             // Build summary
             var totalTasksThisMonth = monthTasks.Count;
-            var completedTasksThisMonth = monthTasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved);
+            var completedTasksThisMonth = monthTasks.Count(t => t.Status == TaskStatus.Completed);
             var overallCompletionRate = totalTasksThisMonth > 0
                 ? Math.Round((double)completedTasksThisMonth / totalTasksThisMonth * 100, 1)
                 : 0;
@@ -666,7 +667,7 @@ public class ReportsController : BaseApiController
                     TotalTasksThisMonth = totalTasksThisMonth,
                     CompletedTasksThisMonth = completedTasksThisMonth,
                     OverallCompletionRate = overallCompletionRate,
-                    TotalPendingIssues = allIssues.Count(i => i.Status != IssueStatus.Resolved && i.Status != IssueStatus.Dismissed)
+                    TotalPendingIssues = allIssues.Count(i => i.Status != IssueStatus.Resolved)
                 }
             };
 
@@ -869,7 +870,7 @@ public class ReportsController : BaseApiController
             return new TasksByPeriod
             {
                 Label = label,
-                Completed = periodTasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved),
+                Completed = periodTasks.Count(t => t.Status == TaskStatus.Completed),
                 InProgress = periodTasks.Count(t => t.Status == TaskStatus.InProgress),
                 Pending = periodTasks.Count(t => t.Status == TaskStatus.Pending)
             };
@@ -1090,6 +1091,7 @@ public class ReportsController : BaseApiController
                 "pending" => TaskStatus.Pending,
                 "in_progress" => TaskStatus.InProgress,
                 "completed" => TaskStatus.Completed,
+                "underreview" => TaskStatus.UnderReview,
                 _ => null
             };
 
@@ -1113,10 +1115,9 @@ public class ReportsController : BaseApiController
             {
                 { TaskStatus.Pending, "قيد الانتظار" },
                 { TaskStatus.InProgress, "قيد التنفيذ" },
+                { TaskStatus.UnderReview, "قيد المراجعة" },
                 { TaskStatus.Completed, "مكتملة" },
-                { TaskStatus.Approved, "معتمدة" },
-                { TaskStatus.Rejected, "مرفوضة" },
-                { TaskStatus.Cancelled, "ملغاة" }
+                { TaskStatus.Rejected, "مرفوضة" }
             };
 
             // Generate PDF
@@ -1147,7 +1148,7 @@ public class ReportsController : BaseApiController
                         col.Item().PaddingBottom(10).Row(row =>
                         {
                             row.RelativeItem().Text($"إجمالي المهام: {tasks.Count}").FontSize(12);
-                            row.RelativeItem().Text($"مكتملة: {tasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved)}").FontSize(12);
+                            row.RelativeItem().Text($"مكتملة: {tasks.Count(t => t.Status == TaskStatus.Completed)}").FontSize(12);
                         });
 
                         // Tasks table
@@ -1332,6 +1333,7 @@ public class ReportsController : BaseApiController
                 "pending" => TaskStatus.Pending,
                 "in_progress" => TaskStatus.InProgress,
                 "completed" => TaskStatus.Completed,
+                "underreview" => TaskStatus.UnderReview,
                 _ => null
             };
 
@@ -1352,10 +1354,9 @@ public class ReportsController : BaseApiController
             {
                 { TaskStatus.Pending, "قيد الانتظار" },
                 { TaskStatus.InProgress, "قيد التنفيذ" },
+                { TaskStatus.UnderReview, "قيد المراجعة" },
                 { TaskStatus.Completed, "مكتملة" },
-                { TaskStatus.Approved, "معتمدة" },
-                { TaskStatus.Rejected, "مرفوضة" },
-                { TaskStatus.Cancelled, "ملغاة" }
+                { TaskStatus.Rejected, "مرفوضة" }
             };
 
             using var workbook = new XLWorkbook();

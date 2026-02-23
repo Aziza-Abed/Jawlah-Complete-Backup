@@ -87,8 +87,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.Photos)
             .Include(i => i.ForwardedToDepartment)
             .Where(i => i.Severity == IssueSeverity.Critical &&
-                       i.Status != IssueStatus.Resolved &&
-                       i.Status != IssueStatus.Dismissed)
+                       i.Status != IssueStatus.Resolved)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
     }
@@ -126,7 +125,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Select(g => new IssueStatsDto
             {
                 ReportedToday = g.Count(i => i.ReportedAt >= today && i.ReportedAt < tomorrow),
-                Unresolved = g.Count(i => i.Status != IssueStatus.Resolved && i.Status != IssueStatus.Dismissed)
+                Unresolved = g.Count(i => i.Status != IssueStatus.Resolved)
             })
             .FirstOrDefaultAsync();
 

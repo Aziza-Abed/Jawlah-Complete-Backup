@@ -143,7 +143,7 @@ public class DashboardController : BaseApiController
                 ZoneName = attendance?.Zone?.ZoneName,
                 TodayTasksCount = workerTasks.Count(t => t.CreatedAt >= today),
                 PendingTasksCount = workerTasks.Count(t => t.Status == TaskStatus.Pending),
-                CompletedTasksCount = workerTasks.Count(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Approved)
+                CompletedTasksCount = workerTasks.Count(t => t.Status == TaskStatus.Completed)
             };
         });
 

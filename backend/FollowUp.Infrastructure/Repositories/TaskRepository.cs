@@ -111,8 +111,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .Include(t => t.Photos)
             .Include(t => t.Team)
             .Where(t => t.DueDate < now &&
-                       t.Status != TaskStatus.Completed &&
-                       t.Status != TaskStatus.Cancelled);
+                       (t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress));
 
         if (userId.HasValue)
         {

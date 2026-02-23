@@ -66,7 +66,7 @@ class IssueLocal extends HiveObject {
   @HiveField(19)
   int? syncVersion;
 
-  // Issue status from server (Reported, UnderReview, Resolved, Dismissed)
+  // Issue status from server (New, Forwarded, Resolved)
   @HiveField(20)
   String? status;
 

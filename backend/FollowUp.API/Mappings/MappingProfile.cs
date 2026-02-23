@@ -73,9 +73,11 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => GetAppealStatusName(src.Status)))
             .ForMember(dest => dest.EntityTitle, opt => opt.Ignore()); // Will be set manually in controller
 
-        // Sync Mappings
-        CreateMap<TaskEntity, TaskSyncDto>();
-        CreateMap<Issue, IssueSyncDto>();
+        // Sync Mappings (include photos like the response DTOs)
+        CreateMap<TaskEntity, TaskSyncDto>()
+            .ForMember(dest => dest.Photos, opt => opt.MapFrom(src => src.Photos.OrderBy(p => p.OrderIndex).Select(p => p.PhotoUrl).ToList()));
+        CreateMap<Issue, IssueSyncDto>()
+            .ForMember(dest => dest.Photos, opt => opt.MapFrom(src => src.Photos.OrderBy(p => p.OrderIndex).Select(p => p.PhotoUrl).ToList()));
     }
 
     private static string GetAppealTypeName(Core.Enums.AppealType type)

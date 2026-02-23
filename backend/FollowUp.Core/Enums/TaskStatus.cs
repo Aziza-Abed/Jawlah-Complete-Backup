@@ -1,13 +1,11 @@
 namespace FollowUp.Core.Enums;
 
-// workflow: Pending → InProgress → Completed → Approved/Rejected (supervisor review)
-// or: Pending → Cancelled
+// workflow: Pending → InProgress → UnderReview (worker submits) → Completed/Rejected (supervisor review)
 public enum TaskStatus
 {
     Pending = 0,
     InProgress = 1,
-    Completed = 2,
-    Cancelled = 3,
-    Approved = 4,    // supervisor approved completed task
-    Rejected = 5     // supervisor rejected completed task
+    UnderReview = 2,   // worker submitted evidence, awaiting supervisor review
+    Completed = 3,     // supervisor approved
+    Rejected = 4       // supervisor rejected
 }

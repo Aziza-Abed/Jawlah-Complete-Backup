@@ -62,6 +62,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
+                  if (attendanceProvider.hasNotCheckedInToday)
+                    _buildAutoGeofenceBanner(),
                   _buildStatusCard(attendanceProvider),
                   const SizedBox(height: 20),
                   _buildActionButton(attendanceProvider),
@@ -225,13 +227,42 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 children: [
                   Icon(canCheckIn ? Icons.play_arrow_rounded : Icons.stop_rounded),
                   const SizedBox(width: 8),
-                  Text(canCheckIn ? 'بدء العمل' : 'إنهاء العمل',
+                  Text(canCheckIn ? 'تسجيل يدوي' : 'إنهاء العمل',
                       style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'Cairo')),
                 ],
               ),
+      ),
+    );
+  }
+
+  Widget _buildAutoGeofenceBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.gps_fixed, color: AppColors.primary, size: 24),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'تسجيل الحضور التلقائي عبر GPS نشط\nسيتم تسجيل حضورك تلقائياً عند دخولك منطقة العمل',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 13,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -243,7 +274,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           color: AppColors.info.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.info.withOpacity(0.3))),
-      child: const Text('يتم تسجيل الموقع تلقائياً لأغراض التوثيق.',
+      child: const Text(
+          'يتم تسجيل الحضور تلقائياً عبر GPS.\nالتسجيل اليدوي متاح كبديل ويتطلب موافقة المشرف.',
           textAlign: TextAlign.center,
           style: TextStyle(fontFamily: 'Cairo', fontSize: 13)),
     );
