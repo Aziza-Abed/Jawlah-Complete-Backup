@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
       attendanceManager.setSyncManager(syncManager);
 
       attendanceManager.loadTodayRecord();
+      attendanceManager.listenToBackgroundUpdates();
       context.read<TaskManager>().loadTasks();
       context.read<NoticeManager>().loadNotices();
     });
@@ -55,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _workDurationTimer?.cancel();
-    // cleanup
+    context.read<AttendanceManager>().cancelBackgroundListener();
     super.dispose();
   }
 

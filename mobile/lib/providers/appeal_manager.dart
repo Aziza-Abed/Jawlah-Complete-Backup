@@ -29,7 +29,7 @@ class AppealManager extends BaseController {
   Future<bool> submitAppeal({
     required int taskId,
     required String explanation,
-    File? evidencePhoto,
+    required File evidencePhoto,
   }) async {
     final success = await executeVoidWithErrorHandling(() async {
       await _appealsService.submitAppeal(

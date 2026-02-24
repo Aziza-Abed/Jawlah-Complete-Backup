@@ -19,6 +19,11 @@ class AttendanceCard extends StatelessWidget {
 
         final attendance = attendanceProvider.todayRecord;
 
+        // pending approval state
+        if (attendance != null && attendanceProvider.isPendingApproval) {
+          return _buildPendingApprovalCard(context);
+        }
+
         // user not checked in today
         if (attendance == null) {
           return _buildNotCheckedInCard(context);
@@ -28,7 +33,7 @@ class AttendanceCard extends StatelessWidget {
         final checkOutTime = attendance.checkOutTimeFormatted;
         final isActive = attendance.isActive;
 
-        // alredy checked out work done
+        // already checked out work done
         if (!isActive && checkOutTime != null) {
           return _buildCheckedOutCard(
               context, checkInTime, checkOutTime, attendance.workDurationFormatted);
@@ -93,7 +98,7 @@ class AttendanceCard extends StatelessWidget {
               height: 52,
               decoration: _iconDecoration(AppColors.warning),
               child: const Icon(
-                Icons.access_time,
+                Icons.gps_fixed,
                 size: 30,
                 color: AppColors.warning,
               ),
@@ -104,7 +109,7 @@ class AttendanceCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'لم تبدأ العمل بعد اليوم',
+                    'في انتظار الدخول لمنطقة العمل',
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
@@ -115,7 +120,7 @@ class AttendanceCard extends StatelessWidget {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'اضغط هنا لبدء العمل',
+                    'سيتم التسجيل تلقائياً عبر GPS',
                     style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
@@ -128,6 +133,63 @@ class AttendanceCard extends StatelessWidget {
             const Icon(
               Icons.arrow_back_ios,
               color: AppColors.warning,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingApprovalCard(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, Routes.attendance),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: _cardDecoration(),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: _iconDecoration(Colors.orange),
+              child: const Icon(
+                Icons.hourglass_top,
+                size: 30,
+                color: Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'بانتظار موافقة المشرف',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange,
+                      fontFamily: 'Cairo',
+                      height: 1.4,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'تم إرسال طلب تسجيل يدوي',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_back_ios,
+              color: Colors.orange,
               size: 20,
             ),
           ],
@@ -173,7 +235,7 @@ class AttendanceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'مدة العمل حتى الآن: $workDuration',
+                    'مدة العمل: $workDuration',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
@@ -246,7 +308,7 @@ class AttendanceCard extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   const Text(
-                    'اضغط لإنهاء العمل',
+                    'سيتم تسجيل الانصراف تلقائياً',
                     style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,

@@ -73,6 +73,33 @@ class AttendanceService {
     }
   }
 
+  // request manual attendance (fallback - requires supervisor approval)
+  Future<AttendanceModel> requestManualAttendance({
+    required String reason,
+    int? zoneId,
+  }) async {
+    try {
+      final data = <String, dynamic>{'reason': reason};
+      if (zoneId != null) data['zoneId'] = zoneId;
+
+      final response = await _apiService.post(
+        ApiConfig.manualAttendance,
+        data: data,
+      );
+
+      final responseData = response.data;
+      if (responseData['success'] != true) {
+        throw ServerException(
+          responseData['message'] ?? 'فشل طلب التسجيل اليدوي',
+        );
+      }
+      return AttendanceModel.fromJson(responseData['data']);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw ServerException('فشل طلب التسجيل اليدوي');
+    }
+  }
+
   // get today's attendance record if exists
   Future<AttendanceModel?> getTodayAttendance() async {
     try {

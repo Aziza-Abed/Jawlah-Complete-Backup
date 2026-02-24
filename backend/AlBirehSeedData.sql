@@ -83,83 +83,83 @@ DECLARE @AgriDeptId INT = SCOPE_IDENTITY();
 -- 3. ZONES (Real Al-Bireh Neighborhoods)
 -- ========================================================================
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'البصبوص', 'ZONE01', 'Al-Basbous', 31.896, 35.208, 125993, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'البصبوص', '19', 'Al-Basbous', 31.896, 35.208, 125993, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z1 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'راس الطاحونة', 'ZONE02', 'Ras-Attahouneh', 31.907, 35.212, 104253, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'راس الطاحونة', '26', 'Ras-Attahouneh', 31.907, 35.212, 104253, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z2 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'حديقة حرب', 'ZONE03', 'Hadiqat-Harb', 31.910, 35.212, 120466, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'حديقة حرب', '27', 'Hadiqat-Harb', 31.910, 35.212, 120466, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z3 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'قطعة شيبان', 'ZONE04', 'Qitat-Shayban', 31.912, 35.217, 110971, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'قطعة شيبان', '5', 'Qitat-Shayban', 31.912, 35.217, 110971, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z4 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'البلدية', 'ZONE05', 'Al-Baladiyya', 31.907, 35.215, 54385, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'البلدية', '7', 'Al-Baladiyya', 31.907, 35.215, 54385, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z5 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'البص', 'ZONE06', 'Al-Bass', 31.899, 35.213, 106870, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'البص', '11', 'Al-Bass', 31.899, 35.213, 106870, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z6 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'راس حسين', 'ZONE07', 'Ras-Hsein', 31.897, 35.207, 131550, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'راس حسين', '21', 'Ras-Hsein', 31.897, 35.207, 131550, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z7 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'الشيح الجنوبي', 'ZONE08', 'AsSheikh-AlJanubi', 31.889, 35.215, 147098, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'الشيح الجنوبي', '15', 'AsSheikh-AlJanubi', 31.889, 35.215, 147098, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z8 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'الغربية', 'ZONE09', 'Al-Gharbieh', 31.910, 35.211, 121813, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'الغربية', '28', 'Al-Gharbieh', 31.910, 35.211, 121813, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z9 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'بئر الراس', 'ZONE10', 'Bir-ArRas', 31.916, 35.217, 148286, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'بئر الراس', '2', 'Bir-ArRas', 31.916, 35.217, 148286, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z10 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'الميدان', 'ZONE11', 'Al-Midan', 31.900, 35.209, 134508, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'الميدان', '22', 'Al-Midan', 31.900, 35.209, 134508, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z11 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'سهل عواد', 'ZONE12', 'Sahl-Awwad', 31.911, 35.218, 85603, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'سهل عواد', '4', 'Sahl-Awwad', 31.911, 35.218, 85603, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z12 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'المركز', 'ZONE13', 'Al-Markaz', 31.911, 35.207, 103523, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'المركز', '29', 'Al-Markaz', 31.911, 35.207, 103523, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z13 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'الشيح الشمالي', 'ZONE14', 'Al-Sheikh-AsShamali', 31.892, 35.214, 168505, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'الشيح الشمالي', '14', 'Al-Sheikh-AsShamali', 31.892, 35.214, 168505, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z14 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'الجور التحتا', 'ZONE15', 'Al-Jjuwar-AtTahta', 31.914, 35.219, 87603, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'الجور التحتا', '3', 'Al-Jjuwar-AtTahta', 31.914, 35.219, 87603, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z15 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'البلدة القديمة', 'ZONE16', 'Old-City', 31.905, 35.216, 84034, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'البلدة القديمة', '331', 'Old-City', 31.905, 35.216, 84034, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z16 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'المنارة', 'ZONE17', 'Al-Manara', 31.903, 35.206, 91684, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'المنارة', '23', 'Al-Manara', 31.903, 35.206, 91684, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z17 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'الحومة', 'ZONE18', 'Al-Homa', 31.900, 35.215, 65365, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'الحومة', '10', 'Al-Homa', 31.900, 35.215, 65365, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z18 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'المبارخ', 'ZONE19', 'Al-Mbarekh', 31.892, 35.208, 102778, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'المبارخ', '18', 'Al-Mbarekh', 31.892, 35.208, 102778, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z19 INT = SCOPE_IDENTITY();
 
 INSERT INTO [Zones] (MunicipalityId, ZoneName, ZoneCode, Description, CenterLatitude, CenterLongitude, AreaSquareMeters, District, Version, VersionDate, IsActive, CreatedAt)
-VALUES (@MunicipalityId, N'القبارصة', 'ZONE20', 'Al-Qabarsah', 31.916, 35.220, 113248, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
+VALUES (@MunicipalityId, N'القبارصة', '1', 'Al-Qabarsah', 31.916, 35.220, 113248, N'البيرة', 1, GETUTCDATE(), 1, GETUTCDATE());
 DECLARE @Z20 INT = SCOPE_IDENTITY();
 
 PRINT 'Created 20 real Al-Bireh zones';

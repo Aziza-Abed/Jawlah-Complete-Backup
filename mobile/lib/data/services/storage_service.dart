@@ -18,6 +18,12 @@ class StorageService {
   Future<String?> getToken() => StorageHelper.getToken();
   Future<bool> removeToken() => StorageHelper.removeToken();
 
+  // refresh token methods
+  Future<bool> saveRefreshToken(String token) =>
+      StorageHelper.saveRefreshToken(token);
+  Future<String?> getRefreshToken() => StorageHelper.getRefreshToken();
+  Future<bool> removeRefreshToken() => StorageHelper.removeRefreshToken();
+
   // user ID methods save and get userId as int
   Future<bool> saveUserId(int userId) =>
       StorageHelper.saveInt('user_id', userId);

@@ -13,7 +13,7 @@ class AppealsService {
   Future<int> submitAppeal({
     required int taskId,
     required String explanation,
-    File? evidencePhoto,
+    required File evidencePhoto,
   }) async {
     try {
       final formData = FormData.fromMap({
@@ -22,15 +22,13 @@ class AppealsService {
         'WorkerExplanation': explanation,
       });
 
-      if (evidencePhoto != null) {
-        formData.files.add(MapEntry(
-          'EvidencePhoto',
-          await MultipartFile.fromFile(
-            evidencePhoto.path,
-            filename: 'evidence_${DateTime.now().millisecondsSinceEpoch}.jpg',
-          ),
-        ));
-      }
+      formData.files.add(MapEntry(
+        'EvidencePhoto',
+        await MultipartFile.fromFile(
+          evidencePhoto.path,
+          filename: 'evidence_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        ),
+      ));
 
       final response = await _apiService.post(
         ApiConfig.appeals,

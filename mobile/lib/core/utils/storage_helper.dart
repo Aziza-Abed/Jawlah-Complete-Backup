@@ -31,6 +31,14 @@ class StorageHelper {
   static Future<bool> removeToken() => SecureStorageHelper.removeToken();
   static Future<bool> hasToken() => SecureStorageHelper.hasToken();
 
+  // refresh token
+  static Future<bool> saveRefreshToken(String token) =>
+      SecureStorageHelper.saveRefreshToken(token);
+  static Future<String?> getRefreshToken() =>
+      SecureStorageHelper.getRefreshToken();
+  static Future<bool> removeRefreshToken() =>
+      SecureStorageHelper.removeRefreshToken();
+
   // user profile methods
   static Future<bool> keepUser(UserModel user) async {
     try {

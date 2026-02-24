@@ -56,7 +56,7 @@ class NotCheckedInBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'لم تبدأ العمل بعد',
+                      'لم يتم تسجيل الحضور بعد',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -65,7 +65,7 @@ class NotCheckedInBanner extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'اضغط لبدء يوم العمل',
+                      'سيتم التسجيل تلقائياً عند دخول منطقة العمل',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary.withOpacity(0.8),
@@ -91,7 +91,7 @@ class NotCheckedInBanner extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  'بدء العمل',
+                  'تسجيل يدوي',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,

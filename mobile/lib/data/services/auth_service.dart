@@ -71,6 +71,7 @@ class AuthService {
       return AuthResult(
         user: UserModel.fromJson(data['user'] as Map<String, dynamic>),
         token: data['token'] as String,
+        refreshToken: data['refreshToken'] as String?,
         message: data['message'] as String?,
       );
     } catch (e) {
@@ -157,6 +158,7 @@ class AuthService {
       return AuthResult(
         user: UserModel.fromJson(data['user'] as Map<String, dynamic>),
         token: data['token'] as String,
+        refreshToken: data['refreshToken'] as String?,
         message: data['message'] as String?,
       );
     } catch (e) {
@@ -331,6 +333,7 @@ class OtpResendResult {
 class AuthResult {
   final UserModel? user;
   final String? token;
+  final String? refreshToken;
   final String? message;
 
   // OTP (Two-Factor Authentication) fields
@@ -341,6 +344,7 @@ class AuthResult {
   AuthResult({
     this.user,
     this.token,
+    this.refreshToken,
     this.message,
     this.requiresOtp = false,
     this.sessionToken,

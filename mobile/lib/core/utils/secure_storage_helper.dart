@@ -5,6 +5,7 @@ class SecureStorageHelper {
   SecureStorageHelper._();
 
   static const String _keyToken = 'jwt_token';
+  static const String _keyRefreshToken = 'refresh_token';
   static const String _keyFcmToken = 'fcm_token';
   static const String _keyEmployeeId = 'employee_id';
   static const String _keyHashedPin = 'hashed_pin';
@@ -37,6 +38,29 @@ class SecureStorageHelper {
   static Future<bool> hasToken() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;
+  }
+
+  // refresh token methods
+  static Future<bool> saveRefreshToken(String token) async {
+    try {
+      await _secureStorage.write(key: _keyRefreshToken, value: token);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<String?> getRefreshToken() async {
+    return await _secureStorage.read(key: _keyRefreshToken);
+  }
+
+  static Future<bool> removeRefreshToken() async {
+    try {
+      await _secureStorage.delete(key: _keyRefreshToken);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   // fcm methods
@@ -112,6 +136,7 @@ class SecureStorageHelper {
   static Future<bool> clearAll() async {
     try {
       await _secureStorage.delete(key: _keyToken);
+      await _secureStorage.delete(key: _keyRefreshToken);
       await _secureStorage.delete(key: _keyFcmToken);
       await _secureStorage.delete(key: _keyHashedPin);
       await _secureStorage.delete(key: _keyUserProfile);
@@ -126,6 +151,7 @@ class SecureStorageHelper {
   static Future<bool> clearAllIncludingCredentials() async {
     try {
       await _secureStorage.delete(key: _keyToken);
+      await _secureStorage.delete(key: _keyRefreshToken);
       await _secureStorage.delete(key: _keyFcmToken);
       await _secureStorage.delete(key: _keyEmployeeId);
       await _secureStorage.delete(key: _keyHashedPin);

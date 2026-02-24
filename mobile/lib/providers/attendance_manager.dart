@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/models/attendance_model.dart';
@@ -26,14 +28,44 @@ class AttendanceManager extends BaseController {
   bool canLoadMore = true;
   bool isFetchingMore = false;
 
+  StreamSubscription? _bgSubscription;
+
   bool get isCheckedIn => todayRecord != null && todayRecord!.isActive;
   bool get isCheckedOut => todayRecord != null && !todayRecord!.isActive;
   bool get hasNotCheckedInToday => todayRecord == null;
+  bool get isPendingApproval => todayRecord?.approvalStatus == 'Pending';
   String? get currentWorkDuration => todayRecord?.workDurationFormatted;
 
   // set sync manager
   void setSyncManager(SyncManager manager) {
     _syncManager = manager;
+  }
+
+  // listen for background service auto check-in/out events
+  void listenToBackgroundUpdates() {
+    _bgSubscription?.cancel();
+    _bgSubscription = FlutterBackgroundService().on('attendanceUpdate').listen((event) {
+      if (kDebugMode) debugPrint('Background attendance event: $event');
+      loadTodayRecord();
+    });
+  }
+
+  // cancel background listener
+  void cancelBackgroundListener() {
+    _bgSubscription?.cancel();
+    _bgSubscription = null;
+  }
+
+  // request manual attendance (fallback - requires supervisor approval)
+  Future<bool> requestManualAttendance(String reason, {int? zoneId}) async {
+    final success = await executeVoidWithErrorHandling(() async {
+      await _attendanceService.requestManualAttendance(
+        reason: reason,
+        zoneId: zoneId,
+      );
+      await loadTodayRecord();
+    });
+    return success;
   }
 
 

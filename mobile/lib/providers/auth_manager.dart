@@ -150,6 +150,9 @@ class AuthManager extends BaseController {
 
       // save user data
       await _storageService.saveToken(loginResult.token!);
+      if (loginResult.refreshToken != null) {
+        await _storageService.saveRefreshToken(loginResult.refreshToken!);
+      }
       await _storageService.saveUserId(loginResult.user!.userId);
 
       await _storageService.saveHashedPin(_hashPasswordWithSalt(password));
@@ -157,6 +160,7 @@ class AuthManager extends BaseController {
 
       // update api token
       ApiService().updateToken(loginResult.token);
+      ApiService().updateRefreshToken(loginResult.refreshToken);
 
       notifyListeners();
 
@@ -309,11 +313,15 @@ class AuthManager extends BaseController {
 
       // save user data
       await _storageService.saveToken(verifyResult.token!);
+      if (verifyResult.refreshToken != null) {
+        await _storageService.saveRefreshToken(verifyResult.refreshToken!);
+      }
       await _storageService.saveUserId(verifyResult.user!.userId);
       await _storageService.saveUserProfile(jsonEncode(verifyResult.user!.toJson()));
 
       // update api token
       ApiService().updateToken(verifyResult.token);
+      ApiService().updateRefreshToken(verifyResult.refreshToken);
 
       notifyListeners();
 

@@ -32,6 +32,7 @@ class ApiConfig {
   static const String profile = 'auth/profile';
   static const String logout = 'auth/logout';
   static const String registerFcmToken = 'auth/register-fcm-token';
+  static const String refreshToken = 'auth/refresh';
   static const String forgotPassword = 'auth/forgot-password';
   static const String resetPassword = 'auth/reset-password';
 
@@ -47,6 +48,7 @@ class ApiConfig {
   static const String checkOut = 'attendance/checkout';
   static const String todayAttendance = 'attendance/today';
   static const String attendanceHistory = 'attendance/history';
+  static const String manualAttendance = 'attendance/manual';
 
   // issues endpoints
   static const String reportIssue = 'issues/report-with-photo';

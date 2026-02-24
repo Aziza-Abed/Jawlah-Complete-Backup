@@ -90,13 +90,23 @@ class _SubmitAppealScreenState extends State<SubmitAppealScreen> {
       return;
     }
 
+    if (_evidencePhoto == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يجب إرفاق صورة كدليل للطعن'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     final appealManager = context.read<AppealManager>();
     final success = await appealManager.submitAppeal(
       taskId: widget.rejectedTask.taskId,
       explanation: _explanationController.text.trim(),
-      evidencePhoto: _evidencePhoto,
+      evidencePhoto: _evidencePhoto!,
     );
 
     if (!mounted) return;
@@ -182,7 +192,7 @@ class _SubmitAppealScreenState extends State<SubmitAppealScreen> {
 
                 // Evidence photo section
                 const Text(
-                  'صورة داعمة (اختياري)',
+                  'صورة داعمة (مطلوب)',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -190,7 +200,7 @@ class _SubmitAppealScreenState extends State<SubmitAppealScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'يمكنك إرفاق صورة تثبت وجودك في الموقع الصحيح',
+                  'يجب إرفاق صورة تثبت وجودك في الموقع الصحيح',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey,

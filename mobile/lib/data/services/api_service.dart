@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/config/api_config.dart';
 import '../../core/utils/storage_helper.dart';
@@ -13,6 +15,9 @@ class ApiService {
   late final Dio dioClient;
 
   String? _token;
+  String? _refreshToken;
+  bool _isRefreshing = false;
+  final List<_RetryRequest> _pendingRequests = [];
 
   Dio get dio => dioClient;
 
@@ -47,7 +52,7 @@ class ApiService {
     }
   }
 
-  // add token to requests
+  // add token to requests and handle 401 with refresh
   InterceptorsWrapper makeAuthHelper() {
     return InterceptorsWrapper(
       onRequest: (options, handler) async {
@@ -58,18 +63,115 @@ class ApiService {
         return handler.next(options);
       },
       onError: (error, handler) async {
-        // if we get 401, logout user
-        if (error.response?.statusCode == 401) {
-          await cleanAuthData();
+        if (error.response?.statusCode != 401) {
+          return handler.next(error);
         }
-        return handler.next(error);
+
+        final requestPath = error.requestOptions.path;
+
+        // don't try to refresh if the failing request is auth-related
+        if (requestPath.contains('auth/login') ||
+            requestPath.contains('auth/refresh') ||
+            requestPath.contains('auth/verify-otp') ||
+            requestPath.contains('auth/forgot-password') ||
+            requestPath.contains('auth/reset-password')) {
+          await cleanAuthData();
+          return handler.next(error);
+        }
+
+        // if no refresh token available, logout
+        if (_refreshToken == null || _refreshToken!.isEmpty) {
+          await cleanAuthData();
+          return handler.next(error);
+        }
+
+        // if already refreshing, queue this request to retry later
+        if (_isRefreshing) {
+          final retry = _RetryRequest(error.requestOptions);
+          _pendingRequests.add(retry);
+          try {
+            final response = await retry.completer.future;
+            return handler.resolve(response);
+          } catch (e) {
+            return handler.next(error);
+          }
+        }
+
+        // attempt refresh
+        _isRefreshing = true;
+        try {
+          final refreshResponse = await dioClient.post(
+            ApiConfig.refreshToken,
+            data: {'refreshToken': _refreshToken},
+            options: Options(
+              headers: {'Authorization': ''},  // no auth for refresh
+            ),
+          );
+
+          final responseData = refreshResponse.data;
+          if (responseData['success'] == true && responseData['data'] != null) {
+            final data = responseData['data'];
+            final newToken = data['token'] as String?;
+            final newRefreshToken = data['refreshToken'] as String?;
+
+            if (newToken != null) {
+              _token = newToken;
+              await StorageHelper.saveToken(newToken);
+
+              if (newRefreshToken != null) {
+                _refreshToken = newRefreshToken;
+                await StorageHelper.saveRefreshToken(newRefreshToken);
+              }
+
+              if (kDebugMode) debugPrint('Token refreshed successfully');
+
+              // retry all pending requests with new token
+              for (final pending in _pendingRequests) {
+                pending.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+                try {
+                  final response = await dioClient.fetch(pending.requestOptions);
+                  pending.completer.complete(response);
+                } catch (e) {
+                  pending.completer.completeError(e);
+                }
+              }
+              _pendingRequests.clear();
+
+              // retry the original request
+              error.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+              final retryResponse = await dioClient.fetch(error.requestOptions);
+              return handler.resolve(retryResponse);
+            }
+          }
+
+          // refresh failed - clean up
+          await cleanAuthData();
+          _failPendingRequests(error);
+          return handler.next(error);
+        } catch (e) {
+          if (kDebugMode) debugPrint('Token refresh failed: $e');
+          await cleanAuthData();
+          _failPendingRequests(error);
+          return handler.next(error);
+        } finally {
+          _isRefreshing = false;
+        }
       },
     );
   }
 
+  void _failPendingRequests(DioException error) {
+    for (final pending in _pendingRequests) {
+      pending.completer.completeError(error);
+    }
+    _pendingRequests.clear();
+  }
+
   Future<void> cleanAuthData() async {
     _token = null;
+    _refreshToken = null;
     await StorageHelper.removeToken();
+    await StorageHelper.removeRefreshToken();
     await StorageHelper.removeUser();
   }
 
@@ -77,8 +179,13 @@ class ApiService {
     _token = token;
   }
 
+  void updateRefreshToken(String? refreshToken) {
+    _refreshToken = refreshToken;
+  }
+
   Future<void> loadToken() async {
     _token = await StorageHelper.getToken();
+    _refreshToken = await StorageHelper.getRefreshToken();
   }
 
   // HTTP methods
@@ -187,4 +294,12 @@ class ApiService {
     // anything else
     return AppException('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
   }
+}
+
+/// Helper class to queue requests while token refresh is in progress
+class _RetryRequest {
+  final RequestOptions requestOptions;
+  final completer = Completer<Response>();
+
+  _RetryRequest(this.requestOptions);
 }

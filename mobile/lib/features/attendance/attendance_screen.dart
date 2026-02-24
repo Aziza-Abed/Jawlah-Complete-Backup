@@ -30,7 +30,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     return BaseScreen(
-      title: 'بدء وإنهاء العمل',
+      title: 'سجل الحضور',
       showBackButton: true,
       actions: [
         IconButton(
@@ -62,11 +62,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  if (attendanceProvider.hasNotCheckedInToday)
+                  if (attendanceProvider.hasNotCheckedInToday &&
+                      !attendanceProvider.isPendingApproval)
                     _buildAutoGeofenceBanner(),
                   _buildStatusCard(attendanceProvider),
                   const SizedBox(height: 20),
-                  _buildActionButton(attendanceProvider),
+                  _buildManualRequestButton(attendanceProvider),
                   const SizedBox(height: 20),
                   _buildInfoCard(),
                 ],
@@ -104,7 +105,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             const SizedBox(height: 12),
             Text(
               isOffline
-                  ? 'يمكنك تسجيل الحضور والانصراف بشكل طبيعي، سيتم حفظ البيانات وإرسالها عند توفر الإنترنت.'
+                  ? 'سيتم تسجيل الحضور تلقائياً عند توفر الاتصال ودخول منطقة العمل.'
                   : (provider.errorMessage ?? 'يرجى المحاولة مرة أخرى لاحقاً'),
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -132,6 +133,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Widget _buildStatusCard(AttendanceManager provider) {
     final attendance = provider.todayRecord;
     final isWorking = provider.isCheckedIn && !provider.isCheckedOut;
+    final isPending = provider.isPendingApproval;
 
     return Container(
       width: double.infinity,
@@ -154,27 +156,42 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   color: AppColors.textSecondary, fontFamily: 'Cairo')),
           const SizedBox(height: 16),
           Icon(
-              isWorking
-                  ? Icons.check_circle
-                  : (attendance != null ? Icons.done_all : Icons.access_time),
+              isPending
+                  ? Icons.hourglass_top
+                  : isWorking
+                      ? Icons.check_circle
+                      : (attendance != null ? Icons.done_all : Icons.gps_fixed),
               size: 60,
-              color: isWorking
-                  ? AppColors.success
-                  : (attendance != null
-                      ? AppColors.primary
-                      : AppColors.warning)),
+              color: isPending
+                  ? Colors.orange
+                  : isWorking
+                      ? AppColors.success
+                      : (attendance != null
+                          ? AppColors.primary
+                          : AppColors.warning)),
           const SizedBox(height: 16),
           Text(
-              isWorking
-                  ? 'أنت الآن في فترة العمل'
-                  : (attendance != null
-                      ? 'تم إنهاء العمل لهذا اليوم'
-                      : 'لم تبدأ العمل بعد'),
+              isPending
+                  ? 'بانتظار موافقة المشرف'
+                  : isWorking
+                      ? 'أنت الآن في فترة العمل'
+                      : (attendance != null
+                          ? 'تم إنهاء العمل لهذا اليوم'
+                          : 'في انتظار الدخول لمنطقة العمل'),
               style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Cairo')),
-          if (attendance != null) ...[
+          if (isPending) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'تم إرسال طلب تسجيل يدوي وينتظر موافقة المشرف',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: AppColors.textSecondary, fontFamily: 'Cairo'),
+            ),
+          ],
+          if (attendance != null && !isPending) ...[
             const SizedBox(height: 8),
             Text('بدأت العمل: ${attendance.checkInTimeFormatted}',
                 style: const TextStyle(
@@ -198,19 +215,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  Widget _buildActionButton(AttendanceManager provider) {
-    final bool canCheckIn = !provider.isCheckedIn;
-
-    if (provider.isCheckedOut) return const SizedBox.shrink();
+  Widget _buildManualRequestButton(AttendanceManager provider) {
+    // only show when not checked in and not pending approval
+    if (!provider.hasNotCheckedInToday || provider.isPendingApproval) {
+      return const SizedBox.shrink();
+    }
 
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: provider.isLoading
-            ? null
-            : () => _handleAction(provider, canCheckIn),
+        onPressed: provider.isLoading ? null : () => _showManualReasonDialog(provider),
         style: ElevatedButton.styleFrom(
-          backgroundColor: canCheckIn ? AppColors.oliveGreen : AppColors.error,
+          backgroundColor: AppColors.oliveGreen,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape:
@@ -222,13 +238,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 width: 24,
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2))
-            : Row(
+            : const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(canCheckIn ? Icons.play_arrow_rounded : Icons.stop_rounded),
-                  const SizedBox(width: 8),
-                  Text(canCheckIn ? 'تسجيل يدوي' : 'إنهاء العمل',
-                      style: const TextStyle(
+                  Icon(Icons.edit_note),
+                  SizedBox(width: 8),
+                  Text('طلب تسجيل يدوي',
+                      style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'Cairo')),
@@ -236,6 +252,100 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ),
       ),
     );
+  }
+
+  Future<void> _showManualReasonDialog(AttendanceManager provider) async {
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'طلب تسجيل يدوي',
+          textAlign: TextAlign.right,
+          style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text(
+                'يرجى إدخال سبب طلب التسجيل اليدوي.\nسيتطلب هذا الطلب موافقة المشرف.',
+                textAlign: TextAlign.right,
+                style: TextStyle(fontFamily: 'Cairo', fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: reasonController,
+                textAlign: TextAlign.right,
+                textDirection: TextDirection.rtl,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'مثال: عطل في GPS، دخول من بوابة بديلة...',
+                  hintStyle: const TextStyle(fontFamily: 'Cairo', fontSize: 13),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                style: const TextStyle(fontFamily: 'Cairo'),
+                validator: (value) {
+                  if (value == null || value.trim().length < 5) {
+                    return 'يجب أن يكون السبب 5 أحرف على الأقل';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, reasonController.text.trim());
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.oliveGreen,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('إرسال الطلب', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+        ],
+      ),
+    );
+
+    if (reason == null || reason.isEmpty) return;
+
+    HapticFeedback.heavyImpact();
+    final success = await provider.requestManualAttendance(reason);
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'تم إرسال الطلب بنجاح - بانتظار موافقة المشرف',
+                style: TextStyle(fontFamily: 'Cairo')),
+            backgroundColor: AppColors.success));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                provider.errorMessage ?? 'فشل إرسال الطلب، يرجى المحاولة مرة أخرى',
+                style: const TextStyle(fontFamily: 'Cairo')),
+            backgroundColor: AppColors.error));
+      }
+    }
   }
 
   Widget _buildAutoGeofenceBanner() {
@@ -279,29 +389,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(fontFamily: 'Cairo', fontSize: 13)),
     );
-  }
-
-  Future<void> _handleAction(AttendanceManager provider, bool isCheckIn) async {
-    HapticFeedback.heavyImpact();
-
-    // Use automatic GPS location (no map picker for attendance)
-    final success =
-        isCheckIn ? await provider.doCheckIn() : await provider.doCheckOut();
-    if (mounted) {
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                isCheckIn ? 'تم بدء العمل بنجاح - بالتوفيق!' : 'تم إنهاء العمل بنجاح - شكراً لك!',
-                style: const TextStyle(fontFamily: 'Cairo')),
-            backgroundColor: AppColors.success));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                provider.errorMessage ?? 'فشلت العملية، يرجى المحاولة مرة أخرى',
-                style: const TextStyle(fontFamily: 'Cairo')),
-            backgroundColor: AppColors.error));
-      }
-    }
   }
 
   Future<void> _handleLogout(BuildContext context) async {
