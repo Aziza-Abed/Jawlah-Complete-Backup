@@ -119,8 +119,8 @@ export default function AdminMonitoring() {
 
   useEffect(() => {
     fetchData();
-    // Fallback poll every 60s for battery info & new workers (SignalR handles locations)
-    const interval = setInterval(() => fetchData(true), 60000);
+    // Fallback poll every 30s for battery info & new workers (SignalR handles locations)
+    const interval = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(interval);
   }, []);
 

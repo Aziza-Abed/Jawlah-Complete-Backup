@@ -1,6 +1,6 @@
 // Task types matching backend DTOs
 
-export type TaskStatus = "Pending" | "InProgress" | "UnderReview" | "Completed" | "Rejected";
+export type TaskStatus = "Pending" | "InProgress" | "UnderReview" | "Completed" | "Rejected" | "Created" | "Assigned" | "Accepted" | "Submitted" | "Synced" | "Cancelled" | "FailedSync";
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 export type TaskType = "GarbageCollection" | "StreetSweeping" | "ContainerMaintenance" | "RepairMaintenance" | "PublicSpaceCleaning" | "Inspection" | "Other";
 

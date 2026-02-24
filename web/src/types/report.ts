@@ -15,7 +15,7 @@ export type TasksReportData = {
   completed: number;
   inProgress: number;
   pending: number;
-  cancelled: number;
+  underReview: number;
   activeWorkers: number;
   totalWorkers: number;
   byPeriod: TasksByPeriod[];

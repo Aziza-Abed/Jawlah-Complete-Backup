@@ -168,6 +168,55 @@ export default function AdminSupervisors() {
 
 
 
+          {/* Alerts Section */}
+          {monitoringData?.alerts && monitoringData.alerts.length > 0 && (
+            <div className="space-y-3">
+              {monitoringData.alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`flex items-center gap-4 flex-row-reverse p-4 rounded-[16px] border ${
+                    alert.severity === 'Critical'
+                      ? 'bg-[#C86E5D]/5 border-[#C86E5D]/20'
+                      : alert.severity === 'Warning'
+                      ? 'bg-[#F5B300]/5 border-[#F5B300]/20'
+                      : 'bg-[#7895B2]/5 border-[#7895B2]/20'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${
+                    alert.severity === 'Critical'
+                      ? 'bg-[#C86E5D]/10'
+                      : alert.severity === 'Warning'
+                      ? 'bg-[#F5B300]/10'
+                      : 'bg-[#7895B2]/10'
+                  }`}>
+                    <AlertTriangle size={18} className={
+                      alert.severity === 'Critical'
+                        ? 'text-[#C86E5D]'
+                        : alert.severity === 'Warning'
+                        ? 'text-[#F5B300]'
+                        : 'text-[#7895B2]'
+                    } />
+                  </div>
+                  <div className="flex-1 text-right">
+                    <p className="text-[14px] font-bold text-[#2F2F2F]">{alert.message}</p>
+                    {alert.supervisorName && (
+                      <p className="text-[12px] text-[#6B7280] mt-0.5">المشرف: {alert.supervisorName}</p>
+                    )}
+                  </div>
+                  <span className={`text-[11px] font-black px-3 py-1 rounded-full shrink-0 ${
+                    alert.severity === 'Critical'
+                      ? 'bg-[#C86E5D]/10 text-[#C86E5D]'
+                      : alert.severity === 'Warning'
+                      ? 'bg-[#F5B300]/10 text-[#F5B300]'
+                      : 'bg-[#7895B2]/10 text-[#7895B2]'
+                  }`}>
+                    {alert.severity === 'Critical' ? 'حرج' : alert.severity === 'Warning' ? 'تحذير' : 'معلومة'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Search and Filters */}
           <div className="bg-white rounded-[16px] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)] flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">

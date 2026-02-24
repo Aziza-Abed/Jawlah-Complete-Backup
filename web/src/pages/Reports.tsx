@@ -22,7 +22,7 @@ import {
 
 type TabKey = "tasks" | "workers" | "zones";
 type PeriodPreset = "daily" | "weekly" | "monthly" | "yearly" | "custom";
-type TaskStatus = "all" | "open" | "in_progress" | "closed" | "pending";
+type TaskStatus = "all" | "pending" | "in_progress" | "underreview" | "completed";
 
 type FiltersDraft = {
   period: PeriodPreset;
@@ -233,7 +233,7 @@ export default function Reports() {
 
     setExporting(true);
     try {
-      if (tab === "tasks") {
+      if (tab === "tasks" || tab === "zones") {
         await downloadTasksReport(format, filters);
       } else {
         await downloadAttendanceReport(format, filters);
@@ -342,10 +342,10 @@ export default function Reports() {
                 onChange={(v) => setDraft((p) => ({ ...p, status: v as TaskStatus }))}
                 options={[
                   { value: "all", label: "الكل" },
-                  { value: "open", label: "مفتوحة" },
-                  { value: "in_progress", label: "قيد التنفيذ" },
                   { value: "pending", label: "معلقة" },
-                  { value: "closed", label: "مغلقة" },
+                  { value: "in_progress", label: "قيد التنفيذ" },
+                  { value: "underreview", label: "قيد المراجعة" },
+                  { value: "completed", label: "مكتملة" },
                 ]}
                 disabled={!showStatusFilter}
               />
@@ -498,6 +498,7 @@ export default function Reports() {
                               <span className={`px-3 py-1 rounded-full text-[10px] font-black border tracking-wider uppercase ${
                                   r.status === 'مكتملة' ? 'bg-[#8FA36A]/10 text-[#8FA36A] border-[#8FA36A]/20' :
                                   r.status === 'قيد التنفيذ' ? 'bg-[#7895B2]/10 text-[#7895B2] border-[#7895B2]/20' :
+                                  r.status === 'قيد المراجعة' ? 'bg-[#A78BFA]/10 text-[#A78BFA] border-[#A78BFA]/20' :
                                   r.status === 'معلقة' ? 'bg-[#C86E5D]/10 text-[#C86E5D] border-[#C86E5D]/20' :
                                   r.status === 'مرفوضة' ? 'bg-red-500/10 text-red-600 border-red-500/20' : 'bg-[#7895B2]/5 text-[#AFAFAF] border-black/5'
                               }`}>
@@ -872,10 +873,10 @@ function translateStatus(status: string): string {
   const map: Record<string, string> = {
     'Pending': 'معلقة',
     'InProgress': 'قيد التنفيذ',
+    'UnderReview': 'قيد المراجعة',
     'Completed': 'مكتملة',
     'Rejected': 'مرفوضة',
-    'Open': 'مفتوحة',
-    'Closed': 'مغلقة',
+    'Cancelled': 'ملغاة',
   };
   return map[status] || status;
 }
@@ -903,7 +904,8 @@ function buildViewFromTasksApi(data: TasksReportData, f: FiltersDraft, lastUpdat
   const total = data.total || 1;
   const completedPct = Math.round((data.completed / total) * 100);
   const inProgressPct = Math.round((data.inProgress / total) * 100);
-  const pendingPct = 100 - completedPct - inProgressPct;
+  const underReviewPct = Math.round(((data.underReview ?? 0) / total) * 100);
+  const pendingPct = Math.max(0, 100 - completedPct - inProgressPct - underReviewPct);
 
   // Map byPeriod to chart points
   const points: SeriesPoint[] = data.byPeriod.map((p) => ({
@@ -949,8 +951,9 @@ function buildViewFromTasksApi(data: TasksReportData, f: FiltersDraft, lastUpdat
       parts: [
         { label: "مكتملة", value: completedPct, color: palette.green },
         { label: "نشطة", value: inProgressPct, color: palette.blue },
+        { label: "قيد المراجعة", value: underReviewPct, color: palette.purple },
         { label: "معلقة", value: pendingPct, color: palette.red },
-      ],
+      ].filter(p => p.value > 0),
     },
     table: {
       title: "جدول المهام التفصيلي",

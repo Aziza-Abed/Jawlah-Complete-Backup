@@ -283,6 +283,8 @@ class IssueModel {
     }
   }
 
+  bool get isClosed => status.toLowerCase() == 'closed';
+
   String get statusArabic {
     // map to correct enum that match backend IssueStatus enum
     switch (status.toLowerCase()) {
@@ -290,8 +292,12 @@ class IssueModel {
         return 'جديدة';
       case 'forwarded':
         return 'محولة';
+      case 'inprogress':
+        return 'قيد المعالجة';
       case 'resolved':
         return 'تم الحل';
+      case 'closed':
+        return 'مغلقة';
       // legacy support for old values
       case 'reported':
         return 'جديدة';
@@ -299,8 +305,6 @@ class IssueModel {
         return 'محولة';
       case 'dismissed':
         return 'تم الحل';
-      case 'inprogress':
-        return 'محولة';
       case 'rejected':
         return 'تم الحل';
       default:

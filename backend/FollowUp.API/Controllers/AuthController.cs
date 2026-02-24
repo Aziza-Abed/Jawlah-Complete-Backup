@@ -87,7 +87,8 @@ public class AuthController : BaseApiController
         }
 
         // Validate device ID format (must be valid GUID)
-        var deviceId = Request.Headers["X-Device-Id"].FirstOrDefault();
+        // Accept from request body (mobile sends it there) or X-Device-Id header (fallback)
+        var deviceId = request.DeviceId ?? Request.Headers["X-Device-Id"].FirstOrDefault();
         if (!string.IsNullOrEmpty(deviceId) && !Guid.TryParse(deviceId, out _))
         {
             _logger.LogWarning("Invalid device ID format received: {DeviceId}", deviceId);

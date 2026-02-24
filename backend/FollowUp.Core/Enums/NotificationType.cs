@@ -7,5 +7,11 @@ public enum NotificationType
     TaskUpdated = 3,
     IssueReviewed = 4,
     SystemAlert = 5,
-    BatteryLow = 6
+    BatteryLow = 6,
+    TaskStatusChanged = 7,
+    AttendanceReminder = 8,
+    ManualAttendanceApproved = 9,
+    ManualAttendanceRejected = 10,
+    IssueReported = 11,
+    IssueResolved = 12
 }

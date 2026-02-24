@@ -315,13 +315,20 @@ class TaskModel {
   }
 
   bool get isPending => status.toLowerCase() == 'pending';
+  bool get isCreated => status.toLowerCase() == 'created';
+  bool get isAssigned => status.toLowerCase() == 'assigned';
+  bool get isAccepted => status.toLowerCase() == 'accepted';
 
   bool get isInProgress => status.toLowerCase() == 'inprogress';
+  bool get isSubmitted => status.toLowerCase() == 'submitted';
 
   bool get isUnderReview => status.toLowerCase() == 'underreview';
 
   bool get isCompleted => status.toLowerCase() == 'completed';
+  bool get isSynced => status.toLowerCase() == 'synced';
   bool get isRejected => status.toLowerCase() == 'rejected';
+  bool get isCancelled => status.toLowerCase() == 'cancelled';
+  bool get isFailedSync => status.toLowerCase() == 'failedsync';
 
   bool get isOverdue {
     if (dueDate == null || isUnderReview || isCompleted) return false;
@@ -336,15 +343,26 @@ class TaskModel {
   String get statusArabic {
     switch (status.toLowerCase()) {
       case 'pending':
+      case 'created':
         return 'جديد';
+      case 'assigned':
+        return 'تم التعيين';
+      case 'accepted':
+        return 'مقبولة';
       case 'inprogress':
         return 'قيد التنفيذ';
+      case 'submitted':
       case 'underreview':
         return 'قيد المراجعة';
       case 'completed':
+      case 'synced':
         return 'مكتملة';
       case 'rejected':
         return 'مرفوضة';
+      case 'cancelled':
+        return 'ملغاة';
+      case 'failedsync':
+        return 'فشل المزامنة';
       default:
         return status;
     }

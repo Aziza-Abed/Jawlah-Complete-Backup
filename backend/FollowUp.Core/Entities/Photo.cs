@@ -20,8 +20,16 @@ public class Photo
 
     public long? FileSizeBytes { get; set; }
 
+    // GPS coordinates of where the photo was captured
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+
     public DateTime UploadedAt { get; set; }
     public int? UploadedByUserId { get; set; }
+
+    // Dual timestamp model: when captured vs when synced
+    public DateTime? EventTime { get; set; }
+    public DateTime? SyncTime { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

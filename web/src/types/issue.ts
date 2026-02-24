@@ -2,7 +2,7 @@
 
 export type IssueType = "Infrastructure" | "Safety" | "Cleanliness" | "Equipment" | "Other";
 export type IssueSeverity = "Low" | "Medium" | "High" | "Critical";
-export type IssueStatus = "New" | "Forwarded" | "Resolved";
+export type IssueStatus = "New" | "Forwarded" | "Resolved" | "InProgress" | "Closed";
 
 export type IssueResponse = {
   issueId: number;
