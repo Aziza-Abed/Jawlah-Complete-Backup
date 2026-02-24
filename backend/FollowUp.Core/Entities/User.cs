@@ -36,7 +36,7 @@ public class User
     public DateTime? LastLoginAt { get; set; }
     public string? FcmToken { get; set; }
 
-    // Login attempt tracking (SR1.5)
+    // login attempt tracking
     public int FailedLoginAttempts { get; set; } = 0;
     public DateTime? LockoutEndTime { get; set; }
 

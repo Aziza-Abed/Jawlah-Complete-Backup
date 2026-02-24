@@ -5,7 +5,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace FollowUp.Infrastructure.Services;
 
-// UR23: Simple audit logging service
+// simple audit logging service
 public class AuditLogService
 {
     private readonly FollowUpDbContext _context;

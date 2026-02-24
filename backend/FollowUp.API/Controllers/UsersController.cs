@@ -276,7 +276,7 @@ public class UsersController : BaseApiController
         await _users.UpdateAsync(user);
         await _users.SaveChangesAsync();
 
-        // UC17: Audit log for user update
+        // audit log for user update
         var currentUserId = GetCurrentUserId();
         var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
         await _audit.LogAsync(currentUserId, currentUser?.Username, "UserUpdated",
@@ -292,7 +292,7 @@ public class UsersController : BaseApiController
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateUserStatus(int id, [FromBody] UpdateUserStatusRequest request)
     {
-        // UC16: Prevent admin from deactivating themselves
+        // prevent admin from deactivating themselves
         if (id == GetCurrentUserId() && request.Status == UserStatus.Inactive)
             return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكنك تعطيل حسابك الخاص"));
 
@@ -326,7 +326,7 @@ public class UsersController : BaseApiController
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteUser(int id)
     {
-        // UC16: Prevent admin from deleting themselves
+        // prevent admin from deleting themselves
         if (id == GetCurrentUserId())
             return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكنك حذف حسابك الخاص"));
 
@@ -365,7 +365,7 @@ public class UsersController : BaseApiController
         return NoContent();
     }
 
-    // SR1.6: Admin can reset user password
+    // admin can reset user password
     [HttpPost("{id}/reset-password")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ResetUserPassword(int id, [FromBody] AdminResetPasswordRequest request)
@@ -892,7 +892,7 @@ public class UsersController : BaseApiController
             worker.SupervisorId = request.NewSupervisorId;
         }
 
-        // Chapter 4: Also transfer pending tasks assigned by old supervisor
+        // also transfer pending tasks assigned by old supervisor
         var workerIds = workers.Select(w => w.UserId).ToList();
         var pendingTasks = await _context.Tasks
             .Where(t => workerIds.Contains(t.AssignedToUserId) &&
@@ -915,7 +915,7 @@ public class UsersController : BaseApiController
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = Request.Headers.UserAgent.ToString();
 
-        // Create audit log entry for worker transfer (TC-12 requirement)
+        // audit log for worker transfer
         await _audit.LogAsync(
             currentUserId,
             currentUser?.Username,
@@ -936,9 +936,7 @@ public class UsersController : BaseApiController
         }));
     }
 
-    /// <summary>
-    /// SR22.5: Bulk role assignment - Admin can assign roles to multiple users at once
-    /// </summary>
+    // bulk role assignment - admin can assign roles to multiple users at once
     [HttpPost("bulk-role-assignment")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkRoleAssignment([FromBody] BulkRoleAssignmentRequest request)
@@ -980,7 +978,7 @@ public class UsersController : BaseApiController
 
         await _users.SaveChangesAsync();
 
-        // UC17: Audit log
+        // audit log
         var currentUser = await _users.GetByIdAsync(currentUserId.Value);
         await _audit.LogAsync(currentUserId, currentUser?.Username, "BulkRoleAssignment",
             $"تغيير صلاحية {successCount} مستخدم إلى {request.NewRole}",
@@ -996,9 +994,7 @@ public class UsersController : BaseApiController
         }));
     }
 
-    /// <summary>
-    /// UC16: Bulk enable/disable users
-    /// </summary>
+    // bulk enable/disable users
     [HttpPost("bulk-status")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkStatusChange([FromBody] BulkStatusRequest request)
@@ -1015,7 +1011,7 @@ public class UsersController : BaseApiController
 
         foreach (var userId in request.UserIds)
         {
-            // UC16: Prevent admin from deactivating themselves
+            // prevent admin from deactivating themselves
             if (userId == currentUserId.Value && request.Status == UserStatus.Inactive)
             {
                 failedUsers.Add("لا يمكنك تعطيل حسابك الخاص");
@@ -1036,7 +1032,7 @@ public class UsersController : BaseApiController
 
         await _users.SaveChangesAsync();
 
-        // UC17: Audit log
+        // audit log
         var currentUser = await _users.GetByIdAsync(currentUserId.Value);
         var action = request.Status == UserStatus.Active ? "تفعيل" : "تعطيل";
         await _audit.LogAsync(currentUserId, currentUser?.Username, "BulkStatusChange",

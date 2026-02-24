@@ -3,9 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 
-/// Read-only map view showing where a task is located
-/// Workers use this to see exactly where they need to go
-/// Uses OpenStreetMap (free, no API key required)
+// read-only map view showing where a task is located
+// uses OpenStreetMap (free, no API key required)
 class TaskLocationMapView extends StatefulWidget {
   final double latitude;
   final double longitude;

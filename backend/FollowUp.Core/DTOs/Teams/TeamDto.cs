@@ -1,8 +1,6 @@
 namespace FollowUp.Core.DTOs.Teams;
 
-/// <summary>
-/// Team DTO for API responses
-/// </summary>
+// team data for API responses
 public class TeamDto
 {
     public int TeamId { get; set; }

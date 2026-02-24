@@ -10,10 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FollowUp.API.Controllers;
 
-/// <summary>
-/// Controller for managing municipalities.
-/// Admin-only endpoints for creating, updating, and managing municipalities.
-/// </summary>
+// manages municipalities (admin-only endpoints for creating, updating, and managing)
 [Route("api/[controller]")]
 public class MunicipalityController : BaseApiController
 {
@@ -37,9 +34,7 @@ public class MunicipalityController : BaseApiController
         _logger = logger;
     }
 
-    /// <summary>
-    /// Get all municipalities (Admin only)
-    /// </summary>
+    // get all municipalities (admin only)
     [HttpGet]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAll()
@@ -66,10 +61,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Get the current user's municipality settings (for authenticated users)
-    /// Returns essential settings for map display and app configuration
-    /// </summary>
+    // get the current user's municipality settings (for map display and app configuration)
     [HttpGet("current")]
     [Authorize]
     public async Task<IActionResult> GetCurrent()
@@ -131,9 +123,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Get default/first municipality settings (for login screen, anonymous access)
-    /// </summary>
+    // get default/first municipality settings (for login screen, anonymous access)
     [HttpGet("default")]
     [AllowAnonymous]
     public async Task<IActionResult> GetDefault()
@@ -177,9 +167,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Get active municipalities only (for public/mobile use)
-    /// </summary>
+    // get active municipalities only (for public/mobile use)
     [HttpGet("active")]
     [AllowAnonymous]
     public async Task<IActionResult> GetActive()
@@ -207,9 +195,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Get municipality by ID (Admin only)
-    /// </summary>
+    // get municipality by ID (admin only)
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetById(int id)
@@ -235,9 +221,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Create a new municipality (Admin only)
-    /// </summary>
+    // create a new municipality (admin only)
     [HttpPost]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateMunicipalityRequest request)
@@ -306,9 +290,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Update a municipality (Admin only)
-    /// </summary>
+    // update a municipality (admin only)
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMunicipalityRequest request)
@@ -395,9 +377,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Import zones from GeoJSON for a municipality (Admin only)
-    /// </summary>
+    // import zones from GeoJSON for a municipality (admin only)
     [HttpPost("{id}/import-geojson")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ImportGeoJson(int id, [FromBody] ImportGeoJsonRequest request)
@@ -432,9 +412,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Get zones for a municipality
-    /// </summary>
+    // get zones for a municipality
     [HttpGet("{id}/zones")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetZones(int id)
@@ -470,9 +448,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Deactivate a municipality (Admin only)
-    /// </summary>
+    // deactivate a municipality (admin only)
     [HttpPost("{id}/deactivate")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Deactivate(int id)
@@ -502,9 +478,7 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Activate a municipality (Admin only)
-    /// </summary>
+    // activate a municipality (admin only)
     [HttpPost("{id}/activate")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Activate(int id)
@@ -566,9 +540,7 @@ public class MunicipalityController : BaseApiController
     }
 }
 
-/// <summary>
-/// Request for importing GeoJSON data
-/// </summary>
+// request for importing GeoJSON data
 public class ImportGeoJsonRequest
 {
     public string GeoJson { get; set; } = string.Empty;

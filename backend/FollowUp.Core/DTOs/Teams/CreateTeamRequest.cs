@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Teams;
 
-/// <summary>
-/// Request DTO for creating a new team
-/// </summary>
+// request for creating a new team
 public class CreateTeamRequest
 {
     [Required(ErrorMessage = "اسم الفريق مطلوب")]

@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Tasks;
 
-/// <summary>
-/// Request for updating task progress (for multi-day tasks)
-/// </summary>
+// request for updating task progress (for multi-day tasks)
 public class UpdateTaskProgressRequest
 {
     [Required]

@@ -2,9 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Auth;
 
-// Request for GPS-based login (mobile workers) using Username + Password + DeviceID
-// UC2: Login is pure authentication. GPS is optional and not used for attendance.
-// Attendance is handled automatically via geofencing (UC4).
+// request for GPS-based login (mobile workers) using Username + Password + DeviceID
+// login is pure authentication, GPS is optional and not used for attendance
+// attendance is handled automatically via geofencing
 public class LoginWithGPSRequest
 {
     [Required(ErrorMessage = "اسم المستخدم مطلوب")]

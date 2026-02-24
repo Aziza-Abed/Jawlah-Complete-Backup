@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Reusable widget for displaying label-value pairs in a row
+// reusable widget for displaying label-value pairs in a row
 class InfoRow extends StatelessWidget {
   final String label;
   final String value;

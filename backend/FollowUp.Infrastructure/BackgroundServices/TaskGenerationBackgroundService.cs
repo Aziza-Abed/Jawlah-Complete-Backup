@@ -165,13 +165,11 @@ public class TaskGenerationBackgroundService : BackgroundService
         return false;
     }
 
-    /// <summary>
-    /// Auto-close attendance records that have been open (CheckedIn) for more than 14 hours.
-    /// This handles the case where a worker forgets to check out at end of day.
-    /// Sets status to AutoClosed (3) so supervisors can distinguish from normal checkouts.
-    /// Uses per-user ExpectedEndTime for the auto-close checkout time.
-    /// Uses raw SQL to avoid EF Core SELECT * query generation issues.
-    /// </summary>
+    // auto-close attendance records that have been open (CheckedIn) for more than 14 hours
+    // handles the case where a worker forgets to check out at end of day
+    // sets status to AutoClosed (3) so supervisors can distinguish from normal checkouts
+    // uses per-user ExpectedEndTime for the auto-close checkout time
+    // uses raw SQL to avoid EF Core SELECT * query generation issues
     private async Task AutoCloseStaleAttendanceAsync(CancellationToken stoppingToken)
     {
         using var scope = _serviceProvider.CreateScope();

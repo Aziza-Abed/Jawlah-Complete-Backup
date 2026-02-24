@@ -2,68 +2,43 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Auth;
 
-/// <summary>
-/// Request to verify SMS OTP code
-/// </summary>
+// request to verify SMS OTP code
 public class VerifyOtpRequest
 {
-    /// <summary>
-    /// Temporary session token from initial login
-    /// </summary>
+    // temporary session token from initial login
     [Required(ErrorMessage = "رمز الجلسة مطلوب")]
     public string SessionToken { get; set; } = string.Empty;
 
-    /// <summary>
-    /// 6-digit OTP code from SMS
-    /// </summary>
+    // 6-digit OTP code from SMS
     [Required(ErrorMessage = "رمز التحقق مطلوب")]
     [StringLength(6, MinimumLength = 6, ErrorMessage = "رمز التحقق يجب أن يكون 6 أرقام")]
     [RegularExpression(@"^\d{6}$", ErrorMessage = "رمز التحقق يجب أن يحتوي على أرقام فقط")]
     public string OtpCode { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Device ID for registration (optional)
-    /// </summary>
+    // device ID for registration (optional)
     public string? DeviceId { get; set; }
 }
 
-/// <summary>
-/// Response after successful OTP verification
-/// </summary>
+// response after successful OTP verification
 public class VerifyOtpResponse
 {
-    /// <summary>
-    /// Whether verification was successful
-    /// </summary>
     public bool Success { get; set; }
 
-    /// <summary>
-    /// JWT access token (only if successful)
-    /// </summary>
+    // JWT access token (only if successful)
     public string? Token { get; set; }
 
-    /// <summary>
-    /// When the token expires
-    /// </summary>
+    // when the token expires
     public DateTime? ExpiresAt { get; set; }
 
-    /// <summary>
-    /// User details (only if successful)
-    /// </summary>
+    // user details (only if successful)
     public UserDto? User { get; set; }
 
-    /// <summary>
-    /// Error message (only if failed)
-    /// </summary>
+    // error message (only if failed)
     public string? Error { get; set; }
 
-    /// <summary>
-    /// Remaining attempts before lockout
-    /// </summary>
+    // remaining attempts before lockout
     public int? RemainingAttempts { get; set; }
 
-    /// <summary>
-    /// Refresh token for obtaining new access tokens
-    /// </summary>
+    // refresh token for obtaining new access tokens
     public string? RefreshToken { get; set; }
 }

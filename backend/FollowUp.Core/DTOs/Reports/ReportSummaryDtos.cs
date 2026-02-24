@@ -177,9 +177,7 @@ public class SupervisorStatsDetail
 
 // ========== ADMIN SUPERVISOR MONITORING ==========
 
-/// <summary>
-/// Enhanced supervisor monitoring data for Admin dashboard
-/// </summary>
+// supervisor monitoring data for Admin dashboard
 public class AdminSupervisorMonitoringData
 {
     public List<SupervisorMonitoringItem> Supervisors { get; set; } = new();

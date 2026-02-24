@@ -2,8 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'zone_local.g.dart';
 
-/// Section 3.5.2: Local zone storage for offline validation
-/// "validation is executed locally using preloaded shapefiles"
+// local zone storage for offline validation
 @HiveType(typeId: 5)
 class ZoneLocal extends HiveObject {
   @HiveField(0)

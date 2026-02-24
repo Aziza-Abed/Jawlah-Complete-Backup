@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Attendance;
 
-// UR8: Manual attendance request when GPS is not available
+// manual attendance request when GPS is not available
 public class ManualAttendanceRequest
 {
     public int? ZoneId { get; set; }

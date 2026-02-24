@@ -4,10 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FollowUp.Infrastructure.Data.Configurations;
 
-/// <summary>
-/// EF Core configuration for RefreshToken entity
-/// Required by ERD in Chapter 3 - Class Diagram
-/// </summary>
+// EF Core configuration for RefreshToken entity
 public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
 {
     public void Configure(EntityTypeBuilder<RefreshToken> builder)

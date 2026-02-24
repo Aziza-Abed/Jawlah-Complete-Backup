@@ -5,8 +5,8 @@ import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/auth_service.dart';
 
-/// Reset Password Screen (SR1.6)
-/// User enters the OTP received on their phone + new password
+// reset password screen
+// user enters the OTP received on their phone + new password
 class ResetPasswordScreen extends StatefulWidget {
   final String sessionToken;
   final String maskedPhone;

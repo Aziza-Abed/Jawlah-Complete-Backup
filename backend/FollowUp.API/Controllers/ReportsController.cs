@@ -271,9 +271,7 @@ public class ReportsController : BaseApiController
 
     // ========== INDIVIDUAL WORKER REPORT ==========
 
-    /// <summary>
-    /// Get detailed performance report for a specific worker
-    /// </summary>
+    // get detailed performance report for a specific worker
     [HttpGet("worker/{workerId}")]
     public async Task<IActionResult> GetIndividualWorkerReport(
         int workerId,
@@ -481,10 +479,8 @@ public class ReportsController : BaseApiController
 
     // ========== ADMIN SUPERVISOR MONITORING (ENHANCED) ==========
 
-    /// <summary>
-    /// Admin-only endpoint for comprehensive supervisor monitoring
-    /// Shows workers under each supervisor, tasks they assigned, performance metrics, and alerts
-    /// </summary>
+    // admin-only: comprehensive supervisor monitoring
+    // shows workers under each supervisor, tasks they assigned, performance metrics, and alerts
     [HttpGet("admin/supervisors-monitoring")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAdminSupervisorsMonitoring()
@@ -941,9 +937,7 @@ public class ReportsController : BaseApiController
 
     // ========== PDF EXPORT ENDPOINTS ==========
 
-    /// <summary>
-    /// Export attendance report as PDF
-    /// </summary>
+    // export attendance report as PDF
     [HttpGet("attendance/pdf")]
     public async Task<IActionResult> ExportAttendancePdf(
         [FromQuery] string period = "monthly",
@@ -956,7 +950,7 @@ public class ReportsController : BaseApiController
             var attendance = (await _attendance.GetFilteredAttendanceAsync(null, null, fromDate, toDate)).ToList();
             var workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
 
-            // UC14: Get supervisor name for report metadata
+            // get supervisor name for report metadata
             var currentUserId = GetCurrentUserId();
             var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
             var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
@@ -1072,9 +1066,7 @@ public class ReportsController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Export tasks report as PDF
-    /// </summary>
+    // export tasks report as PDF
     [HttpGet("tasks/pdf")]
     public async Task<IActionResult> ExportTasksPdf(
         [FromQuery] string period = "monthly",
@@ -1097,7 +1089,7 @@ public class ReportsController : BaseApiController
 
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
 
-            // UC14: Get supervisor name for report metadata
+            // get supervisor name for report metadata
             var currentUserId = GetCurrentUserId();
             var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
             var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
@@ -1217,9 +1209,7 @@ public class ReportsController : BaseApiController
 
     // ========== EXCEL EXPORT ENDPOINTS ==========
 
-    /// <summary>
-    /// Export attendance report as Excel
-    /// </summary>
+    // export attendance report as Excel
     [HttpGet("attendance/excel")]
     public async Task<IActionResult> ExportAttendanceExcel(
         [FromQuery] string period = "monthly",
@@ -1232,7 +1222,7 @@ public class ReportsController : BaseApiController
             var attendance = (await _attendance.GetFilteredAttendanceAsync(null, null, fromDate, toDate)).ToList();
             var workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
 
-            // UC14: Get supervisor name for report metadata
+            // get supervisor name for report metadata
             var currentUserId = GetCurrentUserId();
             var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
             var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
@@ -1257,7 +1247,7 @@ public class ReportsController : BaseApiController
             worksheet.Cell(2, 1).Value = $"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}";
             worksheet.Range(2, 1, 2, 6).Merge();
 
-            // UC14: Add supervisor name
+            // add supervisor name
             worksheet.Cell(3, 1).Value = $"أنشأه: {supervisorName}";
             worksheet.Range(3, 1, 3, 6).Merge();
 
@@ -1314,9 +1304,7 @@ public class ReportsController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Export tasks report as Excel
-    /// </summary>
+    // export tasks report as Excel
     [HttpGet("tasks/excel")]
     public async Task<IActionResult> ExportTasksExcel(
         [FromQuery] string period = "monthly",
@@ -1339,7 +1327,7 @@ public class ReportsController : BaseApiController
 
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
 
-            // UC14: Get supervisor name for report metadata
+            // get supervisor name for report metadata
             var currentUserId = GetCurrentUserId();
             var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
             var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
@@ -1371,7 +1359,7 @@ public class ReportsController : BaseApiController
             worksheet.Cell(2, 1).Value = $"من {fromDate:yyyy-MM-dd} إلى {toDate:yyyy-MM-dd}";
             worksheet.Range(2, 1, 2, 7).Merge();
 
-            // UC14: Add supervisor name
+            // add supervisor name
             worksheet.Cell(3, 1).Value = $"أنشأه: {supervisorName}";
             worksheet.Range(3, 1, 3, 7).Merge();
 

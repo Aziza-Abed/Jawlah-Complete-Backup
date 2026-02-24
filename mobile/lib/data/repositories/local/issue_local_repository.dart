@@ -76,15 +76,15 @@ class IssueLocalRepository {
     }
   }
 
-  /// Merge server data with local data using field-level ownership.
-  ///
-  /// Field ownership (non-overlapping):
-  /// - Worker fields (never overwritten by server unless fully synced):
-  ///   title, description, type, severity, latitude, longitude,
-  ///   locationDescription, photoUrl
-  /// - Supervisor fields (always accepted from server):
-  ///   status, forwardedToDepartmentId, forwardedToDepartmentName,
-  ///   forwardedAt, forwardingNotes
+  // merge server data with local data using field-level ownership.
+  //
+  // field ownership (non-overlapping):
+  // - worker fields (never overwritten by server unless fully synced):
+  //   title, description, type, severity, latitude, longitude,
+  //   locationDescription, photoUrl
+  // - supervisor fields (always accepted from server):
+  //   status, forwardedToDepartmentId, forwardedToDepartmentName,
+  //   forwardedAt, forwardingNotes
   Future<void> mergeFromServer(IssueLocal serverIssue) async {
     final box = await _openBox();
     final existingIndex =

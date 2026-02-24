@@ -6,8 +6,8 @@ import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_manager.dart';
 
-/// OTP Verification Screen for Two-Factor Authentication
-/// Displayed when login requires SMS OTP verification (Admin/Supervisor always, Worker on new device)
+// OTP verification screen for two-factor authentication
+// displayed when login requires SMS OTP verification
 class OtpVerificationScreen extends StatefulWidget {
   final String sessionToken;
   final String maskedPhone;

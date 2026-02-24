@@ -1,9 +1,7 @@
 namespace FollowUp.Core.Entities;
 
-/// <summary>
-/// SMS-based One-Time Password for Two-Factor Authentication
-/// Used for Admin/Supervisor always, Workers on new device only
-/// </summary>
+// SMS-based OTP for two-factor authentication
+// used for Admin/Supervisor always, Workers on new device only
 public class TwoFactorCode
 {
     public int Id { get; set; }
@@ -11,54 +9,34 @@ public class TwoFactorCode
     public int UserId { get; set; }
     public User User { get; set; } = null!;
 
-    /// <summary>
-    /// Hashed 6-digit OTP code (never store plain text)
-    /// </summary>
+    // hashed 6-digit OTP code (never store plain text)
     public string CodeHash { get; set; } = string.Empty;
 
-    /// <summary>
-    /// When the OTP expires (5 minutes from creation)
-    /// </summary>
+    // when the OTP expires (5 minutes from creation)
     public DateTime ExpiresAt { get; set; }
 
-    /// <summary>
-    /// Whether the OTP has been used
-    /// </summary>
+    // whether the OTP has been used
     public bool IsUsed { get; set; } = false;
 
-    /// <summary>
-    /// When the OTP was created
-    /// </summary>
+    // when the OTP was created
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
-    /// Purpose: Login, PasswordReset, DeviceChange
-    /// </summary>
+    // purpose: Login, PasswordReset, DeviceChange
     public string Purpose { get; set; } = "Login";
 
-    /// <summary>
-    /// Number of failed verification attempts (max 3)
-    /// </summary>
+    // number of failed verification attempts (max 3)
     public int FailedAttempts { get; set; } = 0;
 
-    /// <summary>
-    /// Phone number the OTP was sent to (for audit)
-    /// </summary>
+    // phone number the OTP was sent to (for audit)
     public string PhoneNumber { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Device ID that requested the OTP (for tracking)
-    /// </summary>
+    // device ID that requested the OTP (for tracking)
     public string? DeviceId { get; set; }
 
-    /// <summary>
-    /// Session token for OTP verification lookup (GUID)
-    /// </summary>
+    // session token for OTP verification lookup (GUID)
     public string SessionToken { get; set; } = string.Empty;
 
-    /// <summary>
-    /// JWT token to return after successful OTP verification
-    /// This eliminates the need for in-memory session cache (load balancer safe)
-    /// </summary>
+    // JWT token to return after successful OTP verification
+    // this eliminates the need for in-memory session cache (load balancer safe)
     public string? PendingJwtToken { get; set; }
 }

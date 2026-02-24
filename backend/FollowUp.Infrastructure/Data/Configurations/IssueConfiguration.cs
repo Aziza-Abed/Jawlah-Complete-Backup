@@ -105,7 +105,7 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
             .HasForeignKey(e => e.ZoneId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Issue forwarding to departments (SR15)
+        // issue forwarding to departments
         builder.Property(e => e.ForwardingNotes).HasMaxLength(1000);
         builder.HasOne(e => e.ForwardedToDepartment)
             .WithMany()

@@ -1,22 +1,13 @@
 namespace FollowUp.Core.Enums;
 
-/// <summary>
-/// Status of an appeal
-/// </summary>
 public enum AppealStatus
 {
-    /// <summary>
-    /// Appeal submitted, awaiting supervisor review
-    /// </summary>
+    // awaiting supervisor review
     Pending = 1,
 
-    /// <summary>
-    /// Appeal approved by supervisor - task/attendance reinstated
-    /// </summary>
+    // approved - task/attendance reinstated
     Approved = 2,
 
-    /// <summary>
-    /// Appeal rejected by supervisor - original rejection stands
-    /// </summary>
+    // rejected - original rejection stands
     Rejected = 3
 }

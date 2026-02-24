@@ -13,17 +13,13 @@ public class CreateTaskRequest
     [StringLength(2000)]
     public string Description { get; set; } = string.Empty;
 
-    /// <summary>
-    /// For individual tasks: the worker to assign the task to.
-    /// Required if TeamId is not provided.
-    /// </summary>
+    // for individual tasks: the worker to assign the task to
+    // required if TeamId is not provided
     public int? AssignedToUserId { get; set; }
 
-    /// <summary>
-    /// For team tasks: the team to assign the task to.
-    /// All team members will see and can work on this task.
-    /// Required if AssignedToUserId is not provided.
-    /// </summary>
+    // for team tasks: the team to assign the task to
+    // all team members will see and can work on this task
+    // required if AssignedToUserId is not provided
     public int? TeamId { get; set; }
 
     public int? ZoneId { get; set; }

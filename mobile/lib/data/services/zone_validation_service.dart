@@ -4,15 +4,14 @@ import 'package:maps_toolkit/maps_toolkit.dart';
 import '../models/local/zone_local.dart';
 import '../repositories/local/zone_local_repository.dart';
 
-/// Section 3.5.2: Local zone validation service
-/// "validation is executed locally using preloaded shapefiles"
+// local zone validation service using preloaded shapefiles
 class ZoneValidationService {
   final ZoneLocalRepository _zoneRepo;
 
   ZoneValidationService(this._zoneRepo);
 
-  /// Validate if a GPS point is inside any of the user's assigned zones
-  /// Returns the zone if valid, null if outside all zones
+  // validate if a GPS point is inside any of the user's assigned zones
+  // returns the zone if valid, null if outside all zones
   Future<ZoneLocal?> validateLocationOffline(
     double latitude,
     double longitude,
@@ -54,7 +53,7 @@ class ZoneValidationService {
     return null;
   }
 
-  /// Parse GeoJSON to list of LatLng points
+  // parse GeoJSON to list of LatLng points
   List<LatLng>? _parseGeoJsonToPolygon(String geoJson) {
     try {
       final json = jsonDecode(geoJson);
@@ -94,12 +93,12 @@ class ZoneValidationService {
     }
   }
 
-  /// Check if point is inside polygon using maps_toolkit
+  // check if point is inside polygon using maps_toolkit
   bool _isPointInPolygon(LatLng point, List<LatLng> polygon) {
     return PolygonUtil.containsLocation(point, polygon, true);
   }
 
-  /// Check if zones are available for offline validation
+  // check if zones are available for offline validation
   Future<bool> hasOfflineZones() async {
     return await _zoneRepo.hasZones();
   }

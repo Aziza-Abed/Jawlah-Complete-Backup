@@ -30,7 +30,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   File? _photo3;
   bool _isSubmitting = false;
 
-  // Chapter 4: Updated to match report terminology
+  // updated to match report terminology
   final Map<String, String> _problemTypes = {
     'Infrastructure': 'بنية تحتية',
     'Safety': 'سلامة',

@@ -20,9 +20,7 @@ public class TeamsController : BaseApiController
         _logger = logger;
     }
 
-    /// <summary>
-    /// Get all teams for task assignment dropdown
-    /// </summary>
+    // get all teams for task assignment dropdown
     [HttpGet]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetAll([FromQuery] bool? activeOnly = true)
@@ -88,9 +86,7 @@ public class TeamsController : BaseApiController
         return Ok(ApiResponse<List<TeamDto>>.SuccessResponse(teams));
     }
 
-    /// <summary>
-    /// Get team by ID
-    /// </summary>
+    // get team by ID
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetById(int id)
@@ -140,9 +136,7 @@ public class TeamsController : BaseApiController
         return Ok(ApiResponse<TeamDto>.SuccessResponse(team));
     }
 
-    /// <summary>
-    /// Create a new team
-    /// </summary>
+    // create a new team
     [HttpPost]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateTeamRequest request)
@@ -234,9 +228,7 @@ public class TeamsController : BaseApiController
         return Ok(ApiResponse<TeamDto>.SuccessResponse(teamDto, "تم إنشاء الفريق بنجاح"));
     }
 
-    /// <summary>
-    /// Update an existing team
-    /// </summary>
+    // update an existing team
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateTeamRequest request)
@@ -336,9 +328,7 @@ public class TeamsController : BaseApiController
         return Ok(ApiResponse<TeamDto>.SuccessResponse(teamDto, "تم تحديث الفريق بنجاح"));
     }
 
-    /// <summary>
-    /// Delete a team (only if it has no members)
-    /// </summary>
+    // delete a team (only if it has no members)
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
@@ -372,9 +362,7 @@ public class TeamsController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(new { }, "تم حذف الفريق بنجاح"));
     }
 
-    /// <summary>
-    /// Get team members
-    /// </summary>
+    // get team members
     [HttpGet("{id}/members")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetTeamMembers(int id)
@@ -420,9 +408,7 @@ public class TeamsController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(members));
     }
 
-    /// <summary>
-    /// Add worker to team
-    /// </summary>
+    // add worker to team
     [HttpPost("{teamId}/members/{workerId}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AddMemberToTeam(int teamId, int workerId)
@@ -470,9 +456,7 @@ public class TeamsController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(new { }, "تم إضافة العامل إلى الفريق بنجاح"));
     }
 
-    /// <summary>
-    /// Remove worker from team
-    /// </summary>
+    // remove worker from team
     [HttpDelete("{teamId}/members/{workerId}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RemoveMemberFromTeam(int teamId, int workerId)

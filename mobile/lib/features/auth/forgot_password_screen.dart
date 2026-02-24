@@ -3,8 +3,8 @@ import '../../core/theme/app_colors.dart';
 import '../../data/services/auth_service.dart';
 import 'reset_password_screen.dart';
 
-/// Forgot Password Screen (SR1.6)
-/// User enters their username, backend sends OTP to their registered phone
+// forgot password screen
+// user enters their username, backend sends OTP to their registered phone
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 

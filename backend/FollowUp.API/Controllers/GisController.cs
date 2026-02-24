@@ -44,9 +44,7 @@ public class GisController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Get current status of all GIS files
-    /// </summary>
+    // get current status of all GIS files
     [HttpGet("status")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetGisFilesStatus()
@@ -67,9 +65,7 @@ public class GisController : BaseApiController
         });
     }
 
-    /// <summary>
-    /// Get all uploaded GIS files (history)
-    /// </summary>
+    // get all uploaded GIS files (history)
     [HttpGet("files")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAllGisFiles()
@@ -83,9 +79,7 @@ public class GisController : BaseApiController
         });
     }
 
-    /// <summary>
-    /// Upload a new GIS file (replaces existing file of same type)
-    /// </summary>
+    // upload a new GIS file (replaces existing file of same type)
     [HttpPost("upload")]
     [Authorize(Roles = "Admin")]
     [EnableRateLimiting("upload")]
@@ -341,9 +335,7 @@ public class GisController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Import a previously uploaded GIS file to zones
-    /// </summary>
+    // import a previously uploaded GIS file to zones
     [HttpPost("import/{fileId}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ImportGisFile(int fileId)
@@ -391,9 +383,7 @@ public class GisController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Delete a GIS file
-    /// </summary>
+    // delete a GIS file
     [HttpDelete("files/{fileId}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteGisFile(int fileId)
@@ -422,9 +412,7 @@ public class GisController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Download a GIS file
-    /// </summary>
+    // download a GIS file
     [HttpGet("files/{fileId}/download")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DownloadGisFile(int fileId)
@@ -441,9 +429,7 @@ public class GisController : BaseApiController
         return File(content, "application/geo+json", gisFile.OriginalFileName);
     }
 
-    /// <summary>
-    /// Get zones count by type
-    /// </summary>
+    // get zones count by type
     [HttpGet("zones-summary")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetZonesSummary()

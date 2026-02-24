@@ -12,9 +12,7 @@ public class LoginRequest
     [StringLength(100, ErrorMessage = "Password must be at least 4 characters", MinimumLength = 4)]
     public string Password { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Device ID for device binding (sent from mobile app body).
-    /// Falls back to X-Device-Id header if not provided in body.
-    /// </summary>
+    // device ID for device binding (sent from mobile app body)
+    // falls back to X-Device-Id header if not provided in body
     public string? DeviceId { get; set; }
 }

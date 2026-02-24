@@ -80,7 +80,7 @@ export async function refreshToken(token: string): Promise<LoginResponse> {
   };
 }
 
-// SR1.6: Forgot password - send OTP to user's phone
+// forgot password - send OTP to user's phone
 export async function forgotPassword(request: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
   const response = await apiClient.post<ApiResponse<ForgotPasswordResponse>>("/auth/forgot-password", request);
   if (response.data.success && response.data.data) {
@@ -92,7 +92,7 @@ export async function forgotPassword(request: ForgotPasswordRequest): Promise<Fo
   };
 }
 
-// SR1.6: Reset password using OTP verification
+// reset password using OTP verification
 export async function resetPassword(request: ResetPasswordRequest): Promise<{ success: boolean; message?: string }> {
   const response = await apiClient.post<ApiResponse<unknown>>("/auth/reset-password", request);
   return {

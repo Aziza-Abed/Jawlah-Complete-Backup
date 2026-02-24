@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Users;
 
-// SR1.6: Password reset by admin
+// password reset by admin
 public class AdminResetPasswordRequest
 {
     [Required(ErrorMessage = "كلمة المرور الجديدة مطلوبة")]

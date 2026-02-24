@@ -69,8 +69,7 @@ class AuthManager extends BaseController {
         if (jwtToken != null) {
           await _registerFcmToken();
 
-          // UC4: Start background service for GPS tracking and auto-geofencing
-          // Background service handles automatic check-in/out via geofencing
+          // start background service for GPS tracking and auto-geofencing
           BackgroundServiceUtils.startService();
           BatteryService().startMonitoring();
         }
@@ -111,8 +110,8 @@ class AuthManager extends BaseController {
     }
   }
 
-  // UC2: Login is pure authentication. No attendance check-in.
-  // UC4: Attendance is handled automatically via geofencing in background service.
+  // login is pure authentication, no attendance check-in
+  // attendance is handled automatically via geofencing in background service
   Future<bool> doLogin(
     String username, {
     required String password,
@@ -164,7 +163,7 @@ class AuthManager extends BaseController {
 
       notifyListeners();
 
-      // UC4: Start background service for GPS tracking and auto-geofencing
+      // start background service for GPS tracking and auto-geofencing
       BackgroundServiceUtils.startService();
       BatteryService().startMonitoring();
 
@@ -325,7 +324,7 @@ class AuthManager extends BaseController {
 
       notifyListeners();
 
-      // UC4: Start background service for GPS tracking and auto-geofencing
+      // start background service for GPS tracking and auto-geofencing
       BackgroundServiceUtils.startService();
       BatteryService().startMonitoring();
 

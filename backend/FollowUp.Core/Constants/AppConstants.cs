@@ -1,105 +1,102 @@
 namespace FollowUp.Core.Constants;
 
-/// <summary>
-/// Application-wide constants for configuration values
-/// Centralizes magic numbers that were previously scattered throughout the codebase
-/// </summary>
+// application-wide constants for configuration values
 public static class AppConstants
 {
     #region Pagination
 
-    /// <summary>Default page size for paginated endpoints</summary>
+    // default page size for paginated endpoints
     public const int DefaultPageSize = 50;
 
-    /// <summary>Maximum allowed page size</summary>
+    // maximum allowed page size
     public const int MaxPageSize = 100;
 
-    /// <summary>Minimum allowed page size</summary>
+    // minimum allowed page size
     public const int MinPageSize = 1;
 
     #endregion
 
     #region Authentication & Security
 
-    /// <summary>Maximum failed login attempts before account lockout</summary>
+    // maximum failed login attempts before account lockout
     public const int MaxFailedLoginAttempts = 5;
 
-    /// <summary>Account lockout duration in minutes</summary>
+    // account lockout duration in minutes
     public const int LockoutMinutes = 15;
 
-    /// <summary>Default JWT token expiration in minutes (24 hours)</summary>
+    // default JWT token expiration in minutes (24 hours)
     public const int DefaultJwtExpirationMinutes = 1440;
 
-    /// <summary>OTP code expiration in minutes</summary>
+    // OTP code expiration in minutes
     public const int OtpExpirationMinutes = 5;
 
-    /// <summary>Cooldown between OTP resend requests in seconds</summary>
+    // cooldown between OTP resend requests in seconds
     public const int OtpResendCooldownSeconds = 60;
 
-    /// <summary>Maximum OTP verification attempts</summary>
+    // maximum OTP verification attempts
     public const int MaxOtpAttempts = 3;
 
     #endregion
 
     #region Task Distance Validation
 
-    /// <summary>Distance in meters beyond which task submission is auto-rejected</summary>
+    // distance in meters beyond which task submission is auto-rejected
     public const int HardRejectDistanceMeters = 500;
 
-    /// <summary>Distance in meters that triggers a warning but allows submission</summary>
+    // distance in meters that triggers a warning but allows submission
     public const int WarningDistanceMeters = 100;
 
     #endregion
 
     #region Online Status
 
-    /// <summary>Minutes since last location update to consider a worker online</summary>
+    // minutes since last location update to consider a worker online
     public const int OnlineThresholdMinutes = 15;
 
     #endregion
 
     #region Input Validation
 
-    /// <summary>Default maximum length for sanitized text inputs</summary>
+    // default maximum length for sanitized text inputs
     public const int DefaultMaxInputLength = 500;
 
-    /// <summary>Minimum username length</summary>
+    // minimum username length
     public const int MinUsernameLength = 3;
 
-    /// <summary>Minimum password length</summary>
+    // minimum password length
     public const int MinPasswordLength = 8;
 
-    /// <summary>OTP code length</summary>
+    // OTP code length
     public const int OtpCodeLength = 6;
 
     #endregion
 
     #region Battery Monitoring
 
-    /// <summary>Maximum battery percentage change allowed in one minute (fraud detection)</summary>
+    // maximum battery percentage change allowed in one minute (fraud detection)
     public const int MaxBatteryDeltaPerMinute = 50;
 
     #endregion
 
     #region Database
 
-    /// <summary>Database command timeout in seconds</summary>
+    // database command timeout in seconds
     public const int DbCommandTimeoutSeconds = 60;
 
     #endregion
 
     #region Reports
 
-    /// <summary>Default number of items to include in report summaries</summary>
+    // default number of items to include in report summaries
     public const int ReportItemLimit = 100;
 
-    /// <summary>Performance threshold percentage below which workers are flagged</summary>
+    // performance threshold percentage below which workers are flagged
     public const int LowPerformanceThreshold = 50;
 
-    /// <summary>Number of delayed tasks that triggers a performance alert</summary>
+    // number of delayed tasks that triggers a performance alert
     public const int DelayedTasksAlertThreshold = 5;
 
-    /// <summary>Minimum tasks assigned before performance can be evaluated</summary>
+    // minimum tasks assigned before performance can be evaluated
     public const int MinTasksForEvaluation = 10;
 
     #endregion

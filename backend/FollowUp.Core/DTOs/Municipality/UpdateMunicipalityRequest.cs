@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Municipality;
 
-/// <summary>
-/// Request DTO for updating an existing municipality
-/// </summary>
+// request for updating an existing municipality
 public class UpdateMunicipalityRequest
 {
     [StringLength(200, MinimumLength = 2, ErrorMessage = "اسم البلدية يجب أن يكون بين 2 و 200 حرف")]

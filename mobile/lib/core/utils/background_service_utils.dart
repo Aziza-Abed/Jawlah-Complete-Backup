@@ -89,7 +89,7 @@ class BackgroundServiceUtils {
 
     final trackingService = TrackingService();
 
-    // UC4: Initialize geofencing for automatic attendance
+    // initialize geofencing for automatic attendance
     final zoneService = ZoneValidationService(ZoneLocalRepository());
     final geofenceState = _GeofenceState();
     await geofenceState.loadState();
@@ -206,7 +206,7 @@ class BackgroundServiceUtils {
             heading: position.heading,
           );
 
-          // UC4: Auto-geofencing check after each position fix
+          // auto-geofencing check after each position fix
           await _checkGeofence(
             position: position,
             geofenceState: geofenceState,
@@ -242,7 +242,7 @@ class BackgroundServiceUtils {
     scheduleNextUpdate();
   }
 
-  /// UC4: Automatic geofencing - check if worker entered/left assigned zone
+  // check if worker entered/left assigned zone
   static Future<void> _checkGeofence({
     required Position position,
     required _GeofenceState geofenceState,
@@ -278,7 +278,7 @@ class BackgroundServiceUtils {
               geofenceState.consecutiveInsideCount = 0;
               await geofenceState.saveState();
 
-              // SR7.6: Show notification
+              // show notification
               await _showAttendanceNotification(
                 notificationsPlugin,
                 'تم تسجيل حضورك تلقائياً',
@@ -307,7 +307,7 @@ class BackgroundServiceUtils {
             geofenceState.consecutiveOutsideCount = 0;
             await geofenceState.saveState();
 
-            // SR7.6: Show notification
+            // show notification
             await _showAttendanceNotification(
               notificationsPlugin,
               'تم تسجيل انصرافك تلقائياً',
@@ -332,7 +332,7 @@ class BackgroundServiceUtils {
     }
   }
 
-  /// Call check-in API from background service
+  // call check-in API from background service
   static Future<bool> _autoCheckIn(Position position) async {
     try {
       const secureStorage = FlutterSecureStorage();
@@ -365,7 +365,7 @@ class BackgroundServiceUtils {
     }
   }
 
-  /// Call check-out API from background service
+  // call check-out API from background service
   static Future<bool> _autoCheckOut(Position position) async {
     try {
       const secureStorage = FlutterSecureStorage();
@@ -398,7 +398,7 @@ class BackgroundServiceUtils {
     }
   }
 
-  /// Show attendance notification to user
+  // show attendance notification to user
   static Future<void> _showAttendanceNotification(
     FlutterLocalNotificationsPlugin plugin,
     String title,
@@ -458,7 +458,7 @@ class BackgroundServiceUtils {
   }
 }
 
-/// Geofence state persisted across background service restarts
+// geofence state persisted across background service restarts
 class _GeofenceState {
   bool isInside = false;
   int consecutiveInsideCount = 0;

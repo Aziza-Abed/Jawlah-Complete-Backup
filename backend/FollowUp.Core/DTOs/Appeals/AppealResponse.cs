@@ -2,9 +2,7 @@ using FollowUp.Core.Enums;
 
 namespace FollowUp.Core.DTOs.Appeals;
 
-/// <summary>
-/// Response containing appeal details
-/// </summary>
+// response containing appeal details
 public class AppealResponse
 {
     public int AppealId { get; set; }

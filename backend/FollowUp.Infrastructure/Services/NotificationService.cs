@@ -73,10 +73,8 @@ public class NotificationService : INotificationService
 
     // ─── Private helpers to eliminate duplicate notification boilerplate ────────
 
-    /// <summary>
-    /// Create, save, and push a notification to a single user.
-    /// Returns false if the user was not found.
-    /// </summary>
+    // create, save, and push a notification to a single user
+    // returns false if the user was not found
     private async Task<bool> SendToUserAsync(
         int userId,
         string title,
@@ -112,10 +110,8 @@ public class NotificationService : INotificationService
         return true;
     }
 
-    /// <summary>
-    /// Broadcast a notification to all supervisors.
-    /// Batches the DB save outside the loop for efficiency.
-    /// </summary>
+    // broadcast a notification to all supervisors
+    // batches the DB save outside the loop for efficiency
     private async Task SendToAllSupervisorsAsync(
         string title,
         string body,

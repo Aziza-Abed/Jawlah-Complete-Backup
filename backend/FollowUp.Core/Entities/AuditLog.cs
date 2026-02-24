@@ -1,6 +1,6 @@
 namespace FollowUp.Core.Entities;
 
-// UR23: Audit logging for critical user actions
+// audit logging for critical user actions
 public class AuditLog
 {
     public int AuditLogId { get; set; }

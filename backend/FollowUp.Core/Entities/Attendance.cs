@@ -32,7 +32,7 @@ public class Attendance
     public bool IsSynced { get; set; }
     public int SyncVersion { get; set; }
 
-    // UR8: Manual attendance with supervisor approval
+    // manual attendance with supervisor approval
     public bool IsManual { get; set; } = false;
     public string? ManualReason { get; set; }
     public int? ApprovedByUserId { get; set; }

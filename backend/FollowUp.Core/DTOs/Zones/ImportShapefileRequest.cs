@@ -1,17 +1,11 @@
 namespace FollowUp.Core.DTOs.Zones;
 
-/// <summary>
-/// Request to import zones from a shapefile
-/// </summary>
+// request to import zones from a shapefile
 public class ImportShapefileRequest
 {
-    /// <summary>
-    /// Path to the shapefile on the server
-    /// </summary>
+    // path to the shapefile on the server
     public string FilePath { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Municipality ID to assign imported zones to
-    /// </summary>
+    // municipality ID to assign imported zones to
     public int MunicipalityId { get; set; }
 }

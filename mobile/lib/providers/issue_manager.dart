@@ -264,7 +264,7 @@ class IssueManager extends BaseController {
     await loadIssues(status: filterStatus, forceRefresh: true);
   }
 
-  // SR15: Forward issue to a department
+  // forward issue to a department
   Future<bool> forwardIssue({
     required int issueId,
     required int departmentId,

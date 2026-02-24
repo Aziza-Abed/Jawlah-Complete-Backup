@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FollowUp.API.Controllers;
 
-// UR23: Audit log viewer for administrators
+// audit log viewer for administrators
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin,Supervisor")]

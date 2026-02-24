@@ -2,35 +2,22 @@ using FollowUp.Core.Enums;
 
 namespace FollowUp.Core.DTOs.Users;
 
-/// <summary>
-/// Request DTO for updating user information (Admin only)
-/// Supports partial updates - only non-null fields are updated
-/// </summary>
+// request for updating user information (Admin only)
+// supports partial updates - only non-null fields are updated
 public class UpdateUserRequest
 {
-    /// <summary>
-    /// New supervisor ID for worker transfer. Set to 0 or null to remove supervisor.
-    /// Only applicable for workers.
-    /// </summary>
+    // new supervisor ID for worker transfer, set to 0 or null to remove supervisor
     public int? SupervisorId { get; set; }
 
-    /// <summary>
-    /// Update user's department. Set to 0 or null to remove department.
-    /// </summary>
+    // update user's department, set to 0 or null to remove department
     public int? DepartmentId { get; set; }
 
-    /// <summary>
-    /// Update user's full name
-    /// </summary>
+    // update user's full name
     public string? FullName { get; set; }
 
-    /// <summary>
-    /// Update user's phone number
-    /// </summary>
+    // update user's phone number
     public string? PhoneNumber { get; set; }
 
-    /// <summary>
-    /// Update user's status (Active/Inactive)
-    /// </summary>
+    // update user's status (Active/Inactive)
     public UserStatus? Status { get; set; }
 }

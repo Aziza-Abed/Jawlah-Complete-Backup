@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/battery_provider.dart';
 
-/// Widget to display current battery level with visual indicator
+// widget to display current battery level with visual indicator
 class BatteryWidget extends StatelessWidget {
   const BatteryWidget({super.key});
 

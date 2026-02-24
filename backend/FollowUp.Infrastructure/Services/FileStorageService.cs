@@ -201,9 +201,7 @@ public class FileStorageService : IFileStorageService
         return true;
     }
 
-    /// <summary>
-    /// Validates file content by checking magic bytes to ensure it's a real image
-    /// </summary>
+    // validates file content by checking magic bytes to ensure it's a real image
     private bool ValidateImageMagicBytes(IFormFile file)
     {
         try
@@ -258,11 +256,9 @@ public class FileStorageService : IFileStorageService
         return "http://localhost:5000";
     }
 
-    /// <summary>
-    /// Strips EXIF metadata (GPS, device info, timestamps) from JPEG images for privacy.
-    /// Removes APP1-APP13 segments (EXIF, XMP, ICC, IPTC) and COM markers.
-    /// Preserves APP0 (JFIF) and all image data segments (SOF, DQT, DHT, SOS).
-    /// </summary>
+    // strips EXIF metadata (GPS, device info, timestamps) from JPEG images for privacy
+    // removes APP1-APP13 segments (EXIF, XMP, ICC, IPTC) and COM markers
+    // preserves APP0 (JFIF) and all image data segments (SOF, DQT, DHT, SOS)
     private void StripImageMetadata(string filePath, string extension)
     {
         if (extension != ".jpg" && extension != ".jpeg")

@@ -2,60 +2,27 @@ using FollowUp.Core.Entities;
 
 namespace FollowUp.Core.Interfaces.Services;
 
-/// <summary>
-/// Service for managing SMS-based OTP verification
-/// </summary>
+// service for managing SMS-based OTP verification
 public interface IOtpService
 {
-    /// <summary>
-    /// Check if user requires OTP verification based on role and device
-    /// </summary>
-    /// <param name="user">The user to check</param>
-    /// <param name="deviceId">Current device ID</param>
-    /// <returns>True if OTP is required</returns>
+    // check if user requires OTP verification based on role and device
     bool RequiresOtp(User user, string? deviceId);
 
-    /// <summary>
-    /// Generate and send OTP to user's phone
-    /// </summary>
-    /// <param name="user">User to send OTP to</param>
-    /// <param name="purpose">Purpose: Login, PasswordReset, DeviceChange</param>
-    /// <param name="deviceId">Device requesting OTP</param>
-    /// <returns>Session token for verification, or null if failed</returns>
+    // generate and send OTP to user's phone, returns session token or null if failed
     System.Threading.Tasks.Task<string?> GenerateAndSendOtpAsync(User user, string purpose = "Login", string? deviceId = null);
 
-    /// <summary>
-    /// Verify OTP code
-    /// </summary>
-    /// <param name="sessionToken">Session token from GenerateAndSendOtpAsync</param>
-    /// <param name="otpCode">6-digit code entered by user</param>
-    /// <param name="ipAddress">IP address for rate limiting (optional)</param>
-    /// <returns>User ID if valid, null if invalid</returns>
+    // verify OTP code, returns success status, user ID, error, and remaining attempts
     System.Threading.Tasks.Task<(bool Success, int? UserId, string? Error, int RemainingAttempts)> VerifyOtpAsync(string sessionToken, string otpCode, string? ipAddress = null);
 
-    /// <summary>
-    /// Get masked phone number for display
-    /// </summary>
+    // get masked phone number for display
     string MaskPhoneNumber(string phoneNumber);
 
-    /// <summary>
-    /// Store pending JWT token for session (for load-balanced environments)
-    /// </summary>
-    /// <param name="sessionToken">Session token</param>
-    /// <param name="jwtToken">JWT token to store</param>
+    // store pending JWT token for session (for load-balanced environments)
     System.Threading.Tasks.Task StorePendingTokenAsync(string sessionToken, string jwtToken);
 
-    /// <summary>
-    /// Retrieve and clear pending JWT token for session
-    /// </summary>
-    /// <param name="sessionToken">Session token</param>
-    /// <returns>JWT token if found, null otherwise</returns>
+    // retrieve and clear pending JWT token for session
     System.Threading.Tasks.Task<string?> GetAndClearPendingTokenAsync(string sessionToken);
 
-    /// <summary>
-    /// Get session info without clearing (for resend OTP)
-    /// </summary>
-    /// <param name="sessionToken">Session token</param>
-    /// <returns>UserId and JWT token if found</returns>
+    // get session info without clearing (for resend OTP)
     System.Threading.Tasks.Task<(int? UserId, string? JwtToken)> GetSessionInfoAsync(string sessionToken);
 }

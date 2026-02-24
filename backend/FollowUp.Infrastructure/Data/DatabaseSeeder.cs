@@ -5,9 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FollowUp.Infrastructure.Data;
 
-/// <summary>
-/// Seeds the database with initial data using Entity Framework (proper UTF-8 encoding)
-/// </summary>
+// seeds the database with initial data using Entity Framework
 public class DatabaseSeeder
 {
     private readonly FollowUpDbContext _context;

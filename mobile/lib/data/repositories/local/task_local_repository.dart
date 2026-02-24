@@ -105,15 +105,15 @@ class TaskLocalRepository {
     }
   }
 
-  /// Merge server data with local data using field-level ownership.
-  ///
-  /// Field ownership (non-overlapping):
-  /// - Worker fields (never overwritten by server unless fully synced):
-  ///   status, completionNotes, photoUrl, completedAt,
-  ///   latitude, longitude, progressPercentage, progressNotes
-  /// - Supervisor fields (always accepted from server):
-  ///   title, description, priority, dueDate, zoneId, zoneName,
-  ///   locationDescription, taskType, requiresPhotoProof, estimatedDurationMinutes
+  // merge server data with local data using field-level ownership.
+  //
+  // field ownership (non-overlapping):
+  // - worker fields (never overwritten by server unless fully synced):
+  //   status, completionNotes, photoUrl, completedAt,
+  //   latitude, longitude, progressPercentage, progressNotes
+  // - supervisor fields (always accepted from server):
+  //   title, description, priority, dueDate, zoneId, zoneName,
+  //   locationDescription, taskType, requiresPhotoProof, estimatedDurationMinutes
   Future<void> mergeFromServer(TaskLocal serverTask) async {
     final box = await _openBox();
     final existingIndex =
@@ -155,8 +155,8 @@ class TaskLocalRepository {
     await existing.save();
   }
 
-  /// Update only the syncVersion after a server conflict response.
-  /// Keeps isSynced = false so worker changes retry with correct version.
+  // update only the syncVersion after a server conflict response.
+  // keeps isSynced = false so worker changes retry with correct version.
   Future<void> updateSyncVersion(int taskId, int newVersion) async {
     final box = await _openBox();
     try {

@@ -9,7 +9,7 @@ import 'api_service.dart';
 class AppealsService {
   final ApiService _apiService = ApiService();
 
-  /// Submit an appeal against an auto-rejected task
+  // submit an appeal against an auto-rejected task
   Future<int> submitAppeal({
     required int taskId,
     required String explanation,
@@ -49,7 +49,7 @@ class AppealsService {
     }
   }
 
-  /// Get all appeals for the current user
+  // get all appeals for the current user
   Future<List<AppealModel>> getMyAppeals() async {
     try {
       final response = await _apiService.get(ApiConfig.myAppeals);
@@ -69,7 +69,7 @@ class AppealsService {
     }
   }
 
-  /// Get appeal by ID
+  // get appeal by ID
   Future<AppealModel> getAppealById(int appealId) async {
     try {
       final response = await _apiService.get('${ApiConfig.appeals}/$appealId');

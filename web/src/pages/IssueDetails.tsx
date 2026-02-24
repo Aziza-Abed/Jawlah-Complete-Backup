@@ -292,7 +292,7 @@ export default function IssueDetails() {
               )}
             </div>
 
-            {/* Forwarding Info (SR15) */}
+            {/* forwarding info */}
             {rawIssue?.forwardedToDepartmentName && (
               <div className="mt-4 bg-[#7895B2]/10 rounded-[12px] border border-[#7895B2]/20 p-4">
                 <div className="text-right text-[13px] text-[#7895B2] font-sans font-semibold mb-2">

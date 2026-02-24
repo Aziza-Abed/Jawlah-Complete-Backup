@@ -42,7 +42,7 @@ public class Issue
     public bool IsSynced { get; set; }
     public int SyncVersion { get; set; }
 
-    // Issue forwarding to municipal departments (SR15)
+    // issue forwarding to municipal departments
     public int? ForwardedToDepartmentId { get; set; }
     public DateTime? ForwardedAt { get; set; }
     public string? ForwardingNotes { get; set; }

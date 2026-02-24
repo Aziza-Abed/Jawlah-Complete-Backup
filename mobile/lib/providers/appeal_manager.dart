@@ -25,7 +25,7 @@ class AppealManager extends BaseController {
 
   bool get hasAppeals => myAppeals.isNotEmpty;
 
-  /// Submit an appeal for an auto-rejected task
+  // submit an appeal for an auto-rejected task
   Future<bool> submitAppeal({
     required int taskId,
     required String explanation,
@@ -47,7 +47,7 @@ class AppealManager extends BaseController {
     return success;
   }
 
-  /// Load all appeals for current user
+  // load all appeals for current user
   Future<void> loadMyAppeals() async {
     final appeals = await executeWithErrorHandling(
       () => _appealsService.getMyAppeals(),
@@ -59,7 +59,7 @@ class AppealManager extends BaseController {
     }
   }
 
-  /// Load specific appeal by ID
+  // load specific appeal by ID
   Future<void> loadAppealById(int appealId) async {
     final appeal = await executeWithErrorHandling(
       () => _appealsService.getAppealById(appealId),
@@ -78,7 +78,7 @@ class AppealManager extends BaseController {
     }
   }
 
-  /// Check if an appeal exists for a specific task
+  // check if an appeal exists for a specific task
   bool hasAppealForTask(int taskId) {
     return myAppeals.any((appeal) =>
         appeal.entityType == 'Task' &&
@@ -86,7 +86,7 @@ class AppealManager extends BaseController {
         appeal.isPending);
   }
 
-  /// Get appeal for a specific task
+  // get appeal for a specific task
   AppealModel? getAppealForTask(int taskId) {
     try {
       return myAppeals.firstWhere(

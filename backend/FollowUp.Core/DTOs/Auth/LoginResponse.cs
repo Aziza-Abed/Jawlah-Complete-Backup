@@ -8,27 +8,18 @@ public class LoginResponse
     public UserDto? User { get; set; }
     public string? Error { get; set; }
 
-    /// <summary>
-    /// Whether OTP verification is required before full login
-    /// True for Admin/Supervisor always, Workers on new device
-    /// </summary>
+    // whether OTP verification is required before full login
+    // true for Admin/Supervisor always, Workers on new device
     public bool RequiresOtp { get; set; } = false;
 
-    /// <summary>
-    /// Temporary session token for OTP verification flow
-    /// Only set when RequiresOtp is true
-    /// </summary>
+    // temporary session token for OTP verification flow
+    // only set when RequiresOtp is true
     public string? SessionToken { get; set; }
 
-    /// <summary>
-    /// Masked phone number for OTP display (e.g., ****1234)
-    /// Only set when RequiresOtp is true
-    /// </summary>
+    // masked phone number for OTP display (e.g., ****1234)
+    // only set when RequiresOtp is true
     public string? MaskedPhone { get; set; }
 
-    /// <summary>
-    /// Refresh token for obtaining new access tokens without re-login
-    /// ERD Chapter 3: RefreshToken table
-    /// </summary>
+    // refresh token for obtaining new access tokens without re-login
     public string? RefreshToken { get; set; }
 }

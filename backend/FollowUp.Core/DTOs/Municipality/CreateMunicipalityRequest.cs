@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Municipality;
 
-/// <summary>
-/// Request DTO for creating a new municipality
-/// </summary>
+// request for creating a new municipality
 public class CreateMunicipalityRequest
 {
     [Required(ErrorMessage = "رمز البلدية مطلوب")]

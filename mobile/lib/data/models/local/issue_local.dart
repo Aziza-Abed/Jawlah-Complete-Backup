@@ -49,7 +49,7 @@ class IssueLocal extends HiveObject {
   @HiveField(14)
   DateTime? syncedAt;
 
-  // Issue forwarding fields (SR15)
+  // issue forwarding fields
   @HiveField(15)
   int? forwardedToDepartmentId;
 

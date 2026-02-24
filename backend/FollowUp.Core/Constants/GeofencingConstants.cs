@@ -40,10 +40,8 @@ public static class GeofencingConstants
     public const double PalestineMinLongitude = 34.0;  // Western boundary
     public const double PalestineMaxLongitude = 36.0;  // Eastern boundary
 
-    /// <summary>
-    /// Check if coordinates are within the general Palestine region
-    /// For more specific validation, use the municipality's bounding box
-    /// </summary>
+    // check if coordinates are within the general Palestine region
+    // for more specific validation, use the municipality's bounding box
     public static bool IsWithinPalestine(double latitude, double longitude)
     {
         return latitude >= PalestineMinLatitude && latitude <= PalestineMaxLatitude &&

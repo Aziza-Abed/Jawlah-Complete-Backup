@@ -5,20 +5,19 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/location_service.dart';
 
-/// A widget that displays a map and allows users to pick or confirm a location
-/// Uses OpenStreetMap (free, no API key required)
-/// Used for attendance check-in/out, task completion, and issue reporting
+// a widget that displays a map and allows users to pick or confirm a location
+// uses OpenStreetMap (free, no API key required)
 class LocationPickerMap extends StatefulWidget {
-  /// Initial position for the map (defaults to current location if null)
+  // initial position for the map (defaults to current location if null)
   final Position? initialPosition;
 
-  /// Title to display in the app bar
+  // title to display in the app bar
   final String title;
 
-  /// Description text to show above the map
+  // description text to show above the map
   final String description;
 
-  /// Whether to allow tapping the map to adjust location
+  // whether to allow tapping the map to adjust location
   final bool allowDragging;
 
   const LocationPickerMap({

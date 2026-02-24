@@ -10,9 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FollowUp.API.Controllers;
 
-/// <summary>
-/// Controller for handling location validation appeals
-/// </summary>
+// handles location validation appeals
 [Route("api/[controller]")]
 [Authorize]
 public class AppealsController : BaseApiController
@@ -46,9 +44,7 @@ public class AppealsController : BaseApiController
         _logger = logger;
     }
 
-    /// <summary>
-    /// Submit an appeal against an auto-rejected task or failed attendance
-    /// </summary>
+    // submit an appeal against an auto-rejected task or failed attendance
     [HttpPost]
     [Authorize(Roles = "Worker")]
     [Consumes("multipart/form-data")]
@@ -174,9 +170,7 @@ public class AppealsController : BaseApiController
         }
     }
 
-    /// <summary>
-    /// Get all appeals for the current user
-    /// </summary>
+    // get all appeals for the current user
     [HttpGet("my-appeals")]
     [Authorize(Roles = "Worker")]
     public async Task<IActionResult> GetMyAppeals()
@@ -210,9 +204,7 @@ public class AppealsController : BaseApiController
         return Ok(ApiResponse<List<AppealResponse>>.SuccessResponse(responses));
     }
 
-    /// <summary>
-    /// Get appeal by ID
-    /// </summary>
+    // get appeal by ID
     [HttpGet("{id}")]
     public async Task<IActionResult> GetAppealById(int id)
     {
@@ -249,9 +241,7 @@ public class AppealsController : BaseApiController
         return Ok(ApiResponse<AppealResponse>.SuccessResponse(response));
     }
 
-    /// <summary>
-    /// Get all pending appeals (supervisors only see their workers' appeals)
-    /// </summary>
+    // get all pending appeals (supervisors only see their workers' appeals)
     [HttpGet("pending")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetPendingAppeals()
@@ -299,9 +289,7 @@ public class AppealsController : BaseApiController
         return Ok(ApiResponse<List<AppealResponse>>.SuccessResponse(responses));
     }
 
-    /// <summary>
-    /// Review an appeal (approve or reject) - supervisors only
-    /// </summary>
+    // review an appeal (approve or reject) - supervisors only
     [HttpPost("{id}/review")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> ReviewAppeal(int id, [FromBody] ReviewAppealRequest request)

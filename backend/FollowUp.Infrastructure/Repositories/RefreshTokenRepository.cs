@@ -6,10 +6,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace FollowUp.Infrastructure.Repositories;
 
-/// <summary>
-/// Repository for RefreshToken operations
-/// Required by ERD in Chapter 3 - Class Diagram
-/// </summary>
+// repository for refresh token operations
 public class RefreshTokenRepository : IRefreshTokenRepository
 {
     private readonly FollowUpDbContext _context;

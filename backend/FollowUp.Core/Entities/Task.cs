@@ -19,9 +19,7 @@ public class Task
     // When TeamId is set, the task is shared among all team members
     public int? TeamId { get; set; }
 
-    /// <summary>
-    /// Indicates if this is a team-shared task requiring collaboration
-    /// </summary>
+    // indicates if this is a team-shared task requiring collaboration
     public bool IsTeamTask { get; set; } = false;
 
     public string Title { get; set; } = string.Empty;

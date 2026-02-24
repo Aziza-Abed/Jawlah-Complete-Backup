@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Users;
 
-/// <summary>
-/// Request to update a worker's registered device ID
-/// </summary>
+// request to update a worker's registered device ID
 public class UpdateDeviceIdRequest
 {
     [Required(ErrorMessage = "معرف الجهاز مطلوب")]

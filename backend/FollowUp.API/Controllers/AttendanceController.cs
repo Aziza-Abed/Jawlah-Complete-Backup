@@ -100,7 +100,7 @@ public class AttendanceController : BaseApiController
         if (zone == null)
             return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لا توجد مناطق مخصصة لك. يرجى التواصل مع المشرف"));
 
-        // Chapter 5 FIX #2: Calculate late arrival
+        // calculate late arrival
         var now = DateTime.UtcNow;
         var expectedStart = now.Date.Add(user.ExpectedStartTime); // e.g., 08:00
         var graceEnd = expectedStart.AddMinutes(user.GraceMinutes); // e.g., 08:15
@@ -149,7 +149,7 @@ public class AttendanceController : BaseApiController
             return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لديك تسجيل حضور نشط بالفعل"));
         }
 
-        // UC17: Audit log for check-in
+        // audit log for check-in
         await _audit.LogAsync(userId, user.Username, "CheckIn",
             $"تسجيل حضور في المنطقة {zone.ZoneName}",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -248,7 +248,7 @@ public class AttendanceController : BaseApiController
         await _attendance.UpdateAsync(attendance);
         await _attendance.SaveChangesAsync();
 
-        // UC17: Audit log for check-out
+        // audit log for check-out
         await _audit.LogAsync(userId, user?.Username, "CheckOut",
             $"تسجيل انصراف - مدة العمل: {attendance.WorkDuration?.ToString(@"hh\:mm") ?? "غير محدد"}",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -305,7 +305,7 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<List<AttendanceResponse>>.SuccessResponse(responses));
     }
 
-    // UR8: Request manual attendance (worker submits when GPS not available)
+    // request manual attendance (worker submits when GPS not available)
     [HttpPost("manual")]
     public async Task<IActionResult> RequestManualAttendance([FromBody] ManualAttendanceRequest request)
     {
@@ -351,7 +351,7 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم إرسال طلب الحضور اليدوي"));
     }
 
-    // UR8: Get pending manual attendance requests (supervisor)
+    // get pending manual attendance requests (supervisor)
     [HttpGet("pending-manual")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetPendingManualAttendance()
@@ -384,7 +384,7 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(response));
     }
 
-    // UR8: Approve or reject manual attendance (supervisor)
+    // approve or reject manual attendance (supervisor)
     [HttpPost("{id}/approve")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> ApproveManualAttendance(int id, [FromBody] ApproveAttendanceRequest request)
@@ -429,7 +429,7 @@ public class AttendanceController : BaseApiController
         _logger.LogInformation("Manual attendance {Id} {Action} by supervisor {SupervisorId}",
             id, request.Approved ? "approved" : "rejected", supervisorId);
 
-        // UC17: Audit log for manual attendance approval/rejection
+        // audit log for manual attendance approval/rejection
         var supervisor = await _users.GetByIdAsync(supervisorId.Value);
         await _audit.LogAsync(supervisorId, supervisor?.Username,
             request.Approved ? "ManualAttendanceApproved" : "ManualAttendanceRejected",

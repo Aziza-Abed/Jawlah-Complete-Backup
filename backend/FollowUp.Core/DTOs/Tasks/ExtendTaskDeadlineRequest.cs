@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Tasks;
 
-/// <summary>
-/// Request for supervisor to extend task deadline
-/// </summary>
+// request for supervisor to extend task deadline
 public class ExtendTaskDeadlineRequest
 {
     [Required]

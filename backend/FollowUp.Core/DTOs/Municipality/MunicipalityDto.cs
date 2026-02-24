@@ -1,8 +1,6 @@
 namespace FollowUp.Core.DTOs.Municipality;
 
-/// <summary>
-/// DTO for municipality data
-/// </summary>
+// municipality data
 public class MunicipalityDto
 {
     public int MunicipalityId { get; set; }

@@ -391,7 +391,7 @@ class SyncService {
         await _saveLastSyncTime(serverTime);
       }
 
-      // Section 3.5.2: Sync zones for offline validation
+      // sync zones for offline validation
       await syncZones();
     } catch (e) {
       if (kDebugMode) {
@@ -400,8 +400,7 @@ class SyncService {
     }
   }
 
-  /// Section 3.5.2: Download user's assigned zones for offline validation
-  /// "validation is executed locally using preloaded shapefiles"
+  // download user's assigned zones for offline validation
   Future<void> syncZones() async {
     try {
       final response = await _dio.get(ApiConfig.myZones);

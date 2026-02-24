@@ -16,14 +16,14 @@ class HiveInit {
     Hive.registerAdapter(TaskLocalAdapter());
     Hive.registerAdapter(IssueLocalAdapter());
     Hive.registerAdapter(LocationPointAdapter());
-    Hive.registerAdapter(ZoneLocalAdapter()); // Section 3.5.2: Offline zones
+    Hive.registerAdapter(ZoneLocalAdapter()); // offline zones
 
     // open boxes for local storage
     await Hive.openBox<AttendanceLocal>('attendance_local');
     await Hive.openBox<TaskLocal>('task_local');
     await Hive.openBox<IssueLocal>('issue_local');
     await Hive.openBox<LocationPoint>('location_buffer');
-    await Hive.openBox<ZoneLocal>('zone_local'); // Section 3.5.2: Offline zones
+    await Hive.openBox<ZoneLocal>('zone_local'); // offline zones
 
     if (kDebugMode) debugPrint('Hive initialized successfully');
   }

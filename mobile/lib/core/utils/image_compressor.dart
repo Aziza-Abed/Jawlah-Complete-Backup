@@ -3,11 +3,11 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 
-/// Compresses images before upload if they exceed the size limit
+// compresses images before upload if they exceed the size limit
 class ImageCompressor {
   static const int _maxFileSizeBytes = 5 * 1024 * 1024; // 5MB
 
-  /// Compress image if it's larger than 5MB, otherwise return original
+  // compress image if it's larger than 5MB, otherwise return original
   static Future<File> compressIfNeeded(File imageFile) async {
     try {
       final fileSize = await imageFile.length();

@@ -6,24 +6,16 @@ namespace FollowUp.Core.Interfaces.Repositories;
 
 public interface IAppealRepository : IRepository<Appeal>
 {
-    /// <summary>
-    /// Get all appeals for a specific user
-    /// </summary>
+    // get all appeals for a specific user
     Task<IEnumerable<Appeal>> GetUserAppealsAsync(int userId);
 
-    /// <summary>
-    /// Get all pending appeals (for supervisors)
-    /// </summary>
+    // get all pending appeals (for supervisors)
     Task<IEnumerable<Appeal>> GetPendingAppealsAsync();
 
-    /// <summary>
-    /// Get appeals by status
-    /// </summary>
+    // get appeals by status
     Task<IEnumerable<Appeal>> GetAppealsByStatusAsync(AppealStatus status);
 
-    /// <summary>
-    /// Get appeals filtered by various criteria
-    /// </summary>
+    // get appeals filtered by various criteria
     Task<IEnumerable<Appeal>> GetFilteredAppealsAsync(
         int? userId = null,
         AppealStatus? status = null,
@@ -31,13 +23,9 @@ public interface IAppealRepository : IRepository<Appeal>
         DateTime? fromDate = null,
         DateTime? toDate = null);
 
-    /// <summary>
-    /// Check if an appeal already exists for an entity
-    /// </summary>
+    // check if an appeal already exists for an entity
     Task<bool> HasAppealForEntityAsync(string entityType, int entityId);
 
-    /// <summary>
-    /// Find appeal by evidence photo filename (for file access authorization)
-    /// </summary>
+    // find appeal by evidence photo filename (for file access authorization)
     Task<Appeal?> GetByEvidencePhotoFilenameAsync(string filename);
 }

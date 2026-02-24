@@ -2,9 +2,7 @@ using FollowUp.Core.Enums;
 
 namespace FollowUp.Core.Entities;
 
-/// <summary>
-/// Represents a worker's appeal against an auto-rejected task or failed attendance check-in
-/// </summary>
+// worker's appeal against an auto-rejected task or failed attendance check-in
 public class Appeal
 {
     public int AppealId { get; set; }

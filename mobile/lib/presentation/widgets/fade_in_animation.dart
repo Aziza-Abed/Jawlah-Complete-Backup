@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Simple fade-in animation using Flutter's built-in AnimatedOpacity
+// simple fade-in animation using Flutter's built-in AnimatedOpacity
 class FadeInAnimation extends StatefulWidget {
   final Widget child;
   final Duration delay;

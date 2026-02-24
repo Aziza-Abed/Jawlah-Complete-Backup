@@ -1,22 +1,14 @@
 namespace FollowUp.Core.Enums;
 
-/// <summary>
-/// Types of GIS files that can be uploaded
-/// </summary>
+// types of GIS files that can be uploaded
 public enum GisFileType
 {
-    /// <summary>
-    /// Quarters/Neighborhoods boundaries
-    /// </summary>
+    // quarters/neighborhoods boundaries
     Quarters = 0,
 
-    /// <summary>
-    /// Municipality borders/boundaries
-    /// </summary>
+    // municipality borders/boundaries
     Borders = 1,
 
-    /// <summary>
-    /// Blocks within quarters
-    /// </summary>
+    // blocks within quarters
     Blocks = 2
 }

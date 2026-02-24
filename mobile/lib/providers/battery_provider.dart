@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import '../data/services/battery_service.dart';
 import 'base_controller.dart';
 
-/// Provider for battery monitoring (UI display)
-/// Uses BatteryService for actual monitoring - no duplicate API calls
+// provider for battery monitoring (UI display)
+// uses BatteryService for actual monitoring - no duplicate API calls
 class BatteryProvider extends BaseController {
   final BatteryService _batteryService = BatteryService();
 
@@ -17,7 +17,7 @@ class BatteryProvider extends BaseController {
   bool get isCharging => _isCharging;
   bool get isLowBattery => _batteryLevel <= lowBatteryThreshold;
 
-  /// Initialize battery monitoring for UI display
+  // initialize battery monitoring for UI display
   Future<void> initialize() async {
     try {
       // Get initial values from BatteryService
@@ -37,7 +37,7 @@ class BatteryProvider extends BaseController {
     }
   }
 
-  /// Manually refresh battery level for UI
+  // manually refresh battery level for UI
   Future<void> refreshBatteryLevel() async {
     try {
       _batteryLevel = await _batteryService.getBatteryLevel();
@@ -57,7 +57,7 @@ class BatteryProvider extends BaseController {
     }
   }
 
-  /// Reset low battery warning flag
+  // reset low battery warning flag
   void resetLowBatteryWarning() {
     _hasShownLowBatteryWarning = false;
   }

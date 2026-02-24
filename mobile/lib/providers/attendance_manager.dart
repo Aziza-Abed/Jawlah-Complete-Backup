@@ -164,7 +164,7 @@ class AttendanceManager extends BaseController {
         throw Exception('يجب تفعيل تحديد الموقع (GPS)');
       }
 
-      // Section 3.5.2: Offline zone validation using cached zones
+      // offline zone validation using cached zones
       final zoneValidation = ZoneValidationService(ZoneLocalRepository());
       if (await zoneValidation.hasOfflineZones()) {
         final zone = await zoneValidation.validateLocationOffline(

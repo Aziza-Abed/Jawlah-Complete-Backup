@@ -2,20 +2,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Appeals;
 
-/// <summary>
-/// Request to approve or reject an appeal (supervisor action)
-/// </summary>
+// request to approve or reject an appeal (supervisor action)
 public class ReviewAppealRequest
 {
-    /// <summary>
-    /// Whether to approve the appeal (true) or reject it (false)
-    /// </summary>
+    // whether to approve the appeal (true) or reject it (false)
     [Required]
     public bool Approved { get; set; }
 
-    /// <summary>
-    /// Supervisor's notes about the decision
-    /// </summary>
+    // supervisor's notes about the decision
     [StringLength(1000, ErrorMessage = "يجب أن تكون الملاحظات أقل من 1000 حرف")]
     public string? ReviewNotes { get; set; }
 }

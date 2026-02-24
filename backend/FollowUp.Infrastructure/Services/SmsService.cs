@@ -4,11 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace FollowUp.Infrastructure.Services;
 
-/// <summary>
-/// SMS service implementation
-/// Currently uses mock/logging for development
-/// Can be replaced with Twilio or local SMS gateway for production
-/// </summary>
+// sms service implementation
+// currently uses mock/logging for development
+// can be replaced with Twilio or local SMS gateway for production
 public class SmsService : ISmsService
 {
     private readonly ILogger<SmsService> _logger;

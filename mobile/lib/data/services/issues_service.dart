@@ -187,7 +187,7 @@ class IssuesService {
     }
   }
 
-  // SR15: Forward issue to a department
+  // forward issue to a department
   Future<IssueModel> forwardIssue({
     required int issueId,
     required int departmentId,

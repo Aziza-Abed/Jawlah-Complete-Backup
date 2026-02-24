@@ -19,7 +19,7 @@ class IssueModel {
   final DateTime createdAt; // When was it reported
   final DateTime updatedAt; // Last update time
 
-  // Issue forwarding info (SR15)
+  // issue forwarding info
   final int? forwardedToDepartmentId;
   final String? forwardedToDepartmentName;
   final DateTime? forwardedAt;
@@ -211,7 +211,7 @@ class IssueModel {
 
   bool get hasPhoto => photos.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
 
-  /// Get all photo URLs (combines photos list and legacy photoUrl)
+  // get all photo URLs (combines photos list and legacy photoUrl)
   List<String> get allPhotos {
     final result = <String>[];
     result.addAll(photos);
@@ -234,7 +234,7 @@ class IssueModel {
   bool get isUnderReview => status.toLowerCase() == 'underreview' || status.toLowerCase() == 'forwarded';
 
   String get typeArabic {
-    // Chapter 4: Updated to match report terminology
+    // updated to match report terminology
     switch (type.toLowerCase()) {
       case 'infrastructure':
         return 'بنية تحتية';
@@ -261,7 +261,7 @@ class IssueModel {
   }
 
   String get severityArabic {
-    // Chapter 4: Updated to match report terminology
+    // updated to match report terminology
     switch (severity.toLowerCase()) {
       case 'low':
         return 'منخفضة';

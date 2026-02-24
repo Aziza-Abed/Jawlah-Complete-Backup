@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FollowUp.Core.DTOs.Tasks;
 
-/// <summary>
-/// Request for reassigning a task to a different worker
-/// </summary>
+// request for reassigning a task to a different worker
 public class ReassignTaskRequest
 {
     [Required(ErrorMessage = "يجب تحديد العامل الجديد")]

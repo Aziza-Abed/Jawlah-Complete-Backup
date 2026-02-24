@@ -287,7 +287,7 @@ public class TasksController : BaseApiController
         await _tasks.AddAsync(task);
         await _tasks.SaveChangesAsync();
 
-        // UC17: Audit log for task creation
+        // audit log for task creation
         await _audit.LogAsync(userId, currentUser.Username, "TaskCreated",
             $"إنشاء مهمة: {task.Title} (#{task.TaskId})",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -516,7 +516,7 @@ public class TasksController : BaseApiController
         await _tasks.UpdateAsync(task);
         await _tasks.SaveChangesAsync();
 
-        // UC17: Audit log for task status update
+        // audit log for task status update
         var currentUser = userId.HasValue ? await _users.GetByIdAsync(userId.Value) : null;
         await _audit.LogAsync(userId, currentUser?.Username, "TaskUpdated",
             $"تحديث حالة المهمة #{task.TaskId} إلى {request.Status}",
@@ -902,7 +902,7 @@ public class TasksController : BaseApiController
         _logger.LogInformation("Task {TaskId} completed by user {UserId} with photo {PhotoUrl}",
             id, userId, photoUrl);
 
-        // UC17: Audit log for task completion
+        // audit log for task completion
         var completer = await _users.GetByIdAsync(userId!.Value);
         await _audit.LogAsync(userId, completer?.Username, "TaskCompleted",
             $"إكمال مهمة: {task.Title} (#{task.TaskId})",
@@ -1262,7 +1262,7 @@ public class TasksController : BaseApiController
         if (request.ProgressPercentage < 0 || request.ProgressPercentage > 100)
             return BadRequest(ApiResponse<object>.ErrorResponse("نسبة التقدم يجب أن تكون بين 0 و 100"));
 
-        // Chapter 5 Fix: Block backward progress - progress can only increase
+        // block backward progress - progress can only increase
         if (request.ProgressPercentage < task.ProgressPercentage)
         {
             _logger.LogWarning("Task {TaskId} progress decrease blocked: {Old}% to {New}% by user {UserId}",
@@ -1704,10 +1704,7 @@ public class TasksController : BaseApiController
         return degrees * (Math.PI / 180);
     }
 
-    /// <summary>
-    /// Security Shield: Centralized authorization check for task access.
-    /// Returns true if user can access the task (individual assignment OR team membership).
-    /// </summary>
+    // centralized authorization check for task access (individual assignment or team membership)
     private async Task<bool> CanAccessTaskAsync(TaskEntity task, int userId)
     {
         // Individual task: direct assignment

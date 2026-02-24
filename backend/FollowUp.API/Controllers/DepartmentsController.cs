@@ -21,9 +21,7 @@ public class DepartmentsController : BaseApiController
         _logger = logger;
     }
 
-    /// <summary>
-    /// Get all departments
-    /// </summary>
+    // get all departments
     [HttpGet]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetAll([FromQuery] bool? activeOnly = null)
@@ -53,9 +51,7 @@ public class DepartmentsController : BaseApiController
         return Ok(ApiResponse<List<DepartmentDto>>.SuccessResponse(departments));
     }
 
-    /// <summary>
-    /// Get department by ID
-    /// </summary>
+    // get department by ID
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetById(int id)
@@ -81,9 +77,7 @@ public class DepartmentsController : BaseApiController
         return Ok(ApiResponse<DepartmentDto>.SuccessResponse(department));
     }
 
-    /// <summary>
-    /// Create a new department (Admin only)
-    /// </summary>
+    // create a new department (admin only)
     [HttpPost]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateDepartmentRequest request)
@@ -136,9 +130,7 @@ public class DepartmentsController : BaseApiController
         return Ok(ApiResponse<DepartmentDto>.SuccessResponse(dto, "تم إنشاء القسم بنجاح"));
     }
 
-    /// <summary>
-    /// Update department (Admin only)
-    /// </summary>
+    // update department (admin only)
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateDepartmentRequest request)
@@ -192,9 +184,7 @@ public class DepartmentsController : BaseApiController
         return Ok(ApiResponse<DepartmentDto>.SuccessResponse(dto, "تم تحديث القسم بنجاح"));
     }
 
-    /// <summary>
-    /// Delete department (Admin only)
-    /// </summary>
+    // delete department (admin only)
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)

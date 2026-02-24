@@ -386,7 +386,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // UC2: Simple login - authenticate only, no check-in
+  // simple login - authenticate only, no check-in
   Future<void> _login() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 

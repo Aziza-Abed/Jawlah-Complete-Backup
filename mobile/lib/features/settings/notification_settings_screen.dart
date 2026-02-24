@@ -3,8 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../presentation/widgets/base_screen.dart';
 
-/// SR16.5: Notification preferences screen
-/// Allows users to configure notification preferences
+// notification preferences screen
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 

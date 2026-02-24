@@ -1,8 +1,8 @@
 namespace FollowUp.Core.DTOs.Auth;
 
-// Response for GPS-based login (mobile workers)
-// UC2: Login is pure authentication. No attendance data in response.
-// Attendance is handled automatically via geofencing (UC4).
+// response for GPS-based login (mobile workers)
+// login is pure authentication, no attendance data in response
+// attendance is handled automatically via geofencing
 public class LoginWithGPSResponse
 {
     public bool Success { get; set; }

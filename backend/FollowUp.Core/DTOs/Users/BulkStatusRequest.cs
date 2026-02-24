@@ -3,10 +3,7 @@ using FollowUp.Core.Enums;
 
 namespace FollowUp.Core.DTOs.Users;
 
-/// <summary>
-/// UC16: Bulk enable/disable users request
-/// Admin can enable/disable multiple users at once
-/// </summary>
+// bulk enable/disable users - admin can enable/disable multiple users at once
 public class BulkStatusRequest
 {
     [Required]

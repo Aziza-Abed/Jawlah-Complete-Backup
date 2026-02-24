@@ -3,10 +3,7 @@ using FollowUp.Core.Enums;
 
 namespace FollowUp.Core.DTOs.Users;
 
-/// <summary>
-/// SR22.5: Bulk role assignment request
-/// Admin can assign roles to multiple users at once
-/// </summary>
+// bulk role assignment - admin can assign roles to multiple users at once
 public class BulkRoleAssignmentRequest
 {
     [Required]

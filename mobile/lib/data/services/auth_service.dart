@@ -10,8 +10,8 @@ import 'device_service.dart';
 class AuthService {
   final ApiService _apiService = ApiService();
 
-  // UC2: Login is pure authentication with device binding
-  // Attendance is handled automatically via geofencing (UC4)
+  // login is pure authentication with device binding
+  // attendance is handled automatically via geofencing
   Future<AuthResult> loginWithGPS({
     required String username,
     required String password,
@@ -217,7 +217,7 @@ class AuthService {
     }
   }
 
-  // SR1.6: Forgot password - send OTP to user's phone
+  // forgot password - send OTP to user's phone
   Future<ForgotPasswordResult> forgotPassword({
     required String username,
   }) async {
@@ -252,7 +252,7 @@ class AuthService {
     }
   }
 
-  // SR1.6: Reset password using OTP verification
+  // reset password using OTP verification
   Future<void> resetPassword({
     required String sessionToken,
     required String otpCode,
@@ -329,7 +329,7 @@ class OtpResendResult {
   });
 }
 
-// UC2: Authentication result - no attendance data
+// authentication result - no attendance data
 class AuthResult {
   final UserModel? user;
   final String? token;

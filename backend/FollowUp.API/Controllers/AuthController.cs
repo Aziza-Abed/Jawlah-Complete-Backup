@@ -74,7 +74,7 @@ public class AuthController : BaseApiController
         var (success, token, error) = await _auth.LoginAsync(request.Username, request.Password);
         if (!success)
         {
-            // UR23: Log failed login
+            // log failed login
             await _audit.LogAsync(null, request.Username, "LoginFailed", error, ipAddress, userAgent);
             return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse(error ?? "فشل تسجيل الدخول"));
         }
@@ -133,10 +133,10 @@ public class AuthController : BaseApiController
         }
 
         // No OTP required - return token directly
-        // UR23: Log successful login
+        // log successful login
         await _audit.LogAsync(user.UserId, user.Username, "Login", "تسجيل دخول ناجح", ipAddress, userAgent);
 
-        // ERD Chapter 3: Generate refresh token on login
+        // generate refresh token on login
         string? refreshToken = null;
         try
         {
@@ -159,9 +159,7 @@ public class AuthController : BaseApiController
         return Ok(ApiResponse<LoginResponse>.SuccessResponse(response, "تم تسجيل الدخول بنجاح"));
     }
 
-    /// <summary>
-    /// Verify OTP code and complete login
-    /// </summary>
+    // verify OTP code and complete login
     [AllowAnonymous]
     [HttpPost("verify-otp")]
     [EnableRateLimiting("auth")]
@@ -231,7 +229,7 @@ public class AuthController : BaseApiController
         // Log successful 2FA login
         await _audit.LogAsync(user.UserId, user.Username, "Login2FA", "تسجيل دخول ناجح مع التحقق الثنائي", ipAddress, userAgent);
 
-        // ERD Chapter 3: Generate refresh token after OTP verification
+        // generate refresh token after OTP verification
         string? otpRefreshToken = null;
         try
         {
@@ -254,9 +252,7 @@ public class AuthController : BaseApiController
         return Ok(ApiResponse<VerifyOtpResponse>.SuccessResponse(response, "تم التحقق بنجاح"));
     }
 
-    /// <summary>
-    /// Resend OTP code
-    /// </summary>
+    // resend OTP code
     [AllowAnonymous]
     [HttpPost("resend-otp")]
     [EnableRateLimiting("auth")]
@@ -300,20 +296,9 @@ public class AuthController : BaseApiController
         return Ok(ApiResponse<SendOtpResponse>.SuccessResponse(response, "تم إرسال رمز التحقق"));
     }
 
-    /// <summary>
-    /// GPS-Based Login and Attendance - Mobile Worker Authentication Flow
-    ///
-    /// This endpoint handles worker login with automatic attendance check-in.
-    /// Per UC2: Login is pure authentication. Attendance is handled separately via geofencing (UC4).
-    ///
-    /// Security Features:
-    /// - Device binding: Workers can only login from their registered device
-    ///
-    /// Flow:
-    /// 1. Authenticate credentials (username + password)
-    /// 2. Validate device ID matches registered device
-    /// 3. Return JWT token
-    /// </summary>
+    // GPS-based login for mobile workers
+    // authenticates credentials, validates device binding, returns JWT token
+    // attendance is handled separately via geofencing in the mobile background service
     [AllowAnonymous]
     [HttpPost("login-gps")]
     [EnableRateLimiting("auth")]
@@ -403,15 +388,15 @@ public class AuthController : BaseApiController
                 }
             }
 
-            // UC2: Login is authentication only. No attendance check-in here.
-            // Attendance is handled automatically via geofencing (UC4) in the mobile background service.
+            // login is authentication only - no attendance check-in here
+            // attendance is handled automatically via geofencing in the mobile background service
 
             // update user last login and save device registration if new
             user.LastLoginAt = DateTime.UtcNow;
             await _users.UpdateAsync(user);
             await _users.SaveChangesAsync();
 
-            // ERD Chapter 3: Generate refresh token for GPS login (consistency with other login flows)
+            // generate refresh token for GPS login (consistency with other login flows)
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
             string? gpsRefreshToken = null;
             try
@@ -445,11 +430,7 @@ public class AuthController : BaseApiController
 
     #region GPS Validation Helper Methods
 
-    /// <summary>
-    /// Validates GPS accuracy is within acceptable range
-    /// </summary>
-    /// <param name="accuracy">GPS accuracy in meters</param>
-    /// <returns>Error message if invalid, null if valid</returns>
+    // validate GPS accuracy is within acceptable range
     private string? ValidateGpsAccuracy(double? accuracy)
     {
         if (accuracy.HasValue && accuracy.Value > Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters)
@@ -459,10 +440,7 @@ public class AuthController : BaseApiController
         return null;
     }
 
-    /// <summary>
-    /// Validates GPS coordinates are within municipality bounds
-    /// Supports both production and testing mode
-    /// </summary>
+    // validate GPS coordinates are within municipality bounds (supports production and testing mode)
     private string? ValidateGpsBounds(double latitude, double longitude)
     {
         var isTestingMode = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
@@ -493,11 +471,7 @@ public class AuthController : BaseApiController
         return null;
     }
 
-    /// <summary>
-    /// Finds the zone that contains the given GPS coordinates for the specified user
-    /// Checks user's assigned zones only
-    /// </summary>
-    /// <returns>Matched zone if found, null otherwise</returns>
+    // find the zone containing the given GPS coordinates (checks user's assigned zones only)
     private async Task<(Zone? MatchedZone, string? Error)> FindUserZoneByGps(int userId, double latitude, double longitude)
     {
         var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
@@ -633,7 +607,7 @@ public class AuthController : BaseApiController
         if (!success)
             return BadRequest(ApiResponse<UserDto>.ErrorResponse(error ?? "فشل التسجيل"));
 
-        // UC17: Audit log for user creation
+        // audit log for user creation
         var currentUserId = GetCurrentUserId();
         var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
         await _audit.LogAsync(currentUserId, currentUser?.Username, "UserCreated",
@@ -663,7 +637,7 @@ public class AuthController : BaseApiController
         return Ok(ApiResponse<UserDto>.SuccessResponse(userDto));
     }
 
-    // ERD Chapter 3: Refresh access token using refresh token
+    // refresh access token using refresh token
     [AllowAnonymous]
     [HttpPost("refresh")]
     [EnableRateLimiting("auth")]
@@ -696,7 +670,7 @@ public class AuthController : BaseApiController
         {
             await _auth.LogoutAsync(userId.Value);
 
-            // UC17: Audit log for logout
+            // audit log for logout
             var user = await _users.GetByIdAsync(userId.Value);
             await _audit.LogAsync(userId, user?.Username, "Logout",
                 "تسجيل خروج",
@@ -707,7 +681,7 @@ public class AuthController : BaseApiController
         return Ok(ApiResponse<string>.SuccessResponse("تم تسجيل الخروج بنجاح"));
     }
 
-    // SR1.6: Forgot password - send OTP to user's phone
+    // forgot password - send OTP to user's phone
     [AllowAnonymous]
     [HttpPost("forgot-password")]
     [EnableRateLimiting("auth")]
@@ -757,7 +731,7 @@ public class AuthController : BaseApiController
         }));
     }
 
-    // SR1.6: Reset password using OTP verification
+    // reset password using OTP verification
     [AllowAnonymous]
     [HttpPost("reset-password")]
     [EnableRateLimiting("auth")]

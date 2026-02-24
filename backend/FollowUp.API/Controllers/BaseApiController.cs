@@ -22,16 +22,7 @@ public abstract class BaseApiController : ControllerBase
         return User.FindFirst(ClaimTypes.Role)?.Value;
     }
 
-    /// <summary>
-    /// Validates GPS coordinates for zero values and geographic boundaries
-    /// </summary>
-    /// <param name="latitude">The latitude coordinate to validate</param>
-    /// <param name="longitude">The longitude coordinate to validate</param>
-    /// <param name="allowZero">Whether to allow zero coordinates (default: false)</param>
-    /// <returns>BadRequest with error message if invalid, null if valid</returns>
-    /// <summary>
-    /// Normalizes pagination parameters to safe values.
-    /// </summary>
+    // normalize pagination parameters to safe values
     protected (int Page, int PageSize) NormalizePagination(int page, int pageSize, int maxPageSize = 100, int defaultPageSize = 50)
     {
         if (pageSize < 1 || pageSize > maxPageSize) pageSize = defaultPageSize;

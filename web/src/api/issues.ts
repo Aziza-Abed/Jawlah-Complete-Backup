@@ -31,7 +31,7 @@ export async function deleteIssue(id: number): Promise<void> {
   await apiClient.delete(`/issues/${id}`);
 }
 
-// Forward issue to a department (SR15)
+// forward issue to a department
 export async function forwardIssue(id: number, request: ForwardIssueRequest): Promise<IssueResponse> {
   const response = await apiClient.post<ApiResponse<IssueResponse>>(`/issues/${id}/forward`, request);
   if (response.data.success && response.data.data) {

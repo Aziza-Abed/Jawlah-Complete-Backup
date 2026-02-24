@@ -2,59 +2,38 @@ using FollowUp.Core.Enums;
 
 namespace FollowUp.Core.Entities;
 
-/// <summary>
-/// Represents a GIS file uploaded by admin for geographic data.
-/// Files are stored in Storage/GIS folder and tracked here.
-/// </summary>
+// GIS file uploaded by admin for geographic data, stored in Storage/GIS folder
 public class GisFile
 {
     public int GisFileId { get; set; }
 
-    /// <summary>
-    /// Type of GIS data: Quarters, Borders, Blocks
-    /// </summary>
+    // type of GIS data: Quarters, Borders, Blocks
     public GisFileType FileType { get; set; }
 
-    /// <summary>
-    /// Original filename when uploaded
-    /// </summary>
+    // original filename when uploaded
     public string OriginalFileName { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Stored filename in Storage/GIS folder
-    /// </summary>
+    // stored filename in Storage/GIS folder
     public string StoredFileName { get; set; } = string.Empty;
 
-    /// <summary>
-    /// File size in bytes
-    /// </summary>
+    // file size in bytes
     public long FileSize { get; set; }
 
-    /// <summary>
-    /// Whether this file is currently active (only one per type should be active)
-    /// </summary>
+    // whether this file is currently active (only one per type should be active)
     public bool IsActive { get; set; } = true;
 
-    /// <summary>
-    /// Number of features/zones imported from this file
-    /// </summary>
+    // number of features/zones imported from this file
     public int FeaturesCount { get; set; }
 
-    /// <summary>
-    /// User who uploaded this file
-    /// </summary>
+    // user who uploaded this file
     public int UploadedByUserId { get; set; }
 
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
-    /// When this file was last used to import zones
-    /// </summary>
+    // when this file was last used to import zones
     public DateTime? LastImportedAt { get; set; }
 
-    /// <summary>
-    /// Notes about this file (optional)
-    /// </summary>
+    // notes about this file (optional)
     public string? Notes { get; set; }
 
     // Navigation property

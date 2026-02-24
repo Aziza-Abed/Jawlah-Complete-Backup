@@ -20,7 +20,7 @@ public class IssueSyncDto
     public DateTime ReportedAt { get; set; }
     public int SyncVersion { get; set; }
 
-    // Forwarding fields (SR15)
+    // forwarding fields
     public int? ForwardedToDepartmentId { get; set; }
     public DateTime? ForwardedAt { get; set; }
     public string? ForwardingNotes { get; set; }

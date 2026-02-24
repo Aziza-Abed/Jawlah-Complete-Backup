@@ -214,7 +214,7 @@ builder.Services.AddScoped<IMunicipalityRepository, MunicipalityRepository>();
 builder.Services.AddScoped<IAppealRepository, AppealRepository>();
 builder.Services.AddScoped<ITaskTemplateRepository, TaskTemplateRepository>();
 builder.Services.AddScoped<IGisFileRepository, GisFileRepository>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>(); // ERD Chapter 3
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddHostedService<TaskGenerationBackgroundService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();

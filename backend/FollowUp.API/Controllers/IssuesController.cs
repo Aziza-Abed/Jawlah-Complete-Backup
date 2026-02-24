@@ -101,7 +101,7 @@ public class IssuesController : BaseApiController
         await _issues.AddAsync(issue);
         await _issues.SaveChangesAsync();
 
-        // UC17: Audit log for issue reported
+        // audit log for issue reported
         await _audit.LogAsync(userId, user.Username, "IssueReported",
             $"بلاغ مشكلة: {issue.Title} (#{issue.IssueId})",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -417,7 +417,7 @@ public class IssuesController : BaseApiController
             _logger.LogInformation("Issue {IssueId} status updated to {Status} by user {UserId}",
                 id, request.Status, userId);
 
-            // UC17: Audit log for issue update
+            // audit log for issue update
             var currentUser = userId.HasValue ? await _users.GetByIdAsync(userId.Value) : null;
             await _audit.LogAsync(userId, currentUser?.Username, "IssueUpdated",
                 $"تحديث حالة البلاغ #{issue.IssueId} إلى {request.Status}",
@@ -448,7 +448,7 @@ public class IssuesController : BaseApiController
         return Ok(ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue)));
     }
 
-    // SR15: Forward issue to a municipal department
+    // forward issue to a municipal department
     [HttpPost("{id}/forward")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> ForwardIssue(int id, [FromBody] ForwardIssueRequest request)
@@ -558,9 +558,7 @@ public class IssuesController : BaseApiController
 
     // ============ PDF Generation ============
 
-    /// <summary>
-    /// Generate and download PDF report for an issue
-    /// </summary>
+    // generate and download PDF report for an issue
     [HttpGet("{id}/pdf")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> DownloadIssuePdf(int id)
@@ -597,7 +595,7 @@ public class IssuesController : BaseApiController
         // Configure QuestPDF license (Community license for open source)
         QuestPDF.Settings.License = LicenseType.Community;
 
-        // Arabic text mappings (Chapter 4: Updated to match report terminology)
+        // Arabic text mappings for PDF display
         var severityMap = new Dictionary<IssueSeverity, string>
         {
             { IssueSeverity.Low, "منخفضة" },
@@ -756,10 +754,7 @@ public class IssuesController : BaseApiController
         return File(pdfBytes, "application/pdf", fileName);
     }
 
-    /// <summary>
-    /// Validates and returns a safe file path for photos, preventing path traversal attacks.
-    /// Returns null if the path is invalid or outside the allowed storage directory.
-    /// </summary>
+    // validate and return a safe file path for photos, preventing path traversal attacks
     private string? GetSafePhotoPath(string photoUrl)
     {
         if (string.IsNullOrEmpty(photoUrl))

@@ -13,12 +13,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace FollowUp.Infrastructure.Services;
 
-/// <summary>
-/// SMS-based OTP service for Two-Factor Authentication
-/// Policy (Updated):
-/// - ALL roles: OTP only on FIRST login or NEW device (device binding)
-/// - Once device is registered, no OTP needed for that device
-/// </summary>
+// sms-based OTP service for two-factor authentication
+// all roles: OTP only on first login or new device (device binding)
+// once device is registered, no OTP needed for that device
 public class OtpService : IOtpService
 {
     private readonly FollowUpDbContext _db;
@@ -42,22 +39,13 @@ public class OtpService : IOtpService
         _logger = logger;
     }
 
-    /// <summary>
-    /// OTP DEVICE BINDING FLOW
-    ///
-    /// Determine if user needs OTP verification based on device binding.
-    /// This implements a "trust this device" security pattern.
-    ///
-    /// Policy (applies to ALL roles: Admin, Supervisor, Worker):
-    /// - First login: OTP required to register device
-    /// - Same device: No OTP needed (device is trusted)
-    /// - New device: OTP required to verify identity
-    ///
-    /// Security benefit:
-    /// - Reduces SMS costs (OTP only on first login or device change)
-    /// - Maintains security (stolen password alone is not enough)
-    /// - Better user experience (no OTP on every login)
-    /// </summary>
+    // determine if user needs OTP verification based on device binding
+    // implements a "trust this device" security pattern
+    //
+    // policy (applies to all roles):
+    // - first login: OTP required to register device
+    // - same device: no OTP needed (device is trusted)
+    // - new device: OTP required to verify identity
     public bool RequiresOtp(User user, string? deviceId)
     {
         // If no device registered yet, this is first login - require OTP to register device
@@ -80,9 +68,7 @@ public class OtpService : IOtpService
         return false;
     }
 
-    /// <summary>
-    /// Generate OTP, store hash, and send via SMS
-    /// </summary>
+    // generate OTP, store hash, and send via SMS
     public async Task<string?> GenerateAndSendOtpAsync(User user, string purpose = "Login", string? deviceId = null)
     {
         try
@@ -149,9 +135,7 @@ public class OtpService : IOtpService
         }
     }
 
-    /// <summary>
-    /// Verify OTP code entered by user
-    /// </summary>
+    // verify OTP code entered by user
     public async Task<(bool Success, int? UserId, string? Error, int RemainingAttempts)> VerifyOtpAsync(string sessionToken, string otpCode, string? ipAddress = null)
     {
         try
@@ -228,9 +212,7 @@ public class OtpService : IOtpService
         }
     }
 
-    /// <summary>
-    /// Mask phone number for display (e.g., ****1234)
-    /// </summary>
+    // mask phone number for display (e.g., ****1234)
     public string MaskPhoneNumber(string phoneNumber)
     {
         if (string.IsNullOrEmpty(phoneNumber) || phoneNumber.Length < 4)
@@ -241,9 +223,7 @@ public class OtpService : IOtpService
         return $"****{lastFour}";
     }
 
-    /// <summary>
-    /// Check if IP is rate limited for OTP verification
-    /// </summary>
+    // check if IP is rate limited for OTP verification
     private bool IsIpRateLimited(string? ipAddress, out int remainingMinutes)
     {
         remainingMinutes = 0;
@@ -271,9 +251,7 @@ public class OtpService : IOtpService
         return false;
     }
 
-    /// <summary>
-    /// Record failed OTP attempt from IP address
-    /// </summary>
+    // record failed OTP attempt from IP address
     private void RecordFailedIpAttempt(string? ipAddress)
     {
         if (string.IsNullOrEmpty(ipAddress))
@@ -291,9 +269,7 @@ public class OtpService : IOtpService
             });
     }
 
-    /// <summary>
-    /// Reset failed attempts after successful verification
-    /// </summary>
+    // reset failed attempts after successful verification
     private void ResetIpAttempts(string? ipAddress)
     {
         if (!string.IsNullOrEmpty(ipAddress))
@@ -302,9 +278,7 @@ public class OtpService : IOtpService
         }
     }
 
-    /// <summary>
-    /// Clean up expired IP lockouts to prevent memory leak
-    /// </summary>
+    // clean up expired IP lockouts to prevent memory leak
     private void CleanupExpiredIpLockouts()
     {
         var expiredKeys = _ipRateLimits
@@ -320,9 +294,7 @@ public class OtpService : IOtpService
         _logger.LogDebug("Cleaned up {Count} expired IP lockouts", expiredKeys.Count);
     }
 
-    /// <summary>
-    /// Generate random 6-digit OTP
-    /// </summary>
+    // generate random 6-digit OTP
     private string GenerateOtpCode()
     {
         using var rng = RandomNumberGenerator.Create();
@@ -332,9 +304,7 @@ public class OtpService : IOtpService
         return number.ToString("D6"); // Pad with zeros to ensure 6 digits
     }
 
-    /// <summary>
-    /// Hash OTP code for secure storage
-    /// </summary>
+    // hash OTP code for secure storage
     private string HashOtpCode(string otpCode)
     {
         using var sha256 = SHA256.Create();
@@ -343,9 +313,7 @@ public class OtpService : IOtpService
         return Convert.ToBase64String(hash);
     }
 
-    /// <summary>
-    /// Store pending JWT token for session (for load-balanced environments)
-    /// </summary>
+    // store pending JWT token for session (for load-balanced environments)
     public async Task StorePendingTokenAsync(string sessionToken, string jwtToken)
     {
         var record = await _db.TwoFactorCodes
@@ -360,9 +328,7 @@ public class OtpService : IOtpService
         }
     }
 
-    /// <summary>
-    /// Retrieve and clear pending JWT token for session
-    /// </summary>
+    // retrieve and clear pending JWT token for session
     public async Task<string?> GetAndClearPendingTokenAsync(string sessionToken)
     {
         var record = await _db.TwoFactorCodes
@@ -383,9 +349,7 @@ public class OtpService : IOtpService
         return token;
     }
 
-    /// <summary>
-    /// Get session info without clearing (for resend OTP)
-    /// </summary>
+    // get session info without clearing (for resend OTP)
     public async Task<(int? UserId, string? JwtToken)> GetSessionInfoAsync(string sessionToken)
     {
         var record = await _db.TwoFactorCodes

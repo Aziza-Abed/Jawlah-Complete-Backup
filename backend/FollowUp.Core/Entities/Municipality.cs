@@ -1,36 +1,23 @@
 namespace FollowUp.Core.Entities;
 
-/// <summary>
-/// Represents a municipality that uses the FollowUp system.
-/// Each municipality has its own zones, users, and configuration.
-/// </summary>
+// municipality that uses the FollowUp system, each has its own zones, users, and configuration
 public class Municipality
 {
     public int MunicipalityId { get; set; }
 
-    /// <summary>
-    /// Unique code identifier for the municipality (e.g., "ALBIREH", "RAMALLAH")
-    /// </summary>
+    // unique code identifier (e.g., "ALBIREH", "RAMALLAH")
     public string Code { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Arabic name of the municipality
-    /// </summary>
+    // arabic name
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>
-    /// English name of the municipality
-    /// </summary>
+    // english name
     public string? NameEnglish { get; set; }
 
-    /// <summary>
-    /// Country where the municipality is located
-    /// </summary>
+    // country
     public string Country { get; set; } = "Palestine";
 
-    /// <summary>
-    /// Region/Governorate within the country
-    /// </summary>
+    // region/governorate
     public string? Region { get; set; }
 
     // Contact information
@@ -38,9 +25,7 @@ public class Municipality
     public string? ContactPhone { get; set; }
     public string? Address { get; set; }
 
-    /// <summary>
-    /// URL to the municipality's logo
-    /// </summary>
+    // URL to the municipality's logo
     public string? LogoUrl { get; set; }
 
     // Geographic bounding box for the municipality area
@@ -56,19 +41,13 @@ public class Municipality
     public TimeSpan DefaultEndTime { get; set; } = new TimeSpan(16, 0, 0); // 16:00
     public int DefaultGraceMinutes { get; set; } = 15;
 
-    /// <summary>
-    /// Maximum acceptable GPS accuracy in meters
-    /// </summary>
+    // maximum acceptable GPS accuracy in meters
     public double MaxAcceptableAccuracyMeters { get; set; } = 50.0;
 
-    /// <summary>
-    /// Whether the municipality is currently active
-    /// </summary>
+    // whether the municipality is currently active
     public bool IsActive { get; set; } = true;
 
-    /// <summary>
-    /// License expiration date (null = no expiration)
-    /// </summary>
+    // license expiration date (null = no expiration)
     public DateTime? LicenseExpiresAt { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -84,9 +63,7 @@ public class Municipality
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public ICollection<Appeal> Appeals { get; set; } = new List<Appeal>();
 
-    /// <summary>
-    /// Checks if a coordinate is within the municipality's bounding box
-    /// </summary>
+    // checks if a coordinate is within the municipality's bounding box
     public bool IsWithinBounds(double latitude, double longitude)
     {
         return latitude >= MinLatitude && latitude <= MaxLatitude &&

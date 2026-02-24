@@ -1,17 +1,10 @@
 namespace FollowUp.Core.Enums;
 
-/// <summary>
-/// Type of appeal
-/// </summary>
 public enum AppealType
 {
-    /// <summary>
-    /// Appeal against auto-rejected task completion
-    /// </summary>
+    // appeal against auto-rejected task completion
     TaskRejection = 1,
 
-    /// <summary>
-    /// Appeal against failed attendance check-in (outside zone)
-    /// </summary>
+    // appeal against failed attendance check-in (outside zone)
     AttendanceFailure = 2
 }

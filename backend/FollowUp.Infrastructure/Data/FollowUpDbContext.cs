@@ -26,7 +26,7 @@ public class FollowUpDbContext : DbContext
     public DbSet<TaskTemplate> TaskTemplates { get; set; } = null!;
     public DbSet<GisFile> GisFiles { get; set; } = null!;
     public DbSet<TwoFactorCode> TwoFactorCodes { get; set; } = null!;
-    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!; // ERD Chapter 3
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

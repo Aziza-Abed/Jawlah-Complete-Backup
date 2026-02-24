@@ -104,7 +104,7 @@ class FollowUpApp extends StatelessWidget {
     final attendanceLocalRepo = AttendanceLocalRepository();
     final taskLocalRepo = TaskLocalRepository();
     final issueLocalRepo = IssueLocalRepository();
-    final zoneLocalRepo = ZoneLocalRepository(); // Section 3.5.2: Offline zones
+    final zoneLocalRepo = ZoneLocalRepository(); // offline zones
 
     // create sync service
     final syncService = SyncService(

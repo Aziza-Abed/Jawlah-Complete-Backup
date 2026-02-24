@@ -36,7 +36,7 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
-    // SR1.5: Maximum 5 failed attempts before lockout
+    // maximum 5 failed attempts before lockout
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 15;
 
@@ -50,7 +50,7 @@ public class AuthService : IAuthService
             return (false, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
-        // SR1.5: Check if account is locked
+        // check if account is locked
         if (user.LockoutEndTime.HasValue && user.LockoutEndTime > DateTime.UtcNow)
         {
             var remainingMinutes = (int)(user.LockoutEndTime.Value - DateTime.UtcNow).TotalMinutes + 1;
@@ -74,7 +74,7 @@ public class AuthService : IAuthService
         var verificationResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (verificationResult == PasswordVerificationResult.Failed)
         {
-            // SR1.5: Increment failed attempts
+            // increment failed attempts
             user.FailedLoginAttempts++;
 
             if (user.FailedLoginAttempts >= MaxFailedAttempts)
@@ -190,7 +190,7 @@ public class AuthService : IAuthService
         return result != PasswordVerificationResult.Failed;
     }
 
-    // ERD Chapter 3: Generate and store a refresh token on login
+    // generate and store a refresh token on login
     public async Task<string> GenerateRefreshTokenAsync(int userId, string? deviceId, string? ipAddress)
     {
         // revoke any existing active tokens for this user+device
@@ -222,7 +222,7 @@ public class AuthService : IAuthService
         return tokenString;
     }
 
-    // ERD Chapter 3: Exchange a valid refresh token for new access + refresh tokens
+    // exchange a valid refresh token for new access + refresh tokens
     public async Task<(bool Success, string? AccessToken, string? NewRefreshToken, string? Error)> RefreshAccessTokenAsync(string refreshToken)
     {
         var stored = await _refreshTokenRepository.GetByTokenAsync(refreshToken);

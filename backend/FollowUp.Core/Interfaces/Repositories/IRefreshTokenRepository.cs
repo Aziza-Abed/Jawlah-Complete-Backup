@@ -3,10 +3,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace FollowUp.Core.Interfaces.Repositories;
 
-/// <summary>
-/// Repository interface for RefreshToken operations
-/// Required by ERD in Chapter 3 - Class Diagram
-/// </summary>
+// repository for refresh token operations
 public interface IRefreshTokenRepository
 {
     Task<RefreshToken?> GetByTokenAsync(string token);

@@ -296,7 +296,7 @@ class ApiService {
   }
 }
 
-/// Helper class to queue requests while token refresh is in progress
+// helper class to queue requests while token refresh is in progress
 class _RetryRequest {
   final RequestOptions requestOptions;
   final completer = Completer<Response>();
