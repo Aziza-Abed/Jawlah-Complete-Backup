@@ -15,19 +15,20 @@ SET ANSI_NULLS ON;
 
 USE FollowUpNew;
 
--- Clean existing data
+-- Clean existing data (order matters: children before parents)
+DELETE FROM [Photos];
 DELETE FROM [Notifications];
 DELETE FROM [Appeals];
+DELETE FROM [AuditLogs];
+DELETE FROM [LocationHistories];
+DELETE FROM [TaskTemplates];
+DELETE FROM [GisFiles];
+DELETE FROM [TwoFactorCodes];
+DELETE FROM [RefreshTokens];
 DELETE FROM [Issues];
-DELETE FROM [Photos];
 DELETE FROM [Tasks];
 DELETE FROM [Attendances];
 DELETE FROM [UserZones];
-DELETE FROM [AuditLogs];
-DELETE FROM [GisFiles];
-DELETE FROM [LocationHistories];
-DELETE FROM [TaskTemplates];
-DELETE FROM [TwoFactorCodes];
 DELETE FROM [Users];
 DELETE FROM [Teams];
 DELETE FROM [Zones];
@@ -675,8 +676,8 @@ PRINT 'Created 12 notifications (7 read + 5 unread)';
 -- ========================================================================
 -- Get the rejected task IDs
 DECLARE @RejectedTask1 INT, @RejectedTask2 INT;
-SELECT TOP 1 @RejectedTask1 = TaskId FROM Tasks WHERE Status = 5 AND AssignedToUserId = @HealthWorker1;
-SELECT TOP 1 @RejectedTask2 = TaskId FROM Tasks WHERE Status = 5 AND AssignedToUserId = @HealthWorker4;
+SELECT TOP 1 @RejectedTask1 = TaskId FROM Tasks WHERE Status = 4 AND AssignedToUserId = @HealthWorker1;
+SELECT TOP 1 @RejectedTask2 = TaskId FROM Tasks WHERE Status = 4 AND AssignedToUserId = @HealthWorker4;
 
 -- Appeal 1: Approved (worker was right, supervisor re-checked photos)
 INSERT INTO [Appeals] (MunicipalityId, AppealType, EntityType, EntityId, UserId, WorkerExplanation, WorkerLatitude, WorkerLongitude, ExpectedLatitude, ExpectedLongitude, DistanceMeters, Status, ReviewedByUserId, ReviewedAt, ReviewNotes, SubmittedAt, CreatedAt, IsSynced, SyncVersion)
@@ -801,40 +802,44 @@ PRINT 'Created 29 location history records (3 days of GPS tracking for 4 workers
 -- ========================================================================
 -- 13. PHOTOS (task completion + issue report evidence)
 -- ========================================================================
+-- Get actual base IDs (handles DBCC RESEED quirk on fresh vs populated tables)
+DECLARE @TaskBase INT = (SELECT MIN(TaskId) FROM Tasks);
+DECLARE @IssueBase INT = (SELECT MIN(IssueId) FROM Issues);
+
 -- Task completion photos (completed tasks have evidence photos)
 INSERT INTO [Photos] (PhotoUrl, EntityType, EntityId, TaskId, OrderIndex, FileSizeBytes, UploadedAt, UploadedByUserId, CreatedAt)
 VALUES
--- Photos for completed task "تنظيف شارع الميدان الرئيسي" (task 1 area)
-(N'/uploads/photos/tasks/task_clean_street_1a.jpg', N'Task', 1, 1, 0, 245000, DATEADD(DAY,-27,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-27,GETUTCDATE())),
-(N'/uploads/photos/tasks/task_clean_street_1b.jpg', N'Task', 1, 1, 1, 312000, DATEADD(DAY,-27,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-27,GETUTCDATE())),
--- Photos for "جمع نفايات - البصبوص" (task 2 area)
-(N'/uploads/photos/tasks/task_collect_waste_2a.jpg', N'Task', 2, 2, 0, 198000, DATEADD(DAY,-26,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-26,GETUTCDATE())),
--- Photos for "تعقيم حاويات - راس الطاحونة" (task 3 area)
-(N'/uploads/photos/tasks/task_sanitize_bins_3a.jpg', N'Task', 3, 3, 0, 267000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker3, DATEADD(DAY,-25,GETUTCDATE())),
-(N'/uploads/photos/tasks/task_sanitize_bins_3b.jpg', N'Task', 3, 3, 1, 289000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker3, DATEADD(DAY,-25,GETUTCDATE())),
--- Photos for works team task "إصلاح أنبوب مياه" (task area)
-(N'/uploads/photos/tasks/task_pipe_repair_before.jpg', N'Task', 9, 9, 0, 410000, DATEADD(DAY,-26,GETUTCDATE()), @WorksWorker1, DATEADD(DAY,-26,GETUTCDATE())),
-(N'/uploads/photos/tasks/task_pipe_repair_after.jpg', N'Task', 9, 9, 1, 385000, DATEADD(DAY,-26,GETUTCDATE()), @WorksWorker1, DATEADD(DAY,-26,GETUTCDATE())),
--- Photos for agri task "تقليم أشجار شارع المنارة"
-(N'/uploads/photos/tasks/task_tree_trim_a.jpg', N'Task', 12, 12, 0, 520000, DATEADD(DAY,-24,GETUTCDATE()), @AgriWorker1, DATEADD(DAY,-24,GETUTCDATE())),
--- Photos for rejected task "تنظيف حاويات - قطعة شيبان" (poor quality evidence)
-(N'/uploads/photos/tasks/task_bins_rejected_blurry.jpg', N'Task', 19, 19, 0, 156000, DATEADD(DAY,-15,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-15,GETUTCDATE()));
+-- Photos for completed task "تنظيف شارع الميدان الرئيسي" (1st task)
+(N'/uploads/photos/tasks/task_clean_street_1a.jpg', N'Task', @TaskBase, @TaskBase, 0, 245000, DATEADD(DAY,-27,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-27,GETUTCDATE())),
+(N'/uploads/photos/tasks/task_clean_street_1b.jpg', N'Task', @TaskBase, @TaskBase, 1, 312000, DATEADD(DAY,-27,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-27,GETUTCDATE())),
+-- Photos for "جمع نفايات - البصبوص" (2nd task)
+(N'/uploads/photos/tasks/task_collect_waste_2a.jpg', N'Task', @TaskBase+1, @TaskBase+1, 0, 198000, DATEADD(DAY,-26,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-26,GETUTCDATE())),
+-- Photos for "تعقيم حاويات - راس الطاحونة" (3rd task)
+(N'/uploads/photos/tasks/task_sanitize_bins_3a.jpg', N'Task', @TaskBase+2, @TaskBase+2, 0, 267000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker3, DATEADD(DAY,-25,GETUTCDATE())),
+(N'/uploads/photos/tasks/task_sanitize_bins_3b.jpg', N'Task', @TaskBase+2, @TaskBase+2, 1, 289000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker3, DATEADD(DAY,-25,GETUTCDATE())),
+-- Photos for works team task "إصلاح أنبوب مياه" (9th task)
+(N'/uploads/photos/tasks/task_pipe_repair_before.jpg', N'Task', @TaskBase+8, @TaskBase+8, 0, 410000, DATEADD(DAY,-26,GETUTCDATE()), @WorksWorker1, DATEADD(DAY,-26,GETUTCDATE())),
+(N'/uploads/photos/tasks/task_pipe_repair_after.jpg', N'Task', @TaskBase+8, @TaskBase+8, 1, 385000, DATEADD(DAY,-26,GETUTCDATE()), @WorksWorker1, DATEADD(DAY,-26,GETUTCDATE())),
+-- Photos for agri task "تقليم أشجار شارع المنارة" (12th task)
+(N'/uploads/photos/tasks/task_tree_trim_a.jpg', N'Task', @TaskBase+11, @TaskBase+11, 0, 520000, DATEADD(DAY,-24,GETUTCDATE()), @AgriWorker1, DATEADD(DAY,-24,GETUTCDATE())),
+-- Photos for rejected task "تنظيف حاويات - قطعة شيبان" (19th task)
+(N'/uploads/photos/tasks/task_bins_rejected_blurry.jpg', N'Task', @TaskBase+18, @TaskBase+18, 0, 156000, DATEADD(DAY,-15,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-15,GETUTCDATE()));
 
 -- Issue report photos
 INSERT INTO [Photos] (PhotoUrl, EntityType, EntityId, IssueId, OrderIndex, FileSizeBytes, UploadedAt, UploadedByUserId, CreatedAt)
 VALUES
--- "حفرة كبيرة في شارع البصبوص"
-(N'/uploads/photos/issues/issue_pothole_1a.jpg', N'Issue', 1, 1, 0, 340000, DATEADD(DAY,-28,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-28,GETUTCDATE())),
-(N'/uploads/photos/issues/issue_pothole_1b.jpg', N'Issue', 1, 1, 1, 298000, DATEADD(DAY,-28,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-28,GETUTCDATE())),
--- "تراكم نفايات خلف المدرسة"
-(N'/uploads/photos/issues/issue_waste_school_2a.jpg', N'Issue', 2, 2, 0, 275000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-25,GETUTCDATE())),
--- "حاوية محترقة"
-(N'/uploads/photos/issues/issue_burnt_bin_5a.jpg', N'Issue', 5, 5, 0, 380000, DATEADD(DAY,-17,GETUTCDATE()), @HealthWorker5, DATEADD(DAY,-17,GETUTCDATE())),
-(N'/uploads/photos/issues/issue_burnt_bin_5b.jpg', N'Issue', 5, 5, 1, 425000, DATEADD(DAY,-17,GETUTCDATE()), @HealthWorker5, DATEADD(DAY,-17,GETUTCDATE())),
--- "تسرب مياه صرف صحي" (recent)
-(N'/uploads/photos/issues/issue_sewage_leak.jpg', N'Issue', 8, 8, 0, 310000, DATEADD(DAY,-5,GETUTCDATE()), @WorksWorker2, DATEADD(DAY,-5,GETUTCDATE())),
--- "عمود إنارة مائل" (today)
-(N'/uploads/photos/issues/issue_tilted_pole.jpg', N'Issue', 13, 13, 0, 445000, DATEADD(HOUR,-2,GETUTCDATE()), @WorksWorker1, DATEADD(HOUR,-2,GETUTCDATE()));
+-- "حفرة كبيرة في شارع البصبوص" (1st issue)
+(N'/uploads/photos/issues/issue_pothole_1a.jpg', N'Issue', @IssueBase, @IssueBase, 0, 340000, DATEADD(DAY,-28,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-28,GETUTCDATE())),
+(N'/uploads/photos/issues/issue_pothole_1b.jpg', N'Issue', @IssueBase, @IssueBase, 1, 298000, DATEADD(DAY,-28,GETUTCDATE()), @HealthWorker1, DATEADD(DAY,-28,GETUTCDATE())),
+-- "تراكم نفايات خلف المدرسة" (2nd issue)
+(N'/uploads/photos/issues/issue_waste_school_2a.jpg', N'Issue', @IssueBase+1, @IssueBase+1, 0, 275000, DATEADD(DAY,-25,GETUTCDATE()), @HealthWorker2, DATEADD(DAY,-25,GETUTCDATE())),
+-- "حاوية محترقة" (5th issue)
+(N'/uploads/photos/issues/issue_burnt_bin_5a.jpg', N'Issue', @IssueBase+4, @IssueBase+4, 0, 380000, DATEADD(DAY,-17,GETUTCDATE()), @HealthWorker5, DATEADD(DAY,-17,GETUTCDATE())),
+(N'/uploads/photos/issues/issue_burnt_bin_5b.jpg', N'Issue', @IssueBase+4, @IssueBase+4, 1, 425000, DATEADD(DAY,-17,GETUTCDATE()), @HealthWorker5, DATEADD(DAY,-17,GETUTCDATE())),
+-- "تسرب مياه صرف صحي" (8th issue)
+(N'/uploads/photos/issues/issue_sewage_leak.jpg', N'Issue', @IssueBase+7, @IssueBase+7, 0, 310000, DATEADD(DAY,-5,GETUTCDATE()), @WorksWorker2, DATEADD(DAY,-5,GETUTCDATE())),
+-- "عمود إنارة مائل" (last issue)
+(N'/uploads/photos/issues/issue_tilted_pole.jpg', N'Issue', @IssueBase+12, @IssueBase+12, 0, 445000, DATEADD(HOUR,-2,GETUTCDATE()), @WorksWorker1, DATEADD(HOUR,-2,GETUTCDATE()));
 
 PRINT 'Created 16 photos (9 task evidence + 7 issue reports)';
 

@@ -64,9 +64,15 @@ public class TaskGenerationBackgroundService : BackgroundService
             .Where(t => t.IsActive)
             .ToListAsync(stoppingToken);
 
+        if (templates.Count == 0)
+        {
+            _logger.LogDebug("No active task templates found — skipping");
+            return;
+        }
+
         // Get first admin user to use as default assignee (required FK)
         var defaultAssignee = await dbContext.Users
-            .Where(u => u.MunicipalityId == templates.FirstOrDefault()!.MunicipalityId)
+            .Where(u => u.MunicipalityId == templates[0].MunicipalityId)
             .OrderBy(u => u.UserId)
             .FirstOrDefaultAsync(stoppingToken);
 
@@ -164,6 +170,7 @@ public class TaskGenerationBackgroundService : BackgroundService
     /// This handles the case where a worker forgets to check out at end of day.
     /// Sets status to AutoClosed (3) so supervisors can distinguish from normal checkouts.
     /// Uses per-user ExpectedEndTime for the auto-close checkout time.
+    /// Uses raw SQL to avoid EF Core SELECT * query generation issues.
     /// </summary>
     private async Task AutoCloseStaleAttendanceAsync(CancellationToken stoppingToken)
     {
@@ -171,39 +178,41 @@ public class TaskGenerationBackgroundService : BackgroundService
         var dbContext = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
 
         var cutoff = DateTime.UtcNow.AddHours(-14);
+        var now = DateTime.UtcNow;
 
-        var staleRecords = await dbContext.Attendances
-            .Include(a => a.User)
-            .Where(a => a.Status == AttendanceStatus.CheckedIn
-                     && a.CheckInEventTime < cutoff
-                     && a.CheckOutEventTime == null)
-            .ToListAsync(stoppingToken);
+        // Raw SQL with CTE: computes per-user checkout time, then updates in one atomic operation.
+        // This avoids EF Core's SELECT * which triggers a column mapping issue with AccuracyMeters.
+        var rowsAffected = await dbContext.Database.ExecuteSqlInterpolatedAsync($@"
+            ;WITH Stale AS (
+                SELECT a.AttendanceId, a.CheckInEventTime, a.AttendanceType,
+                       DATEADD(
+                           SECOND,
+                           DATEDIFF(SECOND, CAST('00:00:00' AS TIME), COALESCE(u.ExpectedEndTime, CAST('16:00:00' AS TIME))),
+                           CAST(CAST(a.CheckInEventTime AS DATE) AS DATETIME2)
+                       ) AS ComputedCheckout
+                FROM Attendances a
+                LEFT JOIN Users u ON a.UserId = u.UserId
+                WHERE a.Status = 1
+                  AND a.CheckInEventTime < {cutoff}
+                  AND a.CheckOutEventTime IS NULL
+            )
+            UPDATE a SET
+                a.Status = 3,
+                a.CheckOutEventTime = s.ComputedCheckout,
+                a.CheckOutSyncTime = {now},
+                a.ValidationMessage = N'تم إغلاق الحضور تلقائياً - لم يتم تسجيل الانصراف',
+                a.AttendanceType = CASE WHEN s.AttendanceType = N'Late' THEN N'Late' ELSE N'AutoClosed' END,
+                a.WorkDuration = CASE
+                    WHEN s.ComputedCheckout <= a.CheckInEventTime THEN CAST('00:00:00' AS TIME)
+                    WHEN DATEDIFF(HOUR, a.CheckInEventTime, s.ComputedCheckout) >= 23 THEN CAST('23:00:00' AS TIME)
+                    ELSE CAST(DATEADD(SECOND, DATEDIFF(SECOND, a.CheckInEventTime, s.ComputedCheckout), CAST('00:00:00' AS DATETIME)) AS TIME)
+                END
+            FROM Attendances a
+            INNER JOIN Stale s ON a.AttendanceId = s.AttendanceId", stoppingToken);
 
-        if (!staleRecords.Any()) return;
-
-        foreach (var record in staleRecords)
+        if (rowsAffected > 0)
         {
-            record.Status = AttendanceStatus.AutoClosed;
-
-            // Use per-user ExpectedEndTime if available, fallback to 16:00
-            var endTime = record.User?.ExpectedEndTime ?? new TimeSpan(16, 0, 0);
-            record.CheckOutEventTime = record.CheckInEventTime.Date.Add(endTime);
-
-            record.CheckOutSyncTime = DateTime.UtcNow;
-            record.ValidationMessage = "تم إغلاق الحضور تلقائياً - لم يتم تسجيل الانصراف";
-            record.AttendanceType = record.AttendanceType == "Late" ? "Late" : "AutoClosed";
-
-            // Calculate work duration from check-in to auto-close time
-            var duration = record.CheckOutEventTime.Value - record.CheckInEventTime;
-            if (duration < TimeSpan.Zero)
-                duration = TimeSpan.Zero;
-            if (duration > TimeSpan.FromHours(23))
-                duration = TimeSpan.FromHours(23);
-            record.WorkDuration = duration;
+            _logger.LogInformation("Auto-closed {Count} stale attendance records", rowsAffected);
         }
-
-        await dbContext.SaveChangesAsync(stoppingToken);
-
-        _logger.LogInformation("Auto-closed {Count} stale attendance records", staleRecords.Count);
     }
 }

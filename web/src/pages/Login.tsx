@@ -82,8 +82,14 @@ export default function Login() {
       } else {
         setError(response.error || "بيانات الدخول غير صحيحة");
       }
-    } catch (err) {
-      setError("حدث خطأ في الاتصال بالخادم");
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "response" in err) {
+        const axiosErr = err as { response?: { data?: { message?: string; errors?: string[] } } };
+        const msg = axiosErr.response?.data?.errors?.join(", ") || axiosErr.response?.data?.message;
+        setError(msg || "حدث خطأ في الاتصال بالخادم");
+      } else {
+        setError("حدث خطأ في الاتصال بالخادم");
+      }
     } finally {
       setLoading(false);
     }

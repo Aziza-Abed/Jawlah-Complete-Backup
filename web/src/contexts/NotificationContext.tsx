@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import { getUnreadNotificationsCount } from "../api/notifications";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 
 interface NotificationContextType {
   unreadCount: number;
@@ -15,6 +16,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const refreshCount = useCallback(async () => {
+    // Skip API call if not authenticated
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    if (!token) return;
+
     try {
       const count = await getUnreadNotificationsCount();
       setUnreadCount(count);

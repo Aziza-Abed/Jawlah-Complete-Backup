@@ -9,6 +9,6 @@ public class LoginRequest
     public string Username { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Password is required")]
-    [StringLength(100, ErrorMessage = "Password must be at least 8 characters", MinimumLength = 8)]
+    [StringLength(100, ErrorMessage = "Password must be at least 4 characters", MinimumLength = 4)]
     public string Password { get; set; } = string.Empty;
 }

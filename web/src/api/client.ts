@@ -106,7 +106,9 @@ apiClient.interceptors.response.use(
         localStorage.removeItem(STORAGE_KEYS.TOKEN);
         localStorage.removeItem(STORAGE_KEYS.USER);
         localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-        window.location.href = '/login';
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
     } else {
       console.error("Network or CORS error:", error.message);

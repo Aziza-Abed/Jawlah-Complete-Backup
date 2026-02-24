@@ -370,7 +370,7 @@ public class UsersController : BaseApiController
     // SR1.6: Admin can reset user password
     [HttpPost("{id}/reset-password")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> ResetUserPassword(int id, [FromBody] ResetPasswordRequest request)
+    public async Task<IActionResult> ResetUserPassword(int id, [FromBody] AdminResetPasswordRequest request)
     {
         var user = await _users.GetByIdAsync(id);
         if (user == null)

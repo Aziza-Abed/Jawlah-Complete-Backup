@@ -341,6 +341,20 @@ using (var scope = app.Services.CreateScope())
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<FollowUp.Core.Entities.User>>();
         var seeder = new DatabaseSeeder(context, passwordHasher);
         await seeder.SeedAsync();
+
+        // DEV ONLY: Reset all passwords to "pass" and clear lockouts
+        var users = await context.Users.ToListAsync();
+        if (users.Any())
+        {
+            foreach (var u in users)
+            {
+                u.PasswordHash = passwordHasher.HashPassword(u, "pass");
+                u.FailedLoginAttempts = 0;
+                u.LockoutEndTime = null;
+            }
+            await context.SaveChangesAsync();
+            Log.Information("DEV: Reset {Count} user passwords to 'pass'", users.Count);
+        }
     }
     catch (Exception ex)
     {
