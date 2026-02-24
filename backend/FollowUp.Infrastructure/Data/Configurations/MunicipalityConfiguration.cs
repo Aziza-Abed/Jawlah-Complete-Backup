@@ -42,16 +42,16 @@ public class MunicipalityConfiguration : IEntityTypeConfiguration<Municipality>
 
         // Bounding box coordinates
         builder.Property(e => e.MinLatitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.MaxLatitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.MinLongitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.MaxLongitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         // Work schedule defaults
         builder.Property(e => e.DefaultStartTime)

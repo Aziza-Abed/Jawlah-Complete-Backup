@@ -38,11 +38,11 @@ public class IssueConfiguration : IEntityTypeConfiguration<Issue>
 
         builder.Property(e => e.Latitude)
             .IsRequired()
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.Longitude)
             .IsRequired()
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.LocationDescription)
             .HasMaxLength(500);

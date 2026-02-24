@@ -17,7 +17,7 @@ type IssueListItem = {
   status: DisplayIssueStatus;
 };
 
-type FilterKey = "all" | "new" | "forwarded" | "closed";
+type FilterKey = "all" | "new" | "forwarded" | "reviewing" | "closed";
 
 const mapIssueToListItem = (issue: IssueResponse): IssueListItem => {
   const date = issue.reportedAt ? new Date(issue.reportedAt) : new Date();
@@ -67,7 +67,7 @@ export default function Issues() {
   }, []);
 
   const counts = useMemo(() => {
-    const base: Record<string, number> = { all: items.length, new: 0, forwarded: 0, closed: 0 };
+    const base: Record<string, number> = { all: items.length, new: 0, forwarded: 0, reviewing: 0, closed: 0 };
     for (const it of items) {
       if (it.status in base) base[it.status]++;
     }

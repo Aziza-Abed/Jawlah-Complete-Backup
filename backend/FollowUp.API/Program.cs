@@ -332,6 +332,51 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<TrackingHub>("/hubs/tracking");
 
+// Ensure database schema is up-to-date (applies any pending migrations)
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var context = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
+        await context.Database.MigrateAsync();
+        Log.Information("Database migrations applied successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Failed to apply migrations - attempting to ensure RefreshTokens table exists");
+        // Fallback: create RefreshTokens table if missing (handles corrupted migration state)
+        try
+        {
+            var context = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
+            await context.Database.ExecuteSqlRawAsync(@"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RefreshTokens')
+                BEGIN
+                    CREATE TABLE [RefreshTokens] (
+                        [RefreshTokenId] INT IDENTITY(1,1) NOT NULL,
+                        [UserId] INT NOT NULL,
+                        [Token] NVARCHAR(500) NOT NULL,
+                        [ExpiresAt] DATETIME2 NOT NULL,
+                        [CreatedAt] DATETIME2 NOT NULL,
+                        [RevokedAt] DATETIME2 NULL,
+                        [ReplacedByToken] NVARCHAR(500) NULL,
+                        [DeviceId] NVARCHAR(100) NULL,
+                        [IpAddress] NVARCHAR(50) NULL,
+                        CONSTRAINT [PK_RefreshTokens] PRIMARY KEY ([RefreshTokenId]),
+                        CONSTRAINT [FK_RefreshTokens_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [Users]([UserId]) ON DELETE CASCADE
+                    );
+                    CREATE UNIQUE INDEX [IX_RefreshToken_Token] ON [RefreshTokens]([Token]);
+                    CREATE INDEX [IX_RefreshToken_User_Active] ON [RefreshTokens]([UserId], [RevokedAt], [ExpiresAt]);
+                    CREATE INDEX [IX_RefreshToken_ExpiresAt] ON [RefreshTokens]([ExpiresAt]);
+                END");
+            Log.Information("RefreshTokens table ensured via fallback SQL");
+        }
+        catch (Exception ex2)
+        {
+            Log.Warning(ex2, "Could not ensure RefreshTokens table");
+        }
+    }
+}
+
 // seed database with initial data (UTF-8 safe via Entity Framework)
 using (var scope = app.Services.CreateScope())
 {

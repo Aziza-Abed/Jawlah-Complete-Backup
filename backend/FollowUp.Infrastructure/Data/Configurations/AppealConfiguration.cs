@@ -35,16 +35,16 @@ public class AppealConfiguration : IEntityTypeConfiguration<Appeal>
             .HasMaxLength(1000);
 
         builder.Property(e => e.WorkerLatitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.WorkerLongitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.ExpectedLatitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.ExpectedLongitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.Status)
             .IsRequired()

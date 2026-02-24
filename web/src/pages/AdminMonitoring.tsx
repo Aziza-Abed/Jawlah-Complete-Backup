@@ -20,7 +20,7 @@ import {
   Radio
 } from "lucide-react";
 import { useMunicipality } from "../contexts/MunicipalityContext";
-import { useTrackingHub } from "../hooks/useTrackingHub";
+import { useTrackingHub, type LiveLocationUpdate, type UserStatusUpdate } from "../hooks/useTrackingHub";
 
 // Fix Leaflet icons
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -85,7 +85,7 @@ export default function AdminMonitoring() {
 
   // SignalR: receive live location pushes from workers
   useTrackingHub({
-    onLocationUpdate: useCallback((update) => {
+    onLocationUpdate: useCallback((update: LiveLocationUpdate) => {
       setLocations((prev) => {
         const idx = prev.findIndex((l) => l.userId === update.userId);
         if (idx === -1) return prev;
@@ -102,7 +102,7 @@ export default function AdminMonitoring() {
       });
       setLastUpdate(new Date());
     }, []),
-    onUserStatus: useCallback((update) => {
+    onUserStatus: useCallback((update: UserStatusUpdate) => {
       setLocations((prev) => {
         const idx = prev.findIndex((l) => l.userId === update.userId);
         if (idx === -1) return prev;

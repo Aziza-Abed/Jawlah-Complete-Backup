@@ -9,7 +9,7 @@ import type { WorkerLocation as ApiWorkerLocation } from "../types/tracking";
 import type { UserResponse } from "../types/user";
 import { Battery, BatteryLow, BatteryMedium, BatteryFull, Wifi, WifiOff, RefreshCcw, MapPin, Clock } from "lucide-react";
 import { useMunicipality } from "../contexts/MunicipalityContext";
-import { useTrackingHub } from "../hooks/useTrackingHub";
+import { useTrackingHub, type LiveLocationUpdate, type UserStatusUpdate } from "../hooks/useTrackingHub";
 
 type WorkerLocation = {
   id: string;
@@ -142,7 +142,7 @@ export default function Zones() {
 
   // SignalR: receive live location pushes from workers
   useTrackingHub({
-    onLocationUpdate: useCallback((update) => {
+    onLocationUpdate: useCallback((update: LiveLocationUpdate) => {
       setWorkers((prev) => {
         const idx = prev.findIndex((w) => w.id === update.userId.toString());
         if (idx === -1) return prev; // unknown worker, wait for next full fetch
@@ -158,7 +158,7 @@ export default function Zones() {
       });
       setLastUpdate(new Date());
     }, []),
-    onUserStatus: useCallback((update) => {
+    onUserStatus: useCallback((update: UserStatusUpdate) => {
       setWorkers((prev) => {
         const idx = prev.findIndex((w) => w.id === update.userId.toString());
         if (idx === -1) return prev;

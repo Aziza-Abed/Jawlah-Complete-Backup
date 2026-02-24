@@ -23,6 +23,7 @@ public class AttendanceController : BaseApiController
     private readonly ILogger<AttendanceController> _logger;
     private readonly IMapper _mapper;
     private readonly AuditLogService _audit;
+    private readonly IConfiguration _config;
 
     public AttendanceController(
         IAttendanceRepository attendance,
@@ -30,13 +31,15 @@ public class AttendanceController : BaseApiController
         IGisService gis,
         ILogger<AttendanceController> logger,
         IMapper mapper,
-        AuditLogService audit)
+        AuditLogService audit,
+        IConfiguration config)
     {
         _attendance = attendance;
         _users = users;
         _gis = gis;
         _logger = logger;
         _mapper = mapper;
+        _config = config;
         _audit = audit;
     }
 
@@ -63,10 +66,36 @@ public class AttendanceController : BaseApiController
         if (gpsValidation != null)
             return gpsValidation;
 
-        // validate location using gis service
-        var zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude, userId.Value);
+        // validate location using gis service (skip in dev mode)
+        var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
+        Zone? zone = null;
+
+        if (!disableGeofencing)
+        {
+            zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude, userId.Value);
+            if (zone == null)
+                return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور"));
+        }
+        else
+        {
+            // In dev mode, try to find the zone but don't block check-in if not found
+            zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude, userId.Value);
+            if (zone == null)
+            {
+                // Fall back to user's first assigned zone
+                var userWithZones = await _users.GetUserWithZonesAsync(userId.Value);
+                var firstZone = userWithZones?.AssignedZones?.FirstOrDefault();
+                if (firstZone != null)
+                {
+                    zone = firstZone.Zone;
+                }
+                _logger.LogWarning("Dev mode: Geofencing bypassed for user {UserId}, using fallback zone", userId.Value);
+            }
+        }
+
+        // If zone is still null (no assigned zones), block check-in
         if (zone == null)
-            return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور"));
+            return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("لا توجد مناطق مخصصة لك. يرجى التواصل مع المشرف"));
 
         // Chapter 5 FIX #2: Calculate late arrival
         var now = DateTime.UtcNow;

@@ -45,10 +45,10 @@ public class TaskConfiguration : IEntityTypeConfiguration<Core.Entities.Task>
             .HasMaxLength(500);
 
         builder.Property(e => e.Latitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.Longitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.EventTime)
             .IsRequired();

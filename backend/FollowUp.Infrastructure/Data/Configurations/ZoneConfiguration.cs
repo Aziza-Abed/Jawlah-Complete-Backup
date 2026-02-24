@@ -35,11 +35,11 @@ public class ZoneConfiguration : IEntityTypeConfiguration<Zone>
 
         builder.Property(e => e.CenterLatitude)
             .IsRequired()
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.CenterLongitude)
             .IsRequired()
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.AreaSquareMeters)
             .IsRequired();

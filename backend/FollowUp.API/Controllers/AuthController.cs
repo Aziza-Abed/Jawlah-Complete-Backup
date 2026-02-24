@@ -136,7 +136,15 @@ public class AuthController : BaseApiController
         await _audit.LogAsync(user.UserId, user.Username, "Login", "تسجيل دخول ناجح", ipAddress, userAgent);
 
         // ERD Chapter 3: Generate refresh token on login
-        var refreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, deviceId, ipAddress);
+        string? refreshToken = null;
+        try
+        {
+            refreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, deviceId, ipAddress);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate refresh token for user {UserId} - login will proceed without it", user.UserId);
+        }
 
         var response = new LoginResponse
         {
@@ -223,7 +231,15 @@ public class AuthController : BaseApiController
         await _audit.LogAsync(user.UserId, user.Username, "Login2FA", "تسجيل دخول ناجح مع التحقق الثنائي", ipAddress, userAgent);
 
         // ERD Chapter 3: Generate refresh token after OTP verification
-        var otpRefreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, deviceId, ipAddress);
+        string? otpRefreshToken = null;
+        try
+        {
+            otpRefreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, deviceId, ipAddress);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate refresh token after OTP for user {UserId}", user.UserId);
+        }
 
         var response = new VerifyOtpResponse
         {
@@ -396,7 +412,15 @@ public class AuthController : BaseApiController
 
             // ERD Chapter 3: Generate refresh token for GPS login (consistency with other login flows)
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var gpsRefreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, request.DeviceId, ipAddress);
+            string? gpsRefreshToken = null;
+            try
+            {
+                gpsRefreshToken = await _auth.GenerateRefreshTokenAsync(user.UserId, request.DeviceId, ipAddress);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to generate refresh token for GPS login user {UserId}", user.UserId);
+            }
 
             // build response object - authentication only, no attendance
             var resObj = new LoginWithGPSResponse

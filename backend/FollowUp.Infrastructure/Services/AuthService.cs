@@ -8,6 +8,7 @@ using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Task = System.Threading.Tasks.Task;
 
@@ -19,17 +20,20 @@ public class AuthService : IAuthService
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IConfiguration _configuration;
     private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IConfiguration configuration,
-        IPasswordHasher<User> passwordHasher)
+        IPasswordHasher<User> passwordHasher,
+        ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _configuration = configuration;
         _passwordHasher = passwordHasher;
+        _logger = logger;
     }
 
     // SR1.5: Maximum 5 failed attempts before lockout
@@ -38,11 +42,11 @@ public class AuthService : IAuthService
 
     public async Task<(bool Success, string? Token, string? Error)> LoginAsync(string username, string password)
     {
-        // get user from database
         var user = await _userRepository.GetByUsernameAsync(username);
 
         if (user == null)
         {
+            _logger.LogWarning("Login failed: user '{Username}' not found", username);
             return (false, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 

@@ -12,11 +12,11 @@ public class LocationHistoryConfiguration : IEntityTypeConfiguration<LocationHis
 
         builder.Property(x => x.Latitude)
             .IsRequired()
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(x => x.Longitude)
             .IsRequired()
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(x => x.Timestamp)
             .IsRequired();

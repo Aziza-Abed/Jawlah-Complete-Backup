@@ -28,24 +28,24 @@ public class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
 
         builder.Property(e => e.CheckInLatitude)
             .IsRequired()
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.CheckInLongitude)
             .IsRequired()
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.CheckOutLatitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         builder.Property(e => e.CheckOutLongitude)
-            .HasPrecision(18, 15);
+            .HasColumnType("float");
 
         // GPS accuracy stored for audit trail (raw meters from device)
         builder.Property(e => e.CheckInAccuracyMeters)
-            .HasPrecision(10, 2);
+            .HasColumnType("float");
 
         builder.Property(e => e.CheckOutAccuracyMeters)
-            .HasPrecision(10, 2);
+            .HasColumnType("float");
 
         builder.Property(e => e.IsValidated)
             .IsRequired();

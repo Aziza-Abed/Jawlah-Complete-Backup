@@ -225,7 +225,7 @@ DECLARE @PassHash NVARCHAR(MAX) = 'AQAAAAIAAYagAAAAEAH6IPlGKjYFLen7QauEW7KaGXE01
 -- 5.1 ADMIN
 -- ========================================================================
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, Email, PhoneNumber, FullName, Role, WorkerType, DepartmentId, Status, CreatedAt)
-VALUES (@MunicipalityId, 'admin', @PassHash, 'admin@albireh.ps', '+970599000001', N'مدير النظام', 2, NULL, NULL, 0, GETUTCDATE());
+VALUES (@MunicipalityId, 'admin', @PassHash, 'admin@albireh.ps', '+970599000001', N'مدير النظام', 0, NULL, NULL, 0, GETUTCDATE());
 DECLARE @AdminId INT = SCOPE_IDENTITY();
 
 -- ========================================================================
@@ -305,7 +305,7 @@ BEGIN
     INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, Email, PhoneNumber, FullName, Role, WorkerType, DepartmentId, SupervisorId, Status, CreatedAt)
     VALUES (@MunicipalityId, 'worker' + CAST(@i AS VARCHAR(10)), @PassHash, NULL,
             '+97059910' + RIGHT('0000' + CAST(@i AS VARCHAR(4)), 4), @WorkerName,
-            0, 0, @HealthDeptId, @SupervisorId, 0, GETUTCDATE());
+            2, 0, @HealthDeptId, @SupervisorId, 0, GETUTCDATE());
 
     SET @i = @i + 1;
 END;
@@ -318,56 +318,56 @@ PRINT 'Created 100 health workers';
 -- Team 1 (5 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker101', @PassHash, '+970599200001', N'رامي طارق', 0, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker102', @PassHash, '+970599200002', N'ماجد سليم', 0, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker103', @PassHash, '+970599200003', N'هشام كمال', 0, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker104', @PassHash, '+970599200004', N'نادر جمال', 0, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker105', @PassHash, '+970599200005', N'زياد محمود', 0, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE());
+(@MunicipalityId, 'worker101', @PassHash, '+970599200001', N'رامي طارق', 2, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker102', @PassHash, '+970599200002', N'ماجد سليم', 2, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker103', @PassHash, '+970599200003', N'هشام كمال', 2, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker104', @PassHash, '+970599200004', N'نادر جمال', 2, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker105', @PassHash, '+970599200005', N'زياد محمود', 2, 1, @WorksDeptId, @WorksTeam1, @WorksSup1, 0, GETUTCDATE());
 
 -- Team 2 (5 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker106', @PassHash, '+970599200006', N'باسم عادل', 0, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker107', @PassHash, '+970599200007', N'عماد خالد', 0, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker108', @PassHash, '+970599200008', N'سامر فيصل', 0, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker109', @PassHash, '+970599200009', N'أيمن راشد', 0, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker110', @PassHash, '+970599200010', N'حسام وليد', 0, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE());
+(@MunicipalityId, 'worker106', @PassHash, '+970599200006', N'باسم عادل', 2, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker107', @PassHash, '+970599200007', N'عماد خالد', 2, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker108', @PassHash, '+970599200008', N'سامر فيصل', 2, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker109', @PassHash, '+970599200009', N'أيمن راشد', 2, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker110', @PassHash, '+970599200010', N'حسام وليد', 2, 1, @WorksDeptId, @WorksTeam2, @WorksSup1, 0, GETUTCDATE());
 
 -- Team 3 (5 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker111', @PassHash, '+970599200011', N'فراس أحمد', 0, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker112', @PassHash, '+970599200012', N'معتز علي', 0, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker113', @PassHash, '+970599200013', N'ثائر محمد', 0, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker114', @PassHash, '+970599200014', N'وسام سعيد', 0, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker115', @PassHash, '+970599200015', N'حازم نبيل', 0, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE());
+(@MunicipalityId, 'worker111', @PassHash, '+970599200011', N'فراس أحمد', 2, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker112', @PassHash, '+970599200012', N'معتز علي', 2, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker113', @PassHash, '+970599200013', N'ثائر محمد', 2, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker114', @PassHash, '+970599200014', N'وسام سعيد', 2, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker115', @PassHash, '+970599200015', N'حازم نبيل', 2, 1, @WorksDeptId, @WorksTeam3, @WorksSup1, 0, GETUTCDATE());
 
 -- Team 4 (5 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker116', @PassHash, '+970599200016', N'ياسر حسن', 0, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker117', @PassHash, '+970599200017', N'شادي عمر', 0, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker118', @PassHash, '+970599200018', N'أسامة طلال', 0, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker119', @PassHash, '+970599200019', N'مهند فادي', 0, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker120', @PassHash, '+970599200020', N'قصي رامي', 0, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 1, GETUTCDATE()) /* Inactive - resigned */;
+(@MunicipalityId, 'worker116', @PassHash, '+970599200016', N'ياسر حسن', 2, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker117', @PassHash, '+970599200017', N'شادي عمر', 2, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker118', @PassHash, '+970599200018', N'أسامة طلال', 2, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker119', @PassHash, '+970599200019', N'مهند فادي', 2, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker120', @PassHash, '+970599200020', N'قصي رامي', 2, 1, @WorksDeptId, @WorksTeam4, @WorksSup2, 1, GETUTCDATE()) /* Inactive - resigned */;
 
 -- Team 5 (5 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker121', @PassHash, '+970599200021', N'براء خالد', 0, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker122', @PassHash, '+970599200022', N'أنس محمود', 0, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker123', @PassHash, '+970599200023', N'حمزة سامي', 0, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker124', @PassHash, '+970599200024', N'عبدالله يوسف', 0, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker125', @PassHash, '+970599200025', N'إياد ماهر', 0, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE());
+(@MunicipalityId, 'worker121', @PassHash, '+970599200021', N'براء خالد', 2, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker122', @PassHash, '+970599200022', N'أنس محمود', 2, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker123', @PassHash, '+970599200023', N'حمزة سامي', 2, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker124', @PassHash, '+970599200024', N'عبدالله يوسف', 2, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker125', @PassHash, '+970599200025', N'إياد ماهر', 2, 1, @WorksDeptId, @WorksTeam5, @WorksSup2, 0, GETUTCDATE());
 
 -- Team 6 (5 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker126', @PassHash, '+970599200026', N'كرم طارق', 0, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker127', @PassHash, '+970599200027', N'بشار عادل', 0, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker128', @PassHash, '+970599200028', N'غسان فيصل', 0, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker129', @PassHash, '+970599200029', N'صهيب راشد', 0, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker130', @PassHash, '+970599200030', N'مصعب وليد', 0, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE());
+(@MunicipalityId, 'worker126', @PassHash, '+970599200026', N'كرم طارق', 2, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker127', @PassHash, '+970599200027', N'بشار عادل', 2, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker128', @PassHash, '+970599200028', N'غسان فيصل', 2, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker129', @PassHash, '+970599200029', N'صهيب راشد', 2, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker130', @PassHash, '+970599200030', N'مصعب وليد', 2, 1, @WorksDeptId, @WorksTeam6, @WorksSup2, 0, GETUTCDATE());
 
 PRINT 'Created 30 works workers in 6 teams';
 
@@ -377,40 +377,40 @@ PRINT 'Created 30 works workers in 6 teams';
 -- Team 1 (4 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker131', @PassHash, '+970599300001', N'منير أحمد', 0, 2, @AgriDeptId, @AgriTeam1, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker132', @PassHash, '+970599300002', N'رائد محمد', 0, 2, @AgriDeptId, @AgriTeam1, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker133', @PassHash, '+970599300003', N'نضال علي', 0, 2, @AgriDeptId, @AgriTeam1, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker134', @PassHash, '+970599300004', N'جهاد خالد', 0, 2, @AgriDeptId, @AgriTeam1, @AgriSup1, 0, GETUTCDATE());
+(@MunicipalityId, 'worker131', @PassHash, '+970599300001', N'منير أحمد', 2, 2, @AgriDeptId, @AgriTeam1, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker132', @PassHash, '+970599300002', N'رائد محمد', 2, 2, @AgriDeptId, @AgriTeam1, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker133', @PassHash, '+970599300003', N'نضال علي', 2, 2, @AgriDeptId, @AgriTeam1, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker134', @PassHash, '+970599300004', N'جهاد خالد', 2, 2, @AgriDeptId, @AgriTeam1, @AgriSup1, 0, GETUTCDATE());
 
 -- Team 2 (4 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker135', @PassHash, '+970599300005', N'عصام سامي', 0, 2, @AgriDeptId, @AgriTeam2, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker136', @PassHash, '+970599300006', N'هيثم نبيل', 0, 2, @AgriDeptId, @AgriTeam2, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker137', @PassHash, '+970599300007', N'لؤي طارق', 0, 2, @AgriDeptId, @AgriTeam2, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker138', @PassHash, '+970599300008', N'رشيد عمر', 0, 2, @AgriDeptId, @AgriTeam2, @AgriSup1, 0, GETUTCDATE());
+(@MunicipalityId, 'worker135', @PassHash, '+970599300005', N'عصام سامي', 2, 2, @AgriDeptId, @AgriTeam2, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker136', @PassHash, '+970599300006', N'هيثم نبيل', 2, 2, @AgriDeptId, @AgriTeam2, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker137', @PassHash, '+970599300007', N'لؤي طارق', 2, 2, @AgriDeptId, @AgriTeam2, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker138', @PassHash, '+970599300008', N'رشيد عمر', 2, 2, @AgriDeptId, @AgriTeam2, @AgriSup1, 0, GETUTCDATE());
 
 -- Team 3 (4 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker139', @PassHash, '+970599300009', N'حاتم فادي', 0, 2, @AgriDeptId, @AgriTeam3, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker140', @PassHash, '+970599300010', N'مأمون رامي', 0, 2, @AgriDeptId, @AgriTeam3, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker141', @PassHash, '+970599300011', N'صابر حسن', 0, 2, @AgriDeptId, @AgriTeam3, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker142', @PassHash, '+970599300012', N'ناصر جمال', 0, 2, @AgriDeptId, @AgriTeam3, @AgriSup1, 0, GETUTCDATE());
+(@MunicipalityId, 'worker139', @PassHash, '+970599300009', N'حاتم فادي', 2, 2, @AgriDeptId, @AgriTeam3, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker140', @PassHash, '+970599300010', N'مأمون رامي', 2, 2, @AgriDeptId, @AgriTeam3, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker141', @PassHash, '+970599300011', N'صابر حسن', 2, 2, @AgriDeptId, @AgriTeam3, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker142', @PassHash, '+970599300012', N'ناصر جمال', 2, 2, @AgriDeptId, @AgriTeam3, @AgriSup1, 0, GETUTCDATE());
 
 -- Team 4 (3 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker143', @PassHash, '+970599300013', N'سهيل محمود', 0, 2, @AgriDeptId, @AgriTeam4, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker144', @PassHash, '+970599300014', N'عادل سعيد', 0, 2, @AgriDeptId, @AgriTeam4, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker145', @PassHash, '+970599300015', N'فيصل أحمد', 0, 2, @AgriDeptId, @AgriTeam4, @AgriSup1, 2, GETUTCDATE()) /* Suspended */;
+(@MunicipalityId, 'worker143', @PassHash, '+970599300013', N'سهيل محمود', 2, 2, @AgriDeptId, @AgriTeam4, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker144', @PassHash, '+970599300014', N'عادل سعيد', 2, 2, @AgriDeptId, @AgriTeam4, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker145', @PassHash, '+970599300015', N'فيصل أحمد', 2, 2, @AgriDeptId, @AgriTeam4, @AgriSup1, 2, GETUTCDATE()) /* Suspended */;
 
 -- Team 5 (3 workers)
 INSERT INTO [Users] (MunicipalityId, Username, PasswordHash, PhoneNumber, FullName, Role, WorkerType, DepartmentId, TeamId, SupervisorId, Status, CreatedAt)
 VALUES
-(@MunicipalityId, 'worker146', @PassHash, '+970599300016', N'طلال كمال', 0, 2, @AgriDeptId, @AgriTeam5, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker147', @PassHash, '+970599300017', N'وائل نادر', 0, 2, @AgriDeptId, @AgriTeam5, @AgriSup1, 0, GETUTCDATE()),
-(@MunicipalityId, 'worker148', @PassHash, '+970599300018', N'خليل ماجد', 0, 2, @AgriDeptId, @AgriTeam5, @AgriSup1, 0, GETUTCDATE());
+(@MunicipalityId, 'worker146', @PassHash, '+970599300016', N'طلال كمال', 2, 2, @AgriDeptId, @AgriTeam5, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker147', @PassHash, '+970599300017', N'وائل نادر', 2, 2, @AgriDeptId, @AgriTeam5, @AgriSup1, 0, GETUTCDATE()),
+(@MunicipalityId, 'worker148', @PassHash, '+970599300018', N'خليل ماجد', 2, 2, @AgriDeptId, @AgriTeam5, @AgriSup1, 0, GETUTCDATE());
 
 PRINT 'Created 18 agriculture workers in 5 teams';
 
