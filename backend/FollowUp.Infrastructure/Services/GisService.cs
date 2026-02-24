@@ -4,7 +4,6 @@ using FollowUp.Core.Interfaces.Services;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace FollowUp.Infrastructure.Services;
@@ -205,35 +204,7 @@ public class GisService : IGisService
                 }
             }
 
-            // save zones to database
-            foreach (var zone in zones)
-            {
-                // check if zone already exists for this municipality
-                var existing = await _zoneRepository.GetByCodeAndMunicipalityAsync(zone.ZoneCode, municipalityId);
-                if (existing != null)
-                {
-                    // update it
-                    existing.ZoneName = zone.ZoneName;
-                    existing.Description = zone.Description;
-                    existing.Boundary = zone.Boundary;
-                    existing.BoundaryGeoJson = zone.BoundaryGeoJson;
-                    existing.CenterLatitude = zone.CenterLatitude;
-                    existing.CenterLongitude = zone.CenterLongitude;
-                    existing.AreaSquareMeters = zone.AreaSquareMeters;
-                    existing.Version++;
-                    existing.VersionDate = DateTime.UtcNow;
-                    existing.VersionNotes = "Updated from shapefile";
-                    existing.UpdatedAt = DateTime.UtcNow;
-                    await _zoneRepository.UpdateAsync(existing);
-                }
-                else
-                {
-                    await _zoneRepository.AddAsync(zone);
-                }
-            }
-
-            await _zoneRepository.SaveChangesAsync();
-            _logger.LogInformation("Imported {Count} zones from shapefile for municipality {MunicipalityId}", zones.Count, municipalityId);
+            await SaveZonesToDatabaseAsync(zones, municipalityId, "shapefile");
         }
         catch (Exception ex)
         {
@@ -326,35 +297,7 @@ public class GisService : IGisService
                 zones.Add(zone);
             }
 
-            // save zones to database
-            foreach (var zone in zones)
-            {
-                // check if zone already exists for this municipality
-                var existing = await _zoneRepository.GetByCodeAndMunicipalityAsync(zone.ZoneCode, municipalityId);
-                if (existing != null)
-                {
-                    // update it
-                    existing.ZoneName = zone.ZoneName;
-                    existing.Description = zone.Description;
-                    existing.Boundary = zone.Boundary;
-                    existing.BoundaryGeoJson = zone.BoundaryGeoJson;
-                    existing.CenterLatitude = zone.CenterLatitude;
-                    existing.CenterLongitude = zone.CenterLongitude;
-                    existing.AreaSquareMeters = zone.AreaSquareMeters;
-                    existing.Version++;
-                    existing.VersionDate = DateTime.UtcNow;
-                    existing.VersionNotes = "Updated from GeoJSON";
-                    existing.UpdatedAt = DateTime.UtcNow;
-                    await _zoneRepository.UpdateAsync(existing);
-                }
-                else
-                {
-                    await _zoneRepository.AddAsync(zone);
-                }
-            }
-
-            await _zoneRepository.SaveChangesAsync();
-            _logger.LogInformation("Imported {Count} zones from GeoJSON for municipality {MunicipalityId}", zones.Count, municipalityId);
+            await SaveZonesToDatabaseAsync(zones, municipalityId, "GeoJSON");
         }
         catch (Exception ex)
         {
@@ -462,40 +405,43 @@ public class GisService : IGisService
                 zones.Add(zone);
             }
 
-            // save zones to database
-            foreach (var zone in zones)
-            {
-                // check if zone already exists for this municipality
-                var existing = await _zoneRepository.GetByCodeAndMunicipalityAsync(zone.ZoneCode, municipalityId);
-                if (existing != null)
-                {
-                    // update it
-                    existing.ZoneName = zone.ZoneName;
-                    existing.Description = zone.Description;
-                    existing.Boundary = zone.Boundary;
-                    existing.BoundaryGeoJson = zone.BoundaryGeoJson;
-                    existing.CenterLatitude = zone.CenterLatitude;
-                    existing.CenterLongitude = zone.CenterLongitude;
-                    existing.AreaSquareMeters = zone.AreaSquareMeters;
-                    existing.Version++;
-                    existing.VersionDate = DateTime.UtcNow;
-                    existing.VersionNotes = "Updated from Blocks GeoJSON";
-                    existing.UpdatedAt = DateTime.UtcNow;
-                    await _zoneRepository.UpdateAsync(existing);
-                }
-                else
-                {
-                    await _zoneRepository.AddAsync(zone);
-                }
-            }
-
-            await _zoneRepository.SaveChangesAsync();
-            _logger.LogInformation("Imported {Count} blocks as zones from GeoJSON for municipality {MunicipalityId}", zones.Count, municipalityId);
+            await SaveZonesToDatabaseAsync(zones, municipalityId, "Blocks GeoJSON");
         }
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Failed to import blocks from GeoJSON: {ex.Message}", ex);
         }
+    }
+
+    // helper to save/update zones in database (upsert by code + municipality)
+    private async Task SaveZonesToDatabaseAsync(List<Zone> zones, int municipalityId, string source)
+    {
+        foreach (var zone in zones)
+        {
+            var existing = await _zoneRepository.GetByCodeAndMunicipalityAsync(zone.ZoneCode, municipalityId);
+            if (existing != null)
+            {
+                existing.ZoneName = zone.ZoneName;
+                existing.Description = zone.Description;
+                existing.Boundary = zone.Boundary;
+                existing.BoundaryGeoJson = zone.BoundaryGeoJson;
+                existing.CenterLatitude = zone.CenterLatitude;
+                existing.CenterLongitude = zone.CenterLongitude;
+                existing.AreaSquareMeters = zone.AreaSquareMeters;
+                existing.Version++;
+                existing.VersionDate = DateTime.UtcNow;
+                existing.VersionNotes = $"Updated from {source}";
+                existing.UpdatedAt = DateTime.UtcNow;
+                await _zoneRepository.UpdateAsync(existing);
+            }
+            else
+            {
+                await _zoneRepository.AddAsync(zone);
+            }
+        }
+
+        await _zoneRepository.SaveChangesAsync();
+        _logger.LogInformation("Imported {Count} zones from {Source} for municipality {MunicipalityId}", zones.Count, source, municipalityId);
     }
 
     // helper to get property from GeoJSON feature

@@ -29,6 +29,16 @@ public abstract class BaseApiController : ControllerBase
     /// <param name="longitude">The longitude coordinate to validate</param>
     /// <param name="allowZero">Whether to allow zero coordinates (default: false)</param>
     /// <returns>BadRequest with error message if invalid, null if valid</returns>
+    /// <summary>
+    /// Normalizes pagination parameters to safe values.
+    /// </summary>
+    protected (int Page, int PageSize) NormalizePagination(int page, int pageSize, int maxPageSize = 100, int defaultPageSize = 50)
+    {
+        if (pageSize < 1 || pageSize > maxPageSize) pageSize = defaultPageSize;
+        if (page < 1) page = 1;
+        return (page, pageSize);
+    }
+
     protected IActionResult? ValidateGpsCoordinates(double latitude, double longitude, bool allowZero = false)
     {
         // Check for zero coordinates

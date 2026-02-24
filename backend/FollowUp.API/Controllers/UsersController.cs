@@ -61,9 +61,7 @@ public class UsersController : BaseApiController
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
-        // fix pagination
-        if (pageSize < 1 || pageSize > 100) pageSize = 50;
-        if (page < 1) page = 1;
+        (page, pageSize) = NormalizePagination(page, pageSize);
 
         // get users from db
         var users = await _users.GetAllAsync();

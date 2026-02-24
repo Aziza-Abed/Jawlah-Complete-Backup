@@ -112,12 +112,120 @@ public class GisController : BaseApiController
             return BadRequest(new { success = false, message = "حجم الملف يتجاوز الحد المسموح (10MB)" });
 
         var ext = Path.GetExtension(file.FileName).ToLower();
-        if (ext != ".json" && ext != ".geojson")
-            return BadRequest(new { success = false, message = "نوع الملف غير مدعوم. يرجى رفع ملف GeoJSON (.json أو .geojson)" });
+        var supportedExtensions = new[] { ".json", ".geojson", ".shp", ".zip" };
+        if (!supportedExtensions.Contains(ext))
+            return BadRequest(new { success = false, message = "نوع الملف غير مدعوم. يرجى رفع ملف GeoJSON (.json/.geojson) أو Shapefile (.shp/.zip)" });
 
         try
         {
-            // Read and validate GeoJSON
+            bool isShapefile = ext == ".shp" || ext == ".zip";
+            int featuresCount = 0;
+            string storedFileName;
+            string storedFilePath;
+
+            if (isShapefile)
+            {
+                // Handle Shapefile upload (.shp or .zip containing shapefile)
+                string shpBasePath;
+
+                if (ext == ".zip")
+                {
+                    // Extract ZIP to temp directory
+                    var extractDir = Path.Combine(_storagePath, $"temp_{Guid.NewGuid():N}");
+                    Directory.CreateDirectory(extractDir);
+
+                    try
+                    {
+                        using (var stream = file.OpenReadStream())
+                        using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
+                        {
+                            archive.ExtractToDirectory(extractDir);
+                        }
+
+                        // Find .shp file inside extracted directory
+                        var shpFiles = Directory.GetFiles(extractDir, "*.shp", SearchOption.AllDirectories);
+                        if (shpFiles.Length == 0)
+                            return BadRequest(new { success = false, message = "ملف ZIP لا يحتوي على ملف Shapefile (.shp)" });
+
+                        shpBasePath = shpFiles[0][..^4]; // remove .shp extension
+                    }
+                    catch (InvalidDataException)
+                    {
+                        if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
+                        return BadRequest(new { success = false, message = "ملف ZIP غير صالح" });
+                    }
+                }
+                else
+                {
+                    // Direct .shp upload - save to storage
+                    shpBasePath = Path.Combine(_storagePath, $"{fileType.ToString().ToLower()}");
+                    var shpPath = shpBasePath + ".shp";
+                    using (var stream = System.IO.File.Create(shpPath))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+                }
+
+                // Deactivate old files of same type
+                await _gisFiles.DeactivateByTypeAsync(fileType);
+
+                storedFileName = $"{fileType.ToString().ToLower()}.shp";
+                storedFilePath = Path.Combine(_storagePath, storedFileName);
+
+                // Create database record
+                var gisFile = new GisFile
+                {
+                    FileType = fileType,
+                    OriginalFileName = file.FileName,
+                    StoredFileName = storedFileName,
+                    FileSize = file.Length,
+                    IsActive = true,
+                    FeaturesCount = 0,
+                    UploadedByUserId = userId.Value,
+                    UploadedAt = DateTime.UtcNow,
+                    Notes = notes
+                };
+
+                await _gisFiles.AddAsync(gisFile);
+
+                // Auto-import shapefile to zones
+                if (autoImport)
+                {
+                    try
+                    {
+                        await _gisService.ImportShapefileAsync(shpBasePath + ".shp", user.MunicipalityId);
+
+                        gisFile.LastImportedAt = DateTime.UtcNow;
+                        await _gisFiles.UpdateAsync(gisFile);
+
+                        _logger.LogInformation("Shapefile auto-imported to zones: {Type}", fileType);
+                    }
+                    catch (Exception importEx)
+                    {
+                        _logger.LogWarning(importEx, "Failed to auto-import Shapefile to zones");
+                        return Ok(new
+                        {
+                            success = true,
+                            message = "تم رفع الملف بنجاح، لكن فشل الاستيراد التلقائي. يمكنك الاستيراد يدوياً لاحقاً.",
+                            warning = importEx.Message,
+                            data = MapToDto(gisFile)
+                        });
+                    }
+                }
+
+                _logger.LogInformation("Shapefile uploaded: {Type} by user {UserId}", fileType, userId);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = autoImport
+                        ? "تم رفع واستيراد ملف Shapefile بنجاح"
+                        : "تم رفع ملف Shapefile بنجاح. يمكنك استيراده لاحقاً.",
+                    data = MapToDto(gisFile)
+                });
+            }
+
+            // Handle GeoJSON upload
             string jsonContent;
             using (var reader = new StreamReader(file.OpenReadStream()))
             {
@@ -125,7 +233,6 @@ public class GisController : BaseApiController
             }
 
             // Basic validation - check if it's valid JSON with features
-            int featuresCount = 0;
             try
             {
                 using var doc = JsonDocument.Parse(jsonContent);
@@ -154,8 +261,8 @@ public class GisController : BaseApiController
             await _gisFiles.DeactivateByTypeAsync(fileType);
 
             // Generate stored filename
-            var storedFileName = $"{fileType.ToString().ToLower()}.geojson";
-            var storedFilePath = Path.Combine(_storagePath, storedFileName);
+            storedFileName = $"{fileType.ToString().ToLower()}.geojson";
+            storedFilePath = Path.Combine(_storagePath, storedFileName);
 
             // Delete old file if exists
             if (System.IO.File.Exists(storedFilePath))
@@ -167,7 +274,7 @@ public class GisController : BaseApiController
             await System.IO.File.WriteAllTextAsync(storedFilePath, jsonContent);
 
             // Create database record
-            var gisFile = new GisFile
+            var geoJsonFile = new GisFile
             {
                 FileType = fileType,
                 OriginalFileName = file.FileName,
@@ -180,7 +287,7 @@ public class GisController : BaseApiController
                 Notes = notes
             };
 
-            await _gisFiles.AddAsync(gisFile);
+            await _gisFiles.AddAsync(geoJsonFile);
 
             _logger.LogInformation("GIS file uploaded: {Type} by user {UserId}, {Features} features",
                 fileType, userId, featuresCount);
@@ -199,8 +306,8 @@ public class GisController : BaseApiController
                         await _gisService.ImportGeoJsonAsync(storedFilePath, user.MunicipalityId);
                     }
 
-                    gisFile.LastImportedAt = DateTime.UtcNow;
-                    await _gisFiles.UpdateAsync(gisFile);
+                    geoJsonFile.LastImportedAt = DateTime.UtcNow;
+                    await _gisFiles.UpdateAsync(geoJsonFile);
 
                     _logger.LogInformation("GIS file auto-imported to zones: {Type}", fileType);
                 }
@@ -213,7 +320,7 @@ public class GisController : BaseApiController
                         success = true,
                         message = "تم رفع الملف بنجاح، لكن فشل الاستيراد التلقائي. يمكنك الاستيراد يدوياً لاحقاً.",
                         warning = importEx.Message,
-                        data = MapToDto(gisFile)
+                        data = MapToDto(geoJsonFile)
                     });
                 }
             }
@@ -224,7 +331,7 @@ public class GisController : BaseApiController
                 message = autoImport
                     ? $"تم رفع واستيراد الملف بنجاح ({featuresCount} منطقة)"
                     : $"تم رفع الملف بنجاح ({featuresCount} منطقة). يمكنك استيراده لاحقاً.",
-                data = MapToDto(gisFile)
+                data = MapToDto(geoJsonFile)
             });
         }
         catch (Exception ex)

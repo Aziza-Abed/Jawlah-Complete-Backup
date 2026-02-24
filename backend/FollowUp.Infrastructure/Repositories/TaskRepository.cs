@@ -10,12 +10,7 @@ namespace FollowUp.Infrastructure.Repositories;
 
 public class TaskRepository : Repository<TaskEntity>, ITaskRepository
 {
-    private readonly FollowUpDbContext _dbContext;
-
-    public TaskRepository(FollowUpDbContext context) : base(context)
-    {
-        _dbContext = context;
-    }
+    public TaskRepository(FollowUpDbContext context) : base(context) { }
 
     public override async Task<IEnumerable<TaskEntity>> GetAllAsync()
     {
@@ -45,7 +40,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
     public async Task<IEnumerable<TaskEntity>> GetUserTasksAsync(int userId, TaskStatus? status = null, TaskPriority? priority = null, int page = 1, int pageSize = 50)
     {
         // Get user's team ID for team task visibility
-        var userTeamId = await _dbContext.Users
+        var userTeamId = await _context.Users
             .Where(u => u.UserId == userId)
             .Select(u => u.TeamId)
             .FirstOrDefaultAsync();
@@ -175,7 +170,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
     public async Task<IEnumerable<TaskEntity>> GetTasksModifiedAfterAsync(int userId, DateTime lastSyncTime)
     {
         // Get user's team ID for team task visibility
-        var userTeamId = await _dbContext.Users
+        var userTeamId = await _context.Users
             .Where(u => u.UserId == userId)
             .Select(u => u.TeamId)
             .FirstOrDefaultAsync();
@@ -223,7 +218,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
         var workerIdSet = workerIds.ToList();
 
         // Get team IDs for the workers in the list
-        var workerTeamIds = await _dbContext.Users
+        var workerTeamIds = await _context.Users
             .Where(u => workerIdSet.Contains(u.UserId) && u.TeamId.HasValue)
             .Select(u => u.TeamId!.Value)
             .Distinct()

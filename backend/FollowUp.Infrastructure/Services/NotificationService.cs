@@ -34,7 +34,6 @@ public class NotificationService : INotificationService
         var credentialsPath = configuration["Firebase:CredentialsPath"];
         if (!string.IsNullOrEmpty(credentialsPath))
         {
-            // resolve path relative to app directory
             var fullPath = Path.IsPathRooted(credentialsPath)
                 ? credentialsPath
                 : Path.Combine(environment.ContentRootPath, credentialsPath);
@@ -72,18 +71,25 @@ public class NotificationService : INotificationService
         }
     }
 
-    public async Task SendTaskAssignedNotificationAsync(int userId, int taskId, string taskTitle)
-    {
-        var title = "مهمة جديدة";
-        var body = $"تم تكليفك بمهمة جديدة: {taskTitle}";
-        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_assigned" } };
+    // ─── Private helpers to eliminate duplicate notification boilerplate ────────
 
-        // get user to get their municipality
+    /// <summary>
+    /// Create, save, and push a notification to a single user.
+    /// Returns false if the user was not found.
+    /// </summary>
+    private async Task<bool> SendToUserAsync(
+        int userId,
+        string title,
+        string body,
+        NotificationType type,
+        string? payloadJson = null,
+        Dictionary<string, string>? pushData = null)
+    {
         var user = await _users.GetByIdAsync(userId);
         if (user == null)
         {
-            _logger.LogWarning("Cannot send task assigned notification - User {UserId} not found", userId);
-            return;
+            _logger.LogWarning("Cannot send {Type} notification - User {UserId} not found", type, userId);
+            return false;
         }
 
         var notification = new AppNotification
@@ -92,108 +98,31 @@ public class NotificationService : INotificationService
             MunicipalityId = user.MunicipalityId,
             Title = title,
             Message = body,
-            Type = NotificationType.TaskAssigned,
+            Type = type,
             IsRead = false,
             IsSent = true,
             CreatedAt = DateTime.UtcNow,
             SentAt = DateTime.UtcNow,
-            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { taskId })
+            PayloadJson = payloadJson
         };
 
         await _notifications.AddAsync(notification);
         await _notifications.SaveChangesAsync();
-
-        // also send push notif to phone
-        await SendPushNotificationAsync(userId, title, body, data);
-
-        _logger.LogInformation("Task assigned notification sent to user {UserId} for task {TaskId}", userId, taskId);
+        await SendPushNotificationAsync(userId, title, body, pushData);
+        return true;
     }
 
-    public async Task SendTaskUpdatedNotificationAsync(int userId, int taskId, string taskTitle)
+    /// <summary>
+    /// Broadcast a notification to all supervisors.
+    /// Batches the DB save outside the loop for efficiency.
+    /// </summary>
+    private async Task SendToAllSupervisorsAsync(
+        string title,
+        string body,
+        NotificationType type,
+        string? payloadJson = null,
+        Dictionary<string, string>? pushData = null)
     {
-        var title = "تحديث المهمة";
-        var body = $"تم تحديث المهمة: {taskTitle}";
-        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_updated" } };
-
-        // get user to get their municipality
-        var user = await _users.GetByIdAsync(userId);
-        if (user == null)
-        {
-            _logger.LogWarning("Cannot send task updated notification - User {UserId} not found", userId);
-            return;
-        }
-
-        var notification = new AppNotification
-        {
-            UserId = userId,
-            MunicipalityId = user.MunicipalityId,
-            Title = title,
-            Message = body,
-            Type = NotificationType.TaskUpdated,
-            IsRead = false,
-            IsSent = true,
-            CreatedAt = DateTime.UtcNow,
-            SentAt = DateTime.UtcNow,
-            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { taskId })
-        };
-
-        await _notifications.AddAsync(notification);
-        await _notifications.SaveChangesAsync();
-
-        // also send push notif to phone
-        await SendPushNotificationAsync(userId, title, body, data);
-
-        _logger.LogInformation("Task updated notification sent to user {UserId} for task {TaskId}", userId, taskId);
-    }
-
-    public async Task SendIssueReviewedNotificationAsync(int userId, int issueId, string status)
-    {
-        var title = "تحديث البلاغ";
-        var body = $"تم تحديث حالة البلاغ إلى: {status}";
-        var data = new Dictionary<string, string> { { "issueId", issueId.ToString() }, { "type", "issue_reviewed" } };
-
-        // get user to get their municipality
-        var user = await _users.GetByIdAsync(userId);
-        if (user == null)
-        {
-            _logger.LogWarning("Cannot send issue reviewed notification - User {UserId} not found", userId);
-            return;
-        }
-
-        var notification = new AppNotification
-        {
-            UserId = userId,
-            MunicipalityId = user.MunicipalityId,
-            Title = title,
-            Message = body,
-            Type = NotificationType.IssueReviewed,
-            IsRead = false,
-            IsSent = true,
-            CreatedAt = DateTime.UtcNow,
-            SentAt = DateTime.UtcNow,
-            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { issueId, status })
-        };
-
-        await _notifications.AddAsync(notification);
-        await _notifications.SaveChangesAsync();
-
-        // also send push notif to phone
-        await SendPushNotificationAsync(userId, title, body, data);
-
-        _logger.LogInformation("Issue reviewed notification sent to user {UserId} for issue {IssueId}", userId, issueId);
-    }
-
-    public async Task SendTaskCompletedToSupervisorsAsync(int taskId, string taskTitle, string workerName)
-    {
-        var title = "مهمة مكتملة بانتظار المراجعة";
-        var body = $"أكمل العامل {workerName} المهمة: {taskTitle}";
-        var data = new Dictionary<string, string>
-        {
-            { "taskId", taskId.ToString() },
-            { "type", "task_completed" }
-        };
-
-        // get all supervisors to notify them
         var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
 
         foreach (var supervisor in supervisors)
@@ -204,293 +133,199 @@ public class NotificationService : INotificationService
                 MunicipalityId = supervisor.MunicipalityId,
                 Title = title,
                 Message = body,
-                Type = NotificationType.TaskUpdated,
+                Type = type,
                 IsRead = false,
                 IsSent = true,
                 CreatedAt = DateTime.UtcNow,
                 SentAt = DateTime.UtcNow,
-                PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { taskId, workerName })
+                PayloadJson = payloadJson
             };
 
             await _notifications.AddAsync(notification);
-
-            // send push notification
-            await SendPushNotificationAsync(supervisor.UserId, title, body, data);
+            await SendPushNotificationAsync(supervisor.UserId, title, body, pushData);
         }
 
         await _notifications.SaveChangesAsync();
+    }
+
+    // ─── Public notification methods ──────────────────────────────────────────
+
+    public async Task SendTaskAssignedNotificationAsync(int userId, int taskId, string taskTitle)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId });
+        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_assigned" } };
+
+        if (await SendToUserAsync(userId, "مهمة جديدة", $"تم تكليفك بمهمة جديدة: {taskTitle}",
+                NotificationType.TaskAssigned, payload, data))
+            _logger.LogInformation("Task assigned notification sent to user {UserId} for task {TaskId}", userId, taskId);
+    }
+
+    public async Task SendTaskStartedNotificationAsync(int supervisorId, int taskId, string taskTitle, string workerName)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId });
+        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_started" } };
+
+        if (await SendToUserAsync(supervisorId, "بدء تنفيذ مهمة", $"بدأ العامل {workerName} بتنفيذ المهمة: {taskTitle}",
+                NotificationType.TaskStatusChanged, payload, data))
+            _logger.LogInformation("Task started notification sent to supervisor {SupervisorId} for task {TaskId}", supervisorId, taskId);
+    }
+
+    public async Task SendTaskUpdatedNotificationAsync(int userId, int taskId, string taskTitle)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId });
+        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_updated" } };
+
+        if (await SendToUserAsync(userId, "تحديث المهمة", $"تم تحديث المهمة: {taskTitle}",
+                NotificationType.TaskUpdated, payload, data))
+            _logger.LogInformation("Task updated notification sent to user {UserId} for task {TaskId}", userId, taskId);
+    }
+
+    public async Task SendIssueReviewedNotificationAsync(int userId, int issueId, string status)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { issueId, status });
+        var data = new Dictionary<string, string> { { "issueId", issueId.ToString() }, { "type", "issue_reviewed" } };
+
+        if (await SendToUserAsync(userId, "تحديث البلاغ", $"تم تحديث حالة البلاغ إلى: {status}",
+                NotificationType.IssueReviewed, payload, data))
+            _logger.LogInformation("Issue reviewed notification sent to user {UserId} for issue {IssueId}", userId, issueId);
+    }
+
+    public async Task SendTaskCompletedToSupervisorsAsync(int taskId, string taskTitle, string workerName)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, workerName });
+        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_completed" } };
+
+        await SendToAllSupervisorsAsync("مهمة مكتملة بانتظار المراجعة", $"أكمل العامل {workerName} المهمة: {taskTitle}",
+            NotificationType.TaskStatusChanged, payload, data);
         _logger.LogInformation("Task completed notification sent to supervisors for task {TaskId} by {WorkerName}", taskId, workerName);
     }
 
     public async Task SendIssueReportedToSupervisorsAsync(int issueId, string issueTitle, string workerName, string severity)
     {
-        var title = "بلاغ جديد";
-        var body = $"أبلغ العامل {workerName} عن مشكلة: {issueTitle} (الخطورة: {severity})";
-        var data = new Dictionary<string, string>
-        {
-            { "issueId", issueId.ToString() },
-            { "type", "issue_reported" },
-            { "severity", severity }
-        };
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { issueId, workerName, severity });
+        var data = new Dictionary<string, string> { { "issueId", issueId.ToString() }, { "type", "issue_reported" }, { "severity", severity } };
 
-        // get all supervisors to notify them
-        var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
-
-        foreach (var supervisor in supervisors)
-        {
-            var notification = new AppNotification
-            {
-                UserId = supervisor.UserId,
-                MunicipalityId = supervisor.MunicipalityId,
-                Title = title,
-                Message = body,
-                Type = NotificationType.IssueReviewed, // reusing type, could add new type
-                IsRead = false,
-                IsSent = true,
-                CreatedAt = DateTime.UtcNow,
-                SentAt = DateTime.UtcNow,
-                PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { issueId, workerName, severity })
-            };
-
-            await _notifications.AddAsync(notification);
-
-            // send push notification
-            await SendPushNotificationAsync(supervisor.UserId, title, body, data);
-        }
-
-        await _notifications.SaveChangesAsync();
+        await SendToAllSupervisorsAsync("بلاغ جديد", $"أبلغ العامل {workerName} عن مشكلة: {issueTitle} (الخطورة: {severity})",
+            NotificationType.IssueReported, payload, data);
         _logger.LogInformation("Issue reported notification sent to supervisors for issue {IssueId} by {WorkerName}", issueId, workerName);
     }
 
     public async Task SendSystemAlertAsync(int userId, string message)
     {
-        var title = "تنبيه النظام";
         var data = new Dictionary<string, string> { { "type", "system_alert" } };
 
-        // get user to get their municipality
-        var user = await _users.GetByIdAsync(userId);
-        if (user == null)
-        {
-            _logger.LogWarning("Cannot send system alert - User {UserId} not found", userId);
-            return;
-        }
-
-        var notification = new AppNotification
-        {
-            UserId = userId,
-            MunicipalityId = user.MunicipalityId,
-            Title = title,
-            Message = message,
-            Type = NotificationType.SystemAlert,
-            IsRead = false,
-            IsSent = true,
-            CreatedAt = DateTime.UtcNow,
-            SentAt = DateTime.UtcNow
-        };
-
-        await _notifications.AddAsync(notification);
-        await _notifications.SaveChangesAsync();
-
-        // also send push notif to phone
-        await SendPushNotificationAsync(userId, title, message, data);
-
-        _logger.LogInformation("System alert sent to user {UserId}", userId);
+        if (await SendToUserAsync(userId, "تنبيه النظام", message, NotificationType.SystemAlert, null, data))
+            _logger.LogInformation("System alert sent to user {UserId}", userId);
     }
 
     public async Task SendBatteryLowNotificationAsync(int workerId, string workerName, int batteryLevel)
     {
-        var title = "تنبيه بطارية منخفضة";
-        var body = $"بطارية العامل {workerName} منخفضة ({batteryLevel}%). قد لا يتمكن من إكمال مهامه.";
-        var data = new Dictionary<string, string>
-        {
-            { "workerId", workerId.ToString() },
-            { "batteryLevel", batteryLevel.ToString() },
-            { "type", "battery_low" }
-        };
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { workerId, batteryLevel });
+        var data = new Dictionary<string, string> { { "workerId", workerId.ToString() }, { "batteryLevel", batteryLevel.ToString() }, { "type", "battery_low" } };
 
-        // get all supervisors to notify them
-        var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
-
-        foreach (var supervisor in supervisors)
-        {
-            var notification = new AppNotification
-            {
-                UserId = supervisor.UserId,
-                MunicipalityId = supervisor.MunicipalityId,
-                Title = title,
-                Message = body,
-                Type = NotificationType.BatteryLow,
-                IsRead = false,
-                IsSent = true,
-                CreatedAt = DateTime.UtcNow,
-                SentAt = DateTime.UtcNow,
-                PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { workerId, batteryLevel })
-            };
-
-            await _notifications.AddAsync(notification);
-
-            // send push notification
-            await SendPushNotificationAsync(supervisor.UserId, title, body, data);
-        }
-
-        await _notifications.SaveChangesAsync();
+        await SendToAllSupervisorsAsync("تنبيه بطارية منخفضة",
+            $"بطارية العامل {workerName} منخفضة ({batteryLevel}%). قد لا يتمكن من إكمال مهامه.",
+            NotificationType.BatteryLow, payload, data);
         _logger.LogInformation("Battery low notification sent for worker {WorkerId} ({BatteryLevel}%)", workerId, batteryLevel);
     }
 
     public async Task SendTaskAutoRejectedToWorkerAsync(int workerId, int taskId, string taskTitle, string reason, int distanceMeters)
     {
-        var title = "تم رفض إثبات المهمة";
         var body = $"تم رفض إثبات المهمة \"{taskTitle}\" تلقائياً.\n{reason}\nالمسافة من موقع المهمة: {distanceMeters} متر";
-        var data = new Dictionary<string, string>
-        {
-            { "taskId", taskId.ToString() },
-            { "type", "task_auto_rejected" },
-            { "distanceMeters", distanceMeters.ToString() }
-        };
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, reason, distanceMeters });
+        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_auto_rejected" }, { "distanceMeters", distanceMeters.ToString() } };
 
-        // get user to get their municipality
-        var user = await _users.GetByIdAsync(workerId);
-        if (user == null)
-        {
-            _logger.LogWarning("Cannot send task auto-rejected notification - Worker {WorkerId} not found", workerId);
-            return;
-        }
-
-        var notification = new AppNotification
-        {
-            UserId = workerId,
-            MunicipalityId = user.MunicipalityId,
-            Title = title,
-            Message = body,
-            Type = NotificationType.TaskUpdated,
-            IsRead = false,
-            IsSent = true,
-            CreatedAt = DateTime.UtcNow,
-            SentAt = DateTime.UtcNow,
-            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { taskId, reason, distanceMeters })
-        };
-
-        await _notifications.AddAsync(notification);
-        await _notifications.SaveChangesAsync();
-
-        await SendPushNotificationAsync(workerId, title, body, data);
-        _logger.LogInformation("Task auto-rejected notification sent to worker {WorkerId} for task {TaskId}", workerId, taskId);
+        if (await SendToUserAsync(workerId, "تم رفض إثبات المهمة", body, NotificationType.TaskStatusChanged, payload, data))
+            _logger.LogInformation("Task auto-rejected notification sent to worker {WorkerId} for task {TaskId}", workerId, taskId);
     }
 
     public async Task SendTaskAutoRejectedToSupervisorsAsync(int taskId, string taskTitle, string workerName, string reason, int distanceMeters)
     {
-        var title = "رفض تلقائي لإثبات مهمة";
-        var body = $"تم رفض إثبات العامل {workerName} للمهمة \"{taskTitle}\" تلقائياً.\n{reason}\nالمسافة: {distanceMeters} متر";
-        var data = new Dictionary<string, string>
-        {
-            { "taskId", taskId.ToString() },
-            { "type", "task_auto_rejected_supervisor" },
-            { "distanceMeters", distanceMeters.ToString() }
-        };
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, workerName, reason, distanceMeters });
+        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_auto_rejected_supervisor" }, { "distanceMeters", distanceMeters.ToString() } };
 
-        var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
-
-        foreach (var supervisor in supervisors)
-        {
-            var notification = new AppNotification
-            {
-                UserId = supervisor.UserId,
-                MunicipalityId = supervisor.MunicipalityId,
-                Title = title,
-                Message = body,
-                Type = NotificationType.SystemAlert,
-                IsRead = false,
-                IsSent = true,
-                CreatedAt = DateTime.UtcNow,
-                SentAt = DateTime.UtcNow,
-                PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { taskId, workerName, reason, distanceMeters })
-            };
-
-            await _notifications.AddAsync(notification);
-            await SendPushNotificationAsync(supervisor.UserId, title, body, data);
-        }
-
-        await _notifications.SaveChangesAsync();
+        await SendToAllSupervisorsAsync("رفض تلقائي لإثبات مهمة",
+            $"تم رفض إثبات العامل {workerName} للمهمة \"{taskTitle}\" تلقائياً.\n{reason}\nالمسافة: {distanceMeters} متر",
+            NotificationType.SystemAlert, payload, data);
         _logger.LogInformation("Task auto-rejected notification sent to supervisors for task {TaskId}", taskId);
     }
 
     public async Task SendWarningIssuedToWorkerAsync(int workerId, string reason, int totalWarnings)
     {
-        var title = "تحذير";
-        var body = $"تم إصدار تحذير: {reason}\nإجمالي التحذيرات: {totalWarnings}";
-        var data = new Dictionary<string, string>
-        {
-            { "type", "warning_issued" },
-            { "totalWarnings", totalWarnings.ToString() }
-        };
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { reason, totalWarnings });
+        var data = new Dictionary<string, string> { { "type", "warning_issued" }, { "totalWarnings", totalWarnings.ToString() } };
 
-        // get user to get their municipality
-        var user = await _users.GetByIdAsync(workerId);
-        if (user == null)
-        {
-            _logger.LogWarning("Cannot send warning notification - Worker {WorkerId} not found", workerId);
-            return;
-        }
-
-        var notification = new AppNotification
-        {
-            UserId = workerId,
-            MunicipalityId = user.MunicipalityId,
-            Title = title,
-            Message = body,
-            Type = NotificationType.SystemAlert,
-            IsRead = false,
-            IsSent = true,
-            CreatedAt = DateTime.UtcNow,
-            SentAt = DateTime.UtcNow,
-            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { reason, totalWarnings })
-        };
-
-        await _notifications.AddAsync(notification);
-        await _notifications.SaveChangesAsync();
-
-        await SendPushNotificationAsync(workerId, title, body, data);
-        _logger.LogInformation("Warning notification sent to worker {WorkerId}, total warnings: {TotalWarnings}", workerId, totalWarnings);
+        if (await SendToUserAsync(workerId, "تحذير", $"تم إصدار تحذير: {reason}\nإجمالي التحذيرات: {totalWarnings}",
+                NotificationType.SystemAlert, payload, data))
+            _logger.LogInformation("Warning notification sent to worker {WorkerId}, total warnings: {TotalWarnings}", workerId, totalWarnings);
     }
 
     public async Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings)
     {
         var title = totalWarnings >= 3 ? "عامل وصل للحد الأقصى من التحذيرات" : "تحذير لعامل";
-        var body = $"تم إصدار تحذير للعامل {workerName}.\nالسبب: {reason}\nإجمالي التحذيرات: {totalWarnings}";
-        var data = new Dictionary<string, string>
-        {
-            { "workerId", workerId.ToString() },
-            { "type", "worker_warning_alert" },
-            { "totalWarnings", totalWarnings.ToString() }
-        };
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { workerId, workerName, reason, totalWarnings });
+        var data = new Dictionary<string, string> { { "workerId", workerId.ToString() }, { "type", "worker_warning_alert" }, { "totalWarnings", totalWarnings.ToString() } };
 
-        var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
-
-        foreach (var supervisor in supervisors)
-        {
-            var notification = new AppNotification
-            {
-                UserId = supervisor.UserId,
-                MunicipalityId = supervisor.MunicipalityId,
-                Title = title,
-                Message = body,
-                Type = NotificationType.SystemAlert,
-                IsRead = false,
-                IsSent = true,
-                CreatedAt = DateTime.UtcNow,
-                SentAt = DateTime.UtcNow,
-                PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { workerId, workerName, reason, totalWarnings })
-            };
-
-            await _notifications.AddAsync(notification);
-            await SendPushNotificationAsync(supervisor.UserId, title, body, data);
-        }
-
-        await _notifications.SaveChangesAsync();
+        await SendToAllSupervisorsAsync(title, $"تم إصدار تحذير للعامل {workerName}.\nالسبب: {reason}\nإجمالي التحذيرات: {totalWarnings}",
+            NotificationType.SystemAlert, payload, data);
         _logger.LogInformation("Warning alert sent to supervisors for worker {WorkerId}, total warnings: {TotalWarnings}", workerId, totalWarnings);
     }
 
-    // send push notif using firebase
+    public async Task SendTaskExtensionRequestAsync(int supervisorId, int taskId, string taskTitle, DateTime originalDeadline, DateTime requestedDeadline)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, originalDeadline, requestedDeadline });
+        var data = new Dictionary<string, string> { { "type", "task_extension_request" }, { "taskId", taskId.ToString() } };
+
+        if (await SendToUserAsync(supervisorId, "طلب تمديد موعد مهمة",
+                $"تم طلب تمديد موعد المهمة \"{taskTitle}\" من {originalDeadline:dd/MM/yyyy} إلى {requestedDeadline:dd/MM/yyyy}",
+                NotificationType.TaskUpdated, payload, data))
+            _logger.LogInformation("Extension request notification sent to supervisor {SupervisorId} for task {TaskId}", supervisorId, taskId);
+    }
+
+    public async Task SendTaskMilestoneNotificationAsync(int workerId, int taskId, string taskTitle, int milestone)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, milestone });
+        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_milestone" }, { "milestone", milestone.ToString() } };
+
+        if (await SendToUserAsync(workerId, $"تم إنجاز {milestone}% من المهمة",
+                $"أحسنت! لقد أنجزت {milestone}% من المهمة \"{taskTitle}\"",
+                NotificationType.TaskUpdated, payload, data))
+            _logger.LogInformation("Task milestone notification sent to worker {WorkerId} for task {TaskId} at {Milestone}%", workerId, taskId, milestone);
+    }
+
+    public async Task SendManualAttendanceApprovedAsync(int workerId, int attendanceId)
+    {
+        var data = new Dictionary<string, string> { { "type", "manual_attendance_approved" }, { "attendanceId", attendanceId.ToString() } };
+
+        if (await SendToUserAsync(workerId, "تمت الموافقة على الحضور",
+                "تمت الموافقة على طلب تسجيل الحضور اليدوي الخاص بك",
+                NotificationType.ManualAttendanceApproved, null, data))
+            _logger.LogInformation("Manual attendance approved notification sent to worker {WorkerId}", workerId);
+    }
+
+    public async Task SendManualAttendanceRejectedAsync(int workerId, int attendanceId, string reason)
+    {
+        var data = new Dictionary<string, string> { { "type", "manual_attendance_rejected" }, { "attendanceId", attendanceId.ToString() } };
+
+        if (await SendToUserAsync(workerId, "تم رفض طلب الحضور",
+                $"تم رفض طلب تسجيل الحضور اليدوي: {reason}",
+                NotificationType.ManualAttendanceRejected, null, data))
+            _logger.LogInformation("Manual attendance rejected notification sent to worker {WorkerId}", workerId);
+    }
+
+    public async Task SendAppealSubmittedToSupervisorsAsync(int taskId, string taskTitle, string workerName)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId });
+        var data = new Dictionary<string, string> { { "type", "appeal_submitted" }, { "taskId", taskId.ToString() } };
+
+        await SendToAllSupervisorsAsync("طعن جديد على مهمة",
+            $"قدّم العامل {workerName} طعناً على المهمة \"{taskTitle}\"",
+            NotificationType.AppealSubmitted, payload, data);
+        _logger.LogInformation("Appeal submitted notification sent to supervisors for task {TaskId}", taskId);
+    }
+
+    // ─── Push notification via Firebase ───────────────────────────────────────
+
     private async Task SendPushNotificationAsync(int userId, string title, string body, Dictionary<string, string>? data = null)
     {
         if (!_fcmEnabled)
@@ -533,7 +368,6 @@ public class NotificationService : INotificationService
         }
         catch (FirebaseMessagingException ex) when (ex.MessagingErrorCode == MessagingErrorCode.Unregistered)
         {
-            // token is bad so we remove it
             _logger.LogWarning("FCM token invalid for user {UserId}, clearing token", userId);
             var user = await _users.GetByIdAsync(userId);
             if (user != null)
@@ -547,94 +381,5 @@ public class NotificationService : INotificationService
         {
             _logger.LogError(ex, "Failed to send FCM push notification to user {UserId}", userId);
         }
-    }
-
-    // send notification to supervisor when worker requests task deadline extension
-    public async Task SendTaskExtensionRequestAsync(
-        int supervisorId,
-        int taskId,
-        string taskTitle,
-        DateTime originalDeadline,
-        DateTime requestedDeadline)
-    {
-        var supervisor = await _users.GetByIdAsync(supervisorId);
-        if (supervisor == null)
-        {
-            _logger.LogWarning("Cannot send extension request - Supervisor {SupervisorId} not found", supervisorId);
-            return;
-        }
-
-        var notification = new AppNotification
-        {
-            UserId = supervisorId,
-            MunicipalityId = supervisor.MunicipalityId,
-            Type = NotificationType.TaskUpdated, // Reuse existing type
-            Title = "طلب تمديد موعد مهمة",
-            Message = $"تم طلب تمديد موعد المهمة \"{taskTitle}\" من {originalDeadline:dd/MM/yyyy} إلى {requestedDeadline:dd/MM/yyyy}",
-            IsRead = false,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        await _notifications.AddAsync(notification);
-        await _notifications.SaveChangesAsync();
-
-        _logger.LogInformation(
-            "Extension request notification sent to supervisor {SupervisorId} for task {TaskId}",
-            supervisorId, taskId);
-
-        // send push notification
-        if (!string.IsNullOrEmpty(supervisor.FcmToken) && _fcmEnabled)
-        {
-            await SendPushNotificationAsync(
-                supervisorId,
-                notification.Title,
-                notification.Message,
-                new Dictionary<string, string>
-                {
-                    { "type", "task_extension_request" },
-                    { "taskId", taskId.ToString() },
-                    { "notificationId", notification.NotificationId.ToString() }
-                });
-        }
-    }
-
-    // Send milestone notification to worker when task progress reaches 25%, 50%, or 75%
-    public async Task SendTaskMilestoneNotificationAsync(int workerId, int taskId, string taskTitle, int milestone)
-    {
-        var user = await _users.GetByIdAsync(workerId);
-        if (user == null)
-        {
-            _logger.LogWarning("Cannot send milestone notification - Worker {WorkerId} not found", workerId);
-            return;
-        }
-
-        var title = $"تم إنجاز {milestone}% من المهمة";
-        var body = $"أحسنت! لقد أنجزت {milestone}% من المهمة \"{taskTitle}\"";
-        var data = new Dictionary<string, string>
-        {
-            { "taskId", taskId.ToString() },
-            { "type", "task_milestone" },
-            { "milestone", milestone.ToString() }
-        };
-
-        var notification = new AppNotification
-        {
-            UserId = workerId,
-            MunicipalityId = user.MunicipalityId,
-            Title = title,
-            Message = body,
-            Type = NotificationType.TaskUpdated,
-            IsRead = false,
-            IsSent = true,
-            CreatedAt = DateTime.UtcNow,
-            SentAt = DateTime.UtcNow,
-            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new { taskId, milestone })
-        };
-
-        await _notifications.AddAsync(notification);
-        await _notifications.SaveChangesAsync();
-
-        await SendPushNotificationAsync(workerId, title, body, data);
-        _logger.LogInformation("Task milestone notification sent to worker {WorkerId} for task {TaskId} at {Milestone}%", workerId, taskId, milestone);
     }
 }

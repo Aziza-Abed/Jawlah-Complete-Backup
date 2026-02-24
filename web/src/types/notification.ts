@@ -1,6 +1,19 @@
 // Notification types matching backend DTOs
 
-export type NotificationType = "TaskAssigned" | "TaskReminder" | "TaskUpdated" | "IssueReviewed" | "SystemAlert" | "BatteryLow";
+export type NotificationType =
+  | "TaskAssigned"
+  | "TaskReminder"
+  | "TaskUpdated"
+  | "IssueReviewed"
+  | "SystemAlert"
+  | "BatteryLow"
+  | "TaskStatusChanged"
+  | "AttendanceReminder"
+  | "ManualAttendanceApproved"
+  | "ManualAttendanceRejected"
+  | "IssueReported"
+  | "IssueResolved"
+  | "AppealSubmitted";
 
 export type NotificationResponse = {
   notificationId: number;
@@ -12,4 +25,6 @@ export type NotificationResponse = {
   createdAt: string;
   sentAt?: string;
   readAt?: string;
+  taskId?: number;
+  issueId?: number;
 };

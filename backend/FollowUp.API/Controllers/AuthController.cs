@@ -590,6 +590,10 @@ public class AuthController : BaseApiController
         if (!Utils.InputSanitizer.IsStrongPassword(request.Password))
             return BadRequest(ApiResponse<UserDto>.ErrorResponse("كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم ورمز خاص"));
 
+        // Validate: Workers must have a supervisor assigned
+        if (request.Role == Core.Enums.UserRole.Worker && !request.SupervisorId.HasValue)
+            return BadRequest(ApiResponse<UserDto>.ErrorResponse("يجب تحديد المشرف عند إنشاء حساب عامل"));
+
         // TEMP: Auto-create default municipality if none exists
         var dbContext = HttpContext.RequestServices.GetRequiredService<FollowUp.Infrastructure.Data.FollowUpDbContext>();
         var municipality = await dbContext.Municipalities.FirstOrDefaultAsync();

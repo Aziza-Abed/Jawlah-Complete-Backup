@@ -152,7 +152,7 @@ export default function AdminMonitoring() {
   const getBatteryIcon = (level: number = 0) => {
     // Battery thresholds: >50% green, 20-50% yellow/blue, <20% red
     if (level > 50) return <BatteryFull size={14} className="text-[#8FA36A]" />;
-    if (level >= 20) return <BatteryMedium size={14} className="text-[#7895B2]" />;
+    if (level >= 20) return <BatteryMedium size={14} className="text-[#D4A843]" />;
     return <BatteryLow size={14} className="text-[#C86E5D]" />;
   };
 

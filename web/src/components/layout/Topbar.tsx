@@ -7,8 +7,6 @@ export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
 
-
-
   return (
     <header className="w-full bg-[#7895B2] px-6 sm:px-8 md:px-10 h-[85px] sm:h-[105px] shadow-lg relative z-30">
       <div className="h-full flex items-center justify-between">

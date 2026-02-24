@@ -99,15 +99,15 @@ public class AppealsController : BaseApiController
             return BadRequest(ApiResponse<object>.ErrorResponse("طعون الحضور غير مدعومة حالياً"));
         }
 
-        // Chapter 5 FIX #4: Require evidence photo for appeals
-        if (request.EvidencePhoto == null)
-            return BadRequest(ApiResponse<object>.ErrorResponse("يجب إرفاق صورة كدليل للطعن"));
+        // Upload evidence photo if provided (optional)
+        string? evidencePhotoUrl = null;
+        if (request.EvidencePhoto != null)
+        {
+            if (!_files.ValidateImage(request.EvidencePhoto))
+                return BadRequest(ApiResponse<object>.ErrorResponse("ملف الصورة غير صالح"));
 
-        // Upload evidence photo
-        if (!_files.ValidateImage(request.EvidencePhoto))
-            return BadRequest(ApiResponse<object>.ErrorResponse("ملف الصورة غير صالح"));
-
-        var evidencePhotoUrl = await _files.UploadImageAsync(request.EvidencePhoto, "appeals");
+            evidencePhotoUrl = await _files.UploadImageAsync(request.EvidencePhoto, "appeals");
+        }
 
         // Create appeal
         var appeal = new Appeal
@@ -140,20 +140,14 @@ public class AppealsController : BaseApiController
             _logger.LogInformation("Appeal {AppealId} submitted by user {UserId} for {EntityType} {EntityId}",
                 appeal.AppealId, userId.Value, entityType, request.EntityId);
 
-            // Chapter 5 FIX #1: Notify supervisors about the new appeal
+            // Notify supervisors about the new appeal using dedicated notification type
             try
             {
                 var task = await _tasks.GetByIdAsync(request.EntityId);
-                var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
-
-                foreach (var supervisor in supervisors)
-                {
-                    await _notifications.SendSystemAlertAsync(
-                        supervisor.UserId,
-                        $"طعن جديد: قدّم العامل {user.FullName} طعناً على المهمة \"{task?.Title ?? "مهمة"}\"");
-                }
-
-                _logger.LogInformation("Appeal notification sent to {Count} supervisors", supervisors.Count());
+                await _notifications.SendAppealSubmittedToSupervisorsAsync(
+                    request.EntityId,
+                    task?.Title ?? "مهمة",
+                    user.FullName);
             }
             catch (Exception ex)
             {

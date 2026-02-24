@@ -318,9 +318,7 @@ public class IssuesController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized(ApiResponse<IEnumerable<IssueResponse>>.ErrorResponse("المستخدم غير مسجل الدخول"));
 
-        // fix pagination values
-        if (pageSize < 1 || pageSize > 100) pageSize = 50;
-        if (page < 1) page = 1;
+        (page, pageSize) = NormalizePagination(page, pageSize);
 
         var userRole = GetCurrentUserRole();
 

@@ -2,53 +2,14 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-import { X } from "lucide-react";
-import { STORAGE_KEYS } from "../../constants/storageKeys";
 import {
-  LayoutDashboard,
-  ClipboardList,
-  AlertCircle,
-  PlusCircle,
-  Map,
-  BarChart3,
-  Users,
-  UserCog,
-  Building,
-  ShieldCheck,
-  Scale,
+  X,
   User,
   Settings as SettingsIcon,
   LogOut,
 } from "lucide-react";
-
-type UserRole = "admin" | "manager" | "supervisor";
-
-type NavItem = {
-  to: string;
-  label: string;
-  icon: React.ElementType;
-  end?: boolean;
-};
-
-const supervisorItems: NavItem[] = [
-  { to: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, end: true },
-  { to: "/tasks", label: "المهام", icon: ClipboardList },
-  { to: "/issues", label: "البلاغات", icon: AlertCircle },
-  { to: "/tasks/new", label: "تعيين مهمة جديدة", icon: PlusCircle },
-  { to: "/zones", label: "الخريطة الحية", icon: Map },
-  { to: "/reports", label: "التقارير", icon: BarChart3 },
-];
-
-const adminItems: NavItem[] = [
-  { to: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, end: true },
-  { to: "/accounts", label: "إدارة الحسابات", icon: Users },
-  { to: "/supervisors", label: "إدارة المشرفين", icon: UserCog },
-  { to: "/departments", label: "إدارة الأقسام", icon: Building },
-  { to: "/zones-admin", label: "إدارة المناطق", icon: Map },
-  { to: "/task-oversight", label: "الرقابة على المهام", icon: ShieldCheck },
-  { to: "/appeals", label: "مركز المراجعة", icon: Scale },
-  { to: "/reports", label: "التقارير", icon: BarChart3 },
-];
+import { STORAGE_KEYS } from "../../constants/storageKeys";
+import { type UserRole, getNavItems } from "./navItems";
 
 export default function AppLayout() {
   const location = useLocation();
@@ -73,9 +34,7 @@ export default function AppLayout() {
 
   const role = getUserRole();
 
-  const items = useMemo(() => {
-    return (role === "admin" || role === "manager") ? adminItems : supervisorItems;
-  }, [role]);
+  const items = useMemo(() => getNavItems(role), [role]);
 
   const handleLogout = async () => {
     try {

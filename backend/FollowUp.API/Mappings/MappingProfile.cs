@@ -60,7 +60,9 @@ public class MappingProfile : Profile
 
         // notification → notificationResponse (convert type enum to string for mobile compatibility)
         CreateMap<Notification, NotificationResponse>()
-            .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type.ToString()));
+            .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type.ToString()))
+            .ForMember(dest => dest.TaskId, opt => opt.MapFrom(src => ExtractIntFromPayload(src.PayloadJson, "taskId")))
+            .ForMember(dest => dest.IssueId, opt => opt.MapFrom(src => ExtractIntFromPayload(src.PayloadJson, "issueId")));
 
         // zone → zoneResponse (all properties match)
         CreateMap<Zone, ZoneResponse>();
@@ -99,5 +101,18 @@ public class MappingProfile : Profile
             Core.Enums.AppealStatus.Rejected => "مرفوض",
             _ => status.ToString()
         };
+    }
+
+    private static int? ExtractIntFromPayload(string? payloadJson, string key)
+    {
+        if (string.IsNullOrEmpty(payloadJson)) return null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(payloadJson);
+            if (doc.RootElement.TryGetProperty(key, out var prop) && prop.TryGetInt32(out var value))
+                return value;
+        }
+        catch { /* ignore malformed JSON */ }
+        return null;
     }
 }

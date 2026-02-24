@@ -403,12 +403,11 @@ export default function Reports() {
                         <BarChart3 size={20} />
                     </div>
                     <h3 className="text-xl font-bold text-[#2F2F2F]">
-                    {view.tab === "tasks" || view.tab === "workers" ? view.chart1.title : view.chart1.title}
+                    {view.chart1.title}
                     </h3>
                 </div>
 
-                {view.tab === "tasks" && <Legend items={view.chart1.legend} />}
-                {view.tab === "workers" && <Legend items={view.chart1.legend} />}
+                {(view.tab === "tasks" || view.tab === "workers") && <Legend items={view.chart1.legend} />}
               </div>
 
               <div className="mt-3">
@@ -593,7 +592,7 @@ export default function Reports() {
                     <PieChart size={20} />
                 </div>
                 <h3 className="text-lg font-bold text-[#2F2F2F]">
-                  {view.tab === "tasks" ? view.chart2.title : view.tab === "workers" ? view.chart2.title : view.chart2.title}
+                  {view.chart2.title}
                 </h3>
               </div>
 

@@ -76,9 +76,7 @@ public class TasksController : BaseApiController
         if (!userId.HasValue)
             return Unauthorized();
 
-        // fix bad pagination values
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 50;
+        (page, pageSize) = NormalizePagination(page, pageSize);
 
         // parse status filter
         TaskStatus? statusEnum = null;
@@ -339,8 +337,7 @@ public class TasksController : BaseApiController
         [FromQuery] int? workerId = null,
         [FromQuery] int? zoneId = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 50;
+        (page, pageSize) = NormalizePagination(page, pageSize);
 
         var currentRole = GetCurrentUserRole();
         var currentUserId = GetCurrentUserId();
@@ -525,6 +522,23 @@ public class TasksController : BaseApiController
             $"تحديث حالة المهمة #{task.TaskId} إلى {request.Status}",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             Request.Headers.UserAgent.ToString());
+
+        // Notify supervisor when worker starts a task
+        if (request.Status == TaskStatus.InProgress && task.AssignedByUserId > 0 && currentUser != null)
+        {
+            try
+            {
+                await _notifications.SendTaskStartedNotificationAsync(
+                    task.AssignedByUserId.Value,
+                    task.TaskId,
+                    task.Title,
+                    currentUser.FullName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send task started notification for task {TaskId}", task.TaskId);
+            }
+        }
 
         return Ok(ApiResponse<TaskResponse>.SuccessResponse(_mapper.Map<TaskResponse>(task)));
     }
@@ -921,9 +935,7 @@ public class TasksController : BaseApiController
         var userId = GetCurrentUserId();
         var userRole = GetCurrentUserRole();
 
-        // fix pagination
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 50;
+        (page, pageSize) = NormalizePagination(page, pageSize);
 
         // workers see only their overdue tasks
         IEnumerable<TaskEntity> tasks;
@@ -1491,8 +1503,7 @@ public class TasksController : BaseApiController
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 50;
+        (page, pageSize) = NormalizePagination(page, pageSize);
 
         var allTasks = await _tasks.GetAllAsync();
 

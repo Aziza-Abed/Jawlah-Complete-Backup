@@ -6,6 +6,7 @@ namespace FollowUp.Core.Interfaces.Services;
 public interface INotificationService
 {
     Task SendTaskAssignedNotificationAsync(int userId, int taskId, string taskTitle);
+    Task SendTaskStartedNotificationAsync(int supervisorId, int taskId, string taskTitle, string workerName);
     Task SendTaskUpdatedNotificationAsync(int userId, int taskId, string taskTitle);
     Task SendTaskCompletedToSupervisorsAsync(int taskId, string taskTitle, string workerName);
     Task SendIssueReportedToSupervisorsAsync(int issueId, string issueTitle, string workerName, string severity);
@@ -26,4 +27,11 @@ public interface INotificationService
 
     // Task milestone notification (25%, 50%, 75% progress)
     Task SendTaskMilestoneNotificationAsync(int workerId, int taskId, string taskTitle, int milestone);
+
+    // Manual attendance approval/rejection notifications
+    Task SendManualAttendanceApprovedAsync(int workerId, int attendanceId);
+    Task SendManualAttendanceRejectedAsync(int workerId, int attendanceId, string reason);
+
+    // Appeal notification
+    Task SendAppealSubmittedToSupervisorsAsync(int taskId, string taskTitle, string workerName);
 }

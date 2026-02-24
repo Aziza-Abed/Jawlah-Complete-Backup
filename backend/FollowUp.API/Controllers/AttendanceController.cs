@@ -24,6 +24,7 @@ public class AttendanceController : BaseApiController
     private readonly IMapper _mapper;
     private readonly AuditLogService _audit;
     private readonly IConfiguration _config;
+    private readonly INotificationService _notifications;
 
     public AttendanceController(
         IAttendanceRepository attendance,
@@ -32,7 +33,8 @@ public class AttendanceController : BaseApiController
         ILogger<AttendanceController> logger,
         IMapper mapper,
         AuditLogService audit,
-        IConfiguration config)
+        IConfiguration config,
+        INotificationService notifications)
     {
         _attendance = attendance;
         _users = users;
@@ -41,6 +43,7 @@ public class AttendanceController : BaseApiController
         _mapper = mapper;
         _config = config;
         _audit = audit;
+        _notifications = notifications;
     }
 
     // worker checkin at the start of day
@@ -287,9 +290,7 @@ public class AttendanceController : BaseApiController
         var from = fromDate ?? DateTime.UtcNow.Date.AddMonths(-1);
         var to = toDate ?? DateTime.UtcNow.Date.AddDays(1);
 
-        // fix bad pagination values
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 50;
+        (page, pageSize) = NormalizePagination(page, pageSize);
 
         var attendances = (await _attendance.GetUserAttendanceHistoryAsync(userId.Value, from, to))
             .OrderByDescending(a => a.CheckInEventTime)
@@ -435,6 +436,19 @@ public class AttendanceController : BaseApiController
             $"حضور يدوي #{id} للعامل {attendance.UserId} - {(request.Approved ? "موافقة" : "رفض")}",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             Request.Headers.UserAgent.ToString());
+
+        // Notify worker of approval/rejection
+        try
+        {
+            if (request.Approved)
+                await _notifications.SendManualAttendanceApprovedAsync(attendance.UserId, id);
+            else
+                await _notifications.SendManualAttendanceRejectedAsync(attendance.UserId, id, request.RejectionReason ?? "");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send manual attendance notification to worker {WorkerId}", attendance.UserId);
+        }
 
         return Ok(ApiResponse<object?>.SuccessResponse(null,
             request.Approved ? "تمت الموافقة على الحضور" : "تم رفض الحضور"));

@@ -11,4 +11,8 @@ public class NotificationResponse
     public DateTime CreatedAt { get; set; }
     public DateTime? SentAt { get; set; }
     public DateTime? ReadAt { get; set; }
+
+    // Extracted from PayloadJson for easy frontend navigation
+    public int? TaskId { get; set; }
+    public int? IssueId { get; set; }
 }

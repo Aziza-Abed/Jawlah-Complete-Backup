@@ -40,6 +40,8 @@ const mapNotificationToNotice = (notification: NotificationResponse): Notice => 
     title: notification.title,
     body: notification.message,
     time: `${hours}:${minutes}`,
+    taskId: notification.taskId?.toString(),
+    issueId: notification.issueId?.toString(),
   };
 };
 

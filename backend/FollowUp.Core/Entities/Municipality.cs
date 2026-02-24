@@ -59,7 +59,7 @@ public class Municipality
     /// <summary>
     /// Maximum acceptable GPS accuracy in meters
     /// </summary>
-    public double MaxAcceptableAccuracyMeters { get; set; } = 150.0;
+    public double MaxAcceptableAccuracyMeters { get; set; } = 50.0;
 
     /// <summary>
     /// Whether the municipality is currently active
