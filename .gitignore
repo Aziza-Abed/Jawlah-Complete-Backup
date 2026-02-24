@@ -26,6 +26,22 @@ logs/
 .env.*.local
 backend/FollowUp.API/*firebase-adminsdk*.json
 
+# Backend build outputs
+backend/**/bin/
+backend/**/obj/
+
+# Backend runtime uploads (user-generated at runtime)
+backend/FollowUp.API/Storage/uploads/
+
+# Mobile build outputs
+mobile/.dart_tool/
+mobile/build/
+mobile/android/build/
+mobile/ios/build/
+
+# Node modules
+node_modules/
+
 # Documentation/notes (not for repo)
 COMPREHENSIVE_CODE_AUDIT_REPORT.md
 CRITICAL_FIXES_SUMMARY.md

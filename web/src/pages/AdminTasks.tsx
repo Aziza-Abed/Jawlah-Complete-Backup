@@ -32,8 +32,6 @@ export default function AdminTasks() {
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "all">("all");
   const [zoneFilter, setZoneFilter] = useState<string>("all");
-  const [_unusedActionLoading, setActionLoading] = useState<number | null>(null);
-
   // Tabs & Templates State
   const [activeTab, setActiveTab] = useState<'tasks' | 'templates'>('tasks');
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -82,14 +80,11 @@ export default function AdminTasks() {
 
   const handleDeleteTask = async (taskId: number) => {
     if (!await confirm("هل أنت متأكد من حذف (إلغاء) هذه المهمة نهائياً؟")) return;
-    setActionLoading(taskId);
     try {
       await deleteTask(taskId);
       setTasks(tasks.filter(t => t.taskId !== taskId));
     } catch (err) {
       console.error("Failed to delete task", err);
-    } finally {
-      setActionLoading(null);
     }
   };
 
