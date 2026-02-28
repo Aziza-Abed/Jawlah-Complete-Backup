@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { IssueResponse, UpdateIssueStatusRequest, ForwardIssueRequest } from "../types/issue";
+import type { IssueResponse, UpdateIssueStatusRequest, ForwardIssueRequest, CreateTaskFromIssueRequest } from "../types/issue";
 import type { ApiResponse } from "../types/api";
 
 // Get all issues
@@ -38,5 +38,14 @@ export async function forwardIssue(id: number, request: ForwardIssueRequest): Pr
     return response.data.data;
   }
   throw new Error(response.data.message || "فشل تحويل البلاغ");
+}
+
+// convert issue to a task (supervisor/admin only)
+export async function createTaskFromIssue(issueId: number, request: CreateTaskFromIssueRequest): Promise<{ taskId: number }> {
+  const response = await apiClient.post<ApiResponse<{ taskId: number }>>(`/issues/${issueId}/create-task`, request);
+  if (response.data.success && response.data.data) {
+    return response.data.data;
+  }
+  throw new Error(response.data.message || "فشل تحويل البلاغ إلى مهمة");
 }
 

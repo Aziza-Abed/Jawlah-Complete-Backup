@@ -3,6 +3,7 @@ import 'local/task_local.dart';
 
 class TaskModel {
   final int taskId;
+  final int? sourceIssueId; // set if this task was created from an issue
   final String title;
   final String description;
   final String status;
@@ -18,7 +19,8 @@ class TaskModel {
   final double? latitude;
   final double? longitude;
   final DateTime? dueDate;
-  final DateTime? completedAt;
+  final DateTime? completedAt;   // server time (tamper-proof)
+  final DateTime? eventTime;     // device time when worker actually completed it
   final String? completionNotes;
   final String? photoUrl;
   final List<String> photos; // Multiple photos from backend
@@ -44,6 +46,7 @@ class TaskModel {
 
   TaskModel({
     required this.taskId,
+    this.sourceIssueId,
     required this.title,
     required this.description,
     required this.status,
@@ -60,6 +63,7 @@ class TaskModel {
     this.longitude,
     this.dueDate,
     this.completedAt,
+    this.eventTime,
     this.completionNotes,
     this.photoUrl,
     List<String>? photos,
@@ -108,6 +112,7 @@ class TaskModel {
 
     return TaskModel(
       taskId: json['taskId'] as int? ?? json['TaskId'] as int? ?? 0,
+      sourceIssueId: json['sourceIssueId'] as int? ?? json['SourceIssueId'] as int?,
       title: json['title'] as String? ?? json['Title'] as String? ?? '',
       description: json['description'] as String? ??
           json['Description'] as String? ??
@@ -141,6 +146,8 @@ class TaskModel {
       dueDate: DateFormatter.tryParseUtc(json['dueDate'] ?? json['DueDate']),
       completedAt:
           DateFormatter.tryParseUtc(json['completedAt'] ?? json['CompletedAt']),
+      eventTime:
+          DateFormatter.tryParseUtc(json['eventTime'] ?? json['EventTime']),
       completionNotes: json['completionNotes'] as String? ??
           json['CompletionNotes'] as String?,
       photoUrl: json['photoUrl'] as String? ?? json['PhotoUrl'] as String?,
@@ -230,6 +237,7 @@ class TaskModel {
       'longitude': longitude,
       'dueDate': dueDate?.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
+      'eventTime': eventTime?.toIso8601String(),
       'completionNotes': completionNotes,
       'photoUrl': photoUrl,
       'createdAt': createdAt.toIso8601String(),
@@ -243,6 +251,7 @@ class TaskModel {
 
   TaskModel copyWith({
     int? taskId,
+    int? sourceIssueId,
     String? title,
     String? description,
     String? status,
@@ -259,6 +268,7 @@ class TaskModel {
     double? longitude,
     DateTime? dueDate,
     DateTime? completedAt,
+    DateTime? eventTime,
     String? completionNotes,
     String? photoUrl,
     DateTime? createdAt,
@@ -277,6 +287,7 @@ class TaskModel {
   }) {
     return TaskModel(
       taskId: taskId ?? this.taskId,
+      sourceIssueId: sourceIssueId ?? this.sourceIssueId,
       title: title ?? this.title,
       description: description ?? this.description,
       status: status ?? this.status,
@@ -294,6 +305,7 @@ class TaskModel {
       longitude: longitude ?? this.longitude,
       dueDate: dueDate ?? this.dueDate,
       completedAt: completedAt ?? this.completedAt,
+      eventTime: eventTime ?? this.eventTime,
       completionNotes: completionNotes ?? this.completionNotes,
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt ?? this.createdAt,
@@ -437,6 +449,7 @@ class TaskModel {
       photoUrl: photoUrl,
       photos: photos,
       completedAt: completedAt,
+      eventTime: eventTime,
       updatedAt: updatedAt,
       dueDate: dueDate,
       zoneId: zoneId,

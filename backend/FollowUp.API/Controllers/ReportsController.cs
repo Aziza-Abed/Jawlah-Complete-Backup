@@ -53,27 +53,23 @@ public class ReportsController : BaseApiController
         {
             var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
 
-            TaskStatus? statusFilter = status?.ToLower() switch
-            {
-                "pending" => TaskStatus.Pending,
-                "in_progress" => TaskStatus.InProgress,
-                "completed" => TaskStatus.Completed,
-                "underreview" => TaskStatus.UnderReview,
-                _ => null
-            };
+            var statusFilter = ParseStatusFilter(status);
 
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
-            var workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
             var todayAttendance = await _attendance.GetFilteredAttendanceAsync(null, null, DateTime.UtcNow.Date, DateTime.UtcNow.Date.AddDays(1));
 
-            // SECURITY: Supervisors should only see their workers' data
-            var currentUserId = GetCurrentUserId();
-            var currentRole = GetCurrentUserRole();
-            if (currentRole?.Equals("Supervisor", StringComparison.OrdinalIgnoreCase) == true && currentUserId.HasValue)
+            // data isolation: supervisors only see their workers
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            List<User> workers;
+            if (visibleWorkerIds != null)
             {
-                var workerIds = workers.Where(w => w.SupervisorId == currentUserId.Value).Select(w => w.UserId).ToHashSet();
-                workers = workers.Where(w => workerIds.Contains(w.UserId)).ToList();
-                tasks = tasks.Where(t => workerIds.Contains(t.AssignedToUserId)).ToList();
+                workers = (await _users.GetWorkersBySupervisorAsync(GetCurrentUserId()!.Value)).ToList();
+                tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
+            }
+            else
+            {
+                workers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
             }
 
             var data = new TasksReportData
@@ -118,37 +114,30 @@ public class ReportsController : BaseApiController
         {
             var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
 
-            // FIX: Filter workers by SupervisorId for supervisors (data isolation)
+            // data isolation: supervisors only see their workers
             var currentUserId = GetCurrentUserId();
-            var currentRole = GetCurrentUserRole();
-
-            IEnumerable<User> workers;
-            if (currentRole?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                // Admin sees all workers
-                workers = await _users.GetByRoleAsync(UserRole.Worker);
-            }
-            else if (currentUserId.HasValue)
-            {
-                // Supervisor only sees their assigned workers
-                var allWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-                workers = allWorkers.Where(w => w.SupervisorId == currentUserId.Value);
-            }
-            else
-            {
+            if (!currentUserId.HasValue)
                 return Unauthorized(ApiResponse<object>.ErrorResponse("غير مصرح"));
-            }
+
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            IEnumerable<User> workers;
+            if (visibleWorkerIds != null)
+                workers = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
+            else
+                workers = await _users.GetByRoleAsync(UserRole.Worker);
 
             var workersList = workers.ToList();
             var workerIds = workersList.Select(w => w.UserId).ToHashSet();
+            var workerTeamIds = workersList.Where(w => w.TeamId.HasValue).Select(w => w.TeamId!.Value).ToHashSet();
 
             // Filter attendance and tasks to only include this user's workers
             var attendance = (await _attendance.GetFilteredAttendanceAsync(null, null, fromDate, toDate))
                 .Where(a => workerIds.Contains(a.UserId))
                 .ToList();
-            var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, null))
-                .Where(t => workerIds.Contains(t.AssignedToUserId))
-                .ToList();
+            var tasks = FilterTasksByVisibility(
+                await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, null),
+                visibleWorkerIds != null ? workerIds : null,
+                workerTeamIds);
 
             var todayAttendance = attendance.Where(a => a.CheckInEventTime.Date == DateTime.UtcNow.Date).ToList();
             var checkedInIds = todayAttendance.Select(a => a.UserId).Distinct().ToHashSet();
@@ -167,7 +156,7 @@ public class ReportsController : BaseApiController
                 CompliancePercent = compliance,
                 ByPeriod = BuildAttendanceByPeriod(attendance, workersList.Count, period),
                 TopWorkload = tasks
-                    .Where(t => t.Status == TaskStatus.InProgress || t.Status == TaskStatus.Pending)
+                    .Where(t => (t.Status == TaskStatus.InProgress || t.Status == TaskStatus.Pending) && !t.IsTeamTask)
                     .GroupBy(t => t.AssignedToUserId)
                     .Select(g => new { UserId = g.Key, Count = g.Count() })
                     .OrderByDescending(x => x.Count)
@@ -180,7 +169,13 @@ public class ReportsController : BaseApiController
                     }).ToList(),
                 Workers = workersList.Select(w =>
                 {
-                    var workerTasks = tasks.Where(t => t.AssignedToUserId == w.UserId).ToList();
+                    // Individual tasks directly assigned to this worker
+                    var workerTasks = tasks.Where(t => !t.IsTeamTask && t.AssignedToUserId == w.UserId).ToList();
+                    // Team tasks for this worker's team
+                    var workerTeamTasks = w.TeamId.HasValue
+                        ? tasks.Where(t => t.IsTeamTask && t.TeamId == w.TeamId).ToList()
+                        : new List<Core.Entities.Task>();
+                    var allWorkerTasks = workerTasks.Concat(workerTeamTasks).ToList();
                     var lastCheckIn = todayAttendance.FirstOrDefault(a => a.UserId == w.UserId);
                     return new WorkerItem
                     {
@@ -188,8 +183,8 @@ public class ReportsController : BaseApiController
                         Name = w.FullName,
                         IsPresent = checkedInIds.Contains(w.UserId),
                         LastCheckIn = lastCheckIn?.CheckInEventTime,
-                        ActiveTasks = workerTasks.Count(t => t.Status == TaskStatus.InProgress || t.Status == TaskStatus.Pending),
-                        CompletedTasks = workerTasks.Count(t => t.Status == TaskStatus.Completed)
+                        ActiveTasks = allWorkerTasks.Count(t => t.Status == TaskStatus.InProgress || t.Status == TaskStatus.Pending),
+                        CompletedTasks = allWorkerTasks.Count(t => t.Status == TaskStatus.Completed)
                     };
                 }).ToList()
             };
@@ -216,15 +211,10 @@ public class ReportsController : BaseApiController
             var zones = (await _zones.GetActiveZonesAsync()).ToList();
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, null)).ToList();
 
-            // SECURITY: Supervisors should only see their workers' tasks
-            var currentUserId = GetCurrentUserId();
-            var currentRole = GetCurrentUserRole();
-            if (currentRole?.Equals("Supervisor", StringComparison.OrdinalIgnoreCase) == true && currentUserId.HasValue)
-            {
-                var allWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-                var workerIds = allWorkers.Where(w => w.SupervisorId == currentUserId.Value).Select(w => w.UserId).ToHashSet();
-                tasks = tasks.Where(t => workerIds.Contains(t.AssignedToUserId)).ToList();
-            }
+            // data isolation: supervisors only see their workers' tasks
+            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
+            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
             var tasksByZone = tasks.Where(t => t.ZoneId.HasValue)
                 .GroupBy(t => t.ZoneId!.Value)
@@ -523,12 +513,13 @@ public class ReportsController : BaseApiController
                 workersBySuper.TryGetValue(supervisor.UserId, out var workers);
                 workers ??= new List<User>();
                 var workerIds = workers.Select(w => w.UserId).ToHashSet();
+                var supervisorTeamIds = workers.Where(w => w.TeamId.HasValue).Select(w => w.TeamId!.Value).ToHashSet();
 
                 // Active workers today (checked in)
                 var activeWorkersToday = workers.Count(w => checkedInWorkerIds.Contains(w.UserId));
 
-                // Tasks for workers under this supervisor
-                var supervisorWorkerTasks = monthTasks.Where(t => workerIds.Contains(t.AssignedToUserId)).ToList();
+                // Tasks for workers under this supervisor (including team tasks)
+                var supervisorWorkerTasks = FilterTasksByVisibility(monthTasks, workerIds, supervisorTeamIds);
                 var tasksAssigned = supervisorWorkerTasks.Count;
                 var tasksCompleted = supervisorWorkerTasks.Count(t => t.Status == TaskStatus.Completed);
                 var tasksPendingReview = supervisorWorkerTasks.Count(t => t.Status == TaskStatus.UnderReview); // Submitted, awaiting supervisor review
@@ -765,8 +756,8 @@ public class ReportsController : BaseApiController
 
             // filter for supervisor data isolation
             var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
-            if (visibleWorkerIds != null)
-                tasks = tasks.Where(t => visibleWorkerIds.Contains(t.AssignedToUserId)).ToList();
+            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
             if (format.Equals("excel", StringComparison.OrdinalIgnoreCase))
             {
@@ -830,17 +821,62 @@ public class ReportsController : BaseApiController
     // get worker IDs visible to the current user (null = admin sees all)
     private async Task<HashSet<int>?> GetVisibleWorkerIdsAsync()
     {
-        var role = GetCurrentUserRole();
-        if (role?.Equals("Admin", StringComparison.OrdinalIgnoreCase) == true)
+        if (GetCurrentUserRole() == "Admin")
             return null;
 
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
             return new HashSet<int>();
 
-        var workers = await _users.GetByRoleAsync(UserRole.Worker);
-        return workers.Where(w => w.SupervisorId == userId.Value).Select(w => w.UserId).ToHashSet();
+        var workers = await _users.GetWorkersBySupervisorAsync(userId.Value);
+        return workers.Select(w => w.UserId).ToHashSet();
     }
+
+    // Returns team IDs for the visible workers' teams (null = admin, sees all)
+    private async Task<HashSet<int>?> GetVisibleTeamIdsAsync()
+    {
+        if (GetCurrentUserRole() == "Admin")
+            return null;
+
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+            return new HashSet<int>();
+
+        var workers = await _users.GetWorkersBySupervisorAsync(userId.Value);
+        return workers.Where(w => w.TeamId.HasValue).Select(w => w.TeamId!.Value).ToHashSet();
+    }
+
+    // Filter tasks to only those visible to the current user:
+    // individual tasks by workerIds, plus team tasks by teamIds
+    private static List<Core.Entities.Task> FilterTasksByVisibility(
+        IEnumerable<Core.Entities.Task> tasks,
+        HashSet<int>? visibleWorkerIds,
+        HashSet<int>? visibleTeamIds)
+    {
+        if (visibleWorkerIds == null) return tasks.ToList(); // Admin sees all
+        return tasks.Where(t =>
+            visibleWorkerIds.Contains(t.AssignedToUserId) ||
+            (t.IsTeamTask && t.TeamId.HasValue && visibleTeamIds != null && visibleTeamIds.Contains(t.TeamId.Value))
+        ).ToList();
+    }
+
+    private static TaskStatus? ParseStatusFilter(string? status) => status?.ToLower() switch
+    {
+        "pending" => TaskStatus.Pending,
+        "in_progress" => TaskStatus.InProgress,
+        "completed" => TaskStatus.Completed,
+        "underreview" => TaskStatus.UnderReview,
+        _ => null
+    };
+
+    private static readonly Dictionary<TaskStatus, string> ArabicStatusMap = new()
+    {
+        { TaskStatus.Pending, "قيد الانتظار" },
+        { TaskStatus.InProgress, "قيد التنفيذ" },
+        { TaskStatus.UnderReview, "قيد المراجعة" },
+        { TaskStatus.Completed, "مكتملة" },
+        { TaskStatus.Rejected, "مرفوضة" }
+    };
 
     private static (DateTime from, DateTime to) GetDateRange(string period, DateTime? start, DateTime? end)
     {
@@ -1049,7 +1085,7 @@ public class ReportsController : BaseApiController
                     // Footer
                     page.Footer().AlignCenter().Text(text =>
                     {
-                        text.Span("تم إنشاء هذا التقرير بواسطة نظام جولة - ");
+                        text.Span("تم إنشاء هذا التقرير بواسطة نظام فولو أب - ");
                         text.Span(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"));
                     });
                 });
@@ -1078,14 +1114,7 @@ public class ReportsController : BaseApiController
         {
             var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
 
-            TaskStatus? statusFilter = status?.ToLower() switch
-            {
-                "pending" => TaskStatus.Pending,
-                "in_progress" => TaskStatus.InProgress,
-                "completed" => TaskStatus.Completed,
-                "underreview" => TaskStatus.UnderReview,
-                _ => null
-            };
+            var statusFilter = ParseStatusFilter(status);
 
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
 
@@ -1096,21 +1125,11 @@ public class ReportsController : BaseApiController
 
             // filter for supervisor data isolation
             var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
-            if (visibleWorkerIds != null)
-                tasks = tasks.Where(t => visibleWorkerIds.Contains(t.AssignedToUserId)).ToList();
+            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
             // Configure QuestPDF license
             QuestPDF.Settings.License = LicenseType.Community;
-
-            // Status mapping
-            var statusMap = new Dictionary<TaskStatus, string>
-            {
-                { TaskStatus.Pending, "قيد الانتظار" },
-                { TaskStatus.InProgress, "قيد التنفيذ" },
-                { TaskStatus.UnderReview, "قيد المراجعة" },
-                { TaskStatus.Completed, "مكتملة" },
-                { TaskStatus.Rejected, "مرفوضة" }
-            };
 
             // Generate PDF
             var document = Document.Create(container =>
@@ -1177,7 +1196,7 @@ public class ReportsController : BaseApiController
                                 table.Cell().Element(DataCellStyle).Text(task.Title);
                                 table.Cell().Element(DataCellStyle).Text(task.AssignedToUser?.FullName ?? "-");
                                 table.Cell().Element(DataCellStyle).Text(task.Zone?.ZoneName ?? "-");
-                                table.Cell().Element(DataCellStyle).Text(statusMap.GetValueOrDefault(task.Status, task.Status.ToString()));
+                                table.Cell().Element(DataCellStyle).Text(ArabicStatusMap.GetValueOrDefault(task.Status, task.Status.ToString()));
                                 table.Cell().Element(DataCellStyle).Text(task.CreatedAt.ToString("yyyy-MM-dd"));
 
                                 rowNumber++;
@@ -1190,7 +1209,7 @@ public class ReportsController : BaseApiController
                     // Footer
                     page.Footer().AlignCenter().Text(text =>
                     {
-                        text.Span("تم إنشاء هذا التقرير بواسطة نظام جولة - ");
+                        text.Span("تم إنشاء هذا التقرير بواسطة نظام فولو أب - ");
                         text.Span(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"));
                     });
                 });
@@ -1316,14 +1335,7 @@ public class ReportsController : BaseApiController
         {
             var (fromDate, toDate) = GetDateRange(period, startDate, endDate);
 
-            TaskStatus? statusFilter = status?.ToLower() switch
-            {
-                "pending" => TaskStatus.Pending,
-                "in_progress" => TaskStatus.InProgress,
-                "completed" => TaskStatus.Completed,
-                "underreview" => TaskStatus.UnderReview,
-                _ => null
-            };
+            var statusFilter = ParseStatusFilter(status);
 
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
 
@@ -1334,18 +1346,8 @@ public class ReportsController : BaseApiController
 
             // filter for supervisor data isolation
             var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
-            if (visibleWorkerIds != null)
-                tasks = tasks.Where(t => visibleWorkerIds.Contains(t.AssignedToUserId)).ToList();
-
-            // Status mapping
-            var statusMap = new Dictionary<TaskStatus, string>
-            {
-                { TaskStatus.Pending, "قيد الانتظار" },
-                { TaskStatus.InProgress, "قيد التنفيذ" },
-                { TaskStatus.UnderReview, "قيد المراجعة" },
-                { TaskStatus.Completed, "مكتملة" },
-                { TaskStatus.Rejected, "مرفوضة" }
-            };
+            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
             using var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add("تقرير المهام");
@@ -1388,7 +1390,7 @@ public class ReportsController : BaseApiController
                 worksheet.Cell(currentRow, 3).Value = task.Description;
                 worksheet.Cell(currentRow, 4).Value = task.AssignedToUser?.FullName ?? "-";
                 worksheet.Cell(currentRow, 5).Value = task.Zone?.ZoneName ?? "-";
-                worksheet.Cell(currentRow, 6).Value = statusMap.GetValueOrDefault(task.Status, task.Status.ToString());
+                worksheet.Cell(currentRow, 6).Value = ArabicStatusMap.GetValueOrDefault(task.Status, task.Status.ToString());
                 worksheet.Cell(currentRow, 7).Value = task.CreatedAt.ToString("yyyy-MM-dd");
 
                 currentRow++;

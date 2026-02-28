@@ -17,7 +17,28 @@ export default function AdminDashboard() {
   const [workerStatuses, setWorkerStatuses] = useState<WorkerStatus[]>([]);
   const [monitoringData, setMonitoringData] = useState<AdminSupervisorMonitoringData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [userName, setUserName] = useState("مدير");
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setFetchError(false);
+      const [data, workersData, adminMonData] = await Promise.all([
+        getDashboardOverview(),
+        getWorkerStatuses(),
+        getAdminSupervisorsMonitoring()
+      ]);
+      setOverview(data);
+      setWorkerStatuses(workersData);
+      setMonitoringData(adminMonData);
+    } catch (err) {
+      console.error("Failed to fetch dashboard data", err);
+      setFetchError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -27,24 +48,6 @@ export default function AdminDashboard() {
         setUserName(user.fullName?.split(' ')[0] || "مدير");
       }
     } catch (e) {}
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [data, workersData, adminMonData] = await Promise.all([
-          getDashboardOverview(),
-          getWorkerStatuses(),
-          getAdminSupervisorsMonitoring()
-        ]);
-        setOverview(data);
-        setWorkerStatuses(workersData);
-        setMonitoringData(adminMonData);
-      } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
-      } finally {
-        setLoading(false);
-      }
-    };
 
     fetchData();
   }, []);
@@ -68,7 +71,21 @@ export default function AdminDashboard() {
     <div className="h-full w-full bg-[#F3F1ED] overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[1400px] mx-auto space-y-10">
-          
+
+          {fetchError && (
+            <div className="bg-[#C86E5D]/10 border border-[#C86E5D]/30 rounded-[16px] p-4 text-right flex items-center justify-between gap-4">
+              <button
+                onClick={() => { setFetchError(false); fetchData(); }}
+                className="text-[13px] font-bold text-[#C86E5D] underline underline-offset-2 hover:opacity-70 shrink-0"
+              >
+                إعادة المحاولة
+              </button>
+              <p className="text-[#C86E5D] font-semibold text-[14px]">
+                تعذّر تحميل بيانات لوحة التحكم. تحقق من الاتصال بالخادم.
+              </p>
+            </div>
+          )}
+
           {/* Header with Title (Title Left, Date Right) */}
           <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
               <div className="w-full lg:w-auto text-right">
@@ -163,9 +180,19 @@ export default function AdminDashboard() {
                       <ClipboardList size={20} className="text-[#7895B2]" />
                     </div>
                     <div className="space-y-4">
-                        <TaskProgressRow label="قيد التنفيذ" value={overview?.tasks.inProgress || 0} total={overview?.tasks.createdToday || 1} color="#F3C668" />
-                        <TaskProgressRow label="مكتملة اليوم" value={overview?.tasks.completedToday || 0} total={overview?.tasks.createdToday || 1} color="#8FA36A" />
-                        <TaskProgressRow label="بانتظار العمل" value={overview?.tasks.pending || 0} total={overview?.tasks.createdToday || 1} color="#C86E5D" />
+                        {(() => {
+                          const inProg = overview?.tasks.inProgress || 0;
+                          const completed = overview?.tasks.completedToday || 0;
+                          const pending = overview?.tasks.pending || 0;
+                          const total = inProg + completed + pending || 1;
+                          return (
+                            <>
+                              <TaskProgressRow label="قيد التنفيذ" value={inProg} total={total} color="#F3C668" />
+                              <TaskProgressRow label="مكتملة اليوم" value={completed} total={total} color="#8FA36A" />
+                              <TaskProgressRow label="بانتظار العمل" value={pending} total={total} color="#C86E5D" />
+                            </>
+                          );
+                        })()}
                         <button 
                           onClick={() => navigate('/tasks')}
                           className="w-full mt-4 h-12 rounded-xl bg-[#7895B2]/5 text-[#7895B2] font-black text-[13px] hover:bg-[#7895B2]/10 transition-colors"

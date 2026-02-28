@@ -1,10 +1,30 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { getIssue, updateIssueStatus, forwardIssue } from "../api/issues";
+import { useParams } from "react-router-dom";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { getIssue, updateIssueStatus, forwardIssue, createTaskFromIssue } from "../api/issues";
+import { getMyWorkers } from "../api/users";
+import type { UserResponse } from "../types/user";
 import { getDepartments } from "../api/departments";
 import type { IssueResponse } from "../types/issue";
 import type { Department } from "../api/departments";
 import { mapSeverity, mapStatus, mapTypeToArabic, type Severity, type DisplayIssueStatus } from "../utils/issueDisplay";
+
+const IssueLocationIcon = L.divIcon({
+  className: "custom-marker",
+  html: `<div class="relative flex items-center justify-center w-10 h-10">
+    <div class="absolute w-full h-full bg-red-500 rounded-full animate-ping opacity-30"></div>
+    <div class="relative w-6 h-6 bg-red-600 rounded-full border-3 border-white shadow-lg flex items-center justify-center">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3" fill="white"></circle>
+      </svg>
+    </div>
+  </div>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 20]
+});
 
 type IssueDTO = {
   id: string; // رقم البلاغ
@@ -50,8 +70,6 @@ const mapIssueResponseToDTO = (issue: IssueResponse): IssueDTO => {
 
 export default function IssueDetails() {
   const { id } = useParams(); // /issues/:id
-  const navigate = useNavigate();
-
   const [issue, setIssue] = useState<IssueDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,6 +80,16 @@ export default function IssueDetails() {
   // Modals
   const [forwardOpen, setForwardOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+
+  // Convert modal state
+  const [workers, setWorkers] = useState<UserResponse[]>([]);
+  const [convertAssignee, setConvertAssignee] = useState("");
+  const [convertPriority, setConvertPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
+  const [convertDueDate, setConvertDueDate] = useState("");
+  const [convertRequiresPhoto, setConvertRequiresPhoto] = useState(true);
+  const [convertSubmitting, setConvertSubmitting] = useState(false);
+  const [convertedTaskId, setConvertedTaskId] = useState<number | null>(null);
 
   // Fetch issue details and departments
   useEffect(() => {
@@ -73,15 +101,17 @@ export default function IssueDetails() {
         const numericId = id?.startsWith("i-") ? id.slice(2) : id;
         if (!numericId) throw new Error("Invalid issue ID");
 
-        const [issueData, deptData] = await Promise.all([
+        const [issueData, deptData, workerData] = await Promise.all([
           getIssue(Number(numericId)),
-          getDepartments(true).catch(() => [])
+          getDepartments(true).catch(() => []),
+          getMyWorkers().catch(() => [])
         ]);
 
         const dto = mapIssueResponseToDTO(issueData);
         setIssue(dto);
         setRawIssue(issueData);
         setDepartments(deptData);
+        setWorkers(workerData);
       } catch (err) {
         console.error("Failed to fetch data:", err);
         setError("فشل تحميل بيانات الصفحة");
@@ -96,26 +126,30 @@ export default function IssueDetails() {
   const [note, setNote] = useState<string>("");
   const [rejectReason, setRejectReason] = useState<string>("");
 
-  const onConvertToTask = () => {
-    if (!issue) return;
+  const submitConvertToTask = async () => {
+    if (!issue || !convertAssignee) return;
 
-    navigate("/tasks/new", {
-      state: {
-        fromIssue: {
-          issueId: issue.id,
-          title: issue.title.replace("بلاغ:", "").trim(),
-          description: issue.description,
-          zone: issue.zone,
-          locationText: issue.locationText,
-          gps: issue.gps,
-          severity: issue.severity,
-          images: issue.images,
-          type: issue.type,
-          reporterName: issue.reporterName,
-          reportedAt: issue.reportedAt,
-        },
-      },
-    });
+    const numericId = id?.startsWith("i-") ? id.slice(2) : id;
+    if (!numericId) return;
+
+    try {
+      setConvertSubmitting(true);
+      const result = await createTaskFromIssue(Number(numericId), {
+        assignedToUserId: Number(convertAssignee),
+        priority: convertPriority,
+        dueDate: convertDueDate || undefined,
+        requiresPhotoProof: convertRequiresPhoto,
+      });
+
+      setConvertedTaskId(result.taskId);
+      setIssue({ ...issue, status: "converted" });
+      setConvertOpen(false);
+    } catch (err) {
+      console.error("Failed to convert issue to task:", err);
+      alert("فشل في تحويل البلاغ إلى مهمة");
+    } finally {
+      setConvertSubmitting(false);
+    }
   };
 
   const submitForwardToDepartment = async () => {
@@ -257,11 +291,40 @@ export default function IssueDetails() {
 
               <div className="bg-white rounded-[12px] border border-black/10 p-4">
                 <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold">
-                  خريطة (Placeholder)
+                  موقع البلاغ على الخريطة
                 </div>
-                <div className="mt-2 h-[140px] rounded-[10px] bg-[#E9E6E0] border border-black/5 grid place-items-center text-[#6B7280] text-[12px]">
-                  لاحقاً: خريطة مصغّرة + Marker لموقع البلاغ
-                </div>
+                {issue.gps ? (
+                  <div className="mt-2 h-[180px] rounded-[10px] overflow-hidden border border-black/5">
+                    <MapContainer
+                      center={[issue.gps.lat, issue.gps.lng]}
+                      zoom={15}
+                      className="w-full h-full"
+                      zoomControl={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker position={[issue.gps.lat, issue.gps.lng]} icon={IssueLocationIcon}>
+                        <Popup>
+                          <div dir="rtl" className="text-right font-sans p-1">
+                            <div className="font-bold text-[#2F2F2F] text-sm mb-1">موقع البلاغ</div>
+                            <div className="text-[10px] text-[#6B7280]">
+                              {issue.gps.lat.toFixed(5)}, {issue.gps.lng.toFixed(5)}
+                            </div>
+                            {issue.locationText && issue.locationText !== "غير محدد" && (
+                              <div className="text-[10px] text-[#6B7280] mt-1">{issue.locationText}</div>
+                            )}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    </MapContainer>
+                  </div>
+                ) : (
+                  <div className="mt-2 h-[140px] rounded-[10px] bg-[#E9E6E0] border border-black/5 grid place-items-center text-[#6B7280] text-[12px]">
+                    لا يوجد موقع GPS متاح لهذا البلاغ
+                  </div>
+                )}
               </div>
             </div>
 
@@ -330,13 +393,19 @@ export default function IssueDetails() {
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={onConvertToTask}
-                className="h-[44px] px-6 rounded-[12px] bg-[#7895B2] text-white font-sans font-semibold text-[14px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 w-full sm:w-auto"
-              >
-                تحويل البلاغ إلى مهمة
-              </button>
+              {issue.status === "converted" ? (
+                <div className="h-[44px] px-6 rounded-[12px] bg-[#8FA36A]/20 border border-[#8FA36A]/40 text-[#5a7040] font-sans font-semibold text-[14px] flex items-center w-full sm:w-auto justify-center">
+                  {convertedTaskId ? `تم إنشاء مهمة #${convertedTaskId}` : "تم التحويل إلى مهمة"}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConvertOpen(true)}
+                  className="h-[44px] px-6 rounded-[12px] bg-[#7895B2] text-white font-sans font-semibold text-[14px] shadow-[0_2px_0_rgba(0,0,0,0.15)] hover:opacity-95 w-full sm:w-auto"
+                >
+                  تحويل البلاغ إلى مهمة
+                </button>
+              )}
             </div>
           </Card>
 
@@ -434,6 +503,86 @@ export default function IssueDetails() {
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="مثال: بلاغ مكرر / معلومات ناقصة / خارج نطاق البلدية..."
             />
+          </Modal>
+
+          {/* Convert to Task Modal */}
+          <Modal
+            open={convertOpen}
+            title="تحويل البلاغ إلى مهمة"
+            onClose={() => {
+              setConvertOpen(false);
+              setConvertAssignee("");
+              setConvertPriority("Medium");
+              setConvertDueDate("");
+              setConvertRequiresPhoto(true);
+            }}
+            footer={
+              <>
+                <button
+                  type="button"
+                  className="h-[40px] px-4 rounded-[10px] bg-white border border-black/10 font-sans font-semibold"
+                  onClick={() => setConvertOpen(false)}
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  className="h-[40px] px-4 rounded-[10px] bg-[#7895B2] text-white font-sans font-semibold disabled:opacity-50"
+                  onClick={submitConvertToTask}
+                  disabled={!convertAssignee || convertSubmitting}
+                >
+                  {convertSubmitting ? "جاري التحويل..." : "تأكيد التحويل"}
+                </button>
+              </>
+            }
+          >
+            <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold">تعيين إلى عامل *</div>
+            <select
+              className="mt-2 w-full h-[44px] rounded-[12px] bg-white border border-black/10 px-3 text-right"
+              value={convertAssignee}
+              onChange={(e) => setConvertAssignee(e.target.value)}
+            >
+              <option value="">— اختر عاملاً —</option>
+              {workers.map((w) => (
+                <option key={w.userId} value={w.userId}>
+                  {w.fullName || w.username}
+                </option>
+              ))}
+            </select>
+
+            <div className="mt-4 text-right text-[13px] text-[#6B7280] font-sans font-semibold">الأولوية</div>
+            <select
+              className="mt-2 w-full h-[44px] rounded-[12px] bg-white border border-black/10 px-3 text-right"
+              value={convertPriority}
+              onChange={(e) => setConvertPriority(e.target.value as typeof convertPriority)}
+            >
+              <option value="Low">منخفضة</option>
+              <option value="Medium">متوسطة</option>
+              <option value="High">عالية</option>
+              <option value="Urgent">عاجلة</option>
+            </select>
+
+            <div className="mt-4 text-right text-[13px] text-[#6B7280] font-sans font-semibold">تاريخ الاستحقاق (اختياري)</div>
+            <input
+              type="date"
+              className="mt-2 w-full h-[44px] rounded-[12px] bg-white border border-black/10 px-3 text-right"
+              value={convertDueDate}
+              onChange={(e) => setConvertDueDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+            />
+
+            <div className="mt-4 flex items-center justify-end gap-3 flex-row-reverse">
+              <label className="text-right text-[13px] text-[#6B7280] font-sans font-semibold" htmlFor="requires-photo">
+                تتطلب إثبات صوري
+              </label>
+              <input
+                id="requires-photo"
+                type="checkbox"
+                checked={convertRequiresPhoto}
+                onChange={(e) => setConvertRequiresPhoto(e.target.checked)}
+                className="w-4 h-4 accent-[#7895B2]"
+              />
+            </div>
           </Modal>
 
           <div className="mt-6" />

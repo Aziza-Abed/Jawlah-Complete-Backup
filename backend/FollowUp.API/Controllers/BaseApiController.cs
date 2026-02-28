@@ -1,7 +1,8 @@
 using System.Security.Claims;
+using FollowUp.Core.Constants;
+using FollowUp.Core.DTOs.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using FollowUp.Core.Constants;
 
 namespace FollowUp.API.Controllers;
 
@@ -30,25 +31,15 @@ public abstract class BaseApiController : ControllerBase
         return (page, pageSize);
     }
 
+    // validate GPS coordinates are non-zero and within service area
     protected IActionResult? ValidateGpsCoordinates(double latitude, double longitude, bool allowZero = false)
     {
-        // Check for zero coordinates
         if (!allowZero && latitude == 0 && longitude == 0)
-        {
-            return BadRequest(new { message = "Invalid GPS coordinates. Please enable location services." });
-        }
+            return BadRequest(ApiResponse<object>.ErrorResponse("إحداثيات GPS غير صالحة. يرجى تفعيل خدمات الموقع"));
 
-        // Check if coordinates are within valid geographic boundaries (Palestine region)
         if (!GeofencingConstants.IsWithinPalestine(latitude, longitude))
-        {
-            return BadRequest(new
-            {
-                message = "GPS coordinates are outside the valid service area.",
-                latitude,
-                longitude
-            });
-        }
+            return BadRequest(ApiResponse<object>.ErrorResponse("إحداثيات GPS خارج منطقة الخدمة"));
 
-        return null; // Coordinates are valid
+        return null;
     }
 }

@@ -1,3 +1,4 @@
+import '../../core/utils/date_formatter.dart';
 import 'local/issue_local.dart';
 
 class IssueModel {
@@ -108,28 +109,21 @@ class IssueModel {
       resolutionNotes: json['resolutionNotes'] as String? ??
           json['ResolutionNotes'] as String?,
       resolvedAt: (json['resolvedAt'] ?? json['ResolvedAt']) != null
-          ? DateTime.parse(
-              ((json['resolvedAt'] ?? json['ResolvedAt']) as String)
-                      .endsWith('Z')
-                  ? (json['resolvedAt'] ?? json['ResolvedAt']) as String
-                  : '${(json['resolvedAt'] ?? json['ResolvedAt'])}Z')
+          ? DateFormatter.parseUtc(
+              (json['resolvedAt'] ?? json['ResolvedAt']) as String)
           : null,
       createdAt: (json['createdAt'] ?? json['reportedAt']) != null
-          ? DateTime.parse(((json['createdAt'] ?? json['reportedAt']) as String)
-                  .endsWith('Z')
-              ? (json['createdAt'] ?? json['reportedAt']) as String
-              : '${(json['createdAt'] ?? json['reportedAt'])}Z')
+          ? DateFormatter.parseUtc(
+              (json['createdAt'] ?? json['reportedAt']) as String)
           : DateTime.now().toUtc(),
       updatedAt: (json['updatedAt'] ?? json['syncTime']) != null
-          ? DateTime.parse(
-              ((json['updatedAt'] ?? json['syncTime']) as String).endsWith('Z')
-                  ? (json['updatedAt'] ?? json['syncTime']) as String
-                  : '${(json['updatedAt'] ?? json['syncTime'])}Z')
+          ? DateFormatter.parseUtc(
+              (json['updatedAt'] ?? json['syncTime']) as String)
           : DateTime.now().toUtc(),
       forwardedToDepartmentId: json['forwardedToDepartmentId'] as int?,
       forwardedToDepartmentName: json['forwardedToDepartmentName'] as String?,
       forwardedAt: json['forwardedAt'] != null
-          ? DateTime.tryParse(json['forwardedAt'] as String)
+          ? DateFormatter.parseUtc(json['forwardedAt'] as String)
           : null,
       forwardingNotes: json['forwardingNotes'] as String?,
     );
@@ -298,6 +292,8 @@ class IssueModel {
         return 'تم الحل';
       case 'closed':
         return 'مغلقة';
+      case 'convertedtotask':
+        return 'تم تحويله إلى مهمة';
       // legacy support for old values
       case 'reported':
         return 'جديدة';

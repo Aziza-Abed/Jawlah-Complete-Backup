@@ -19,6 +19,9 @@ public class Task
     // When TeamId is set, the task is shared among all team members
     public int? TeamId { get; set; }
 
+    // traceability: if this task was created from an issue, store the source issue id
+    public int? SourceIssueId { get; set; }
+
     // indicates if this is a team-shared task requiring collaboration
     public bool IsTeamTask { get; set; } = false;
 

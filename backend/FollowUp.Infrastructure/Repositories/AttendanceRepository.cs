@@ -22,6 +22,7 @@ public class AttendanceRepository : Repository<Attendance>, IAttendanceRepositor
         // find the first attendance record for this user today
         // NOTE: No AsNoTracking because callers may update this entity
         return await _dbSet
+            .Include(a => a.User)
             .Include(a => a.Zone)
             .Where(a => a.UserId == userId &&
                        a.CheckInEventTime >= today &&
@@ -34,6 +35,7 @@ public class AttendanceRepository : Repository<Attendance>, IAttendanceRepositor
     {
         return await _dbSet
             .AsNoTracking()
+            .Include(a => a.User)
             .Include(a => a.Zone)
             .Where(a => a.UserId == userId &&
                        a.CheckInEventTime >= fromDate &&

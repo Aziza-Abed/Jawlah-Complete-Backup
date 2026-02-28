@@ -41,14 +41,15 @@ class TaskLocalAdapter extends TypeAdapter<TaskLocal> {
       estimatedDurationMinutes: fields[20] as int?,
       progressPercentage: fields[22] as int,
       progressNotes: fields[23] as String?,
-      photos: (fields[24] as List?)?.cast<String>() ?? [],
+      photos: (fields[24] as List).cast<String>(),
+      eventTime: fields[25] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, TaskLocal obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(26)
       ..writeByte(0)
       ..write(obj.clientId)
       ..writeByte(1)
@@ -98,7 +99,9 @@ class TaskLocalAdapter extends TypeAdapter<TaskLocal> {
       ..writeByte(23)
       ..write(obj.progressNotes)
       ..writeByte(24)
-      ..write(obj.photos);
+      ..write(obj.photos)
+      ..writeByte(25)
+      ..write(obj.eventTime);
   }
 
   @override

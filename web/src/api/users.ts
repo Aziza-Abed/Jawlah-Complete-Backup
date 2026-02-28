@@ -17,7 +17,7 @@ export async function updateProfile(data: {
   email: string;
 }): Promise<UserResponse> {
   const response = await apiClient.put<{ data: UserResponse }>(
-    "/auth/profile",
+    "/users/profile",
     data,
   );
   return response.data.data;
@@ -57,8 +57,8 @@ export async function getMyWorkers(): Promise<UserResponse[]> {
 
 // Get workers for assignment
 export async function getWorkers(): Promise<UserResponse[]> {
-  const data = await getUsers(1, 1000, "Worker");
-  return data.items;
+  const response = await apiClient.get<{ data: UserResponse[] }>("/users/by-role/Worker");
+  return response.data.data;
 }
 
 // Reset device ID (unbind device)
@@ -89,8 +89,8 @@ export async function assignUserZones(userId: number, zoneIds: number[]): Promis
 
 // Get user assigned zones returns IDs
 export async function getUserZones(userId: number): Promise<number[]> {
-    const response = await apiClient.get<{ data: number[] }>(`/users/${userId}/zones`);
-    return response.data.data;
+    const response = await apiClient.get<{ data: { zoneId: number }[] }>(`/users/${userId}/zones`);
+    return response.data.data.map(z => z.zoneId);
 }
 
 // Update full user details
@@ -103,7 +103,7 @@ export async function updateUser(userId: number, data: Partial<UserResponse> & {
 export async function transferWorkers(workerIds: number[], newSupervisorId: number | null): Promise<void> {
   // Update each worker's supervisorId
   await Promise.all(workerIds.map(workerId =>
-    apiClient.put(`/users/${workerId}`, { supervisorId: newSupervisorId ?? 0 })
+    apiClient.put(`/users/${workerId}`, { supervisorId: newSupervisorId })
   ));
 }
 

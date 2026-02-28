@@ -90,6 +90,7 @@ class TasksService {
     File? proofPhoto,
     double? latitude,
     double? longitude,
+    DateTime? eventTime,
   }) async {
     final formData = FormData();
 
@@ -101,6 +102,11 @@ class TasksService {
     }
     if (longitude != null) {
       formData.fields.add(MapEntry('longitude', longitude.toString()));
+    }
+
+    // include device time so backend stores when the worker actually completed it
+    if (eventTime != null) {
+      formData.fields.add(MapEntry('eventTime', eventTime.toIso8601String()));
     }
 
     if (proofPhoto != null) {

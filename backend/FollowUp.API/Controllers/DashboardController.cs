@@ -35,30 +35,15 @@ public class DashboardController : BaseApiController
     {
         var today = DateTime.UtcNow.Date;
 
-        // get all workers
-        var workers = await _users.GetByRoleAsync(UserRole.Worker);
+        // get active workers (filtered by supervisor if not admin)
+        var (activeWorkers, workerIds) = await GetFilteredWorkersAsync();
 
-        // SECURITY FIX: Supervisors can only see their own workers' stats
-        var currentRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-        var currentUserId = GetCurrentUserId();
-        if (currentRole?.Equals("Supervisor", StringComparison.OrdinalIgnoreCase) == true && currentUserId.HasValue)
-        {
-            workers = workers.Where(w => w.SupervisorId == currentUserId.Value);
-        }
-
-        var activeWorkers = workers.Where(w => w.Status == UserStatus.Active).ToList();
-
-        // Get the set of worker IDs for filtering
-        var workerIds = activeWorkers.Select(w => w.UserId).ToList();
-
-        // PERFORMANCE FIX: Get only today's attendance for specific workers
         var todayAttendance = await _attendance.GetTodayAttendanceForWorkersAsync(workerIds);
 
         // count who checked in and out
         var checkedIn = todayAttendance.Where(a => a.Status == AttendanceStatus.CheckedIn).ToList();
         var checkedOut = todayAttendance.Where(a => a.Status == AttendanceStatus.CheckedOut).ToList();
 
-        // PERFORMANCE FIX: Use database-level aggregation instead of loading all entities
         var taskStats = await _tasks.GetTaskStatsAsync(workerIds, today);
         var issueStats = await _issues.GetIssueStatsAsync(workerIds, today);
 
@@ -100,30 +85,22 @@ public class DashboardController : BaseApiController
     {
         var today = DateTime.UtcNow.Date;
 
-        // get active workers
-        var workers = await _users.GetByRoleAsync(UserRole.Worker);
-
-        // SECURITY FIX: Supervisors can only see their own workers' status
-        var currentRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-        var currentUserId = GetCurrentUserId();
-        if (currentRole?.Equals("Supervisor", StringComparison.OrdinalIgnoreCase) == true && currentUserId.HasValue)
-        {
-            workers = workers.Where(w => w.SupervisorId == currentUserId.Value);
-        }
-
-        var activeWorkers = workers.Where(w => w.Status == UserStatus.Active).ToList();
-
-        // PERFORMANCE FIX: Get only today's attendance for specific workers
-        var workerIds = activeWorkers.Select(w => w.UserId).ToList();
+        // get active workers (filtered by supervisor if not admin)
+        var (activeWorkers, workerIds) = await GetFilteredWorkersAsync();
         var todayAttendance = (await _attendance.GetTodayAttendanceForWorkersAsync(workerIds)).ToList();
 
-        // PERFORMANCE FIX: Get only needed task data for these workers
         var allTasks = (await _tasks.GetTasksForWorkersAsync(workerIds)).ToList();
 
         // create lookups to avoid repeated loops
         var attendanceByUser = todayAttendance.GroupBy(a => a.UserId)
             .ToDictionary(g => g.Key, g => g.FirstOrDefault());
-        var tasksByUser = allTasks.GroupBy(t => t.AssignedToUserId)
+        var tasksByUser = allTasks
+            .Where(t => !t.IsTeamTask)
+            .GroupBy(t => t.AssignedToUserId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var teamTasksByTeamId = allTasks
+            .Where(t => t.IsTeamTask && t.TeamId.HasValue)
+            .GroupBy(t => t.TeamId!.Value)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         // build worker status list
@@ -132,6 +109,10 @@ public class DashboardController : BaseApiController
             attendanceByUser.TryGetValue(w.UserId, out var attendance);
             tasksByUser.TryGetValue(w.UserId, out var workerTasks);
             workerTasks ??= new List<Core.Entities.Task>();
+
+            // also include team tasks for this worker's team
+            if (w.TeamId.HasValue && teamTasksByTeamId.TryGetValue(w.TeamId.Value, out var teamTasks))
+                workerTasks = workerTasks.Concat(teamTasks).ToList();
 
             return new
             {
@@ -148,5 +129,22 @@ public class DashboardController : BaseApiController
         });
 
         return Ok(ApiResponse<object>.SuccessResponse(workerStatuses));
+    }
+
+    // get active workers, filtered to supervisor's own workers if not admin
+    private async Task<(List<Core.Entities.User> ActiveWorkers, List<int> WorkerIds)> GetFilteredWorkersAsync()
+    {
+        var workers = await _users.GetByRoleAsync(UserRole.Worker);
+
+        var currentRole = GetCurrentUserRole();
+        var currentUserId = GetCurrentUserId();
+        if (currentRole == "Supervisor" && currentUserId.HasValue)
+        {
+            workers = workers.Where(w => w.SupervisorId == currentUserId.Value);
+        }
+
+        var activeWorkers = workers.Where(w => w.Status == UserStatus.Active).ToList();
+        var workerIds = activeWorkers.Select(w => w.UserId).ToList();
+        return (activeWorkers, workerIds);
     }
 }

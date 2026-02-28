@@ -11,11 +11,15 @@ import '../../providers/auth_manager.dart';
 class OtpVerificationScreen extends StatefulWidget {
   final String sessionToken;
   final String maskedPhone;
+  final String? username;
+  final bool rememberMe;
 
   const OtpVerificationScreen({
     super.key,
     required this.sessionToken,
     required this.maskedPhone,
+    this.username,
+    this.rememberMe = false,
   });
 
   @override
@@ -115,6 +119,18 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       if (!mounted) return;
 
       if (success) {
+        // save remember-me preference (carried from login screen)
+        if (widget.username != null) {
+          if (widget.rememberMe) {
+            await authManager.saveEmployeeId(widget.username!);
+            await authManager.setRememberMe(true);
+          } else {
+            await authManager.clearSavedEmployeeId();
+            await authManager.setRememberMe(false);
+          }
+        }
+
+        if (!mounted) return;
         // Navigate to home
         Navigator.of(context).pushReplacementNamed(Routes.home);
       } else {
@@ -128,9 +144,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         _focusNodes[0].requestFocus();
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'حدث خطأ. يرجى المحاولة مرة أخرى';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'حدث خطأ. يرجى المحاولة مرة أخرى';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -175,9 +193,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         });
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'فشل إعادة الإرسال. يرجى المحاولة لاحقاً';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'فشل إعادة الإرسال. يرجى المحاولة لاحقاً';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {

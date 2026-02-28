@@ -44,16 +44,14 @@ public class UserConnection
 public class TrackingHub : Hub<ITrackingClient>
 {
     private readonly ILogger<TrackingHub> _logger;
-    private readonly IUserRepository _userRepository;
     private readonly ILocationHistoryRepository _locationHistory;
 
     // thread-safe dictionary to track active connections (SignalR is concurrent)
     private static readonly ConcurrentDictionary<string, UserConnection> _connections = new();
 
-    public TrackingHub(ILogger<TrackingHub> logger, IUserRepository userRepository, ILocationHistoryRepository locationHistory)
+    public TrackingHub(ILogger<TrackingHub> logger, ILocationHistoryRepository locationHistory)
     {
         _logger = logger;
-        _userRepository = userRepository;
         _locationHistory = locationHistory;
     }
 
@@ -62,21 +60,15 @@ public class TrackingHub : Hub<ITrackingClient>
     // called when a client connects to the hub
     public override async Task OnConnectedAsync()
     {
-        // get the user info from the connection
-        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        int? userId = int.TryParse(userIdStr, out var u) ? u : null;
-        
-        var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
-        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+        var (userId, userName, role) = GetCurrentHubUser();
 
         if (userId.HasValue)
         {
-            // create a connection object and save it in our list
             var connection = new UserConnection
             {
                 UserId = userId.Value,
-                UserName = userName ?? "Unknown",
-                Role = role ?? "Unknown",
+                UserName = userName,
+                Role = role,
                 ConnectionId = Context.ConnectionId,
                 ConnectedAt = DateTime.UtcNow,
                 LastActivity = DateTime.UtcNow
@@ -85,7 +77,7 @@ public class TrackingHub : Hub<ITrackingClient>
             _connections[Context.ConnectionId] = connection;
 
             // put the user in groups based on their role
-            if (role == "Admin" || role == "Supervisor")
+            if (role is "Admin" or "Supervisor")
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, "Supervisors");
             }
@@ -98,15 +90,11 @@ public class TrackingHub : Hub<ITrackingClient>
             if (role == "Worker")
             {
                 await Clients.Group("Supervisors").ReceiveUserStatus(
-                    userId.Value,
-                    userName ?? "Unknown",
-                    "online");
+                    userId.Value, userName, "online");
             }
 
-            // update the connection stats for everyone
             await BroadcastConnectionStats();
-
-            _logger.LogInformation("User connected: " + userName);
+            _logger.LogInformation("User connected: {UserName}", userName);
         }
 
         await base.OnConnectedAsync();
@@ -130,7 +118,7 @@ public class TrackingHub : Hub<ITrackingClient>
             // update connection stats for everyone
             await BroadcastConnectionStats();
 
-            _logger.LogInformation("User disconnected: " + connection.UserName);
+            _logger.LogInformation("User disconnected: {UserName}", connection.UserName);
         }
 
         await base.OnDisconnectedAsync(exception);
@@ -143,14 +131,17 @@ public class TrackingHub : Hub<ITrackingClient>
     // worker sends real-time location update
     public async Task SendLocationUpdate(double latitude, double longitude)
     {
-        // get the user info
-        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        int? userId = int.TryParse(userIdStr, out var u) ? u : null;
-        var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
+        var (userId, userName, _) = GetCurrentHubUser();
 
         if (!userId.HasValue)
         {
             _logger.LogWarning("Location update received from unauthenticated user");
+            return;
+        }
+
+        if (!IsValidGpsCoordinate(latitude, longitude))
+        {
+            _logger.LogWarning("Invalid GPS coordinates from user {UserId}: {Lat}, {Lng}", userId, latitude, longitude);
             return;
         }
 
@@ -164,7 +155,7 @@ public class TrackingHub : Hub<ITrackingClient>
             conn.LastActivity = timestamp;
         }
 
-        // IMPORTANT: Also save to database so REST API can retrieve locations
+        // save to database so REST API can retrieve locations
         try
         {
             var history = new Core.Entities.LocationHistory
@@ -185,34 +176,34 @@ public class TrackingHub : Hub<ITrackingClient>
 
         // send the new location to all supervisors so they can see it on the map
         await Clients.Group("Supervisors").ReceiveLocationUpdate(
-            userId.Value,
-            userName ?? "Unknown",
-            latitude,
-            longitude,
-            timestamp);
+            userId.Value, userName, latitude, longitude, timestamp);
 
-        _logger.LogDebug("Location updated for: " + userName);
+        _logger.LogDebug("Location updated for {UserName}", userName);
     }
 
     // worker sends batch location updates (for offline sync)
     public async Task SendLocationBatch(List<LocationUpdate> locations)
     {
-        // get user info
-        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        int? userId = int.TryParse(userIdStr, out var u) ? u : null;
-        var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
+        var (userId, userName, _) = GetCurrentHubUser();
 
         if (!userId.HasValue || locations == null || !locations.Any())
-        {
             return;
-        }
 
-        _logger.LogInformation("Received batch location updates from: " + userName);
+        // sort once, filter invalid coordinates
+        var validLocations = locations
+            .Where(l => IsValidGpsCoordinate(l.Latitude, l.Longitude))
+            .OrderBy(l => l.Timestamp)
+            .ToList();
 
-        // save batch locations to database (same as SendLocationUpdate does)
+        if (!validLocations.Any())
+            return;
+
+        _logger.LogInformation("Received {Count} batch location updates from {UserName}", validLocations.Count, userName);
+
+        // save batch locations to database
         try
         {
-            foreach (var location in locations.OrderBy(l => l.Timestamp))
+            foreach (var location in validLocations)
             {
                 var history = new Core.Entities.LocationHistory
                 {
@@ -232,14 +223,10 @@ public class TrackingHub : Hub<ITrackingClient>
         }
 
         // broadcast each location to supervisors
-        foreach (var location in locations.OrderBy(l => l.Timestamp))
+        foreach (var location in validLocations)
         {
             await Clients.Group("Supervisors").ReceiveLocationUpdate(
-                userId.Value,
-                userName ?? "Unknown",
-                location.Latitude,
-                location.Longitude,
-                location.Timestamp);
+                userId.Value, userName, location.Latitude, location.Longitude, location.Timestamp);
         }
     }
 
@@ -250,56 +237,34 @@ public class TrackingHub : Hub<ITrackingClient>
     // worker notifies supervisors of an activity (task started, completed, etc.)
     public async Task NotifyActivity(string activityType, string description)
     {
-        // get user info
-        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        int? userId = int.TryParse(userIdStr, out var u) ? u : null;
-        var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
+        var (userId, userName, _) = GetCurrentHubUser();
 
         if (!userId.HasValue)
-        {
             return;
-        }
 
-        // tell supervisors about the activity
         await Clients.Group("Supervisors").ReceiveActivity(
-            userId.Value,
-            userName ?? "Unknown",
-            activityType,
-            description);
+            userId.Value, userName, activityType, description);
 
-        _logger.LogInformation("Activity reported: " + activityType + " by " + userName);
+        _logger.LogInformation("Activity reported: {ActivityType} by {UserName}", activityType, userName);
     }
 
     // worker notifies when entering/exiting a zone
     public async Task NotifyZoneEvent(int zoneId, string zoneName, string eventType)
     {
-        // get user info
-        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        int? userId = int.TryParse(userIdStr, out var u) ? u : null;
-        var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
+        var (userId, userName, _) = GetCurrentHubUser();
 
         if (!userId.HasValue)
-        {
             return;
-        }
 
         // broadcast to supervisors
         await Clients.Group("Supervisors").ReceiveZoneEvent(
-            userId.Value,
-            userName ?? "Unknown",
-            zoneId,
-            zoneName,
-            eventType);
+            userId.Value, userName, zoneId, zoneName, eventType);
 
         // also broadcast to other workers in the same zone (for coordination)
         await Clients.Group($"Zone_{zoneId}").ReceiveZoneEvent(
-            userId.Value,
-            userName ?? "Unknown",
-            zoneId,
-            zoneName,
-            eventType);
+            userId.Value, userName, zoneId, zoneName, eventType);
 
-        _logger.LogInformation("Zone event: " + eventType + " at " + zoneName);
+        _logger.LogInformation("Zone event: {EventType} at {ZoneName}", eventType, zoneName);
     }
 
     #endregion
@@ -309,12 +274,11 @@ public class TrackingHub : Hub<ITrackingClient>
     // supervisor explicitly joins supervisors group to receive worker updates
     public async Task JoinSupervisorsGroup()
     {
-        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+        var (_, _, role) = GetCurrentHubUser();
 
-        if (role == "Admin" || role == "Supervisor")
+        if (role is "Admin" or "Supervisor")
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, "Supervisors");
-
             _logger.LogInformation("Supervisor joined tracking group");
         }
     }
@@ -322,13 +286,12 @@ public class TrackingHub : Hub<ITrackingClient>
     // worker joins a zone-specific group for zone-based notifications
     public async Task JoinZoneGroup(int zoneId)
     {
-        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+        var (_, _, role) = GetCurrentHubUser();
 
         if (role == "Worker")
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"Zone_{zoneId}");
-
-            _logger.LogInformation("Worker joined Zone group: " + zoneId);
+            _logger.LogInformation("Worker joined Zone group: {ZoneId}", zoneId);
         }
     }
 
@@ -336,8 +299,7 @@ public class TrackingHub : Hub<ITrackingClient>
     public async Task LeaveZoneGroup(int zoneId)
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Zone_{zoneId}");
-
-        _logger.LogInformation("Worker left Zone group: " + zoneId);
+        _logger.LogInformation("Worker left Zone group: {ZoneId}", zoneId);
     }
 
     #endregion
@@ -353,9 +315,9 @@ public class TrackingHub : Hub<ITrackingClient>
     // get list of currently online workers (for supervisors)
     public List<OnlineWorker> GetOnlineWorkers()
     {
-        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+        var (_, _, role) = GetCurrentHubUser();
 
-        if (role != "Admin" && role != "Supervisor")
+        if (role is not "Admin" and not "Supervisor")
         {
             return new List<OnlineWorker>();
         }
@@ -389,6 +351,19 @@ public class TrackingHub : Hub<ITrackingClient>
     #endregion
 
     #region Private Helper Methods
+
+    private (int? UserId, string UserName, string Role) GetCurrentHubUser()
+    {
+        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? userId = int.TryParse(userIdStr, out var u) ? u : null;
+        var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
+        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value ?? "Unknown";
+        return (userId, userName, role);
+    }
+
+    private static bool IsValidGpsCoordinate(double latitude, double longitude)
+        => latitude is >= -90 and <= 90 && longitude is >= -180 and <= 180
+           && !(latitude == 0 && longitude == 0);
 
     private async Task BroadcastConnectionStats()
     {

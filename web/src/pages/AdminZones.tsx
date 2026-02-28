@@ -20,7 +20,6 @@ import {
   X,
   Edit2,
   Trash2,
-  Maximize2,
   Layers,
   Globe2,
   Upload,
@@ -603,11 +602,6 @@ export default function AdminZones() {
                         />
                         <ChangeView center={getPreviewGeometry(formData.boundaryGeoJson)?.[0] || mapCenter} zoom={13} />
                       </MapContainer>
-                      <div className="absolute top-4 left-4 z-[1000]">
-                        <button type="button" className="p-2 bg-white/80 backdrop-blur-sm border border-[#E5E7EB] rounded-[8px] shadow-sm hover:bg-white text-[#2F2F2F] transition-colors">
-                          <Maximize2 size={18} />
-                        </button>
-                      </div>
                     </div>
                     <p className="text-[10px] text-[#6B7280] text-center mt-2 italic opacity-60">* المعاينة تعتمد على صحة كود GeoJSON المدخل يدوياً في هذا الإصدار</p>
                   </div>

@@ -1,7 +1,6 @@
 using FollowUp.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using TaskEntity = FollowUp.Core.Entities.Task;
 
 namespace FollowUp.Infrastructure.Data.Configurations;
 

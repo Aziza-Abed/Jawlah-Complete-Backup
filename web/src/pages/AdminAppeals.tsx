@@ -3,7 +3,7 @@ import { Scale, Search, CheckCircle, XCircle, Eye, Filter, X, MapPin, Clock, Use
 import { getPendingAppeals, approveAppeal, rejectAppeal } from "../api/appeals";
 import type { AppealResponse } from "../types/appeal";
 
-type FilterKey = "all" | "Pending" | "Approved" | "Rejected";
+type FilterKey = "all" | "Pending";
 
 export default function AdminAppeals() {
   const [items, setItems] = useState<AppealResponse[]>([]);
@@ -73,8 +73,8 @@ export default function AdminAppeals() {
   };
 
   const counts = useMemo(() => {
-    const base = { all: items.length, Pending: 0, Approved: 0, Rejected: 0 };
-    for (const item of items) base[item.status]++;
+    const base: Record<FilterKey, number> = { all: items.length, Pending: 0 };
+    for (const item of items) if (item.status === "Pending") base.Pending++;
     return base;
   }, [items]);
 

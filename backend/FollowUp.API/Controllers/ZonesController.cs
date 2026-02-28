@@ -12,7 +12,6 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle zones and geofencing
 [Route("api/[controller]")]
-[Authorize]
 public class ZonesController : BaseApiController
 {
     private readonly IZoneRepository _zones;
@@ -113,24 +112,7 @@ public class ZonesController : BaseApiController
 
             // Parse GeoJSON to set center coordinates and Boundary geometry
             if (!string.IsNullOrEmpty(request.BoundaryGeoJson))
-            {
-                try
-                {
-                    var geometry = _gis.ParseGeoJson(request.BoundaryGeoJson);
-                    if (geometry != null)
-                    {
-                        zone.Boundary = geometry;
-                        var centroid = geometry.Centroid;
-                        zone.CenterLatitude = centroid.Y;
-                        zone.CenterLongitude = centroid.X;
-                        zone.AreaSquareMeters = geometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to parse GeoJSON for zone {ZoneCode}", request.ZoneCode);
-                }
-            }
+                ApplyGeoJsonToZone(zone, request.BoundaryGeoJson, calculateArea: true);
 
             await _zones.AddAsync(zone);
             await _zones.SaveChangesAsync();
@@ -185,21 +167,7 @@ public class ZonesController : BaseApiController
             if (!string.IsNullOrEmpty(request.BoundaryGeoJson))
             {
                 zone.BoundaryGeoJson = request.BoundaryGeoJson;
-                try
-                {
-                    var geometry = _gis.ParseGeoJson(request.BoundaryGeoJson);
-                    if (geometry != null)
-                    {
-                        zone.Boundary = geometry;
-                        var centroid = geometry.Centroid;
-                        zone.CenterLatitude = centroid.Y;
-                        zone.CenterLongitude = centroid.X;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to parse GeoJSON for zone {ZoneId}", id);
-                }
+                ApplyGeoJsonToZone(zone, request.BoundaryGeoJson);
             }
 
             zone.UpdatedAt = DateTime.UtcNow;
@@ -251,10 +219,6 @@ public class ZonesController : BaseApiController
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetMapData()
     {
-        // Add cache headers
-        Response.Headers.Append("Cache-Control", "public, max-age=3600");
-        Response.Headers.Append("Vary", "Accept-Encoding");
-
         var zones = await _zones.GetActiveZonesAsync();
 
         // convert to geojson format
@@ -307,8 +271,6 @@ public class ZonesController : BaseApiController
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> GetMapMarkers()
     {
-        Response.Headers.Append("Cache-Control", "public, max-age=3600");
-
         var zones = await _zones.GetActiveZonesAsync();
 
         var markers = zones.Select(z => new
@@ -364,13 +326,35 @@ public class ZonesController : BaseApiController
                 new ValidateLocationResponse
                 {
                     IsValid = true,
-                    Message = $"Location is within {zone.ZoneName}",
+                    Message = $"الموقع داخل منطقة {zone.ZoneName}",
                     Zone = _mapper.Map<ZoneResponse>(zone)
                 }));
         }
         catch (ArgumentException ex)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse(ex.Message));
+        }
+    }
+
+    // helper: parse GeoJSON and apply geometry/centroid to zone
+    private void ApplyGeoJsonToZone(Zone zone, string geoJson, bool calculateArea = false)
+    {
+        try
+        {
+            var geometry = _gis.ParseGeoJson(geoJson);
+            if (geometry != null)
+            {
+                zone.Boundary = geometry;
+                var centroid = geometry.Centroid;
+                zone.CenterLatitude = centroid.Y;
+                zone.CenterLongitude = centroid.X;
+                if (calculateArea)
+                    zone.AreaSquareMeters = geometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse GeoJSON for zone {ZoneCode}", zone.ZoneCode);
         }
     }
 

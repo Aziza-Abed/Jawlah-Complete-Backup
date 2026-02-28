@@ -15,7 +15,7 @@ class TasksSummaryCard extends StatelessWidget {
         final pending = tasksProvider.pendingCount;
         final inProgress = tasksProvider.inProgressCount;
         final completed = tasksProvider.completedCount;
-        final actionableTotal = tasksProvider.actionableCount;
+        final displayedTotal = pending + inProgress + completed;
 
         return Container(
           width: double.infinity,
@@ -58,7 +58,7 @@ class TasksSummaryCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildTaskStat('الكُل', '$actionableTotal', AppColors.textPrimary),
+                  _buildTaskStat('الكُل', '$displayedTotal', AppColors.textPrimary),
                   _buildTaskStat('جديد', '$pending', AppColors.info),
                   _buildTaskStat(
                       'قيد التنفيذ', '$inProgress', AppColors.statusInProgress),

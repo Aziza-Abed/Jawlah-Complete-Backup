@@ -326,6 +326,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
     );
 
+    reasonController.dispose();
+
     if (reason == null || reason.isEmpty) return;
 
     HapticFeedback.heavyImpact();

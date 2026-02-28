@@ -1,3 +1,4 @@
+using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -7,7 +8,6 @@ namespace FollowUp.API.Controllers;
 
 // this controller serve uploaded files securely
 [Route("api/[controller]")]
-[Authorize]
 public class FilesController : BaseApiController
 {
     private readonly IWebHostEnvironment _env;
@@ -53,7 +53,7 @@ public class FilesController : BaseApiController
                 !System.Text.RegularExpressions.Regex.IsMatch(filename, "^[a-zA-Z0-9_.-]+$"))
             {
                 _logger.LogWarning("Invalid folder or filename requested: {Folder}/{Filename}", folder, filename);
-                return BadRequest(new { error = "مسار الملف غير صالح" });
+                return BadRequest(ApiResponse<object>.ErrorResponse("مسار الملف غير صالح"));
             }
 
             var userRole = GetCurrentUserRole();
@@ -69,40 +69,24 @@ public class FilesController : BaseApiController
 
                 bool hasAccess = false;
 
-                // Appeal photos are stored in Appeal entity (not Photo table)
+                // appeal photos are stored in Appeal entity (not Photo table)
                 if (folder.Equals("appeals", StringComparison.OrdinalIgnoreCase))
                 {
                     var appeal = await _appeals.GetByEvidencePhotoFilenameAsync(filename);
-
                     if (appeal == null)
-                    {
-                        return NotFound(new { error = "الملف غير موجود" });
-                    }
+                        return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود"));
 
-                    // Worker: can only see own appeal photos
-                    if (appeal.UserId == userId.Value)
-                    {
-                        hasAccess = true;
-                    }
-                    // Supervisor: can see appeal photos from workers under their supervision
-                    else if (userRole == "Supervisor")
-                    {
-                        var worker = await _users.GetByIdAsync(appeal.UserId);
-                        if (worker != null && worker.SupervisorId == userId.Value)
-                        {
-                            hasAccess = true;
-                        }
-                    }
+                    hasAccess = appeal.UserId == userId.Value
+                        || (userRole == "Supervisor" && await IsSupervisorOfAsync(userId.Value, appeal.UserId));
                 }
                 else
                 {
-                    // Task/Issue photos are in Photo table
+                    // task/issue photos are in Photo table
                     var photo = await _photos.GetByFilenameAsync(filename);
-
                     if (photo == null)
                     {
                         _logger.LogWarning("Photo with filename {Filename} not found in database", filename);
-                        return NotFound(new { error = "الملف غير موجود" });
+                        return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود"));
                     }
 
                     if (photo.EntityType == "Task")
@@ -110,19 +94,17 @@ public class FilesController : BaseApiController
                         var task = await _tasks.GetByIdAsync(photo.EntityId);
                         if (task != null)
                         {
-                            // Worker: can only see own tasks
-                            if (task.AssignedToUserId == userId.Value)
+                            if (task.IsTeamTask && task.TeamId.HasValue)
                             {
-                                hasAccess = true;
+                                // For team tasks: worker must be in the team, supervisor must manage a team member
+                                var requestingUser = await _users.GetByIdAsync(userId.Value);
+                                hasAccess = requestingUser?.TeamId == task.TeamId
+                                    || (userRole == "Supervisor" && await IsSupervisorOfTeamAsync(userId.Value, task.TeamId.Value));
                             }
-                            // Supervisor: can see tasks of workers under their supervision
-                            else if (userRole == "Supervisor")
+                            else
                             {
-                                var worker = await _users.GetByIdAsync(task.AssignedToUserId);
-                                if (worker != null && worker.SupervisorId == userId.Value)
-                                {
-                                    hasAccess = true;
-                                }
+                                hasAccess = task.AssignedToUserId == userId.Value
+                                    || (userRole == "Supervisor" && await IsSupervisorOfAsync(userId.Value, task.AssignedToUserId));
                             }
                         }
                     }
@@ -130,22 +112,8 @@ public class FilesController : BaseApiController
                     {
                         var issue = await _issues.GetByIdAsync(photo.EntityId);
                         if (issue != null)
-                        {
-                            // Worker: can only see own issues
-                            if (issue.ReportedByUserId == userId.Value)
-                            {
-                                hasAccess = true;
-                            }
-                            // Supervisor: can see issues from workers under their supervision
-                            else if (userRole == "Supervisor")
-                            {
-                                var worker = await _users.GetByIdAsync(issue.ReportedByUserId);
-                                if (worker != null && worker.SupervisorId == userId.Value)
-                                {
-                                    hasAccess = true;
-                                }
-                            }
-                        }
+                            hasAccess = issue.ReportedByUserId == userId.Value
+                                || (userRole == "Supervisor" && await IsSupervisorOfAsync(userId.Value, issue.ReportedByUserId));
                     }
                 }
 
@@ -161,7 +129,7 @@ public class FilesController : BaseApiController
             if (!AllowedExtensions.Contains(extension))
             {
                 _logger.LogWarning("Disallowed file extension requested: {Extension}", extension);
-                return BadRequest(new { error = "نوع الملف غير مسموح" });
+                return BadRequest(ApiResponse<object>.ErrorResponse("نوع الملف غير مسموح"));
             }
 
             // build full file path
@@ -180,14 +148,14 @@ public class FilesController : BaseApiController
             if (!fullPath.StartsWith(secureBasePath, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Path traversal attempt detected: {FilePath}", filePath);
-                return BadRequest(new { error = "مسار الملف غير صالح" });
+                return BadRequest(ApiResponse<object>.ErrorResponse("مسار الملف غير صالح"));
             }
 
             // check file exists
             if (!System.IO.File.Exists(filePath))
             {
                 _logger.LogWarning("File not found: {FilePath}", filePath);
-                return NotFound(new { error = "الملف غير موجود" });
+                return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود"));
             }
 
             // get content type based on extension
@@ -220,7 +188,21 @@ public class FilesController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error serving file: {Folder}/{Filename}", folder, filename);
-            return StatusCode(500, new { error = "خطأ داخلي في الخادم" });
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("خطأ داخلي في الخادم"));
         }
+    }
+
+    // check if a supervisor manages the given worker
+    private async Task<bool> IsSupervisorOfAsync(int supervisorId, int workerId)
+    {
+        var worker = await _users.GetByIdAsync(workerId);
+        return worker != null && worker.SupervisorId == supervisorId;
+    }
+
+    // check if a supervisor manages at least one member of the given team
+    private async Task<bool> IsSupervisorOfTeamAsync(int supervisorId, int teamId)
+    {
+        var myWorkers = await _users.GetWorkersBySupervisorAsync(supervisorId);
+        return myWorkers.Any(w => w.TeamId == teamId);
     }
 }

@@ -1,3 +1,5 @@
+import '../../core/utils/date_formatter.dart';
+
 class UserModel {
   final int userId;
   final String employeeId;
@@ -32,8 +34,9 @@ class UserModel {
       workerType: json['workerType'] as String?,
       email: json['email'] as String?,
       // use current date if createdAt is missing or malformed
-      // parse as UTC with error handling
-      createdAt: _parseDateTime(json['createdAt']),
+      createdAt: json['createdAt'] != null
+          ? DateFormatter.parseUtc(json['createdAt'] as String)
+          : DateTime.now().toUtc(),
     );
   }
 
@@ -48,23 +51,6 @@ class UserModel {
       'email': email,
       'createdAt': createdAt.toIso8601String(),
     };
-  }
-
-  // Safe DateTime parsing to prevent crashes from malformed dates
-  static DateTime _parseDateTime(dynamic dateValue) {
-    if (dateValue == null) {
-      return DateTime.now().toUtc();
-    }
-
-    try {
-      final dateStr = dateValue as String;
-      // Add Z suffix if not already present to parse as UTC
-      final normalizedDate = dateStr.endsWith('Z') ? dateStr : '${dateStr}Z';
-      return DateTime.parse(normalizedDate);
-    } catch (e) {
-      // If parsing fails, use current time instead of crashing
-      return DateTime.now().toUtc();
-    }
   }
 
   UserModel copyWith({

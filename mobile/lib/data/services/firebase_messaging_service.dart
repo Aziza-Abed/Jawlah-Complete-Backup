@@ -2,6 +2,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/api_config.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/utils/secure_storage_helper.dart';
@@ -225,30 +226,38 @@ class FirebaseMessagingService {
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
     final notification = message.notification;
+    if (notification == null) return;
 
-    if (notification != null) {
-      const androidDetails = AndroidNotificationDetails(
-        'followup_notifications',
-        'FollowUp Notifications',
-        channelDescription: 'Notifications for tasks, issues, and attendance',
-        importance: Importance.high,
-        priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
-      );
+    // check user notification preferences
+    final type = (message.data['type'] as String? ?? '').toLowerCase();
+    final prefs = await SharedPreferences.getInstance();
 
-      const iosDetails = DarwinNotificationDetails();
+    if (type.contains('task') && !(prefs.getBool('notif_tasks') ?? true)) return;
+    if (type.contains('attendance') && !(prefs.getBool('notif_attendance') ?? true)) return;
+    if (type.contains('issue') && !(prefs.getBool('notif_issues') ?? true)) return;
+    if (type.contains('reminder') && !(prefs.getBool('notif_deadlines') ?? true)) return;
 
-      const details =
-          NotificationDetails(android: androidDetails, iOS: iosDetails);
+    const androidDetails = AndroidNotificationDetails(
+      'followup_notifications',
+      'FollowUp Notifications',
+      channelDescription: 'Notifications for tasks, issues, and attendance',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    );
 
-      await _localNotifications.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
-        details,
-        payload: message.data.toString(),
-      );
-    }
+    const iosDetails = DarwinNotificationDetails();
+
+    const details =
+        NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+    await _localNotifications.show(
+      notification.hashCode,
+      notification.title,
+      notification.body,
+      details,
+      payload: message.data.toString(),
+    );
   }
 
   void _onNotificationTapped(NotificationResponse response) {

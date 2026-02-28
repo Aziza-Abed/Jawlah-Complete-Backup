@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -16,8 +15,6 @@ class ApiService {
 
   String? _token;
   String? _refreshToken;
-  bool _isRefreshing = false;
-  final List<_RetryRequest> _pendingRequests = [];
 
   Dio get dio => dioClient;
 
@@ -79,32 +76,20 @@ class ApiService {
           return handler.next(error);
         }
 
-        // if no refresh token available, logout
-        if (_refreshToken == null || _refreshToken!.isEmpty) {
+        // if no refresh token or already retried, logout
+        final alreadyRetried = error.requestOptions.extra['_retry'] == true;
+        if (_refreshToken == null || _refreshToken!.isEmpty || alreadyRetried) {
           await cleanAuthData();
           return handler.next(error);
         }
 
-        // if already refreshing, queue this request to retry later
-        if (_isRefreshing) {
-          final retry = _RetryRequest(error.requestOptions);
-          _pendingRequests.add(retry);
-          try {
-            final response = await retry.completer.future;
-            return handler.resolve(response);
-          } catch (e) {
-            return handler.next(error);
-          }
-        }
-
-        // attempt refresh
-        _isRefreshing = true;
+        // try to refresh the token once
         try {
           final refreshResponse = await dioClient.post(
             ApiConfig.refreshToken,
             data: {'refreshToken': _refreshToken},
             options: Options(
-              headers: {'Authorization': ''},  // no auth for refresh
+              headers: {'Authorization': ''},
             ),
           );
 
@@ -125,46 +110,24 @@ class ApiService {
 
               if (kDebugMode) debugPrint('Token refreshed successfully');
 
-              // retry all pending requests with new token
-              for (final pending in _pendingRequests) {
-                pending.requestOptions.headers['Authorization'] = 'Bearer $newToken';
-                try {
-                  final response = await dioClient.fetch(pending.requestOptions);
-                  pending.completer.complete(response);
-                } catch (e) {
-                  pending.completer.completeError(e);
-                }
-              }
-              _pendingRequests.clear();
-
-              // retry the original request
+              // retry the original request with new token
               error.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+              error.requestOptions.extra['_retry'] = true;
               final retryResponse = await dioClient.fetch(error.requestOptions);
               return handler.resolve(retryResponse);
             }
           }
 
-          // refresh failed - clean up
+          // refresh response didn't have a valid token
           await cleanAuthData();
-          _failPendingRequests(error);
           return handler.next(error);
         } catch (e) {
           if (kDebugMode) debugPrint('Token refresh failed: $e');
           await cleanAuthData();
-          _failPendingRequests(error);
           return handler.next(error);
-        } finally {
-          _isRefreshing = false;
         }
       },
     );
-  }
-
-  void _failPendingRequests(DioException error) {
-    for (final pending in _pendingRequests) {
-      pending.completer.completeError(error);
-    }
-    _pendingRequests.clear();
   }
 
   Future<void> cleanAuthData() async {
@@ -294,12 +257,4 @@ class ApiService {
     // anything else
     return AppException('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
   }
-}
-
-// helper class to queue requests while token refresh is in progress
-class _RetryRequest {
-  final RequestOptions requestOptions;
-  final completer = Completer<Response>();
-
-  _RetryRequest(this.requestOptions);
 }

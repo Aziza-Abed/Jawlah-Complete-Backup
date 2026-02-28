@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return BaseScreen(
-      title: 'جولة',
+      title: 'فولو أب',
       showBackButton: false,
       actions: [
         Stack(

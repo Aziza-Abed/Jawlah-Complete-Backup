@@ -2,6 +2,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import { logout } from "../../api/auth";
 import {
   X,
   User,
@@ -38,7 +39,6 @@ export default function AppLayout() {
 
   const handleLogout = async () => {
     try {
-      const { logout } = await import("../../api/auth");
       await logout();
     } catch (_) {
       // even if backend fails, clear local data

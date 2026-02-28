@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/notification_model.dart';
 import '../../providers/notice_manager.dart';
@@ -171,7 +172,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         if (!isRead) {
           provider.seenNotice(notification.notificationId);
         }
-        // go to details if needed
+        if (notification.taskId != null) {
+          Navigator.of(context).pushNamed(
+            Routes.taskDetails,
+            arguments: notification.taskId,
+          );
+        }
+        // issue notifications: mark as read only — no issue details screen on mobile
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -312,24 +319,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   IconData _getNotificationIcon(String type) {
     final value = type.toLowerCase();
     if (value.contains('assign')) return Icons.assignment_turned_in_rounded;
-    if (value.contains('update')) return Icons.edit_notifications_rounded;
-    if (value.contains('complete')) return Icons.check_circle_rounded;
+    if (value.contains('update') || value.contains('changed')) return Icons.edit_notifications_rounded;
+    if (value.contains('resolved') || value.contains('approved')) return Icons.check_circle_rounded;
     if (value.contains('reject')) return Icons.error_rounded;
+    if (value.contains('reminder')) return Icons.alarm_rounded;
+    if (value.contains('alert') || value.contains('battery')) return Icons.warning_amber_rounded;
+    if (value.contains('issue') || value.contains('reported')) return Icons.report_problem_rounded;
+    if (value.contains('appeal')) return Icons.gavel_rounded;
     return Icons.notifications_rounded;
   }
 
   Color _getNotificationColor(String type) {
     final value = type.toLowerCase();
     if (value.contains('assign')) return const Color(0xFF7895B2);
-    if (value.contains('update')) return const Color(0xFFC97A63);
-    if (value.contains('complete')) return const Color(0xFFA3B18A);
+    if (value.contains('update') || value.contains('changed')) return const Color(0xFFC97A63);
+    if (value.contains('resolved') || value.contains('approved')) return const Color(0xFFA3B18A);
     if (value.contains('reject')) return AppColors.error;
+    if (value.contains('reminder')) return const Color(0xFFE0A75E);
+    if (value.contains('alert') || value.contains('battery')) return const Color(0xFFD4654A);
+    if (value.contains('issue') || value.contains('reported')) return const Color(0xFF9B8EC4);
+    if (value.contains('appeal')) return const Color(0xFF6B8E9B);
     return AppColors.primary;
   }
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
+    if (diff.inMinutes <= 0) return 'الآن';
     if (diff.inMinutes < 60) return '${diff.inMinutes} دقيقة';
     if (diff.inHours < 24) return '${diff.inHours} ساعة';
     final local = date.toLocal();

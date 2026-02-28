@@ -380,7 +380,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
   Future<void> _pickImage() async {
     final image = await PhotoPickerHelper.pickImageCameraOnly(context);
 
-    if (image != null) {
+    if (image != null && mounted) {
       setState(() {
         _selectedImage = image;
       });
@@ -442,6 +442,7 @@ class _SubmitEvidenceScreenState extends State<SubmitEvidenceScreen> {
           proofPhoto: _selectedImage,
         );
 
+    if (!mounted) return;
     setState(() => _isSubmitting = false);
 
     if (success && mounted) {

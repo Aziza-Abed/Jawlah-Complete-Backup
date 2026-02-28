@@ -321,6 +321,9 @@ class TaskManager extends BaseController {
       setLoading(true);
       clearError();
 
+      // capture device time immediately — before any async GPS call
+      final eventTime = DateTime.now().toUtc();
+
       // get current gps location
       double? lat;
       double? lng;
@@ -341,6 +344,7 @@ class TaskManager extends BaseController {
         proofPhoto: proofPhoto,
         latitude: lat,
         longitude: lng,
+        eventTime: eventTime,
       );
 
       updateMyTaskInList(updatedTask);

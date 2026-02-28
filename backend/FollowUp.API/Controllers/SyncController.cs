@@ -4,14 +4,12 @@ using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Sync;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Interfaces.Repositories;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FollowUp.API.Controllers;
 
 // this controller handle offline sync from mobile app
 [Route("api/[controller]")]
-[Authorize]
 public class SyncController : BaseApiController
 {
     private readonly ITaskRepository _tasks;
@@ -98,26 +96,8 @@ public class SyncController : BaseApiController
                     existing.SyncVersion++;
                     existing.CheckOutSyncTime = DateTime.UtcNow;
 
-                    // Calculate work duration and overtime/early-leave from EventTime
                     if (item.CheckOutEventTime.HasValue)
-                    {
-                        var duration = item.CheckOutEventTime.Value - existing.CheckInEventTime;
-                        if (duration < TimeSpan.Zero) duration = duration.Duration();
-                        if (duration > TimeSpan.FromHours(23)) duration = TimeSpan.FromHours(23);
-                        existing.WorkDuration = duration;
-
-                        var expectedEnd = item.CheckOutEventTime.Value.Date.Add(user.ExpectedEndTime);
-                        if (item.CheckOutEventTime.Value > expectedEnd)
-                        {
-                            existing.OvertimeMinutes = (int)(item.CheckOutEventTime.Value - expectedEnd).TotalMinutes;
-                            if (existing.AttendanceType != "Late") existing.AttendanceType = "Overtime";
-                        }
-                        else if (item.CheckOutEventTime.Value < expectedEnd.AddMinutes(-30))
-                        {
-                            existing.EarlyLeaveMinutes = (int)(expectedEnd - item.CheckOutEventTime.Value).TotalMinutes;
-                            if (existing.AttendanceType != "Late") existing.AttendanceType = "EarlyLeave";
-                        }
-                    }
+                        ApplyCheckoutMetrics(existing, existing.CheckInEventTime, item.CheckOutEventTime.Value, user.ExpectedEndTime);
 
                     await _attendance.UpdateAsync(existing);
                     await _attendance.SaveChangesAsync();
@@ -161,26 +141,8 @@ public class SyncController : BaseApiController
                         CheckOutSyncTime = item.CheckOutEventTime.HasValue ? DateTime.UtcNow : null
                     };
 
-                    // Calculate checkout metrics if checkout time exists
                     if (item.CheckOutEventTime.HasValue)
-                    {
-                        var duration = item.CheckOutEventTime.Value - item.CheckInEventTime;
-                        if (duration < TimeSpan.Zero) duration = duration.Duration();
-                        if (duration > TimeSpan.FromHours(23)) duration = TimeSpan.FromHours(23);
-                        attendance.WorkDuration = duration;
-
-                        var expectedEnd = item.CheckOutEventTime.Value.Date.Add(user.ExpectedEndTime);
-                        if (item.CheckOutEventTime.Value > expectedEnd)
-                        {
-                            attendance.OvertimeMinutes = (int)(item.CheckOutEventTime.Value - expectedEnd).TotalMinutes;
-                            if (attendance.AttendanceType != "Late") attendance.AttendanceType = "Overtime";
-                        }
-                        else if (item.CheckOutEventTime.Value < expectedEnd.AddMinutes(-30))
-                        {
-                            attendance.EarlyLeaveMinutes = (int)(expectedEnd - item.CheckOutEventTime.Value).TotalMinutes;
-                            if (attendance.AttendanceType != "Late") attendance.AttendanceType = "EarlyLeave";
-                        }
-                    }
+                        ApplyCheckoutMetrics(attendance, item.CheckInEventTime, item.CheckOutEventTime.Value, user.ExpectedEndTime);
 
                     await _attendance.AddAsync(attendance);
                     await _attendance.SaveChangesAsync();
@@ -263,6 +225,7 @@ public class SyncController : BaseApiController
                 task.Status = item.Status;
                 task.CompletionNotes = InputSanitizer.SanitizeString(item.CompletionNotes, 1000);
                 task.CompletedAt = item.CompletedAt;
+                task.EventTime = item.EventTime ?? item.CompletedAt ?? task.EventTime; // device time sent by mobile; fall back to CompletedAt if not provided
                 task.Latitude = item.Latitude;
                 task.Longitude = item.Longitude;
                 task.SyncTime = DateTime.UtcNow;
@@ -380,6 +343,27 @@ public class SyncController : BaseApiController
         }
 
         return Ok(ApiResponse<BatchSyncResponse>.SuccessResponse(new BatchSyncResponse { Results = results }));
+    }
+
+    // calculate work duration, overtime, and early leave from checkout time
+    private static void ApplyCheckoutMetrics(Attendance record, DateTime checkIn, DateTime checkOut, TimeSpan expectedEndTime)
+    {
+        var duration = checkOut - checkIn;
+        if (duration < TimeSpan.Zero) duration = duration.Duration();
+        if (duration > TimeSpan.FromHours(23)) duration = TimeSpan.FromHours(23);
+        record.WorkDuration = duration;
+
+        var expectedEnd = checkOut.Date.Add(expectedEndTime);
+        if (checkOut > expectedEnd)
+        {
+            record.OvertimeMinutes = (int)(checkOut - expectedEnd).TotalMinutes;
+            if (record.AttendanceType != "Late") record.AttendanceType = "Overtime";
+        }
+        else if (checkOut < expectedEnd.AddMinutes(-30))
+        {
+            record.EarlyLeaveMinutes = (int)(expectedEnd - checkOut).TotalMinutes;
+            if (record.AttendanceType != "Late") record.AttendanceType = "EarlyLeave";
+        }
     }
 
     // get changes since last sync

@@ -91,15 +91,14 @@ export default function AdminAccounts() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [usersData, supervisorsData, munisData, zonesData, deptsData] = await Promise.all([
+      const [usersData, munisData, zonesData, deptsData] = await Promise.all([
         getUsers(1, 1000),
-        getUsers(1, 1000, "Supervisor"),
         getMunicipalities(),
         getZones(),
         getDepartments(true)
       ]);
       setUsers(usersData.items);
-      setSupervisors(supervisorsData.items);
+      setSupervisors(usersData.items.filter(u => u.role === "Supervisor"));
       setMunicipalities(munisData);
       setZones(zonesData);
       setDepartments(deptsData);
@@ -506,7 +505,7 @@ export default function AdminAccounts() {
               <div className="mb-6 space-y-3">
                 <label className="block text-right text-[12px] font-semibold text-[#6B7280]">كلمة المرور الجديدة</label>
                 <input
-                  type="text"
+                  type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30"
@@ -724,7 +723,7 @@ export default function AdminAccounts() {
                <div className="p-4 bg-[#F3F1ED] rounded-2xl text-center">
                   <Smartphone size={32} className="mx-auto text-[#7895B2] mb-2" />
                   <p className="font-black text-[#2F2F2F]">{deviceModalUser.fullName}</p>
-                  <p className="font-sans text-[12px] text-[#6B7280] mt-1">{deviceModalUser.deviceId || 'لا يوجد جهاز مرتبظ'}</p>
+                  <p className="font-sans text-[12px] text-[#6B7280] mt-1">{deviceModalUser.deviceId || 'لا يوجد جهاز مرتبط'}</p>
                </div>
 
                <div className="grid grid-cols-2 gap-3">

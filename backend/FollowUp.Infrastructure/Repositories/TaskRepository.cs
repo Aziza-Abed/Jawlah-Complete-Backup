@@ -47,6 +47,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
 
         var query = _dbSet
             .AsNoTracking()
+            .Include(t => t.AssignedToUser)
             .Include(t => t.Zone)
             .Include(t => t.AssignedByUser)
             .Include(t => t.Photos)

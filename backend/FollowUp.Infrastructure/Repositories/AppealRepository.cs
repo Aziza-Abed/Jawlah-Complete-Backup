@@ -13,6 +13,15 @@ public class AppealRepository : Repository<Appeal>, IAppealRepository
     {
     }
 
+    // Override base GetByIdAsync to eagerly load navigation properties required by AutoMapper
+    public override async Task<Appeal?> GetByIdAsync(int id)
+    {
+        return await _dbSet
+            .Include(a => a.User)
+            .Include(a => a.ReviewedByUser)
+            .FirstOrDefaultAsync(a => a.AppealId == id);
+    }
+
     public async Task<IEnumerable<Appeal>> GetUserAppealsAsync(int userId)
     {
         return await _dbSet

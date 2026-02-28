@@ -1,15 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using FollowUp.Infrastructure.Data;
 
 namespace FollowUp.API.Controllers;
 
 // this controller check if api and database are working
-[ApiController]
 [Route("api/[controller]")]
-[Authorize]
-public class HealthController : ControllerBase
+public class HealthController : BaseApiController
 {
     private readonly FollowUpDbContext _db;
     private readonly ILogger<HealthController> _logger;
@@ -22,6 +19,7 @@ public class HealthController : ControllerBase
 
     // main health check endpoint
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> Get()
     {
         try
@@ -39,24 +37,12 @@ public class HealthController : ControllerBase
                 });
             }
 
-            // count some records to show system is working
-            var userCount = await _db.Users.CountAsync();
-            var taskCount = await _db.Tasks.CountAsync();
-            var zoneCount = await _db.Zones.CountAsync();
-
             return Ok(new
             {
                 status = "صحي",
                 message = "API يعمل وقاعدة البيانات متاحة",
                 timestamp = DateTime.UtcNow,
-                database = new
-                {
-                    connected = true,
-                    users = userCount,
-                    tasks = taskCount,
-                    zones = zoneCount
-                },
-                version = "1.0.0"
+                database = new { connected = true }
             });
         }
         catch (Exception ex)

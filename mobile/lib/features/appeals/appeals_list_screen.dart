@@ -87,10 +87,6 @@ class _AppealsListScreenState extends State<AppealsListScreen>
               return _buildErrorView(appealManager.errorMessage);
             }
 
-            if (!appealManager.hasAppeals) {
-              return _buildEmptyView();
-            }
-
             return TabBarView(
               controller: _tabController,
               children: [
@@ -278,34 +274,6 @@ class _AppealsListScreenState extends State<AppealsListScreen>
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.question_answer, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'لا توجد طعون',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'سيتم عرض طعونك هنا',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
       ),
     );
   }

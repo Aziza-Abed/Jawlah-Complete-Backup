@@ -17,7 +17,7 @@ type IssueListItem = {
   status: DisplayIssueStatus;
 };
 
-type FilterKey = "all" | "new" | "forwarded" | "reviewing" | "closed";
+type FilterKey = "all" | "new" | "forwarded" | "converted" | "closed";
 
 const mapIssueToListItem = (issue: IssueResponse): IssueListItem => {
   const date = issue.reportedAt ? new Date(issue.reportedAt) : new Date();
@@ -67,7 +67,7 @@ export default function Issues() {
   }, []);
 
   const counts = useMemo(() => {
-    const base: Record<string, number> = { all: items.length, new: 0, forwarded: 0, reviewing: 0, closed: 0 };
+    const base: Record<string, number> = { all: items.length, new: 0, forwarded: 0, converted: 0, closed: 0 };
     for (const it of items) {
       if (it.status in base) base[it.status]++;
     }
@@ -119,10 +119,11 @@ export default function Issues() {
           )}
 
           {/* Mini Stats Grid */}
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
              <MiniStat title="إجمالي البلاغات" value={String(counts.all)} />
              <MiniStat title="بلاغات جديدة" value={String(counts.new)} />
-             <MiniStat title="قيد المراجعة" value={String(counts.reviewing)} />
+             <MiniStat title="قيد المراجعة" value={String(counts.forwarded)} />
+             <MiniStat title="محوّل لمهمة" value={String(counts.converted)} />
              <MiniStat title="مغلقة" value={String(counts.closed)} />
           </div>
 
@@ -141,7 +142,8 @@ export default function Issues() {
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label="الكل" count={counts.all} />
                 <FilterChip active={filter === "new"} onClick={() => setFilter("new")} label="جديد" count={counts.new} />
-                <FilterChip active={filter === "reviewing"} onClick={() => setFilter("reviewing")} label="مراجعة" count={counts.reviewing} />
+                <FilterChip active={filter === "forwarded"} onClick={() => setFilter("forwarded")} label="قيد المراجعة" count={counts.forwarded} />
+                <FilterChip active={filter === "converted"} onClick={() => setFilter("converted")} label="محوّل" count={counts.converted} />
                 <FilterChip active={filter === "closed"} onClick={() => setFilter("closed")} label="مغلق" count={counts.closed} />
               </div>
             </div>
@@ -155,7 +157,7 @@ export default function Issues() {
               </div>
             ) : (
               filtered.map((it) => (
-                <IssueCard key={it.id} issue={it} onClick={() => navigate(`/issues/${it.id}`)} />
+                <IssueCard key={it.id} issue={it} onClick={() => navigate(`/issues/i-${it.id}`)} />
               ))
             )}
           </div>
@@ -233,24 +235,20 @@ function MetaSmallPill({ label, value, color }: { label: string; value: string; 
 }
 
 function formatStatusLabel(s: DisplayIssueStatus) {
-  const map: Record<string, string> = {
+  const map: Record<DisplayIssueStatus, string> = {
     new: "جديد",
-    reviewing: "قيد المراجعة",
-    converted: "محول لمهمة",
-    rejected: "مرفوض",
     forwarded: "تم التوجيه",
+    converted: "محوّل لمهمة",
     closed: "مغلق",
   };
   return map[s] || s;
 }
 
 function getStatusColor(s: DisplayIssueStatus) {
-  const map: Record<string, string> = {
+  const map: Record<DisplayIssueStatus, string> = {
     new: "#7895B2",
-    reviewing: "#F3E7C8",
-    converted: "#8FA36A",
-    rejected: "#C86E5D",
     forwarded: "#F5B300",
+    converted: "#8FA36A",
     closed: "#6B7280",
   };
   return map[s] || "#6B7280";

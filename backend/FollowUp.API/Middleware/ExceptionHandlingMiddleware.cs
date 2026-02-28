@@ -10,6 +10,11 @@ public class ExceptionHandlingMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
 
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
     {
         _next = next;
@@ -25,6 +30,13 @@ public class ExceptionHandlingMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception occurred: {Message}", ex.Message);
+
+            if (context.Response.HasStarted)
+            {
+                _logger.LogWarning("Response already started, cannot write error response for: {ExceptionType}", ex.GetType().Name);
+                return;
+            }
+
             await HandleExceptionAsync(context, ex);
         }
     }
@@ -37,7 +49,7 @@ public class ExceptionHandlingMiddleware
         {
             NotFoundException or KeyNotFoundException or FileNotFoundException => HttpStatusCode.NotFound,
             UnauthorizedException or UnauthorizedAccessException => HttpStatusCode.Unauthorized,
-            Core.Exceptions.ValidationException or ArgumentException or InvalidOperationException or FollowUpException => HttpStatusCode.BadRequest,
+            Core.Exceptions.ValidationException or ArgumentException or FollowUpException => HttpStatusCode.BadRequest,
             _ => HttpStatusCode.InternalServerError
         };
 
@@ -52,10 +64,7 @@ public class ExceptionHandlingMiddleware
         context.Response.StatusCode = (int)statusCode;
 
         var response = ApiResponse<object>.ErrorResponse(message);
-        var jsonResponse = JsonSerializer.Serialize(response, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+        var jsonResponse = JsonSerializer.Serialize(response, _jsonOptions);
 
         await context.Response.WriteAsync(jsonResponse);
     }

@@ -60,6 +60,8 @@ class _LocationPickerMapState extends State<LocationPickerMap> {
         position = await LocationService.getCurrentLocation();
       }
 
+      if (!mounted) return;
+
       if (position == null) {
         setState(() {
           _error = 'فشل الحصول على الموقع الحالي. يرجى التحقق من إعدادات GPS.';
@@ -74,6 +76,7 @@ class _LocationPickerMapState extends State<LocationPickerMap> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'حدث خطأ في تحميل الموقع: $e';
         _isLoading = false;
@@ -110,7 +113,7 @@ class _LocationPickerMapState extends State<LocationPickerMap> {
 
   Future<void> _resetToCurrentLocation() async {
     final position = await LocationService.getCurrentLocation();
-    if (position != null) {
+    if (position != null && mounted) {
       final newPosition = LatLng(position.latitude, position.longitude);
       setState(() {
         _currentPosition = position;

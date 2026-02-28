@@ -28,6 +28,7 @@ class _NotificationSettingsScreenState
 
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _taskNotifications = prefs.getBool('notif_tasks') ?? true;
       _attendanceReminders = prefs.getBool('notif_attendance') ?? true;

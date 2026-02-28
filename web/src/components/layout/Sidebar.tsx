@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { STORAGE_KEYS } from "../../constants/storageKeys";
+import { logout } from "../../api/auth";
 import {
   User,
   Settings as SettingsIcon,
@@ -16,7 +17,6 @@ export default function Sidebar({ role = "supervisor" }: { role?: UserRole }) {
 
   const handleLogout = async () => {
     try {
-      const { logout } = await import("../../api/auth");
       await logout();
     } catch (_) {
       // even if backend fails, clear local data

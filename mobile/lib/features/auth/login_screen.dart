@@ -40,6 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final rememberMe = await authProvider.getRememberMe();
       if (rememberMe) {
         final savedUsername = await authProvider.getSavedEmployeeId();
+        if (!mounted) return;
         if (savedUsername != null && savedUsername.isNotEmpty) {
           setState(() {
             _usernameController.text = savedUsername;
@@ -416,6 +417,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 builder: (context) => OtpVerificationScreen(
                   sessionToken: authProvider.otpSessionToken!,
                   maskedPhone: authProvider.otpMaskedPhone ?? '****',
+                  username: username,
+                  rememberMe: _rememberMe,
                 ),
               ),
             );

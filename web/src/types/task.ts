@@ -6,6 +6,7 @@ export type TaskType = "GarbageCollection" | "StreetSweeping" | "ContainerMainte
 
 export type TaskResponse = {
   taskId: number;
+  sourceIssueId?: number;  // set if this task was created from an issue
   title: string;
   description: string;
   assignedToUserId: number;
@@ -27,7 +28,8 @@ export type TaskResponse = {
   scheduledAt?: string;
   dueDate?: string;
   startedAt?: string;
-  completedAt?: string;
+  completedAt?: string;   // server time (tamper-proof)
+  eventTime?: string;     // device time when worker actually completed it
   locationDescription?: string;
   completionNotes?: string;
   photoUrl?: string;

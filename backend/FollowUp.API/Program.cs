@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Unicode;
 using System.Threading.RateLimiting;
 using FollowUp.API.Filters;
 using FollowUp.API.LiveTracking;
@@ -47,8 +48,8 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        // Allow Arabic/Unicode characters to be output without escaping
-        options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+        // Allow Arabic/Unicode characters without escaping, while still escaping HTML-dangerous chars (<, >, &)
+        options.JsonSerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All);
     });
 
 // Enable response compression (gzip/brotli)
@@ -284,6 +285,18 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// CorrelationId middleware: trace requests across logs (before exception handling so errors are tagged too)
+app.Use(async (context, next) =>
+{
+    var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault()
+        ?? Guid.NewGuid().ToString("N")[..12];
+    context.Response.Headers["X-Correlation-Id"] = correlationId;
+    using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
+    {
+        await next();
+    }
+});
+
 // global exception handling
 app.UseExceptionHandling();
 
@@ -309,18 +322,6 @@ if (app.Environment.IsDevelopment())
     app.UseCors("AllowAll");
 else
     app.UseCors("Production");
-
-// CorrelationId middleware: trace requests across logs
-app.Use(async (context, next) =>
-{
-    var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault()
-        ?? Guid.NewGuid().ToString("N")[..12];
-    context.Response.Headers["X-Correlation-Id"] = correlationId;
-    using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
-    {
-        await next();
-    }
-});
 
 app.UseSerilogRequestLogging();
 
@@ -377,17 +378,14 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// seed database with initial data (UTF-8 safe via Entity Framework)
-using (var scope = app.Services.CreateScope())
+// DEV ONLY: Reset all passwords to "pass" and clear lockouts
+if (app.Environment.IsDevelopment())
 {
+    using var scope = app.Services.CreateScope();
     try
     {
         var context = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<FollowUp.Core.Entities.User>>();
-        var seeder = new DatabaseSeeder(context, passwordHasher);
-        await seeder.SeedAsync();
-
-        // DEV ONLY: Reset all passwords to "pass" and clear lockouts
         var users = await context.Users.ToListAsync();
         if (users.Any())
         {
@@ -403,7 +401,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        Log.Warning(ex, "Failed to seed database.");
+        Log.Warning(ex, "Failed to reset dev passwords.");
     }
 }
 

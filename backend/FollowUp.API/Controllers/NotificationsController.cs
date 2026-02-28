@@ -9,17 +9,14 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle user notifications
 [Route("api/[controller]")]
-[Authorize]
 public class NotificationsController : BaseApiController
 {
     private readonly INotificationRepository _notices;
-    private readonly ILogger<NotificationsController> _logger;
     private readonly IMapper _mapper;
 
-    public NotificationsController(INotificationRepository notices, ILogger<NotificationsController> logger, IMapper mapper)
+    public NotificationsController(INotificationRepository notices, IMapper mapper)
     {
         _notices = notices;
-        _logger = logger;
         _mapper = mapper;
     }
 

@@ -14,7 +14,6 @@ namespace FollowUp.API.Controllers;
 
 // this controller handles checkin and checkout for workers
 [Route("api/[controller]")]
-[Authorize]
 public class AttendanceController : BaseApiController
 {
     private readonly IAttendanceRepository _attendance;
@@ -69,31 +68,19 @@ public class AttendanceController : BaseApiController
         if (gpsValidation != null)
             return gpsValidation;
 
-        // validate location using gis service (skip in dev mode)
+        // validate location using gis service
         var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
-        Zone? zone = null;
+        var zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude, userId.Value);
 
-        if (!disableGeofencing)
+        if (zone == null)
         {
-            zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude, userId.Value);
-            if (zone == null)
+            if (!disableGeofencing)
                 return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور"));
-        }
-        else
-        {
-            // In dev mode, try to find the zone but don't block check-in if not found
-            zone = await _gis.ValidateLocationAsync(request.Latitude, request.Longitude, userId.Value);
-            if (zone == null)
-            {
-                // Fall back to user's first assigned zone
-                var userWithZones = await _users.GetUserWithZonesAsync(userId.Value);
-                var firstZone = userWithZones?.AssignedZones?.FirstOrDefault();
-                if (firstZone != null)
-                {
-                    zone = firstZone.Zone;
-                }
-                _logger.LogWarning("Dev mode: Geofencing bypassed for user {UserId}, using fallback zone", userId.Value);
-            }
+
+            // dev mode: fall back to user's first assigned zone
+            var userWithZones = await _users.GetUserWithZonesAsync(userId.Value);
+            zone = userWithZones?.AssignedZones?.FirstOrDefault()?.Zone;
+            _logger.LogWarning("Dev mode: Geofencing bypassed for user {UserId}, using fallback zone", userId.Value);
         }
 
         // If zone is still null (no assigned zones), block check-in
@@ -167,10 +154,10 @@ public class AttendanceController : BaseApiController
         if (userId == null)
             return Unauthorized(ApiResponse<AttendanceResponse>.ErrorResponse("رمز غير صالح"));
 
-        // Validate GPS coordinates
-        var validationResult = ValidateGpsCoordinates(request.Latitude, request.Longitude);
-        if (validationResult != null)
-            return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("إحداثيات GPS غير صالحة. يرجى التأكد من تفعيل الموقع"));
+        // validate GPS coordinates
+        var gpsValidation = ValidateGpsCoordinates(request.Latitude, request.Longitude);
+        if (gpsValidation != null)
+            return gpsValidation;
 
         // get today attendance
         var attendance = await _attendance.GetTodayAttendanceAsync(userId.Value);

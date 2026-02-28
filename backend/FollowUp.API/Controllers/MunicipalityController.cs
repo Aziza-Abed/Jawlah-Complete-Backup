@@ -1,7 +1,6 @@
 using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Municipality;
-using FollowUp.Core.DTOs.Zones;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
@@ -63,7 +62,6 @@ public class MunicipalityController : BaseApiController
 
     // get the current user's municipality settings (for map display and app configuration)
     [HttpGet("current")]
-    [Authorize]
     public async Task<IActionResult> GetCurrent()
     {
         try

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Search, Trash2, Eye, Filter, X } from "lucide-react";
 import { getIssues, deleteIssue } from "../api/issues";
+import { useConfirm } from "../components/common/ConfirmDialog";
 import type { IssueResponse } from "../types/issue";
 import { mapSeverity, mapStatus, mapTypeToArabic, type Severity, type DisplayIssueStatus } from "../utils/issueDisplay";
 
@@ -18,7 +19,7 @@ type IssueListItem = {
   status: DisplayIssueStatus;
 };
 
-type FilterKey = "all" | "new" | "reviewing" | "converted" | "closed";
+type FilterKey = "all" | "new" | "forwarded" | "converted" | "closed";
 
 const mapIssueToListItem = (issue: IssueResponse): IssueListItem => {
   const date = new Date(issue.reportedAt);
@@ -47,6 +48,8 @@ export default function AdminIssues() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [q, setQ] = useState("");
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [confirm, ConfirmDialog] = useConfirm();
 
   useEffect(() => {
     fetchIssues();
@@ -69,22 +72,23 @@ export default function AdminIssues() {
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("هل أنت متأكد من حذف هذا البلاغ؟")) return;
+    if (!await confirm("هل أنت متأكد من حذف هذا البلاغ؟ لا يمكن التراجع عن هذا الإجراء.")) return;
 
     try {
       setDeleting(id);
+      setDeleteError("");
       await deleteIssue(id);
       setItems(prev => prev.filter(item => item.id !== id));
     } catch (err) {
       console.error("Failed to delete issue:", err);
-      alert("فشل حذف البلاغ");
+      setDeleteError("فشل حذف البلاغ. يرجى المحاولة مرة أخرى.");
     } finally {
       setDeleting(null);
     }
   };
 
   const counts = useMemo(() => {
-    const base: Record<string, number> = { all: items.length, new: 0, reviewing: 0, converted: 0, rejected: 0, forwarded: 0, closed: 0 };
+    const base: Record<string, number> = { all: items.length, new: 0, forwarded: 0, converted: 0, closed: 0 };
     for (const it of items) {
       if (it.status in base) base[it.status]++;
     }
@@ -131,19 +135,15 @@ export default function AdminIssues() {
 
   const statusColors: Record<string, string> = {
     new: "bg-[#7895B2]/10 text-[#7895B2] border-[#7895B2]/30",
-    reviewing: "bg-[#F5B300]/10 text-[#D4A100] border-[#F5B300]/30",
-    converted: "bg-[#8FA36A] text-white border-[#8FA36A]",
-    rejected: "bg-[#C86E5D]/10 text-[#C86E5D] border-[#C86E5D]/30",
     forwarded: "bg-[#F5B300]/10 text-[#D4A100] border-[#F5B300]/30",
+    converted: "bg-[#8FA36A]/10 text-[#8FA36A] border-[#8FA36A]/30",
     closed: "bg-[#6B7280]/10 text-[#6B7280] border-[#6B7280]/30",
   };
 
   const statusLabels: Record<string, string> = {
     new: "جديد",
-    reviewing: "قيد المراجعة",
-    converted: "تم تحويله لمهمة",
-    rejected: "مرفوض",
     forwarded: "تم التوجيه",
+    converted: "تم تحويله لمهمة",
     closed: "مغلق",
   };
 
@@ -203,7 +203,7 @@ export default function AdminIssues() {
 
               <div className="flex items-center gap-2 flex-wrap">
                 <Filter size={16} className="text-[#6B7280]" />
-                {(["all", "new", "reviewing", "converted", "closed"] as FilterKey[]).map((key) => (
+                {(["all", "new", "forwarded", "converted", "closed"] as FilterKey[]).map((key) => (
                   <button
                     key={key}
                     onClick={() => setFilter(key)}
@@ -229,6 +229,13 @@ export default function AdminIssues() {
           {error && (
             <div className="bg-[#C86E5D]/10 border border-[#C86E5D]/30 rounded-[12px] p-4 text-center">
               <p className="text-[#C86E5D] font-medium">{error}</p>
+            </div>
+          )}
+
+          {deleteError && (
+            <div className="bg-[#C86E5D]/10 border border-[#C86E5D]/30 rounded-[12px] p-4 flex items-center justify-between">
+              <button onClick={() => setDeleteError("")} className="text-[#C86E5D] hover:opacity-70"><X size={16} /></button>
+              <p className="text-[#C86E5D] font-medium">{deleteError}</p>
             </div>
           )}
 
@@ -319,6 +326,7 @@ export default function AdminIssues() {
           )}
         </div>
       </div>
+      {ConfirmDialog}
     </div>
   );
 }

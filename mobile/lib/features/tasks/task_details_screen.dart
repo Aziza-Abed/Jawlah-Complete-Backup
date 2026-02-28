@@ -907,7 +907,20 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     final taskManager = context.read<TaskManager>();
     await taskManager.updateTaskProgress(taskId, progress);
 
-    if (taskManager.errorMessage != null && mounted) {
+    if (!mounted) return;
+
+    // Show milestone notification if reached (25%, 50%, 75%)
+    final milestoneMsg = taskManager.lastMilestoneMessage;
+    if (milestoneMsg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(milestoneMsg, style: const TextStyle(fontFamily: 'Cairo')),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      taskManager.clearMilestoneMessage();
+    } else if (taskManager.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

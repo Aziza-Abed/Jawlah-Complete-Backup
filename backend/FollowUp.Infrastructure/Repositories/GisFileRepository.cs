@@ -13,7 +13,7 @@ public class GisFileRepository : Repository<GisFile>, IGisFileRepository
     {
     }
 
-    public new async Task<GisFile?> GetByIdAsync(int id)
+    public override async Task<GisFile?> GetByIdAsync(int id)
     {
         return await _dbSet
             .Include(g => g.UploadedBy)
@@ -27,7 +27,7 @@ public class GisFileRepository : Repository<GisFile>, IGisFileRepository
             .FirstOrDefaultAsync(g => g.FileType == fileType && g.IsActive);
     }
 
-    public new async Task<IEnumerable<GisFile>> GetAllAsync()
+    public override async Task<IEnumerable<GisFile>> GetAllAsync()
     {
         return await _dbSet
             .Include(g => g.UploadedBy)
@@ -44,14 +44,14 @@ public class GisFileRepository : Repository<GisFile>, IGisFileRepository
             .ToListAsync();
     }
 
-    public new async Task<GisFile> AddAsync(GisFile gisFile)
+    public override async Task<GisFile> AddAsync(GisFile gisFile)
     {
         await _dbSet.AddAsync(gisFile);
         await _context.SaveChangesAsync();
         return gisFile;
     }
 
-    public new async Task UpdateAsync(GisFile gisFile)
+    public override async Task UpdateAsync(GisFile gisFile)
     {
         _dbSet.Update(gisFile);
         await _context.SaveChangesAsync();

@@ -36,8 +36,8 @@ export default function ResetPassword() {
       setError("الرجاء إكمال خطوات التحقق أولاً.");
       return;
     }
-    if (newPass.length < 6) {
-      setError("كلمة السر يجب أن تكون 6 أحرف على الأقل.");
+    if (newPass.length < 8 || !/[A-Za-z]/.test(newPass) || !/\d/.test(newPass) || !/[^A-Za-z0-9]/.test(newPass)) {
+      setError("كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم ورمز خاص.");
       return;
     }
     if (newPass !== confirm) {
@@ -66,7 +66,7 @@ export default function ResetPassword() {
     }
   };
 
-  const canSubmit = newPass.length >= 6 && confirm === newPass;
+  const canSubmit = newPass.length >= 8 && confirm === newPass;
 
   return (
     <AuthLayout title="تغيير كلمة المرور" subtitle="أدخل كلمة سر جديدة">

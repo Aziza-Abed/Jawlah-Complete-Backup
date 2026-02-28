@@ -1,7 +1,6 @@
 using AutoMapper;
 using FollowUp.Core.Constants;
 using FollowUp.Core.DTOs.Auth;
-using FollowUp.Core.DTOs.Attendance;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Interfaces.Repositories;
@@ -19,8 +18,6 @@ public class AuthController : BaseApiController
 {
     private readonly IAuthService _auth;
     private readonly IUserRepository _users;
-    private readonly IZoneRepository _zones;
-    private readonly IAttendanceRepository _attendance;
     private readonly IOtpService _otp;
     private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _config;
@@ -30,8 +27,6 @@ public class AuthController : BaseApiController
     public AuthController(
         IAuthService auth,
         IUserRepository users,
-        IZoneRepository zones,
-        IAttendanceRepository attendance,
         IOtpService otp,
         ILogger<AuthController> logger,
         IConfiguration config,
@@ -40,8 +35,6 @@ public class AuthController : BaseApiController
     {
         _auth = auth;
         _users = users;
-        _zones = zones;
-        _attendance = attendance;
         _otp = otp;
         _logger = logger;
         _config = config;
@@ -182,15 +175,7 @@ public class AuthController : BaseApiController
         var (success, userId, error, remaining) = await _otp.VerifyOtpAsync(request.SessionToken, request.OtpCode, ipAddress);
 
         if (!success)
-        {
-            var failResponse = new VerifyOtpResponse
-            {
-                Success = false,
-                Error = error,
-                RemainingAttempts = remaining
-            };
             return Unauthorized(ApiResponse<VerifyOtpResponse>.ErrorResponse(error ?? "رمز التحقق غير صحيح"));
-        }
 
         // Get the stored JWT token from database (load-balancer safe)
         var storedToken = await _otp.GetAndClearPendingTokenAsync(request.SessionToken);
@@ -306,17 +291,12 @@ public class AuthController : BaseApiController
     {
         try
         {
-            // check if request data is valid
             if (!ModelState.IsValid)
             {
-                var errors = new List<string>();
-                foreach (var modelState in ModelState.Values)
-                {
-                    foreach (var error in modelState.Errors)
-                    {
-                        errors.Add(error.ErrorMessage);
-                    }
-                }
+                var errors = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
                 return BadRequest(ApiResponse<LoginWithGPSResponse>.ErrorResponse(errors));
             }
 
@@ -408,8 +388,7 @@ public class AuthController : BaseApiController
                 _logger.LogWarning(ex, "Failed to generate refresh token for GPS login user {UserId}", user.UserId);
             }
 
-            // build response object - authentication only, no attendance
-            var resObj = new LoginWithGPSResponse
+            var response = new LoginWithGPSResponse
             {
                 Success = true,
                 Token = token,
@@ -419,7 +398,7 @@ public class AuthController : BaseApiController
                 Message = "تم تسجيل الدخول بنجاح"
             };
 
-            return Ok(ApiResponse<LoginWithGPSResponse>.SuccessResponse(resObj, "تم تسجيل الدخول بنجاح"));
+            return Ok(ApiResponse<LoginWithGPSResponse>.SuccessResponse(response, "تم تسجيل الدخول بنجاح"));
         }
         catch (Exception ex)
         {
@@ -427,117 +406,6 @@ public class AuthController : BaseApiController
             return StatusCode(500, ApiResponse<LoginWithGPSResponse>.ErrorResponse("حدث خطأ أثناء تسجيل الدخول"));
         }
     }
-
-    #region GPS Validation Helper Methods
-
-    // validate GPS accuracy is within acceptable range
-    private string? ValidateGpsAccuracy(double? accuracy)
-    {
-        if (accuracy.HasValue && accuracy.Value > Core.Constants.GeofencingConstants.MaxAcceptableAccuracyMeters)
-        {
-            return $"دقة GPS منخفضة جداً ({accuracy.Value:F1}م). يرجى المحاولة في مكان أفضل.";
-        }
-        return null;
-    }
-
-    // validate GPS coordinates are within municipality bounds (supports production and testing mode)
-    private string? ValidateGpsBounds(double latitude, double longitude)
-    {
-        var isTestingMode = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
-
-        double minLat, maxLat, minLon, maxLon;
-        if (isTestingMode)
-        {
-            // Extended bounds for testing (includes Birzeit University)
-            minLat = Core.Constants.GeofencingConstants.TestingMinLatitude;
-            maxLat = Core.Constants.GeofencingConstants.TestingMaxLatitude;
-            minLon = Core.Constants.GeofencingConstants.TestingMinLongitude;
-            maxLon = Core.Constants.GeofencingConstants.TestingMaxLongitude;
-        }
-        else
-        {
-            // Production bounds - municipality area only
-            minLat = Core.Constants.GeofencingConstants.MinLatitude;
-            maxLat = Core.Constants.GeofencingConstants.MaxLatitude;
-            minLon = Core.Constants.GeofencingConstants.MinLongitude;
-            maxLon = Core.Constants.GeofencingConstants.MaxLongitude;
-        }
-
-        if (latitude < minLat || latitude > maxLat || longitude < minLon || longitude > maxLon)
-        {
-            return "الموقع خارج منطقة الخدمة. يرجى التحقق من GPS.";
-        }
-
-        return null;
-    }
-
-    // find the zone containing the given GPS coordinates (checks user's assigned zones only)
-    private async Task<(Zone? MatchedZone, string? Error)> FindUserZoneByGps(int userId, double latitude, double longitude)
-    {
-        var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
-
-        // Get user's assigned zones
-        var userWithZones = await _users.GetUserWithZonesAsync(userId);
-        var assignedZoneIds = userWithZones?.AssignedZones?
-            .Where(uz => uz.IsActive)
-            .Select(uz => uz.ZoneId)
-            .ToList() ?? new List<int>();
-
-        if (!assignedZoneIds.Any())
-        {
-            return (null, "لا يوجد مناطق عمل مخصصة لهذا المستخدم.");
-        }
-
-        var assignedZones = (await _zones.GetZonesByIdsAsync(assignedZoneIds))
-            .Where(z => z.IsActive)
-            .ToList();
-
-        if (disableGeofencing)
-        {
-            // In testing mode, return first assigned zone without location validation
-            _logger.LogWarning("DEVELOPMENT MODE: Geofencing disabled - accepting any location for user {UserId}", userId);
-            return (assignedZones.FirstOrDefault(), null);
-        }
-
-        /*
-         * ZONE MATCHING ALGORITHM
-         *
-         * Uses geospatial point-in-polygon algorithm to determine if worker
-         * is physically present inside their assigned work zone.
-         *
-         * Algorithm:
-         * 1. Convert GPS coordinates (lat/lon) to a geometric Point
-         * 2. For each assigned zone:
-         *    a. Check if point is inside zone boundary (Contains)
-         *    b. OR if point is near zone boundary (within buffer tolerance)
-         * 3. Return first matching zone
-         *
-         * Buffer Tolerance:
-         * - Allows small GPS inaccuracies near zone edges
-         * - Prevents false rejections due to GPS drift
-         * - Configured in GeofencingConstants.BufferToleranceDegrees
-         *
-         * Library: Uses NetTopologySuite for geospatial operations
-         */
-        var point = NetTopologySuite.Geometries.GeometryFactory.Default.CreatePoint(
-            new NetTopologySuite.Geometries.Coordinate(longitude, latitude));
-
-        foreach (var zone in assignedZones)
-        {
-            if (zone.Boundary == null) continue;
-
-            // Check if point is inside zone or within buffer tolerance
-            if (zone.Boundary.Contains(point) ||
-                zone.Boundary.Distance(point) <= Core.Constants.GeofencingConstants.BufferToleranceDegrees)
-            {
-                return (zone, null);
-            }
-        }
-
-        return (null, "أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور.");
-    }
-
-    #endregion
 
     // register new user only admin can do this
     [HttpPost("register")]
@@ -622,7 +490,6 @@ public class AuthController : BaseApiController
     // get current user profile (alias: /me for frontend compatibility)
     [HttpGet("me")]
     [HttpGet("profile")]
-    [Authorize]
     public async Task<IActionResult> GetProfile()
     {
         var userId = GetCurrentUserId();

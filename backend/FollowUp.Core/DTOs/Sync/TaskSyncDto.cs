@@ -18,6 +18,7 @@ public class TaskSyncDto
     public string? CompletionNotes { get; set; }
     public string? PhotoUrl { get; set; }
     public DateTime? CompletedAt { get; set; }
+    public DateTime? EventTime { get; set; }  // device time when worker actually completed (before GPS/upload delay)
     public string? Description { get; set; }
     public Enums.TaskPriority? Priority { get; set; }
     public DateTime? DueDate { get; set; }

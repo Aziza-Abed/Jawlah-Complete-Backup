@@ -106,20 +106,24 @@ public class NotificationService : INotificationService
 
         await _notifications.AddAsync(notification);
         await _notifications.SaveChangesAsync();
-        await SendPushNotificationAsync(userId, title, body, pushData);
+        await SendPushNotificationAsync(userId, title, body, pushData, user.FcmToken);
         return true;
     }
 
-    // broadcast a notification to all supervisors
+    // broadcast a notification to supervisors within a municipality
     // batches the DB save outside the loop for efficiency
     private async Task SendToAllSupervisorsAsync(
         string title,
         string body,
         NotificationType type,
         string? payloadJson = null,
-        Dictionary<string, string>? pushData = null)
+        Dictionary<string, string>? pushData = null,
+        int? municipalityId = null)
     {
-        var supervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
+        var allSupervisors = await _users.GetByRoleAsync(UserRole.Supervisor);
+        var supervisors = municipalityId.HasValue
+            ? allSupervisors.Where(s => s.MunicipalityId == municipalityId.Value)
+            : allSupervisors;
 
         foreach (var supervisor in supervisors)
         {
@@ -138,7 +142,7 @@ public class NotificationService : INotificationService
             };
 
             await _notifications.AddAsync(notification);
-            await SendPushNotificationAsync(supervisor.UserId, title, body, pushData);
+            await SendPushNotificationAsync(supervisor.UserId, title, body, pushData, supervisor.FcmToken);
         }
 
         await _notifications.SaveChangesAsync();
@@ -186,23 +190,23 @@ public class NotificationService : INotificationService
             _logger.LogInformation("Issue reviewed notification sent to user {UserId} for issue {IssueId}", userId, issueId);
     }
 
-    public async Task SendTaskCompletedToSupervisorsAsync(int taskId, string taskTitle, string workerName)
+    public async Task SendTaskCompletedToSupervisorsAsync(int taskId, string taskTitle, string workerName, int? municipalityId = null)
     {
         var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, workerName });
         var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_completed" } };
 
         await SendToAllSupervisorsAsync("مهمة مكتملة بانتظار المراجعة", $"أكمل العامل {workerName} المهمة: {taskTitle}",
-            NotificationType.TaskStatusChanged, payload, data);
+            NotificationType.TaskStatusChanged, payload, data, municipalityId);
         _logger.LogInformation("Task completed notification sent to supervisors for task {TaskId} by {WorkerName}", taskId, workerName);
     }
 
-    public async Task SendIssueReportedToSupervisorsAsync(int issueId, string issueTitle, string workerName, string severity)
+    public async Task SendIssueReportedToSupervisorsAsync(int issueId, string issueTitle, string workerName, string severity, int? municipalityId = null)
     {
         var payload = System.Text.Json.JsonSerializer.Serialize(new { issueId, workerName, severity });
         var data = new Dictionary<string, string> { { "issueId", issueId.ToString() }, { "type", "issue_reported" }, { "severity", severity } };
 
         await SendToAllSupervisorsAsync("بلاغ جديد", $"أبلغ العامل {workerName} عن مشكلة: {issueTitle} (الخطورة: {severity})",
-            NotificationType.IssueReported, payload, data);
+            NotificationType.IssueReported, payload, data, municipalityId);
         _logger.LogInformation("Issue reported notification sent to supervisors for issue {IssueId} by {WorkerName}", issueId, workerName);
     }
 
@@ -214,14 +218,14 @@ public class NotificationService : INotificationService
             _logger.LogInformation("System alert sent to user {UserId}", userId);
     }
 
-    public async Task SendBatteryLowNotificationAsync(int workerId, string workerName, int batteryLevel)
+    public async Task SendBatteryLowNotificationAsync(int workerId, string workerName, int batteryLevel, int? municipalityId = null)
     {
         var payload = System.Text.Json.JsonSerializer.Serialize(new { workerId, batteryLevel });
         var data = new Dictionary<string, string> { { "workerId", workerId.ToString() }, { "batteryLevel", batteryLevel.ToString() }, { "type", "battery_low" } };
 
         await SendToAllSupervisorsAsync("تنبيه بطارية منخفضة",
             $"بطارية العامل {workerName} منخفضة ({batteryLevel}%). قد لا يتمكن من إكمال مهامه.",
-            NotificationType.BatteryLow, payload, data);
+            NotificationType.BatteryLow, payload, data, municipalityId);
         _logger.LogInformation("Battery low notification sent for worker {WorkerId} ({BatteryLevel}%)", workerId, batteryLevel);
     }
 
@@ -235,14 +239,14 @@ public class NotificationService : INotificationService
             _logger.LogInformation("Task auto-rejected notification sent to worker {WorkerId} for task {TaskId}", workerId, taskId);
     }
 
-    public async Task SendTaskAutoRejectedToSupervisorsAsync(int taskId, string taskTitle, string workerName, string reason, int distanceMeters)
+    public async Task SendTaskAutoRejectedToSupervisorsAsync(int taskId, string taskTitle, string workerName, string reason, int distanceMeters, int? municipalityId = null)
     {
         var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, workerName, reason, distanceMeters });
         var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_auto_rejected_supervisor" }, { "distanceMeters", distanceMeters.ToString() } };
 
         await SendToAllSupervisorsAsync("رفض تلقائي لإثبات مهمة",
             $"تم رفض إثبات العامل {workerName} للمهمة \"{taskTitle}\" تلقائياً.\n{reason}\nالمسافة: {distanceMeters} متر",
-            NotificationType.SystemAlert, payload, data);
+            NotificationType.SystemAlert, payload, data, municipalityId);
         _logger.LogInformation("Task auto-rejected notification sent to supervisors for task {TaskId}", taskId);
     }
 
@@ -256,14 +260,14 @@ public class NotificationService : INotificationService
             _logger.LogInformation("Warning notification sent to worker {WorkerId}, total warnings: {TotalWarnings}", workerId, totalWarnings);
     }
 
-    public async Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings)
+    public async Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings, int? municipalityId = null)
     {
         var title = totalWarnings >= 3 ? "عامل وصل للحد الأقصى من التحذيرات" : "تحذير لعامل";
         var payload = System.Text.Json.JsonSerializer.Serialize(new { workerId, workerName, reason, totalWarnings });
         var data = new Dictionary<string, string> { { "workerId", workerId.ToString() }, { "type", "worker_warning_alert" }, { "totalWarnings", totalWarnings.ToString() } };
 
         await SendToAllSupervisorsAsync(title, $"تم إصدار تحذير للعامل {workerName}.\nالسبب: {reason}\nإجمالي التحذيرات: {totalWarnings}",
-            NotificationType.SystemAlert, payload, data);
+            NotificationType.SystemAlert, payload, data, municipalityId);
         _logger.LogInformation("Warning alert sent to supervisors for worker {WorkerId}, total warnings: {TotalWarnings}", workerId, totalWarnings);
     }
 
@@ -309,20 +313,20 @@ public class NotificationService : INotificationService
             _logger.LogInformation("Manual attendance rejected notification sent to worker {WorkerId}", workerId);
     }
 
-    public async Task SendAppealSubmittedToSupervisorsAsync(int taskId, string taskTitle, string workerName)
+    public async Task SendAppealSubmittedToSupervisorsAsync(int taskId, string taskTitle, string workerName, int? municipalityId = null)
     {
         var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId });
         var data = new Dictionary<string, string> { { "type", "appeal_submitted" }, { "taskId", taskId.ToString() } };
 
         await SendToAllSupervisorsAsync("طعن جديد على مهمة",
             $"قدّم العامل {workerName} طعناً على المهمة \"{taskTitle}\"",
-            NotificationType.AppealSubmitted, payload, data);
+            NotificationType.AppealSubmitted, payload, data, municipalityId);
         _logger.LogInformation("Appeal submitted notification sent to supervisors for task {TaskId}", taskId);
     }
 
     // ─── Push notification via Firebase ───────────────────────────────────────
 
-    private async Task SendPushNotificationAsync(int userId, string title, string body, Dictionary<string, string>? data = null)
+    private async Task SendPushNotificationAsync(int userId, string title, string body, Dictionary<string, string>? data = null, string? fcmToken = null)
     {
         if (!_fcmEnabled)
         {
@@ -332,8 +336,15 @@ public class NotificationService : INotificationService
 
         try
         {
-            var user = await _users.GetByIdAsync(userId);
-            if (user == null || string.IsNullOrEmpty(user.FcmToken))
+            // Use pre-fetched token if available, otherwise fetch from DB
+            var token = fcmToken;
+            if (string.IsNullOrEmpty(token))
+            {
+                var user = await _users.GetByIdAsync(userId);
+                token = user?.FcmToken;
+            }
+
+            if (string.IsNullOrEmpty(token))
             {
                 _logger.LogDebug("User {UserId} has no FCM token, skipping push notification", userId);
                 return;
@@ -341,7 +352,7 @@ public class NotificationService : INotificationService
 
             var message = new Message
             {
-                Token = user.FcmToken,
+                Token = token,
                 Notification = new FirebaseAdmin.Messaging.Notification
                 {
                     Title = title,

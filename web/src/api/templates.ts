@@ -22,14 +22,14 @@ export interface CreateTaskTemplateRequest {
 
 // Get all task templates
 export async function getTaskTemplates(): Promise<TaskTemplate[]> {
-  const response = await apiClient.get<TaskTemplate[]>("/task-templates");
-  return response.data;
+  const response = await apiClient.get<{ data: TaskTemplate[] }>("/task-templates");
+  return response.data.data;
 }
 
 // Create a new task template
 export async function createTaskTemplate(data: CreateTaskTemplateRequest): Promise<TaskTemplate> {
-  const response = await apiClient.post<TaskTemplate>("/task-templates", data);
-  return response.data;
+  const response = await apiClient.post<{ data: TaskTemplate }>("/task-templates", data);
+  return response.data.data;
 }
 
 // Delete a task template

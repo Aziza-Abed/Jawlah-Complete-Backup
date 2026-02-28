@@ -33,20 +33,7 @@ public class DepartmentsController : BaseApiController
             query = query.Where(d => d.IsActive);
         }
 
-        var departments = await query
-            .OrderBy(d => d.Name)
-            .Select(d => new DepartmentDto
-            {
-                DepartmentId = d.DepartmentId,
-                Name = d.Name,
-                NameEnglish = d.NameEnglish,
-                Code = d.Code,
-                Description = d.Description,
-                IsActive = d.IsActive,
-                UsersCount = _context.Users.Count(u => u.DepartmentId == d.DepartmentId),
-                CreatedAt = d.CreatedAt
-            })
-            .ToListAsync();
+        var departments = await ProjectToDto(query.OrderBy(d => d.Name)).ToListAsync();
 
         return Ok(ApiResponse<List<DepartmentDto>>.SuccessResponse(departments));
     }
@@ -56,19 +43,7 @@ public class DepartmentsController : BaseApiController
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetById(int id)
     {
-        var department = await _context.Departments
-            .Where(d => d.DepartmentId == id)
-            .Select(d => new DepartmentDto
-            {
-                DepartmentId = d.DepartmentId,
-                Name = d.Name,
-                NameEnglish = d.NameEnglish,
-                Code = d.Code,
-                Description = d.Description,
-                IsActive = d.IsActive,
-                UsersCount = _context.Users.Count(u => u.DepartmentId == d.DepartmentId),
-                CreatedAt = d.CreatedAt
-            })
+        var department = await ProjectToDto(_context.Departments.Where(d => d.DepartmentId == id))
             .FirstOrDefaultAsync();
 
         if (department == null)
@@ -115,19 +90,7 @@ public class DepartmentsController : BaseApiController
         _logger.LogInformation("Department created: {Name} ({Code}) by user {UserId}",
             department.Name, department.Code, GetCurrentUserId());
 
-        var dto = new DepartmentDto
-        {
-            DepartmentId = department.DepartmentId,
-            Name = department.Name,
-            NameEnglish = department.NameEnglish,
-            Code = department.Code,
-            Description = department.Description,
-            IsActive = department.IsActive,
-            UsersCount = 0,
-            CreatedAt = department.CreatedAt
-        };
-
-        return Ok(ApiResponse<DepartmentDto>.SuccessResponse(dto, "تم إنشاء القسم بنجاح"));
+        return Ok(ApiResponse<DepartmentDto>.SuccessResponse(MapToDto(department, 0), "تم إنشاء القسم بنجاح"));
     }
 
     // update department (admin only)
@@ -169,19 +132,7 @@ public class DepartmentsController : BaseApiController
 
         var usersCount = await _context.Users.CountAsync(u => u.DepartmentId == id);
 
-        var dto = new DepartmentDto
-        {
-            DepartmentId = department.DepartmentId,
-            Name = department.Name,
-            NameEnglish = department.NameEnglish,
-            Code = department.Code,
-            Description = department.Description,
-            IsActive = department.IsActive,
-            UsersCount = usersCount,
-            CreatedAt = department.CreatedAt
-        };
-
-        return Ok(ApiResponse<DepartmentDto>.SuccessResponse(dto, "تم تحديث القسم بنجاح"));
+        return Ok(ApiResponse<DepartmentDto>.SuccessResponse(MapToDto(department, usersCount), "تم تحديث القسم بنجاح"));
     }
 
     // delete department (admin only)
@@ -206,4 +157,33 @@ public class DepartmentsController : BaseApiController
 
         return Ok(ApiResponse<object>.SuccessResponse(new { }, "تم حذف القسم بنجاح"));
     }
+
+    // project department query to DTO with user count
+    private IQueryable<DepartmentDto> ProjectToDto(IQueryable<Department> query)
+    {
+        return query.Select(d => new DepartmentDto
+        {
+            DepartmentId = d.DepartmentId,
+            Name = d.Name,
+            NameEnglish = d.NameEnglish,
+            Code = d.Code,
+            Description = d.Description,
+            IsActive = d.IsActive,
+            UsersCount = _context.Users.Count(u => u.DepartmentId == d.DepartmentId),
+            CreatedAt = d.CreatedAt
+        });
+    }
+
+    // map a department entity to DTO
+    private static DepartmentDto MapToDto(Department d, int usersCount) => new()
+    {
+        DepartmentId = d.DepartmentId,
+        Name = d.Name,
+        NameEnglish = d.NameEnglish,
+        Code = d.Code,
+        Description = d.Description,
+        IsActive = d.IsActive,
+        UsersCount = usersCount,
+        CreatedAt = d.CreatedAt
+    };
 }

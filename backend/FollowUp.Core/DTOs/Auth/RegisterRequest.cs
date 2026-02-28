@@ -29,10 +29,6 @@ public class RegisterRequest
 
     public WorkerType? WorkerType { get; set; }
 
-    [StringLength(4, MinimumLength = 4, ErrorMessage = "PIN must be exactly 4 digits")]
-    [RegularExpression(@"^\d{4}$", ErrorMessage = "PIN must be exactly 4 digits")]
-    public string? Pin { get; set; } // Optional - legacy field, no longer used
-
     // Department ID for the user (optional)
     public int? DepartmentId { get; set; }
 

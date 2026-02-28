@@ -168,7 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       imageQuality: 70,
     );
 
-    if (image != null) {
+    if (image != null && mounted) {
       setState(() => _profileImage = image);
     }
   }
@@ -235,7 +235,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildStatisticsCard(TaskManager tasksProvider) {
-    final actionableTotal = tasksProvider.actionableCount;
+    final pending = tasksProvider.pendingCount;
+    final inProgress = tasksProvider.inProgressCount;
+    final completed = tasksProvider.completedCount;
+    final displayedTotal = pending + inProgress + completed;
 
     return Container(
       width: double.infinity,
@@ -259,13 +262,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatItem('جديد', tasksProvider.pendingCount.toString(),
+              _buildStatItem('جديد', pending.toString(),
                   AppColors.info),
               _buildStatItem('قيد التنفيذ',
-                  tasksProvider.inProgressCount.toString(), AppColors.warning),
-              _buildStatItem('مكتمل', tasksProvider.completedCount.toString(),
+                  inProgress.toString(), AppColors.warning),
+              _buildStatItem('مكتمل', completed.toString(),
                   AppColors.success),
-              _buildStatItem('الكل', actionableTotal.toString(),
+              _buildStatItem('الكل', displayedTotal.toString(),
                   AppColors.primary),
             ],
           ),

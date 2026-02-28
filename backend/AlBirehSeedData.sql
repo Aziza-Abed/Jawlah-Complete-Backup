@@ -12,6 +12,7 @@
 -- ========================================================================
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
+SET DATEFIRST 7; -- Sunday=1, Friday=6, Saturday=7 (Palestinian weekend skip logic depends on this)
 
 USE FollowUpNew;
 
@@ -570,7 +571,7 @@ VALUES
 (@MunicipalityId, N'تراكم نفايات بجانب المدرسة', N'شكوى من سكان المنطقة - نفايات متراكمة', @HealthWorker1, @Z5, 3, 2, 0, 31.9064, 35.2156, DATEADD(HOUR,-5,GETUTCDATE()), 1, 1, DATEADD(HOUR,-5,GETUTCDATE())),
 (@MunicipalityId, N'عمود إنارة مائل', N'عمود إنارة مائل بشكل خطير بعد حادث سير', @WorksWorker1, @Z17, 2, 4, 0, 31.9025, 35.2048, DATEADD(HOUR,-2,GETUTCDATE()), 1, 1, DATEADD(HOUR,-2,GETUTCDATE()));
 
-PRINT 'Created 16 historical issues (7 resolved, 4 forwarded, 2 new)';
+PRINT 'Created 13 historical issues (7 resolved, 4 under review/forwarded, 2 new)';
 
 -- ========================================================================
 -- 8. ATTENDANCE RECORDS (past 20 work days: Sun-Thu)

@@ -10,6 +10,8 @@ class NotificationModel {
   final DateTime createdAt;
   final DateTime? sentAt;
   DateTime? readAt;
+  final int? taskId;
+  final int? issueId;
 
   NotificationModel({
     required this.notificationId,
@@ -21,6 +23,8 @@ class NotificationModel {
     required this.createdAt,
     this.sentAt,
     this.readAt,
+    this.taskId,
+    this.issueId,
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +42,8 @@ class NotificationModel {
       readAt: json['readAt'] != null
           ? DateFormatter.parseUtc(json['readAt'] as String)
           : null,
+      taskId: json['taskId'] as int?,
+      issueId: json['issueId'] as int?,
     );
   }
 
@@ -52,6 +58,8 @@ class NotificationModel {
       'createdAt': createdAt.toIso8601String(),
       'sentAt': sentAt?.toIso8601String(),
       'readAt': readAt?.toIso8601String(),
+      'taskId': taskId,
+      'issueId': issueId,
     };
   }
 }

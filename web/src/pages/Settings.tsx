@@ -191,10 +191,10 @@ export default function Settings() {
                 storageKey="issues"
               />
 
-              <div className="bg-[#8FA36A]/10 p-4 rounded-xl border border-[#8FA36A]/20 mt-4">
-                 <p className="text-[11px] text-[#8FA36A] text-right font-black leading-relaxed">
-                   <CheckCircle size={12} className="inline ml-1" />
-                   يتم حفظ إعدادات الإشعارات تلقائياً على هذا الجهاز.
+              <div className="bg-[#F5B300]/10 p-4 rounded-xl border border-[#F5B300]/20 mt-4">
+                 <p className="text-[11px] text-[#D4A100] text-right font-black leading-relaxed">
+                   <AlertCircle size={12} className="inline ml-1" />
+                   إعدادات الإشعارات قيد التطوير حالياً وسيتم تفعيلها في تحديث قادم.
                  </p>
               </div>
             </div>

@@ -33,32 +33,15 @@ public class TeamsController : BaseApiController
         }
 
         // SECURITY: Supervisors can only see teams from their department
-        var currentUserId = GetCurrentUserId();
-        var currentUserRole = GetCurrentUserRole();
-
-        if (currentUserRole == "Supervisor" && currentUserId.HasValue)
+        var (isSupervisor, supervisorDeptId) = await GetSupervisorDepartmentAsync();
+        if (isSupervisor)
         {
-            // Get supervisor's department
-            var supervisor = await _context.Users
-                .Where(u => u.UserId == currentUserId.Value)
-                .Select(u => new { u.DepartmentId })
-                .FirstOrDefaultAsync();
-
-            if (supervisor?.DepartmentId != null)
+            if (supervisorDeptId.HasValue)
             {
-                // Filter teams to only those in supervisor's department
-                query = query.Where(t => t.DepartmentId == supervisor.DepartmentId);
-
-                _logger.LogInformation(
-                    "Supervisor {SupervisorId} querying teams (filtered to department {DepartmentId})",
-                    currentUserId.Value, supervisor.DepartmentId);
+                query = query.Where(t => t.DepartmentId == supervisorDeptId.Value);
             }
             else
             {
-                // Supervisor has no department - return empty list
-                _logger.LogWarning(
-                    "Supervisor {SupervisorId} has no department assigned, returning empty team list",
-                    currentUserId.Value);
                 return Ok(ApiResponse<List<TeamDto>>.SuccessResponse(new List<TeamDto>()));
             }
         }
@@ -114,23 +97,10 @@ public class TeamsController : BaseApiController
             return NotFound(ApiResponse<object>.ErrorResponse("الفريق غير موجود"));
 
         // SECURITY: Supervisors can only view teams from their department
-        var currentUserId = GetCurrentUserId();
-        var currentUserRole = GetCurrentUserRole();
-
-        if (currentUserRole == "Supervisor" && currentUserId.HasValue)
+        var (isSupervisor, supervisorDeptId) = await GetSupervisorDepartmentAsync();
+        if (isSupervisor && supervisorDeptId != team.DepartmentId)
         {
-            var supervisor = await _context.Users
-                .Where(u => u.UserId == currentUserId.Value)
-                .Select(u => new { u.DepartmentId })
-                .FirstOrDefaultAsync();
-
-            if (supervisor?.DepartmentId != team.DepartmentId)
-            {
-                _logger.LogWarning(
-                    "Supervisor {SupervisorId} attempted to access team {TeamId} from different department",
-                    currentUserId.Value, id);
-                return Forbid();
-            }
+            return Forbid();
         }
 
         return Ok(ApiResponse<TeamDto>.SuccessResponse(team));
@@ -167,30 +137,8 @@ public class TeamsController : BaseApiController
         // Validate team leader if provided
         if (request.TeamLeaderId.HasValue)
         {
-            var teamLeader = await _context.Users.FindAsync(request.TeamLeaderId.Value);
-            if (teamLeader == null)
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق المحدد غير موجود"));
-            }
-
-            // Ensure team leader is from the same department
-            if (teamLeader.DepartmentId != request.DepartmentId)
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق يجب أن يكون من نفس القسم"));
-            }
-
-            if (teamLeader.Role != Core.Enums.UserRole.Worker)
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق يجب أن يكون عامل"));
-            }
-
-            // Check team leader uniqueness - a worker can only lead ONE team
-            var existingLeadership = await _context.Teams
-                .AnyAsync(t => t.TeamLeaderId == request.TeamLeaderId.Value);
-            if (existingLeadership)
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse("هذا العامل قائد لفريق آخر بالفعل"));
-            }
+            var leaderError = await ValidateTeamLeaderAsync(request.TeamLeaderId.Value, request.DepartmentId);
+            if (leaderError != null) return leaderError;
         }
 
         var team = new Core.Entities.Team
@@ -210,22 +158,7 @@ public class TeamsController : BaseApiController
 
         _logger.LogInformation("Team {TeamId} created: {TeamName}", team.TeamId, team.Name);
 
-        var teamDto = new TeamDto
-        {
-            TeamId = team.TeamId,
-            DepartmentId = team.DepartmentId,
-            DepartmentName = department.Name,
-            Name = team.Name,
-            Code = team.Code,
-            Description = team.Description,
-            TeamLeaderId = team.TeamLeaderId,
-            MaxMembers = team.MaxMembers,
-            MembersCount = 0,
-            IsActive = team.IsActive,
-            CreatedAt = team.CreatedAt
-        };
-
-        return Ok(ApiResponse<TeamDto>.SuccessResponse(teamDto, "تم إنشاء الفريق بنجاح"));
+        return Ok(ApiResponse<TeamDto>.SuccessResponse(MapToDto(team, department.Name, 0), "تم إنشاء الفريق بنجاح"));
     }
 
     // update an existing team
@@ -264,31 +197,8 @@ public class TeamsController : BaseApiController
         // Validate team leader if provided
         if (request.TeamLeaderId.HasValue)
         {
-            var teamLeader = await _context.Users.FindAsync(request.TeamLeaderId.Value);
-            if (teamLeader == null)
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق المحدد غير موجود"));
-            }
-
-            // Ensure team leader is from the same department
-            if (teamLeader.DepartmentId != team.DepartmentId)
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق يجب أن يكون من نفس القسم"));
-            }
-
-            if (teamLeader.Role != Core.Enums.UserRole.Worker)
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق يجب أن يكون عامل"));
-            }
-
-            // Check team leader uniqueness - a worker can only lead ONE team
-            // Exclude current team from check (allow keeping same leader)
-            var existingLeadership = await _context.Teams
-                .AnyAsync(t => t.TeamLeaderId == request.TeamLeaderId.Value && t.TeamId != id);
-            if (existingLeadership)
-            {
-                return BadRequest(ApiResponse<object>.ErrorResponse("هذا العامل قائد لفريق آخر بالفعل"));
-            }
+            var leaderError = await ValidateTeamLeaderAsync(request.TeamLeaderId.Value, team.DepartmentId, excludeTeamId: id);
+            if (leaderError != null) return leaderError;
         }
 
         // Check if MaxMembers is being reduced below current member count
@@ -310,22 +220,7 @@ public class TeamsController : BaseApiController
 
         _logger.LogInformation("Team {TeamId} updated: {TeamName}", team.TeamId, team.Name);
 
-        var teamDto = new TeamDto
-        {
-            TeamId = team.TeamId,
-            DepartmentId = team.DepartmentId,
-            DepartmentName = team.Department.Name,
-            Name = team.Name,
-            Code = team.Code,
-            Description = team.Description,
-            TeamLeaderId = team.TeamLeaderId,
-            MaxMembers = team.MaxMembers,
-            MembersCount = currentMemberCount,
-            IsActive = team.IsActive,
-            CreatedAt = team.CreatedAt
-        };
-
-        return Ok(ApiResponse<TeamDto>.SuccessResponse(teamDto, "تم تحديث الفريق بنجاح"));
+        return Ok(ApiResponse<TeamDto>.SuccessResponse(MapToDto(team, team.Department.Name, currentMemberCount), "تم تحديث الفريق بنجاح"));
     }
 
     // delete a team (only if it has no members)
@@ -374,23 +269,10 @@ public class TeamsController : BaseApiController
         }
 
         // SECURITY: Supervisors can only view members of teams in their department
-        var currentUserId = GetCurrentUserId();
-        var currentUserRole = GetCurrentUserRole();
-
-        if (currentUserRole == "Supervisor" && currentUserId.HasValue)
+        var (isSupervisor, supervisorDeptId) = await GetSupervisorDepartmentAsync();
+        if (isSupervisor && supervisorDeptId != team.DepartmentId)
         {
-            var supervisor = await _context.Users
-                .Where(u => u.UserId == currentUserId.Value)
-                .Select(u => new { u.DepartmentId })
-                .FirstOrDefaultAsync();
-
-            if (supervisor?.DepartmentId != team.DepartmentId)
-            {
-                _logger.LogWarning(
-                    "Supervisor {SupervisorId} attempted to view members of team {TeamId} from different department",
-                    currentUserId.Value, id);
-                return Forbid();
-            }
+            return Forbid();
         }
 
         var members = await _context.Users
@@ -456,6 +338,61 @@ public class TeamsController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(new { }, "تم إضافة العامل إلى الفريق بنجاح"));
     }
 
+    private static TeamDto MapToDto(Core.Entities.Team t, string departmentName, int membersCount) => new()
+    {
+        TeamId = t.TeamId,
+        DepartmentId = t.DepartmentId,
+        DepartmentName = departmentName,
+        Name = t.Name,
+        Code = t.Code,
+        Description = t.Description,
+        TeamLeaderId = t.TeamLeaderId,
+        MaxMembers = t.MaxMembers,
+        MembersCount = membersCount,
+        IsActive = t.IsActive,
+        CreatedAt = t.CreatedAt
+    };
+
+    // helper: get supervisor's department ID (null if not supervisor or no department)
+    private async Task<(bool IsSupervisor, int? DepartmentId)> GetSupervisorDepartmentAsync()
+    {
+        var currentUserId = GetCurrentUserId();
+        var currentUserRole = GetCurrentUserRole();
+
+        if (currentUserRole != "Supervisor" || !currentUserId.HasValue)
+            return (false, null);
+
+        var supervisor = await _context.Users
+            .Where(u => u.UserId == currentUserId.Value)
+            .Select(u => new { u.DepartmentId })
+            .FirstOrDefaultAsync();
+
+        return (true, supervisor?.DepartmentId);
+    }
+
+    // helper: validate team leader (exists, same department, is Worker, not leading another team)
+    private async Task<IActionResult?> ValidateTeamLeaderAsync(int teamLeaderId, int departmentId, int? excludeTeamId = null)
+    {
+        var teamLeader = await _context.Users.FindAsync(teamLeaderId);
+        if (teamLeader == null)
+            return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق المحدد غير موجود"));
+
+        if (teamLeader.DepartmentId != departmentId)
+            return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق يجب أن يكون من نفس القسم"));
+
+        if (teamLeader.Role != Core.Enums.UserRole.Worker)
+            return BadRequest(ApiResponse<object>.ErrorResponse("قائد الفريق يجب أن يكون عامل"));
+
+        var leaderQuery = _context.Teams.Where(t => t.TeamLeaderId == teamLeaderId);
+        if (excludeTeamId.HasValue)
+            leaderQuery = leaderQuery.Where(t => t.TeamId != excludeTeamId.Value);
+
+        if (await leaderQuery.AnyAsync())
+            return BadRequest(ApiResponse<object>.ErrorResponse("هذا العامل قائد لفريق آخر بالفعل"));
+
+        return null;
+    }
+
     // remove worker from team
     [HttpDelete("{teamId}/members/{workerId}")]
     [Authorize(Roles = "Admin")]
@@ -470,6 +407,13 @@ public class TeamsController : BaseApiController
         if (worker.TeamId != teamId)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("العامل ليس عضواً في هذا الفريق"));
+        }
+
+        // Clear team leader reference if this worker is the team leader
+        var team = await _context.Teams.FindAsync(teamId);
+        if (team != null && team.TeamLeaderId == workerId)
+        {
+            team.TeamLeaderId = null;
         }
 
         worker.TeamId = null;

@@ -80,6 +80,10 @@ class TaskLocal extends HiveObject {
   @HiveField(24)
   List<String> photos;
 
+  // device time when the worker actually completed the task (before GPS/upload delay)
+  @HiveField(25)
+  DateTime? eventTime;
+
   TaskLocal({
     this.clientId,
     required this.taskId,
@@ -106,6 +110,7 @@ class TaskLocal extends HiveObject {
     this.progressPercentage = 0,
     this.progressNotes,
     this.photos = const [],
+    this.eventTime,
   });
 
   // Convert to sync DTO for uploading task updates
@@ -117,6 +122,7 @@ class TaskLocal extends HiveObject {
       'completionNotes': completionNotes,
       'photoUrl': photoUrl,
       'completedAt': completedAt?.toIso8601String(),
+      'eventTime': eventTime?.toIso8601String(),
       'latitude': latitude,
       'longitude': longitude,
       'progressPercentage': progressPercentage,

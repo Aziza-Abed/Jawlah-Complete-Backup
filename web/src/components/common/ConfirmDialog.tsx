@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
 
 interface ConfirmState {
@@ -29,6 +29,13 @@ export function useConfirm() {
     resolveRef.current = null;
     setState(null);
   }, []);
+
+  useEffect(() => {
+    if (!state) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [state, handleClose]);
 
   const Dialog = state ? (
     <div className="fixed inset-0 z-50 flex items-center justify-center" dir="rtl">

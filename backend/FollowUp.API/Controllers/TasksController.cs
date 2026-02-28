@@ -10,7 +10,6 @@ using FollowUp.Core.Interfaces.Services;
 using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using TaskEntity = FollowUp.Core.Entities.Task;
 using TaskStatus = FollowUp.Core.Enums.TaskStatus;
 using UserRole = FollowUp.Core.Enums.UserRole;
@@ -19,7 +18,6 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle all task operations
 [Route("api/[controller]")]
-[Authorize]
 public class TasksController : BaseApiController
 {
     private readonly ITaskRepository _tasks;
@@ -106,7 +104,6 @@ public class TasksController : BaseApiController
 
     // get single task by id
     [HttpGet("{id}")]
-    [Authorize]
     public async Task<IActionResult> GetTaskById(int id)
     {
         var userId = GetCurrentUserId();
@@ -342,18 +339,12 @@ public class TasksController : BaseApiController
         var currentRole = GetCurrentUserRole();
         var currentUserId = GetCurrentUserId();
 
-        // SECURITY FIX: Filter at database level, not in memory
+        // data isolation: supervisors only see their workers' tasks
         IEnumerable<TaskEntity> allTasks;
         if (currentRole == "Supervisor" && currentUserId.HasValue)
         {
-            // Get worker IDs assigned to this supervisor
-            var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-            var myWorkerIds = myWorkers
-                .Where(w => w.SupervisorId == currentUserId.Value)
-                .Select(w => w.UserId)
-                .ToList();
-
-            // Query database with filter - only loads supervisor's workers' tasks
+            var myWorkers = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
+            var myWorkerIds = myWorkers.Select(w => w.UserId).ToList();
             allTasks = await _tasks.GetTasksForWorkersAsync(myWorkerIds);
         }
         else
@@ -578,9 +569,9 @@ public class TasksController : BaseApiController
         // validate gps coords
         if (request.Latitude.HasValue && request.Longitude.HasValue)
         {
-            var validationResult = ValidateGpsCoordinates(request.Latitude.Value, request.Longitude.Value);
-            if (validationResult != null)
-                return BadRequest(ApiResponse<object>.ErrorResponse("إحداثيات GPS غير صالحة. يرجى التأكد من تفعيل الموقع"));
+            var gpsValidation = ValidateGpsCoordinates(request.Latitude.Value, request.Longitude.Value);
+            if (gpsValidation != null)
+                return gpsValidation;
 
             // verify proof GPS location is within task's assigned zone (skip if geofencing disabled)
             var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
@@ -662,7 +653,10 @@ public class TasksController : BaseApiController
                             OrderIndex = 0,
                             UploadedAt = DateTime.UtcNow,
                             UploadedByUserId = userId,
-                            CreatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.UtcNow,
+                            Latitude = request.Latitude,
+                            Longitude = request.Longitude,
+                            EventTime = request.EventTime
                         };
                         await _photos.AddAsync(photo);
                     }
@@ -694,7 +688,7 @@ public class TasksController : BaseApiController
                         try
                         {
                             await _notifications.SendWarningAlertToSupervisorsAsync(
-                                worker.UserId, worker.FullName, worker.LastWarningReason, worker.WarningCount);
+                                worker.UserId, worker.FullName, worker.LastWarningReason, worker.WarningCount, worker.MunicipalityId);
                         }
                         catch (Exception ex)
                         {
@@ -742,7 +736,10 @@ public class TasksController : BaseApiController
                             OrderIndex = 0,
                             UploadedAt = DateTime.UtcNow,
                             UploadedByUserId = userId,
-                            CreatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.UtcNow,
+                            Latitude = request.Latitude,
+                            Longitude = request.Longitude,
+                            EventTime = request.EventTime
                         };
                         await _photos.AddAsync(photo);
                     }
@@ -776,9 +773,9 @@ public class TasksController : BaseApiController
                         try
                         {
                             await _notifications.SendTaskAutoRejectedToSupervisorsAsync(
-                                task.TaskId, task.Title, worker.FullName, rejectionReason, completionDistanceMeters.Value);
+                                task.TaskId, task.Title, worker.FullName, rejectionReason, completionDistanceMeters.Value, task.MunicipalityId);
                             await _notifications.SendWarningAlertToSupervisorsAsync(
-                                worker.UserId, worker.FullName, worker.LastWarningReason, worker.WarningCount);
+                                worker.UserId, worker.FullName, worker.LastWarningReason, worker.WarningCount, worker.MunicipalityId);
                         }
                         catch (Exception ex)
                         {
@@ -825,7 +822,8 @@ public class TasksController : BaseApiController
 
             // update task with completion data - moves to UnderReview for supervisor approval
             task.Status = TaskStatus.UnderReview;
-            task.CompletedAt = DateTime.UtcNow;
+            task.CompletedAt = DateTime.UtcNow;                                    // server time (tamper-proof)
+            task.EventTime = request.EventTime ?? DateTime.UtcNow;                 // device time when worker actually completed it
             task.CompletionNotes = sanitizedNotes;
             task.Latitude = request.Latitude;
             task.Longitude = request.Longitude;
@@ -838,7 +836,7 @@ public class TasksController : BaseApiController
 
             await _tasks.UpdateAsync(task);
 
-            // save photo to photos table
+            // save photo to photos table with GPS and device timestamp for full audit trail
             if (photoUrl != null)
             {
                 var photo = new Photo
@@ -849,7 +847,10 @@ public class TasksController : BaseApiController
                     OrderIndex = 0,
                     UploadedAt = DateTime.UtcNow,
                     UploadedByUserId = userId,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    Latitude = request.Latitude,
+                    Longitude = request.Longitude,
+                    EventTime = request.EventTime ?? DateTime.UtcNow
                 };
                 await _photos.AddAsync(photo);
 
@@ -868,7 +869,8 @@ public class TasksController : BaseApiController
                 await _notifications.SendTaskCompletedToSupervisorsAsync(
                     task.TaskId,
                     task.Title,
-                    workerName);
+                    workerName,
+                    task.MunicipalityId);
 
                 // team task: notify other team members that a teammate completed the task
                 if (task.IsTeamTask && task.TeamId.HasValue)
@@ -950,8 +952,8 @@ public class TasksController : BaseApiController
             // supervisors see only their workers' overdue tasks
             if (userRole == "Supervisor" && userId.HasValue)
             {
-                var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-                var myWorkerIds = myWorkers.Where(w => w.SupervisorId == userId.Value).Select(w => w.UserId).ToHashSet();
+                var myWorkers = await _users.GetWorkersBySupervisorAsync(userId.Value);
+                var myWorkerIds = myWorkers.Select(w => w.UserId).ToHashSet();
                 tasks = tasks.Where(t => myWorkerIds.Contains(t.AssignedToUserId));
             }
         }
@@ -1061,11 +1063,19 @@ public class TasksController : BaseApiController
         var currentUserId = GetCurrentUserId();
         if (currentRole == "Supervisor" && currentUserId.HasValue)
         {
-            var assignedWorker = await _users.GetByIdAsync(task.AssignedToUserId);
-            if (assignedWorker?.SupervisorId != currentUserId.Value)
+            bool hasAccess;
+            if (task.IsTeamTask && task.TeamId.HasValue)
             {
-                return Forbid();
+                // For team tasks: supervisor must have at least one worker in the team
+                var myWorkers = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
+                hasAccess = myWorkers.Any(w => w.TeamId == task.TeamId);
             }
+            else
+            {
+                var assignedWorker = await _users.GetByIdAsync(task.AssignedToUserId);
+                hasAccess = assignedWorker?.SupervisorId == currentUserId.Value;
+            }
+            if (!hasAccess) return Forbid();
         }
 
         // can only approve tasks that are under review (submitted by worker)
@@ -1137,11 +1147,19 @@ public class TasksController : BaseApiController
         var currentUserId = GetCurrentUserId();
         if (currentRole == "Supervisor" && currentUserId.HasValue)
         {
-            var assignedWorker = await _users.GetByIdAsync(task.AssignedToUserId);
-            if (assignedWorker?.SupervisorId != currentUserId.Value)
+            bool hasAccess;
+            if (task.IsTeamTask && task.TeamId.HasValue)
             {
-                return Forbid();
+                // For team tasks: supervisor must have at least one worker in the team
+                var myWorkers = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
+                hasAccess = myWorkers.Any(w => w.TeamId == task.TeamId);
             }
+            else
+            {
+                var assignedWorker = await _users.GetByIdAsync(task.AssignedToUserId);
+                hasAccess = assignedWorker?.SupervisorId == currentUserId.Value;
+            }
+            if (!hasAccess) return Forbid();
         }
 
         // can only reject tasks that are under review (submitted by worker)
@@ -1226,7 +1244,6 @@ public class TasksController : BaseApiController
 
     // update task progress (for multi-day tasks)
     [HttpPut("{id}/progress")]
-    [Authorize]
     public async Task<IActionResult> UpdateTaskProgress(int id, [FromBody] UpdateTaskProgressRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -1280,8 +1297,9 @@ public class TasksController : BaseApiController
 
             if (distance > HardRejectDistanceMeters)
             {
-                return BadRequest(ApiResponse<object>.ErrorResponse(
-                    $"لا يمكن تحديث التقدم من هذا الموقع. المسافة من موقع المهمة: {distance} متر"));
+                task.IsDistanceWarning = true;
+                _logger.LogWarning("Task {TaskId} progress updated from {Distance}m by user {UserId}. Warning flag triggered.", 
+                    id, distance, userId);
             }
         }
 
@@ -1419,10 +1437,17 @@ public class TasksController : BaseApiController
                 request.NewAssignedToUserId,
                 task.TaskId,
                 task.Title);
+                
+            // SECURITY/SYNC: Notify OLD worker that task is reassigned so they do not attempt to fulfill it offline
+            await _notifications.SendTaskUpdatedNotificationAsync(
+                oldAssignedUserId,
+                task.TaskId,
+                $"تم سحب وإلغاء تعيين المهمة منك وإسنادها لغيرك: {task.Title}"
+            );
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to send notification to new worker");
+            _logger.LogWarning(ex, "Failed to send notification during task reassignment for task {TaskId}", id);
         }
 
         return Ok(ApiResponse<object>.SuccessResponse(
@@ -1512,8 +1537,8 @@ public class TasksController : BaseApiController
         var currentRole = GetCurrentUserRole();
         if (currentRole == "Supervisor" && currentUserId.HasValue)
         {
-            var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-            var myWorkerIds = myWorkers.Where(w => w.SupervisorId == currentUserId.Value).Select(w => w.UserId).ToHashSet();
+            var myWorkers = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
+            var myWorkerIds = myWorkers.Select(w => w.UserId).ToHashSet();
             allTasks = allTasks.Where(t => myWorkerIds.Contains(t.AssignedToUserId));
         }
 

@@ -68,14 +68,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'إعدادات الإشعارات',
                   subtitle: 'تحكم في أنواع الإشعارات',
                   onTap: () {
-                    Navigator.of(context).pushNamed(Routes.notificationSettings);
+                    Navigator.of(
+                      context,
+                    ).pushNamed(Routes.notificationSettings);
                   },
                 ),
                 _SettingItem(
                   icon: Icons.language,
                   title: 'اللغة',
                   subtitle: 'العربية',
-                  onTap: () {},
+                  onTap: () => _showLanguageDialog(context),
                 ),
                 _SettingItem(
                   icon: Icons.info,
@@ -94,12 +96,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingItem(
                   icon: Icons.help,
                   title: 'المساعدة والدعم',
-                  onTap: () {},
+                  onTap: () => _showHelpDialog(context),
                 ),
                 _SettingItem(
                   icon: Icons.phone,
                   title: 'الاتصال بالدعم الفني',
-                  onTap: () {},
+                  onTap: () => _showSupportDialog(context),
                 ),
               ],
             ),
@@ -170,15 +172,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     // Calculate work stats
     final now = DateTime.now();
-    final completedToday = taskManager.myTasks
-        .where((t) {
-          if (!t.isCompleted || t.completedAt == null) return false;
-          final local = t.completedAt!.toLocal();
-          return local.day == now.day &&
-                 local.month == now.month &&
-                 local.year == now.year;
-        })
-        .length;
+    final completedToday = taskManager.myTasks.where((t) {
+      if (!t.isCompleted || t.completedAt == null) return false;
+      final local = t.completedAt!.toLocal();
+      return local.day == now.day &&
+          local.month == now.month &&
+          local.year == now.year;
+    }).length;
 
     String workDuration = 'غير محدد';
     String checkInTime = 'غير محدد';
@@ -196,8 +196,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         checkOutTime =
             '${checkOut.hour.toString().padLeft(2, '0')}:${checkOut.minute.toString().padLeft(2, '0')}';
         // Use UTC times for duration calculation
-        final duration = todayAttendance.checkOutTime!
-            .difference(todayAttendance.checkInTime);
+        final duration = todayAttendance.checkOutTime!.difference(
+          todayAttendance.checkInTime,
+        );
         final hours = duration.inHours;
         final minutes = duration.inMinutes.remainder(60);
         workDuration = '$hours ساعة و $minutes دقيقة';
@@ -222,9 +223,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Icon(Icons.summarize, color: AppColors.primary),
             SizedBox(width: 8),
-            Text('ملخص العمل اليوم',
-                style: TextStyle(
-                    fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+            Text(
+              'ملخص العمل اليوم',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -238,11 +243,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSummaryRow(Icons.timer, 'مدة العمل', workDuration),
             const SizedBox(height: 8),
             _buildSummaryRow(
-                Icons.task_alt, 'المهام المكتملة', '$completedToday مهمة'),
+              Icons.task_alt,
+              'المهام المكتملة',
+              '$completedToday مهمة',
+            ),
             if (lateInfo.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _buildSummaryRow(Icons.warning_amber, 'ملاحظة', lateInfo,
-                  color: AppColors.warning),
+              _buildSummaryRow(
+                Icons.warning_amber,
+                'ملاحظة',
+                lateInfo,
+                color: AppColors.warning,
+              ),
             ],
             const SizedBox(height: 16),
             Container(
@@ -259,9 +271,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Text(
                       'سيتم تسجيل الانصراف تلقائياً عند الخروج',
                       style: TextStyle(
-                          fontFamily: 'Cairo',
-                          fontSize: 12,
-                          color: AppColors.info),
+                        fontFamily: 'Cairo',
+                        fontSize: 12,
+                        color: AppColors.info,
+                      ),
                     ),
                   ),
                 ],
@@ -285,40 +298,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+            child: const Text(
+              'إلغاء',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                color: AppColors.textPrimary,
+              ),
+            ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<AuthManager>().doLogout();
-              Navigator.of(context)
-                  .pushNamedAndRemoveUntil(Routes.login, (route) => false);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('تسجيل الخروج',
-                style: TextStyle(fontFamily: 'Cairo', color: Colors.white)),
-          ),
+          if (pendingCount > 0)
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'جارِ مزامنة البيانات...',
+                      style: TextStyle(fontFamily: 'Cairo'),
+                    ),
+                  ),
+                );
+                await context.read<SyncManager>().startSync();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'مزامنة أولاً',
+                style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
+              ),
+            )
+          else
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.read<AuthManager>().doLogout();
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil(Routes.login, (route) => false);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text(
+                'تسجيل الخروج',
+                style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryRow(IconData icon, String label, String value,
-      {Color? color}) {
+  Widget _buildSummaryRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? color,
+  }) {
     return Row(
       children: [
         Icon(icon, size: 20, color: color ?? AppColors.primary),
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style:
-              const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontFamily: 'Cairo',
+            fontWeight: FontWeight.bold,
+          ),
         ),
         Expanded(
           child: Text(
             value,
             style: TextStyle(
-                fontFamily: 'Cairo', color: color ?? AppColors.textPrimary),
+              fontFamily: 'Cairo',
+              color: color ?? AppColors.textPrimary,
+            ),
           ),
         ),
       ],
@@ -353,11 +406,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             child: const Hero(
               tag: 'profile-avatar',
-              child: Icon(
-                Icons.person,
-                size: 36,
-                color: AppColors.primary,
-              ),
+              child: Icon(Icons.person, size: 36, color: AppColors.primary),
             ),
           ),
           const SizedBox(width: 16),
@@ -376,8 +425,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.success.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -444,11 +495,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            Icon(
-              item.icon,
-              size: 24,
-              color: AppColors.primary,
-            ),
+            Icon(item.icon, size: 24, color: AppColors.primary),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -488,6 +535,147 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showLanguageDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'اللغة',
+          style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'التطبيق يدعم حالياً اللغة العربية فقط.',
+          style: TextStyle(fontFamily: 'Cairo', fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'حسناً',
+              style: TextStyle(fontFamily: 'Cairo', color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text(
+              'المساعدة والدعم',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'كيفية استخدام التطبيق:',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              '• يتم تسجيل الحضور تلقائياً عبر GPS عند دخول منطقة العمل',
+              style: TextStyle(fontFamily: 'Cairo', fontSize: 14, height: 1.6),
+            ),
+            Text(
+              '• يمكنك طلب تسجيل يدوي من صفحة الحضور إذا لزم الأمر',
+              style: TextStyle(fontFamily: 'Cairo', fontSize: 14, height: 1.6),
+            ),
+            Text(
+              '• تابع مهامك وحدّث نسبة الإنجاز من صفحة المهام',
+              style: TextStyle(fontFamily: 'Cairo', fontSize: 14, height: 1.6),
+            ),
+            Text(
+              '• يمكنك الإبلاغ عن مشكلة ميدانية من زر "بلاغ"',
+              style: TextStyle(fontFamily: 'Cairo', fontSize: 14, height: 1.6),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'حسناً',
+              style: TextStyle(fontFamily: 'Cairo', color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSupportDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.support_agent, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text(
+              'الدعم الفني',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'للتواصل مع فريق الدعم الفني:',
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'يرجى التواصل مع المشرف المباشر أو إدارة البلدية للحصول على المساعدة التقنية.',
+              style: TextStyle(fontFamily: 'Cairo', fontSize: 14, height: 1.6),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'حسناً',
+              style: TextStyle(fontFamily: 'Cairo', color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAboutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -520,7 +708,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'جولة',
+                'فولو أب',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontSize: 22,

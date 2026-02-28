@@ -12,12 +12,10 @@ namespace FollowUp.API.Controllers;
 
 // handles location validation appeals
 [Route("api/[controller]")]
-[Authorize]
 public class AppealsController : BaseApiController
 {
     private readonly IAppealRepository _appeals;
     private readonly ITaskRepository _tasks;
-    private readonly IAttendanceRepository _attendance;
     private readonly IUserRepository _users;
     private readonly IFileStorageService _files;
     private readonly INotificationService _notifications;
@@ -27,7 +25,6 @@ public class AppealsController : BaseApiController
     public AppealsController(
         IAppealRepository appeals,
         ITaskRepository tasks,
-        IAttendanceRepository attendance,
         IUserRepository users,
         IFileStorageService files,
         INotificationService notifications,
@@ -36,7 +33,6 @@ public class AppealsController : BaseApiController
     {
         _appeals = appeals;
         _tasks = tasks;
-        _attendance = attendance;
         _users = users;
         _files = files;
         _notifications = notifications;
@@ -63,16 +59,25 @@ public class AppealsController : BaseApiController
         double? expectedLat = null, expectedLng = null, workerLat = null, workerLng = null;
         int? distanceMeters = null;
         string? originalRejectionReason = null;
+        Core.Entities.Task? task = null;
 
         if (request.AppealType == AppealType.TaskRejection)
         {
             entityType = "Task";
-            var task = await _tasks.GetByIdAsync(request.EntityId);
+            task = await _tasks.GetByIdAsync(request.EntityId);
             if (task == null)
                 return NotFound(ApiResponse<object>.ErrorResponse("المهمة غير موجودة"));
 
-            if (task.AssignedToUserId != userId.Value)
+            // For team tasks check team membership; for individual tasks check direct assignment
+            if (task.IsTeamTask)
+            {
+                if (!task.TeamId.HasValue || user.TeamId != task.TeamId)
+                    return Forbid();
+            }
+            else if (task.AssignedToUserId != userId.Value)
+            {
                 return Forbid();
+            }
 
             if (!task.IsAutoRejected)
                 return BadRequest(ApiResponse<object>.ErrorResponse("هذه المهمة لم يتم رفضها تلقائياً"));
@@ -136,14 +141,14 @@ public class AppealsController : BaseApiController
             _logger.LogInformation("Appeal {AppealId} submitted by user {UserId} for {EntityType} {EntityId}",
                 appeal.AppealId, userId.Value, entityType, request.EntityId);
 
-            // Notify supervisors about the new appeal using dedicated notification type
+            // notify supervisors about the new appeal
             try
             {
-                var task = await _tasks.GetByIdAsync(request.EntityId);
                 await _notifications.SendAppealSubmittedToSupervisorsAsync(
                     request.EntityId,
                     task?.Title ?? "مهمة",
-                    user.FullName);
+                    user.FullName,
+                    user.MunicipalityId);
             }
             catch (Exception ex)
             {

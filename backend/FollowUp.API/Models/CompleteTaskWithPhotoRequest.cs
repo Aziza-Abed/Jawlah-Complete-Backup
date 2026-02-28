@@ -7,4 +7,6 @@ public class CompleteTaskWithPhotoRequest
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public IFormFile? Photo { get; set; }
+    // device time when the worker actually completed the task (before GPS/upload delay)
+    public DateTime? EventTime { get; set; }
 }

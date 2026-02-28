@@ -70,9 +70,9 @@ public class TaskGenerationBackgroundService : BackgroundService
             return;
         }
 
-        // Get first admin user to use as default assignee (required FK)
+        // Get first Worker in this municipality as default assignee (supervisor can reassign)
         var defaultAssignee = await dbContext.Users
-            .Where(u => u.MunicipalityId == templates[0].MunicipalityId)
+            .Where(u => u.MunicipalityId == templates[0].MunicipalityId && u.Role == UserRole.Worker)
             .OrderBy(u => u.UserId)
             .FirstOrDefaultAsync(stoppingToken);
 
@@ -112,57 +112,24 @@ public class TaskGenerationBackgroundService : BackgroundService
 
     private bool ShouldGenerateTask(TaskTemplate template, DateTime now)
     {
-        // 1. Check Time
-        // Allow a window, e.g., if now.TimeOfDay >= template.Time AND haven't run yet today.
-        // Simple check: Is it past the scheduled time?
+        // skip if scheduled time hasn't passed yet today
         if (now.TimeOfDay < template.Time)
             return false;
 
-        // 2. Check Frequency
-        if (template.LastGeneratedAt.HasValue)
-        {
-             var last = template.LastGeneratedAt.Value;
-             
-             if (template.Frequency == "Daily")
-             {
-                 // Should run if last run was not today
-                 return last.Date < now.Date;
-             }
-             else if (template.Frequency == "Weekly")
-             {
-                 // Should run if last run was not this week (e.g., < now.AddDays(-6))?
-                 // Simple weekly: Only run on the same DayOfWeek as CreatedAt (or config?)
-                 // Let's assume consistent DayOfWeek logic.
-                 // If last run was < 1 week ago, don't run.
-                 // Actually, better: if last run was not today AND today is the correct day of week?
-                 // Or just interval: (now - last).TotalDays >= 7?
-                 
-                 // Let's go with interval for robustness + check day of week matches CreatedAt
-                 // If creation was on Monday, it runs every Monday.
-                 if (now.DayOfWeek != template.CreatedAt.DayOfWeek)
-                     return false;
-                     
-                 return last.Date < now.Date; // Ensure hasn't run today (which implies hasn't run this week due to day check)
-             }
-             else if (template.Frequency == "Monthly")
-             {
-                 if (now.Day != template.CreatedAt.Day)
-                     return false;
-                     
-                 return last.Date < now.Date;
-             }
-        }
-        else
-        {
-            // First run
-            // Check if day matches for Weekly/Monthly
-            if (template.Frequency == "Weekly" && now.DayOfWeek != template.CreatedAt.DayOfWeek) return false;
-            if (template.Frequency == "Monthly" && now.Day != template.CreatedAt.Day) return false;
-            
-            return true;
-        }
+        // for Weekly: only run on the same day of week as when template was created
+        if (template.Frequency == "Weekly" && now.DayOfWeek != template.CreatedAt.DayOfWeek)
+            return false;
 
-        return false;
+        // for Monthly: only run on the same day of month as when template was created
+        if (template.Frequency == "Monthly" && now.Day != template.CreatedAt.Day)
+            return false;
+
+        // first run — day checks passed above, generate
+        if (!template.LastGeneratedAt.HasValue)
+            return true;
+
+        // already ran today — skip
+        return template.LastGeneratedAt.Value.Date < now.Date;
     }
 
     // auto-close attendance records that have been open (CheckedIn) for more than 14 hours

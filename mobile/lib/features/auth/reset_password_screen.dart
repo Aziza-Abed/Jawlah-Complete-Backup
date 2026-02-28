@@ -42,10 +42,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Timer? _cooldownTimer;
   String? _errorMessage;
   String? _successMessage;
+  late String _sessionToken;
 
   @override
   void initState() {
     super.initState();
+    _sessionToken = widget.sessionToken;
     _startResendCooldown(60);
   }
 
@@ -96,6 +98,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       if (!mounted) return;
 
       if (result.success) {
+        if (result.sessionToken != null) {
+          _sessionToken = result.sessionToken!;
+        }
         _startResendCooldown(60);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -139,7 +144,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     try {
       await _authService.resetPassword(
-        sessionToken: widget.sessionToken,
+        sessionToken: _sessionToken,
         otpCode: otp,
         newPassword: _passwordController.text,
       );
@@ -412,8 +417,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               ),
                             ),
                             validator: (value) {
-                              if (value == null || value.length < 6) {
-                                return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                              if (value == null || value.length < 8) {
+                                return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
                               }
                               return null;
                             },

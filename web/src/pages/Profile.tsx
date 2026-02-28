@@ -97,7 +97,7 @@ export default function Profile() {
                   <h2 className="text-[32px] font-black tracking-tight">{profile?.fullName}</h2>
                   <div className="flex items-center justify-end gap-2 mt-2">
                     <span className="px-3 py-1 bg-white/20 rounded-full text-[12px] font-black uppercase tracking-widest backdrop-blur-sm">
-                      {profile?.role === "Admin" ? "مدير النظام" : "مشرف ميداني"}
+                      {profile?.role === "Admin" ? "مدير النظام" : profile?.role === "Supervisor" ? "مشرف" : "عامل ميداني"}
                     </span>
                     <Shield size={16} className="text-white/80" />
                   </div>

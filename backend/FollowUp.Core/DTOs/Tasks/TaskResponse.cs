@@ -19,6 +19,9 @@ public class TaskResponse
     public string? TeamName { get; set; }
     public bool IsTeamTask { get; set; } = false;
 
+    // traceability: source issue this task was created from (null for manually created tasks)
+    public int? SourceIssueId { get; set; }
+
     public TaskPriority Priority { get; set; }
     public Enums.TaskStatus Status { get; set; }
 
@@ -31,7 +34,8 @@ public class TaskResponse
     public DateTime? ScheduledAt { get; set; }
     public DateTime? DueDate { get; set; }
     public DateTime? StartedAt { get; set; }
-    public DateTime? CompletedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }  // server time (tamper-proof)
+    public DateTime? EventTime { get; set; }     // device time when worker actually completed it
     public string? LocationDescription { get; set; }
     public string? CompletionNotes { get; set; }
     public string? PhotoUrl { get; set; }

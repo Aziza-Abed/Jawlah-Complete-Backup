@@ -37,9 +37,9 @@ public class TrackingController : BaseApiController
             return Unauthorized();
 
         // Validate GPS coordinates
-        var validationResult = ValidateGpsCoordinates(dto.Latitude, dto.Longitude);
-        if (validationResult != null)
-            return BadRequest(ApiResponse<object>.ErrorResponse("إحداثيات GPS غير صالحة. يرجى التأكد من تفعيل الموقع"));
+        var gpsValidation = ValidateGpsCoordinates(dto.Latitude, dto.Longitude);
+        if (gpsValidation != null)
+            return gpsValidation;
 
         // save location to history table
         var history = new LocationHistory
@@ -74,27 +74,29 @@ public class TrackingController : BaseApiController
     [HttpGet("locations")]
     public async Task<IActionResult> GetWorkerLocations()
     {
-        var today = DateTime.UtcNow.Date;
         var now = DateTime.UtcNow;
 
         // get latest location for each worker (regardless of date, show last known position)
         var locations = await _history.GetLatestLocationsAsync(DateTime.MinValue);
 
         // map to response with worker info
-        var result = locations.Select(loc => new
+        var result = locations.Select(loc =>
         {
-            UserId = loc.UserId,
-            FullName = loc.User?.FullName ?? "غير معروف",
-            Username = loc.User?.Username,
-            Latitude = loc.Latitude,
-            Longitude = loc.Longitude,
-            Speed = loc.Speed,
-            Accuracy = loc.Accuracy,
-            Timestamp = loc.Timestamp,
-            // consider online if location updated recently (see AppConstants.OnlineThresholdMinutes)
-            IsOnline = (now - loc.Timestamp).TotalMinutes <= AppConstants.OnlineThresholdMinutes,
-            Status = (now - loc.Timestamp).TotalMinutes <= AppConstants.OnlineThresholdMinutes ? "Online" : "Offline",
-            ZoneName = loc.User?.AssignedZones?.FirstOrDefault()?.Zone?.ZoneName
+            var isOnline = (now - loc.Timestamp).TotalMinutes <= AppConstants.OnlineThresholdMinutes;
+            return new
+            {
+                UserId = loc.UserId,
+                FullName = loc.User?.FullName ?? "غير معروف",
+                Username = loc.User?.Username,
+                Latitude = loc.Latitude,
+                Longitude = loc.Longitude,
+                Speed = loc.Speed,
+                Accuracy = loc.Accuracy,
+                Timestamp = loc.Timestamp,
+                IsOnline = isOnline,
+                Status = isOnline ? "Online" : "Offline",
+                ZoneName = loc.User?.AssignedZones?.FirstOrDefault()?.Zone?.ZoneName
+            };
         });
 
         return Ok(ApiResponse<object>.SuccessResponse(result));

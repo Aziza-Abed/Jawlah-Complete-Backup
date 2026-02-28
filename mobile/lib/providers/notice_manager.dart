@@ -12,11 +12,21 @@ class NoticeManager extends BaseController {
 
   List<NotificationModel> myNotices = [];
   int newNoticesCount = 0;
+  bool _isInitialized = false;
 
   NoticeManager() {
     _fcmSubscription = _fcmService.onMessage.listen((_) {
       loadNotices();
     });
+    // Auto-load notifications when created
+    _autoLoadOnInit();
+  }
+
+  // Load notifications automatically on initialization
+  Future<void> _autoLoadOnInit() async {
+    if (_isInitialized) return;
+    _isInitialized = true;
+    await loadNotices();
   }
 
   @override

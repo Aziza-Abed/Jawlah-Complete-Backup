@@ -2,7 +2,7 @@
 
 export type IssueType = "Infrastructure" | "Safety" | "Cleanliness" | "Equipment" | "Other";
 export type IssueSeverity = "Low" | "Medium" | "High" | "Critical";
-export type IssueStatus = "New" | "Forwarded" | "Resolved" | "InProgress" | "Closed";
+export type IssueStatus = "New" | "Forwarded" | "Resolved" | "InProgress" | "Closed" | "ConvertedToTask";
 
 export type IssueResponse = {
   issueId: number;
@@ -52,4 +52,12 @@ export type CreateIssueRequest = {
 export type UpdateIssueStatusRequest = {
   status: IssueStatus;
   resolutionNotes?: string;
+};
+
+export type CreateTaskFromIssueRequest = {
+  assignedToUserId: number;
+  priority: "Low" | "Medium" | "High" | "Urgent";
+  dueDate?: string;
+  requiresPhotoProof: boolean;
+  taskType?: string;
 };

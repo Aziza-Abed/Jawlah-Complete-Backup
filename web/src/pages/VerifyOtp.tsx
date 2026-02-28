@@ -19,9 +19,10 @@ export default function VerifyOtp() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState | null;
-  const sessionToken = state?.sessionToken;
   const maskedPhone = state?.maskedPhone;
   const username = state?.username;
+
+  const [sessionToken, setSessionToken] = useState(state?.sessionToken);
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,7 @@ export default function VerifyOtp() {
     try {
       const result = await forgotPassword({ username });
       if (result.success) {
+        if (result.sessionToken) setSessionToken(result.sessionToken);
         setInfo("تمت إعادة إرسال رمز التحقق.");
       } else {
         setError(result.message || "فشل إعادة إرسال الرمز.");

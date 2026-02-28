@@ -4,6 +4,7 @@ using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Issues;
 using FollowUp.Core.Entities;
+using TaskEntity = FollowUp.Core.Entities.Task;
 using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
@@ -19,7 +20,6 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle issue reporting and managment
 [Route("api/[controller]")]
-[Authorize]
 public class IssuesController : BaseApiController
 {
     private readonly IIssueRepository _issues;
@@ -52,80 +52,6 @@ public class IssuesController : BaseApiController
         _notifications = notifications;
         _mapper = mapper;
         _audit = audit;
-    }
-
-    // report new issue without photo
-    [HttpPost("report")]
-    public async Task<IActionResult> ReportIssue([FromBody] ReportIssueRequest request)
-    {
-        var userId = GetCurrentUserId();
-        if (!userId.HasValue)
-            return Unauthorized();
-
-        // Get user to retrieve their municipality
-        var user = await _users.GetByIdAsync(userId.Value);
-        if (user == null)
-            return Unauthorized();
-
-        // Validate GPS coordinates
-        var validationResult = ValidateGpsCoordinates(request.Latitude, request.Longitude);
-        if (validationResult != null)
-            return BadRequest(ApiResponse<object>.ErrorResponse("إحداثيات GPS غير صالحة. يرجى التأكد من تفعيل الموقع"));
-
-        // clean inputs to prevent xss
-        var sanitizedTitle = InputSanitizer.SanitizeString(request.Title, 200);
-        var sanitizedDescription = InputSanitizer.SanitizeString(request.Description, 2000);
-        var sanitizedLocation = InputSanitizer.SanitizeString(request.LocationDescription, 500);
-
-        // create issue entity
-        var issue = new Issue
-        {
-            Title = sanitizedTitle,
-            Description = sanitizedDescription,
-            Type = request.Type,
-            Severity = request.Severity,
-            ReportedByUserId = userId.Value,
-            MunicipalityId = user.MunicipalityId,
-            Latitude = request.Latitude,
-            Longitude = request.Longitude,
-            LocationDescription = sanitizedLocation,
-            PhotoUrl = request.PhotoUrl,
-            Status = IssueStatus.New,
-            ReportedAt = DateTime.UtcNow,
-            EventTime = DateTime.UtcNow,
-            SyncTime = DateTime.UtcNow,
-            IsSynced = true,
-            SyncVersion = 1
-        };
-
-        await _issues.AddAsync(issue);
-        await _issues.SaveChangesAsync();
-
-        // audit log for issue reported
-        await _audit.LogAsync(userId, user.Username, "IssueReported",
-            $"بلاغ مشكلة: {issue.Title} (#{issue.IssueId})",
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString());
-
-        _logger.LogInformation("Issue {IssueId} reported by user {UserId}", issue.IssueId, userId.Value);
-
-        // notify supervisors about the new issue
-        try
-        {
-            var workerName = user.FullName ?? "عامل";
-            await _notifications.SendIssueReportedToSupervisorsAsync(
-                issue.IssueId,
-                issue.Title,
-                workerName,
-                issue.Severity.ToString());
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to send issue reported notification for issue {IssueId}", issue.IssueId);
-        }
-
-        return CreatedAtAction(nameof(GetIssueById), new { id = issue.IssueId },
-            ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue)));
     }
 
     // report issue with photo upload
@@ -162,17 +88,13 @@ public class IssuesController : BaseApiController
                 return BadRequest(ApiResponse<object>.ErrorResponse("مستوى الخطورة غير صالح"));
         }
 
-        // check gps coords are provided
-        if (!request.Latitude.HasValue || !request.Longitude.HasValue ||
-            (request.Latitude.Value == 0 && request.Longitude.Value == 0))
+        // validate GPS coordinates
+        if (!request.Latitude.HasValue || !request.Longitude.HasValue)
             return BadRequest(ApiResponse<object>.ErrorResponse("يجب توفير إحداثيات الموقع"));
 
-        // check coords are inside work area
-        if (request.Latitude.Value < Core.Constants.GeofencingConstants.MinLatitude ||
-            request.Latitude.Value > Core.Constants.GeofencingConstants.MaxLatitude ||
-            request.Longitude.Value < Core.Constants.GeofencingConstants.MinLongitude ||
-            request.Longitude.Value > Core.Constants.GeofencingConstants.MaxLongitude)
-            return BadRequest(ApiResponse<object>.ErrorResponse("الموقع خارج منطقة العمل المسموح بها"));
+        var gpsValidation = ValidateGpsCoordinates(request.Latitude.Value, request.Longitude.Value);
+        if (gpsValidation != null)
+            return gpsValidation;
 
         // clean and default title
         var title = InputSanitizer.SanitizeString(request.Title, 200);
@@ -248,13 +170,17 @@ public class IssuesController : BaseApiController
                     OrderIndex = i,
                     UploadedAt = DateTime.UtcNow,
                     UploadedByUserId = userId.Value,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    Latitude = request.Latitude.Value,
+                    Longitude = request.Longitude.Value,
+                    EventTime = DateTime.UtcNow
                 };
                 await _photos.AddAsync(photo);
 
                 // add to issue's Photos collection so mapper includes it in response
                 issue.Photos.Add(photo);
             }
+
             await _issues.SaveChangesAsync();
 
             _logger.LogInformation("Issue {IssueId} reported with {PhotoCount} photos by user {UserId}",
@@ -275,7 +201,8 @@ public class IssuesController : BaseApiController
                 issue.IssueId,
                 issue.Title,
                 workerName,
-                issue.Severity.ToString());
+                issue.Severity.ToString(),
+                issue.MunicipalityId);
         }
         catch (Exception ex)
         {
@@ -288,7 +215,6 @@ public class IssuesController : BaseApiController
 
     // get single issue by id
     [HttpGet("{id}")]
-    [Authorize]
     public async Task<IActionResult> GetIssueById(int id)
     {
         var userId = GetCurrentUserId();
@@ -299,10 +225,19 @@ public class IssuesController : BaseApiController
         if (issue == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المشكلة غير موجودة"));
 
-        // Workers can only see their own issues
         var userRole = GetCurrentUserRole();
+
+        // Workers can only see their own issues
         if (userRole == "Worker" && issue.ReportedByUserId != userId.Value)
             return Forbid();
+
+        // Supervisors can only see issues within their municipality
+        if (userRole == "Supervisor")
+        {
+            var currentUser = await _users.GetByIdAsync(userId.Value);
+            if (currentUser == null || issue.MunicipalityId != currentUser.MunicipalityId)
+                return Forbid();
+        }
 
         return Ok(ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue)));
     }
@@ -332,13 +267,9 @@ public class IssuesController : BaseApiController
         else if (userRole == "Supervisor")
         {
             // supervisors see only issues from their workers
-            var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-            var myWorkerIds = myWorkers
-                .Where(w => w.SupervisorId == userId.Value)
-                .Select(w => w.UserId)
-                .ToHashSet();
+            var workerIds = await GetSupervisorWorkerIdsAsync(userId.Value);
             var allIssues = await _issues.GetAllAsync();
-            issues = allIssues.Where(i => myWorkerIds.Contains(i.ReportedByUserId));
+            issues = allIssues.Where(i => workerIds.Contains(i.ReportedByUserId));
         }
         else
         {
@@ -369,16 +300,11 @@ public class IssuesController : BaseApiController
         var issues = await _issues.GetCriticalIssuesAsync();
 
         // supervisors see only their workers' critical issues
-        var currentRole = GetCurrentUserRole();
         var currentUserId = GetCurrentUserId();
-        if (currentRole == "Supervisor" && currentUserId.HasValue)
+        if (GetCurrentUserRole() == "Supervisor" && currentUserId.HasValue)
         {
-            var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-            var myWorkerIds = myWorkers
-                .Where(w => w.SupervisorId == currentUserId.Value)
-                .Select(w => w.UserId)
-                .ToHashSet();
-            issues = issues.Where(i => myWorkerIds.Contains(i.ReportedByUserId));
+            var workerIds = await GetSupervisorWorkerIdsAsync(currentUserId.Value);
+            issues = issues.Where(i => workerIds.Contains(i.ReportedByUserId));
         }
 
         return Ok(ApiResponse<IEnumerable<IssueResponse>>.SuccessResponse(
@@ -393,6 +319,10 @@ public class IssuesController : BaseApiController
         var issue = await _issues.GetByIdAsync(id);
         if (issue == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المشكلة غير موجودة"));
+
+        // ConvertedToTask is only set via the create-task endpoint, never manually
+        if (request.Status == IssueStatus.ConvertedToTask)
+            return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكن تعيين هذه الحالة مباشرة. استخدم تحويل البلاغ إلى مهمة"));
 
         var userId = GetCurrentUserId();
 
@@ -461,11 +391,21 @@ public class IssuesController : BaseApiController
         if (issue == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المشكلة غير موجودة"));
 
-        // validate department exists
+        // cannot forward an issue that has already been converted to a task
+        if (issue.Status == IssueStatus.ConvertedToTask)
+            return Conflict(ApiResponse<object>.ErrorResponse("لا يمكن تحويل البلاغ — تم إنشاء مهمة منه بالفعل"));
+
+        // validate department exists and belongs to the same municipality
+        var currentUser = await _users.GetByIdAsync(userId.Value);
+        if (currentUser == null) return Unauthorized();
+
         var dbContext = HttpContext.RequestServices.GetRequiredService<FollowUp.Infrastructure.Data.FollowUpDbContext>();
         var department = await dbContext.Departments.FindAsync(request.DepartmentId);
         if (department == null)
             return BadRequest(ApiResponse<object>.ErrorResponse("القسم المحدد غير موجود"));
+
+        if (department.MunicipalityId != currentUser.MunicipalityId)
+            return BadRequest(ApiResponse<object>.ErrorResponse("القسم المحدد لا ينتمي لنفس البلدية"));
 
         issue.ForwardedToDepartmentId = request.DepartmentId;
         issue.ForwardedAt = DateTime.UtcNow;
@@ -479,7 +419,6 @@ public class IssuesController : BaseApiController
         await _issues.SaveChangesAsync();
 
         // audit log
-        var currentUser = await _users.GetByIdAsync(userId.Value);
         await _audit.LogAsync(userId, currentUser?.Username, "IssueForwarded",
             $"تحويل البلاغ #{issue.IssueId} إلى قسم {department.Name}",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -500,19 +439,16 @@ public class IssuesController : BaseApiController
         var issues = await _issues.GetAllAsync();
 
         // supervisors see only their workers' issues
-        var currentRole = GetCurrentUserRole();
         var currentUserId = GetCurrentUserId();
-        if (currentRole == "Supervisor" && currentUserId.HasValue)
+        if (GetCurrentUserRole() == "Supervisor" && currentUserId.HasValue)
         {
-            var myWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-            var myWorkerIds = myWorkers
-                .Where(w => w.SupervisorId == currentUserId.Value)
-                .Select(w => w.UserId)
-                .ToHashSet();
-            issues = issues.Where(i => myWorkerIds.Contains(i.ReportedByUserId));
+            var workerIds = await GetSupervisorWorkerIdsAsync(currentUserId.Value);
+            issues = issues.Where(i => workerIds.Contains(i.ReportedByUserId));
         }
 
-        var unresolvedCount = issues.Count(i => i.Status != IssueStatus.Resolved);
+        // only New and Forwarded issues are truly "open" — Resolved, Closed, and ConvertedToTask are all handled
+        var unresolvedCount = issues.Count(i =>
+            i.Status == IssueStatus.New || i.Status == IssueStatus.Forwarded || i.Status == IssueStatus.InProgress);
 
         return Ok(ApiResponse<int>.SuccessResponse(unresolvedCount));
     }
@@ -554,6 +490,106 @@ public class IssuesController : BaseApiController
 
         _logger.LogInformation("Issue {IssueId} deleted with {PhotoCount} photos", id, photoUrls.Count);
         return NoContent();
+    }
+
+    // convert an issue into a task (supervisor/admin only)
+    [HttpPost("{id}/create-task")]
+    [Authorize(Roles = "Admin,Supervisor")]
+    public async Task<IActionResult> CreateTaskFromIssue(int id, [FromBody] CreateTaskFromIssueRequest request)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        var currentUser = await _users.GetByIdAsync(currentUserId.Value);
+        if (currentUser == null) return Unauthorized();
+
+        var issue = await _issues.GetByIdAsync(id);
+        if (issue == null)
+            return NotFound(ApiResponse<object>.ErrorResponse("البلاغ غير موجود"));
+
+        // only issues in the same municipality
+        if (issue.MunicipalityId != currentUser.MunicipalityId)
+            return Forbid();
+
+        // prevent converting the same issue twice
+        if (issue.Status == IssueStatus.ConvertedToTask)
+            return Conflict(ApiResponse<object>.ErrorResponse("تم تحويل البلاغ إلى مهمة بالفعل"));
+
+        // validate the assigned user exists, is a Worker, and belongs to the same municipality
+        var assignedUser = await _users.GetByIdAsync(request.AssignedToUserId);
+        if (assignedUser == null || assignedUser.MunicipalityId != currentUser.MunicipalityId)
+            return BadRequest(ApiResponse<object>.ErrorResponse("العامل المختار غير موجود أو لا ينتمي لنفس البلدية"));
+        if (assignedUser.Role != UserRole.Worker)
+            return BadRequest(ApiResponse<object>.ErrorResponse("يمكن تعيين المهام للعمال فقط"));
+
+        var dbContext = HttpContext.RequestServices.GetRequiredService<FollowUp.Infrastructure.Data.FollowUpDbContext>();
+
+        var task = new TaskEntity
+        {
+            Title = InputSanitizer.SanitizeString(issue.Title, 200),
+            Description = InputSanitizer.SanitizeString(issue.Description, 2000),
+            MunicipalityId = currentUser.MunicipalityId,
+            AssignedToUserId = request.AssignedToUserId,
+            AssignedByUserId = currentUserId.Value,
+            ZoneId = issue.ZoneId,
+            Latitude = issue.Latitude,
+            Longitude = issue.Longitude,
+            LocationDescription = issue.LocationDescription,
+            Priority = request.Priority,
+            TaskType = request.TaskType,
+            RequiresPhotoProof = request.RequiresPhotoProof,
+            DueDate = request.DueDate,
+            Status = Core.Enums.TaskStatus.Pending,
+            SourceIssueId = issue.IssueId,
+            MaxDistanceMeters = 100,
+            CreatedAt = DateTime.UtcNow,
+            EventTime = DateTime.UtcNow,
+            SyncVersion = 1
+        };
+
+        dbContext.Tasks.Add(task);
+
+        // mark issue as converted to task (distinct from InProgress review state)
+        issue.Status = IssueStatus.ConvertedToTask;
+        issue.SyncVersion++;
+        issue.SyncTime = DateTime.UtcNow;
+
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // another supervisor converted this issue at the same time
+            return Conflict(ApiResponse<object>.ErrorResponse(
+                "تم تحويل البلاغ بواسطة مستخدم آخر في نفس الوقت. يرجى تحديث الصفحة والمحاولة مرة أخرى"));
+        }
+
+        // audit log
+        await _audit.LogAsync(currentUserId, currentUser.Username, "IssueConvertedToTask",
+            $"تحويل البلاغ #{issue.IssueId} إلى مهمة #{task.TaskId}",
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
+        // notify the assigned worker
+        try
+        {
+            await _notifications.SendTaskAssignedNotificationAsync(
+                request.AssignedToUserId,
+                task.TaskId,
+                task.Title);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send task assigned notification for task {TaskId}", task.TaskId);
+        }
+
+        _logger.LogInformation("Issue {IssueId} converted to task {TaskId} by user {UserId}",
+            issue.IssueId, task.TaskId, currentUserId.Value);
+
+        return Ok(ApiResponse<object>.SuccessResponse(
+            new { taskId = task.TaskId },
+            "تم تحويل البلاغ إلى مهمة بنجاح"));
     }
 
     // ============ PDF Generation ============
@@ -608,7 +644,10 @@ public class IssuesController : BaseApiController
         {
             { IssueStatus.New, "جديدة" },
             { IssueStatus.Forwarded, "محولة" },
-            { IssueStatus.Resolved, "تم الحل" }
+            { IssueStatus.Resolved, "تم الحل" },
+            { IssueStatus.InProgress, "قيد المعالجة" },
+            { IssueStatus.Closed, "مغلقة" },
+            { IssueStatus.ConvertedToTask, "تم تحويله إلى مهمة" }
         };
 
         var typeMap = new Dictionary<IssueType, string>
@@ -738,7 +777,7 @@ public class IssuesController : BaseApiController
                 // Footer
                 page.Footer().AlignCenter().Text(text =>
                 {
-                    text.Span("تم إنشاء هذا التقرير بواسطة نظام جولة - ");
+                    text.Span("تم إنشاء هذا التقرير بواسطة نظام فولو أب - ");
                     text.Span(DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"));
                 });
             });
@@ -752,6 +791,13 @@ public class IssuesController : BaseApiController
         // Return PDF file
         var fileName = $"issue_report_{issue.IssueId}_{DateTime.UtcNow:yyyyMMdd}.pdf";
         return File(pdfBytes, "application/pdf", fileName);
+    }
+
+    // get worker IDs for a supervisor (uses efficient DB query instead of loading all workers)
+    private async Task<HashSet<int>> GetSupervisorWorkerIdsAsync(int supervisorId)
+    {
+        var workers = await _users.GetWorkersBySupervisorAsync(supervisorId);
+        return workers.Select(w => w.UserId).ToHashSet();
     }
 
     // validate and return a safe file path for photos, preventing path traversal attacks

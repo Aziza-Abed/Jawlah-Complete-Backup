@@ -1,3 +1,4 @@
+using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Gis;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Enums;
@@ -100,15 +101,15 @@ public class GisController : BaseApiController
 
         // Validate file
         if (file == null || file.Length == 0)
-            return BadRequest(new { success = false, message = "لم يتم رفع أي ملف" });
+            return BadRequest(ApiResponse<object>.ErrorResponse("لم يتم رفع أي ملف"));
 
         if (file.Length > MaxFileSize)
-            return BadRequest(new { success = false, message = "حجم الملف يتجاوز الحد المسموح (10MB)" });
+            return BadRequest(ApiResponse<object>.ErrorResponse("حجم الملف يتجاوز الحد المسموح (10MB)"));
 
         var ext = Path.GetExtension(file.FileName).ToLower();
         var supportedExtensions = new[] { ".json", ".geojson", ".shp", ".zip" };
         if (!supportedExtensions.Contains(ext))
-            return BadRequest(new { success = false, message = "نوع الملف غير مدعوم. يرجى رفع ملف GeoJSON (.json/.geojson) أو Shapefile (.shp/.zip)" });
+            return BadRequest(ApiResponse<object>.ErrorResponse("نوع الملف غير مدعوم. يرجى رفع ملف GeoJSON (.json/.geojson) أو Shapefile (.shp/.zip)"));
 
         try
         {
@@ -133,20 +134,40 @@ public class GisController : BaseApiController
                         using (var stream = file.OpenReadStream())
                         using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
                         {
-                            archive.ExtractToDirectory(extractDir);
+                            // Extract with ZIP slip protection
+                            foreach (var entry in archive.Entries)
+                            {
+                                var destinationPath = Path.GetFullPath(Path.Combine(extractDir, entry.FullName));
+                                if (!destinationPath.StartsWith(Path.GetFullPath(extractDir) + Path.DirectorySeparatorChar)
+                                    && destinationPath != Path.GetFullPath(extractDir))
+                                {
+                                    throw new InvalidDataException("ZIP entry has a path that escapes the target directory");
+                                }
+
+                                if (string.IsNullOrEmpty(entry.Name))
+                                {
+                                    // Entry is a directory
+                                    Directory.CreateDirectory(destinationPath);
+                                }
+                                else
+                                {
+                                    Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                                    entry.ExtractToFile(destinationPath, overwrite: true);
+                                }
+                            }
                         }
 
                         // Find .shp file inside extracted directory
                         var shpFiles = Directory.GetFiles(extractDir, "*.shp", SearchOption.AllDirectories);
                         if (shpFiles.Length == 0)
-                            return BadRequest(new { success = false, message = "ملف ZIP لا يحتوي على ملف Shapefile (.shp)" });
+                            return BadRequest(ApiResponse<object>.ErrorResponse("ملف ZIP لا يحتوي على ملف Shapefile (.shp)"));
 
                         shpBasePath = shpFiles[0][..^4]; // remove .shp extension
                     }
                     catch (InvalidDataException)
                     {
                         if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
-                        return BadRequest(new { success = false, message = "ملف ZIP غير صالح" });
+                        return BadRequest(ApiResponse<object>.ErrorResponse("ملف ZIP غير صالح"));
                     }
                 }
                 else
@@ -201,7 +222,7 @@ public class GisController : BaseApiController
                         {
                             success = true,
                             message = "تم رفع الملف بنجاح، لكن فشل الاستيراد التلقائي. يمكنك الاستيراد يدوياً لاحقاً.",
-                            warning = importEx.Message,
+                            warning = "فشل الاستيراد التلقائي",
                             data = MapToDto(gisFile)
                         });
                     }
@@ -243,12 +264,12 @@ public class GisController : BaseApiController
 
                 if (featuresCount == 0)
                 {
-                    return BadRequest(new { success = false, message = "ملف GeoJSON لا يحتوي على أي features" });
+                    return BadRequest(ApiResponse<object>.ErrorResponse("ملف GeoJSON لا يحتوي على أي features"));
                 }
             }
             catch (JsonException)
             {
-                return BadRequest(new { success = false, message = "ملف JSON غير صالح" });
+                return BadRequest(ApiResponse<object>.ErrorResponse("ملف JSON غير صالح"));
             }
 
             // Deactivate old files of same type
@@ -313,7 +334,7 @@ public class GisController : BaseApiController
                     {
                         success = true,
                         message = "تم رفع الملف بنجاح، لكن فشل الاستيراد التلقائي. يمكنك الاستيراد يدوياً لاحقاً.",
-                        warning = importEx.Message,
+                        warning = "فشل الاستيراد التلقائي",
                         data = MapToDto(geoJsonFile)
                     });
                 }
@@ -331,7 +352,7 @@ public class GisController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to upload GIS file");
-            return BadRequest(new { success = false, message = "فشل رفع الملف. يرجى التحقق من صيغة الملف والمحاولة مرة أخرى" });
+            return BadRequest(ApiResponse<object>.ErrorResponse("فشل رفع الملف. يرجى التحقق من صيغة الملف والمحاولة مرة أخرى"));
         }
     }
 
@@ -350,11 +371,11 @@ public class GisController : BaseApiController
 
         var gisFile = await _gisFiles.GetByIdAsync(fileId);
         if (gisFile == null)
-            return NotFound(new { success = false, message = "الملف غير موجود" });
+            return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود"));
 
         var filePath = Path.Combine(_storagePath, gisFile.StoredFileName);
         if (!System.IO.File.Exists(filePath))
-            return NotFound(new { success = false, message = "الملف غير موجود على السيرفر" });
+            return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود على السيرفر"));
 
         try
         {
@@ -379,7 +400,7 @@ public class GisController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to import GIS file {FileId}", fileId);
-            return BadRequest(new { success = false, message = "فشل استيراد الملف. يرجى المحاولة مرة أخرى" });
+            return BadRequest(ApiResponse<object>.ErrorResponse("فشل استيراد الملف. يرجى المحاولة مرة أخرى"));
         }
     }
 
@@ -390,7 +411,7 @@ public class GisController : BaseApiController
     {
         var gisFile = await _gisFiles.GetByIdAsync(fileId);
         if (gisFile == null)
-            return NotFound(new { success = false, message = "الملف غير موجود" });
+            return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود"));
 
         try
         {
@@ -408,7 +429,7 @@ public class GisController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to delete GIS file {FileId}", fileId);
-            return BadRequest(new { success = false, message = ex.Message });
+            return BadRequest(ApiResponse<object>.ErrorResponse("فشل حذف الملف. يرجى المحاولة مرة أخرى"));
         }
     }
 
@@ -419,11 +440,11 @@ public class GisController : BaseApiController
     {
         var gisFile = await _gisFiles.GetByIdAsync(fileId);
         if (gisFile == null)
-            return NotFound(new { success = false, message = "الملف غير موجود" });
+            return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود"));
 
         var filePath = Path.Combine(_storagePath, gisFile.StoredFileName);
         if (!System.IO.File.Exists(filePath))
-            return NotFound(new { success = false, message = "الملف غير موجود على السيرفر" });
+            return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود على السيرفر"));
 
         var content = await System.IO.File.ReadAllBytesAsync(filePath);
         return File(content, "application/geo+json", gisFile.OriginalFileName);

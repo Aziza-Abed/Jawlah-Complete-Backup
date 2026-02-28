@@ -118,9 +118,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3))),
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
             ),
+            maxLength: 200,
             validator: (value) {
               if (value == null || value.trim().isEmpty) return 'يرجى إدخال عنوان البلاغ';
               if (value.trim().length < 5) return 'العنوان قصير جداً';
+              if (value.trim().length > 200) return 'العنوان طويل جداً (200 حرف كحد أقصى)';
               return null;
             },
           ),
@@ -244,6 +246,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           TextFormField(
             controller: _locationController,
             textDirection: TextDirection.rtl,
+            maxLength: 500,
             style: const TextStyle(fontSize: 16, fontFamily: 'Cairo'),
             decoration: InputDecoration(
               hintText: 'مثال: بجانب البوابة الرئيسية',
@@ -276,7 +279,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'وصف المشكلة (اختياري)',
+            'وصف المشكلة',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -294,7 +297,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               fontFamily: 'Cairo',
             ),
             decoration: InputDecoration(
-              hintText: 'اشرح تفاصيل المشكلة هنا... (اختياري)',
+              hintText: 'اشرح تفاصيل المشكلة هنا...',
               hintStyle: TextStyle(
                 color: AppColors.textSecondary.withOpacity(0.5),
                 fontFamily: 'Cairo',
@@ -320,13 +323,14 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               ),
             ),
             validator: (value) {
-              if (value != null && value.trim().isNotEmpty) {
-                if (value.trim().length < 10) {
-                  return 'الوصف قصير جداً (10 أحرف على الأقل)';
-                }
-                if (value.trim().length > 500) {
-                  return 'الوصف طويل جداً (500 حرف كحد أقصى)';
-                }
+              if (value == null || value.trim().isEmpty) {
+                return 'يرجى إدخال وصف المشكلة';
+              }
+              if (value.trim().length < 10) {
+                return 'الوصف قصير جداً (10 أحرف على الأقل)';
+              }
+              if (value.trim().length > 500) {
+                return 'الوصف طويل جداً (500 حرف كحد أقصى)';
               }
               return null;
             },
@@ -510,7 +514,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   Future<void> _pickImage(int slot) async {
     final image = await PhotoPickerHelper.pickImageWithChoice(context);
 
-    if (image != null) {
+    if (image != null && mounted) {
       setState(() {
         if (slot == 1) _photo1 = image;
         if (slot == 2) _photo2 = image;
@@ -615,9 +619,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           position: confirmedPosition,
         );
 
-    setState(() => _isSubmitting = false);
-
     if (!mounted) return;
+
+    setState(() => _isSubmitting = false);
 
     if (success) {
       // show sucess message

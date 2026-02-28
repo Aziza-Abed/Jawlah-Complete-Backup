@@ -327,6 +327,7 @@ class SyncService {
             completionNotes: taskJson['completionNotes'],
             photoUrl: taskJson['photoUrl'],
             completedAt: DateFormatter.tryParseUtc(taskJson['completedAt']),
+            eventTime: DateFormatter.tryParseUtc(taskJson['eventTime']),
             syncVersion: taskJson['syncVersion'] ?? 1,
             isSynced: true,
             updatedAt: DateTime.now(),

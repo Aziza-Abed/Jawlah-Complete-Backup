@@ -1,6 +1,4 @@
-using System.Security.Claims;
 using AutoMapper;
-using FollowUp.API;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Users;
 using FollowUp.Core.Entities;
@@ -63,21 +61,18 @@ public class UsersController : BaseApiController
     {
         (page, pageSize) = NormalizePagination(page, pageSize);
 
-        // get users from db
-        var users = await _users.GetAllAsync();
-
         // SECURITY: Supervisors can only see their supervised workers
         var currentUserId = GetCurrentUserId();
         var currentUserRole = GetCurrentUserRole();
 
+        IEnumerable<User> users;
         if (currentUserRole == "Supervisor" && currentUserId.HasValue)
         {
-            // Filter to only workers supervised by this supervisor
-            users = users.Where(u => u.SupervisorId == currentUserId.Value);
-
-            _logger.LogInformation(
-                "Supervisor {SupervisorId} querying their supervised workers (filtered from all users)",
-                currentUserId.Value);
+            users = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
+        }
+        else
+        {
+            users = await _users.GetAllAsync();
         }
 
         // filter by status if needed
@@ -134,20 +129,21 @@ public class UsersController : BaseApiController
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<IActionResult> GetUsersByRole(UserRole role)
     {
-        var users = await _users.GetByRoleAsync(role);
-
         // SECURITY: Supervisors can only see their supervised workers
         var currentUserId = GetCurrentUserId();
         var currentUserRole = GetCurrentUserRole();
 
+        IEnumerable<User> users;
         if (currentUserRole == "Supervisor" && currentUserId.HasValue)
         {
-            // Filter to only workers supervised by this supervisor
-            users = users.Where(u => u.SupervisorId == currentUserId.Value);
-
-            _logger.LogInformation(
-                "Supervisor {SupervisorId} querying workers by role (filtered to supervised only)",
-                currentUserId.Value);
+            // Supervisors only see their workers, regardless of requested role
+            users = role == UserRole.Worker
+                ? await _users.GetWorkersBySupervisorAsync(currentUserId.Value)
+                : Enumerable.Empty<User>();
+        }
+        else
+        {
+            users = await _users.GetByRoleAsync(role);
         }
 
         return Ok(ApiResponse<IEnumerable<UserResponse>>.SuccessResponse(
@@ -216,10 +212,7 @@ public class UsersController : BaseApiController
 
         _logger.LogInformation("User {UserId} changed password", userId);
 
-        await _audit.LogAsync(userId, user.Username, "PasswordChanged",
-            "تغيير كلمة المرور",
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString());
+        await AuditLogAsync("PasswordChanged", "تغيير كلمة المرور");
 
         return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تغيير كلمة المرور بنجاح"));
     }
@@ -276,13 +269,7 @@ public class UsersController : BaseApiController
         await _users.UpdateAsync(user);
         await _users.SaveChangesAsync();
 
-        // audit log for user update
-        var currentUserId = GetCurrentUserId();
-        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
-        await _audit.LogAsync(currentUserId, currentUser?.Username, "UserUpdated",
-            $"تحديث بيانات المستخدم: {user.Username}",
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString());
+        await AuditLogAsync("UserUpdated", $"تحديث بيانات المستخدم: {user.Username}");
 
         return Ok(ApiResponse<UserResponse>.SuccessResponse(_mapper.Map<UserResponse>(user)));
     }
@@ -392,12 +379,7 @@ public class UsersController : BaseApiController
 
         _logger.LogInformation("Admin reset password for user {UserId}", id);
 
-        var currentUserId = GetCurrentUserId();
-        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
-        await _audit.LogAsync(currentUserId, currentUser?.Username, "PasswordReset",
-            $"إعادة تعيين كلمة مرور المستخدم #{id} ({user.Username})",
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString());
+        await AuditLogAsync("PasswordReset", $"إعادة تعيين كلمة مرور المستخدم #{id} ({user.Username})");
 
         return Ok(ApiResponse<object?>.SuccessResponse(null, "تم إعادة تعيين كلمة المرور بنجاح"));
     }
@@ -547,12 +529,7 @@ public class UsersController : BaseApiController
 
         _logger.LogInformation("Device binding reset for user {UserId}. Old device: {OldDeviceId}", id, oldDeviceId ?? "none");
 
-        var currentUserId = GetCurrentUserId();
-        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
-        await _audit.LogAsync(currentUserId, currentUser?.Username, "DeviceReset",
-            $"إعادة تعيين جهاز العامل #{id} ({user.Username})",
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString());
+        await AuditLogAsync("DeviceReset", $"إعادة تعيين جهاز العامل #{id} ({user.Username})");
 
         return Ok(ApiResponse<object>.SuccessResponse(new
         {
@@ -657,7 +634,7 @@ public class UsersController : BaseApiController
             _logger.LogWarning("Worker {WorkerId} has low battery: {BatteryLevel}%", userId.Value, request.BatteryLevel);
 
             // send notification to supervisors
-            await _notifications.SendBatteryLowNotificationAsync(userId.Value, user.FullName, request.BatteryLevel);
+            await _notifications.SendBatteryLowNotificationAsync(userId.Value, user.FullName, request.BatteryLevel, user.MunicipalityId);
         }
 
         return Ok(ApiResponse<object>.SuccessResponse(new
@@ -683,6 +660,29 @@ public class UsersController : BaseApiController
             .Include(u => u.AttendanceRecords.Where(a => a.CheckInEventTime.Date == DateTime.UtcNow.Date))
             .ToListAsync();
 
+        // batch-fetch task stats to avoid N+1 queries
+        var workerIds = workers.Select(w => w.UserId).ToList();
+        var weekStart = DateTime.UtcNow.Date.AddDays(-(int)DateTime.UtcNow.DayOfWeek);
+        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+
+        var completedThisWeekByWorker = await _context.Tasks
+            .Where(t => workerIds.Contains(t.AssignedToUserId) &&
+                       t.Status == TaskStatus.Completed &&
+                       t.CompletedAt >= weekStart)
+            .GroupBy(t => t.AssignedToUserId)
+            .ToDictionaryAsync(g => g.Key, g => g.Count());
+
+        var recentTaskStatsByWorker = await _context.Tasks
+            .Where(t => workerIds.Contains(t.AssignedToUserId) && t.CreatedAt >= thirtyDaysAgo)
+            .GroupBy(t => t.AssignedToUserId)
+            .Select(g => new
+            {
+                UserId = g.Key,
+                Total = g.Count(),
+                Completed = g.Count(t => t.Status == TaskStatus.Completed)
+            })
+            .ToDictionaryAsync(x => x.UserId);
+
         // calculate stats for each worker
         var workerResponses = workers.Select(worker =>
         {
@@ -691,22 +691,10 @@ public class UsersController : BaseApiController
 
             var activeTasksCount = worker.AssignedTasks.Count(t => t.Status == TaskStatus.InProgress || t.Status == TaskStatus.Pending);
 
-            // get completed tasks this week
-            var weekStart = DateTime.UtcNow.Date.AddDays(-(int)DateTime.UtcNow.DayOfWeek);
-            var completedThisWeek = _context.Tasks
-                .Where(t => t.AssignedToUserId == worker.UserId &&
-                           t.Status == TaskStatus.Completed &&
-                           t.CompletedAt >= weekStart)
-                .Count();
-
-            // calculate completion rate (last 30 days)
-            var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
-            var recentTasks = _context.Tasks
-                .Where(t => t.AssignedToUserId == worker.UserId && t.CreatedAt >= thirtyDaysAgo)
-                .ToList();
-
-            var completionRate = recentTasks.Any()
-                ? (double)recentTasks.Count(t => t.Status == TaskStatus.Completed) / recentTasks.Count * 100
+            completedThisWeekByWorker.TryGetValue(worker.UserId, out var completedThisWeek);
+            recentTaskStatsByWorker.TryGetValue(worker.UserId, out var recentStats);
+            var completionRate = recentStats is { Total: > 0 }
+                ? (double)recentStats.Completed / recentStats.Total * 100
                 : 0;
 
             return new
@@ -909,20 +897,8 @@ public class UsersController : BaseApiController
 
         await _context.SaveChangesAsync();
 
-        // Get current user info for audit log
-        var currentUserId = GetCurrentUserId();
-        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var userAgent = Request.Headers.UserAgent.ToString();
-
-        // audit log for worker transfer
-        await _audit.LogAsync(
-            currentUserId,
-            currentUser?.Username,
-            "WorkerTransfer",
-            $"نقل {workers.Count} عامل من {oldSupervisor.FullName} إلى {newSupervisor.FullName}",
-            ipAddress,
-            userAgent);
+        await AuditLogAsync("WorkerTransfer",
+            $"نقل {workers.Count} عامل من {oldSupervisor.FullName} إلى {newSupervisor.FullName}");
 
         _logger.LogInformation(
             "Admin transferred {WorkerCount} workers from supervisor {OldSupervisorId} to supervisor {NewSupervisorId}",
@@ -978,12 +954,7 @@ public class UsersController : BaseApiController
 
         await _users.SaveChangesAsync();
 
-        // audit log
-        var currentUser = await _users.GetByIdAsync(currentUserId.Value);
-        await _audit.LogAsync(currentUserId, currentUser?.Username, "BulkRoleAssignment",
-            $"تغيير صلاحية {successCount} مستخدم إلى {request.NewRole}",
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString());
+        await AuditLogAsync("BulkRoleAssignment", $"تغيير صلاحية {successCount} مستخدم إلى {request.NewRole}");
 
         return Ok(ApiResponse<object>.SuccessResponse(new
         {
@@ -1032,13 +1003,8 @@ public class UsersController : BaseApiController
 
         await _users.SaveChangesAsync();
 
-        // audit log
-        var currentUser = await _users.GetByIdAsync(currentUserId.Value);
         var action = request.Status == UserStatus.Active ? "تفعيل" : "تعطيل";
-        await _audit.LogAsync(currentUserId, currentUser?.Username, "BulkStatusChange",
-            $"{action} {successCount} مستخدم",
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString());
+        await AuditLogAsync("BulkStatusChange", $"{action} {successCount} مستخدم");
 
         return Ok(ApiResponse<object>.SuccessResponse(new
         {
@@ -1047,5 +1013,15 @@ public class UsersController : BaseApiController
             failedUsers,
             message = $"تم {action} {successCount} مستخدم بنجاح"
         }));
+    }
+
+    // helper: audit log with current user context
+    private async System.Threading.Tasks.Task AuditLogAsync(string action, string description)
+    {
+        var currentUserId = GetCurrentUserId();
+        var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
+        await _audit.LogAsync(currentUserId, currentUser?.Username, action, description,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
     }
 }

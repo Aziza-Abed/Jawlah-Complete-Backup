@@ -4,6 +4,7 @@ using FollowUp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 
@@ -12,9 +13,11 @@ using NetTopologySuite.Geometries;
 namespace FollowUp.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(FollowUpDbContext))]
-    partial class FollowUpDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260226145727_AddSourceIssueIdToTask")]
+    partial class AddSourceIssueIdToTask
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

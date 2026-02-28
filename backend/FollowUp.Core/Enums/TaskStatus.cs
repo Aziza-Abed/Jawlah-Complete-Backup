@@ -1,10 +1,10 @@
 namespace FollowUp.Core.Enums;
 
-// Full lifecycle: Created → Assigned → Accepted → InProgress → Submitted → UnderReview → Completed/Synced
-// Pending is kept as alias for backward compatibility (equivalent to Created)
+// Backend lifecycle: Pending → InProgress → UnderReview → Completed/Rejected
+// Mobile-only states: Created, Submitted, Synced, FailedSync (local Hive storage only)
 public enum TaskStatus
 {
-    Pending = 0,       // legacy alias for Created
+    Pending = 0,       // default state for new tasks
     InProgress = 1,
     UnderReview = 2,   // worker submitted evidence, awaiting supervisor review
     Completed = 3,     // supervisor approved
