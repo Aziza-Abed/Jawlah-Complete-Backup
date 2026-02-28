@@ -30,6 +30,8 @@ export const supervisorItems: NavItem[] = [
   { to: "/issues", label: "البلاغات", icon: AlertCircle },
   { to: "/tasks/new", label: "تعيين مهمة جديدة", icon: PlusCircle },
   { to: "/zones", label: "الخريطة الحية", icon: Map },
+  { to: "/task-templates", label: "قوالب المهام", icon: FileText },
+  { to: "/appeals", label: "مركز المراجعة", icon: Scale },
   { to: "/reports", label: "التقارير", icon: BarChart3 },
   { to: "/notifications", label: "الإشعارات", icon: Bell },
 ];

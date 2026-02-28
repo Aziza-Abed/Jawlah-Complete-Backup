@@ -413,7 +413,7 @@ function MiniStat({ title, value, color }: { title: string; value: string; color
 
 function CenterModal({ children, onClose }: { children: React.ReactNode, onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center p-4">
+    <div className="fixed inset-0 z-[800] grid place-items-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="bg-[#F3F1ED] rounded-[24px] shadow-2xl border border-black/10 p-6 w-full max-w-[480px] relative">
         <button onClick={onClose} className="absolute left-6 top-6 text-[#AFAFAF] hover:text-[#2F2F2F] transition-colors">

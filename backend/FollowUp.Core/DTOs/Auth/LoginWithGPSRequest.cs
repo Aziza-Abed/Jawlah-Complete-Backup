@@ -12,7 +12,7 @@ public class LoginWithGPSRequest
     public string Username { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "كلمة المرور مطلوبة")]
-    [StringLength(100, MinimumLength = 8, ErrorMessage = "كلمة المرور يجب أن تكون بين 8 و 100 حرف")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "كلمة المرور مطلوبة")]
     public string Password { get; set; } = string.Empty;
 
     // GPS fields are optional - kept for future use but not required for login

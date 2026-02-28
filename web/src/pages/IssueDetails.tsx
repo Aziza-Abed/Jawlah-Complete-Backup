@@ -687,7 +687,7 @@ function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60]">
+    <div className="fixed inset-0 z-[800]">
       <button
         type="button"
         className="absolute inset-0 bg-black/40"

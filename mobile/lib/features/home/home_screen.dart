@@ -11,6 +11,7 @@ import '../../providers/task_manager.dart';
 import '../../providers/sync_manager.dart';
 import '../../providers/notice_manager.dart';
 import '../../core/routing/app_router.dart';
+import '../../data/services/location_service.dart';
 import 'widgets/greeting_card.dart';
 import 'widgets/sync_status_card.dart';
 import 'widgets/attendance_card.dart';
@@ -31,7 +32,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     // load all data when screen starts
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Request GPS permission from foreground UI — background service cannot show dialogs
+      await LocationService.requestPermissions();
+
+      if (!mounted) return;
+
       final syncManager = context.read<SyncManager>();
       final attendanceManager = context.read<AttendanceManager>();
 

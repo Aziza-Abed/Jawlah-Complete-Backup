@@ -635,7 +635,7 @@ function MiniProgressRing({ value }: { value: number }) {
 
 function CenterModal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[800] flex items-center justify-center p-4">
       <button
         type="button"
         className="absolute inset-0 bg-black/40"

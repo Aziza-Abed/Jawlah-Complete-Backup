@@ -111,7 +111,7 @@ export default function AppRoutes() {
         <Route path="teams" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><AdminTeams /></AdminRoute>} />
         <Route path="zones-admin" element={<AdminRoute><AdminZones /></AdminRoute>} />
         <Route path="task-oversight" element={<AdminRoute><AdminTasks /></AdminRoute>} />
-        <Route path="task-templates" element={<AdminRoute><AdminTaskTemplates /></AdminRoute>} />
+        <Route path="task-templates" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><AdminTaskTemplates /></AdminRoute>} />
         <Route path="monitoring" element={<AdminRoute><AdminMonitoring /></AdminRoute>} />
         <Route path="supervisors" element={<AdminRoute><AdminSupervisors /></AdminRoute>} />
         <Route path="audit-logs" element={<AdminRoute><AdminAuditLogs /></AdminRoute>} />
