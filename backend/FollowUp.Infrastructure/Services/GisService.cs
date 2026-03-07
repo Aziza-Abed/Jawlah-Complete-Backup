@@ -239,6 +239,10 @@ public class GisService : IGisService
 
         try
         {
+            // Sanitize GeoJSON: remove non-standard properties (crs, name) that QGIS/GDAL add
+            // These are not part of RFC 7946 and cause NTS GeoJsonReader to fail
+            geoJson = SanitizeGeoJson(geoJson);
+
             var geoJsonReader = new NetTopologySuite.IO.GeoJsonReader();
             var featureCollection = geoJsonReader.Read<NetTopologySuite.Features.FeatureCollection>(geoJson);
 
@@ -339,6 +343,8 @@ public class GisService : IGisService
 
         try
         {
+            geoJson = SanitizeGeoJson(geoJson);
+
             var geoJsonReader = new NetTopologySuite.IO.GeoJsonReader();
             var featureCollection = geoJsonReader.Read<NetTopologySuite.Features.FeatureCollection>(geoJson);
 
@@ -557,6 +563,59 @@ public class GisService : IGisService
     {
         var writer = new NetTopologySuite.IO.GeoJsonWriter();
         return writer.Write(geometry);
+    }
+
+    // Remove non-standard root-level properties (crs, name) that QGIS/GDAL add.
+    // These are not part of RFC 7946 and cause NTS GeoJsonReader to fail.
+    private string SanitizeGeoJson(string geoJson)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(geoJson);
+            var root = doc.RootElement;
+
+            // Only sanitize FeatureCollections at root level
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Object)
+                return geoJson;
+
+            // Check if any non-standard properties exist to avoid unnecessary rewrite
+            bool needsSanitize = false;
+            string[] removeProps = { "crs", "name" };
+            foreach (var prop in removeProps)
+            {
+                if (root.TryGetProperty(prop, out _))
+                {
+                    needsSanitize = true;
+                    break;
+                }
+            }
+
+            if (!needsSanitize)
+                return geoJson;
+
+            // Rebuild JSON without the non-standard properties
+            using var stream = new System.IO.MemoryStream();
+            using (var writer = new System.Text.Json.Utf8JsonWriter(stream))
+            {
+                writer.WriteStartObject();
+                foreach (var property in root.EnumerateObject())
+                {
+                    if (Array.Exists(removeProps, p => p.Equals(property.Name, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+                    property.WriteTo(writer);
+                }
+                writer.WriteEndObject();
+            }
+
+            var sanitized = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+            _logger.LogInformation("Sanitized GeoJSON: removed non-standard properties (crs/name)");
+            return sanitized;
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            _logger.LogWarning(ex, "Failed to sanitize GeoJSON, proceeding with original");
+            return geoJson;
+        }
     }
 
     // parse GeoJSON string to geometry

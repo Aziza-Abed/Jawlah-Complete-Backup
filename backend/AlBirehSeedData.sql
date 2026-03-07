@@ -11,8 +11,8 @@ SET DATEFIRST 7; -- Sunday=1, Friday=6, Saturday=7
 
 USE FollowUpNew;
 
--- Demo date: March 7, 2026 at 09:00 UTC (11:00 Palestine time)
-DECLARE @Now DATETIME = '2026-03-07 09:00:00';
+-- Demo date: March 8, 2026 at 09:00 UTC (11:00 Palestine time)
+DECLARE @Now DATETIME = '2026-03-08 09:00:00';
 
 -- Clean existing data (order matters: children before parents)
 -- Break self-referencing / circular FKs first

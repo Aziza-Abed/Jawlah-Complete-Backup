@@ -309,13 +309,14 @@ public class GisController : BaseApiController
             {
                 try
                 {
+                    // Import directly from memory to avoid file lock issues
                     if (fileType == GisFileType.Blocks)
                     {
-                        await _gisService.ImportBlocksFromGeoJsonAsync(storedFilePath, user.MunicipalityId);
+                        await _gisService.ImportBlocksFromGeoJsonStringAsync(jsonContent, user.MunicipalityId);
                     }
                     else
                     {
-                        await _gisService.ImportGeoJsonAsync(storedFilePath, user.MunicipalityId, fileType);
+                        await _gisService.ImportGeoJsonStringAsync(jsonContent, user.MunicipalityId, fileType);
                     }
 
                     geoJsonFile.LastImportedAt = DateTime.UtcNow;

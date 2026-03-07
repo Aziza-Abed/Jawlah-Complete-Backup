@@ -337,6 +337,21 @@ public class AttendanceController : BaseApiController
 
         _logger.LogInformation("Manual attendance requested by user {UserId}, reason: {Reason}", userId, request.Reason);
 
+        // Notify supervisor about the pending manual attendance request
+        if (user.SupervisorId.HasValue)
+        {
+            try
+            {
+                await _notifications.SendSystemAlertAsync(
+                    user.SupervisorId.Value,
+                    $"طلب حضور يدوي من العامل {user.FullName}. السبب: {request.Reason}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to notify supervisor {SupervisorId} about manual attendance", user.SupervisorId.Value);
+            }
+        }
+
         var response = _mapper.Map<AttendanceResponse>(attendance);
         return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم إرسال طلب الحضور اليدوي"));
     }
