@@ -24,4 +24,6 @@ public class UserResponse
     // Team assignment for team-based workers
     public int? TeamId { get; set; }
     public string? TeamName { get; set; }
+
+    public string? ProfilePhotoUrl { get; set; }
 }

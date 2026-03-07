@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using FollowUp.Core.Enums;
 
 namespace FollowUp.Core.DTOs.Users;
@@ -13,9 +14,11 @@ public class UpdateUserRequest
     public int? DepartmentId { get; set; }
 
     // update user's full name
+    [StringLength(100)]
     public string? FullName { get; set; }
 
     // update user's phone number
+    [StringLength(20)]
     public string? PhoneNumber { get; set; }
 
     // update user's status (Active/Inactive)

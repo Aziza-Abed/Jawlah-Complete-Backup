@@ -6,13 +6,8 @@ interface ConfirmState {
   danger?: boolean;
 }
 
-/**
- * Hook that replaces window.confirm with a styled dialog.
- * Returns [confirm, DialogComponent].
- * Usage:
- *   const [confirm, ConfirmDialog] = useConfirm();
- *   if (!await confirm("هل أنت متأكد؟")) return;
- */
+// Hook that replaces window.confirm with a styled dialog
+// Usage: const [confirm, ConfirmDialog] = useConfirm(); if (!await confirm("...")) return;
 export function useConfirm() {
   const [state, setState] = useState<ConfirmState | null>(null);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
@@ -38,7 +33,7 @@ export function useConfirm() {
   }, [state, handleClose]);
 
   const Dialog = state ? (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" dir="rtl">
+    <div className="fixed inset-0 z-[900] flex items-center justify-center" dir="rtl">
       <div className="absolute inset-0 bg-black/40" onClick={() => handleClose(false)} />
       <div className="relative bg-white rounded-[18px] shadow-2xl max-w-[400px] w-[90%] p-6">
         <div className="flex items-start gap-4">
@@ -50,7 +45,7 @@ export function useConfirm() {
             <p className="text-[14px] text-[#6B7280] mt-1 leading-relaxed">{state.message}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 mt-6 justify-start">
+        <div className="flex items-center gap-3 mt-6 justify-end">
           <button
             type="button"
             onClick={() => handleClose(true)}

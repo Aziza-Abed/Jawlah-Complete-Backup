@@ -18,18 +18,21 @@ class BottomNavigationScreen extends StatefulWidget {
 class _BottomNavigationScreenState extends State<BottomNavigationScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const TasksListScreen(),
-    const ReportProblemScreen(),
-    const NotificationsScreen(),
-    const SettingsScreen(),
+  final List<Widget> _screens = const [
+    HomeScreen(),
+    TasksListScreen(),
+    ReportProblemScreen(),
+    NotificationsScreen(),
+    SettingsScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }

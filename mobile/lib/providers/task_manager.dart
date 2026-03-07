@@ -7,6 +7,7 @@ import '../data/models/task_model.dart';
 import '../data/services/tasks_service.dart';
 import '../data/services/location_service.dart';
 import '../data/repositories/local/task_local_repository.dart';
+import '../core/config/app_constants.dart';
 import '../core/errors/app_exception.dart';
 
 import 'sync_manager.dart';
@@ -28,6 +29,22 @@ class TaskManager extends BaseController {
 
   // Track which milestones have been notified per task
   final Map<int, Set<int>> _notifiedMilestones = {};
+
+  /// Clear all in-memory cached data (call on logout)
+  void clearCache() {
+    myTasks.clear();
+    currentTask = null;
+    filterStatus = null;
+    filterPriority = null;
+    _lastProgressUpdateTime.clear();
+    _notifiedMilestones.clear();
+    _lastMilestoneMessage = null;
+    _currentPage = 1;
+    _hasMoreData = true;
+    _isLoadingMore = false;
+    clearError();
+    notifyListeners();
+  }
 
   // pagination stuff
   int _currentPage = 1;
@@ -114,8 +131,16 @@ class TaskManager extends BaseController {
       setError(null);
       notifyListeners();
     } catch (e) {
-      // if server fails get from phone
-      await getDataFromDevice(status, priority);
+      // only show offline mode if actually offline, otherwise show error
+      final actuallyOffline = !(_syncManager?.isOnline ?? true);
+      if (actuallyOffline) {
+        await getDataFromDevice(status, priority);
+      } else {
+        // server error while online — show error but keep existing data
+        setError('فشل تحميل المهام من الخادم. حاول مرة أخرى.');
+        setLoading(false);
+        notifyListeners();
+      }
     }
   }
 
@@ -183,7 +208,7 @@ class TaskManager extends BaseController {
   List<TaskModel> _sortByPriority(List<TaskModel> tasks) {
     final sorted = List<TaskModel>.from(tasks);
     sorted.sort((a, b) {
-      const priorityOrder = {'high': 0, 'medium': 1, 'low': 2, 'normal': 2};
+      const priorityOrder = {'urgent': 0, 'high': 1, 'medium': 2, 'low': 3, 'normal': 3};
       final aOrder = priorityOrder[a.priority.toLowerCase()] ?? 3;
       final bOrder = priorityOrder[b.priority.toLowerCase()] ?? 3;
       return aOrder.compareTo(bOrder);
@@ -317,17 +342,16 @@ class TaskManager extends BaseController {
     required String notes,
     File? proofPhoto,
   }) async {
+    // capture device time and GPS before try block so catch blocks can access them
+    final eventTime = DateTime.now().toUtc();
+    double? lat;
+    double? lng;
+
     try {
       setLoading(true);
       clearError();
 
-      // capture device time immediately — before any async GPS call
-      final eventTime = DateTime.now().toUtc();
-
       // get current gps location
-      double? lat;
-      double? lng;
-
       try {
         final position = await LocationService.getCurrentLocation();
         if (position != null) {
@@ -345,46 +369,38 @@ class TaskManager extends BaseController {
         latitude: lat,
         longitude: lng,
         eventTime: eventTime,
+        gpsUnavailable: lat == null,
       );
 
       updateMyTaskInList(updatedTask);
       setLoading(false);
       return true;
+    } on NetworkException catch (e) {
+      setLoading(false);
+      // Only network errors get offline fallback
+      setError(e.message);
+      return await _saveCompletedTaskOffline(taskId, notes, proofPhoto, lat: lat, lng: lng, eventTime: eventTime);
     } on AppException catch (e) {
       setLoading(false);
-
-      // Check if this is a validation error (location mismatch)
-      // These errors should NOT use offline fallback
-      final isValidationError = e.message.contains('الموقع غير مطابق') ||
-          e.message.contains('تحذير') ||
-          e.message.contains('رفض') ||
-          e.message.contains('المسافة');
-
-      if (isValidationError) {
-        // Don't use offline fallback for validation errors
-        // Just set the error message and return false
-        setError(e.message);
-        return false;
-      } else {
-        // For network errors, use offline fallback
-        setError(e.message);
-        return await _saveCompletedTaskOffline(taskId, notes, proofPhoto);
-      }
+      // Server/validation errors (400, 403, etc.) — show error, don't save offline
+      setError(e.message);
+      return false;
     } catch (e) {
       setLoading(false);
-
-      // For unknown errors, try offline fallback
       final errorMessage = e.toString().replaceAll('Exception: ', '');
       setError(errorMessage);
-      return await _saveCompletedTaskOffline(taskId, notes, proofPhoto);
+      return false;
     }
   }
 
   Future<bool> _saveCompletedTaskOffline(
     int taskId,
     String notes,
-    File? proofPhoto,
-  ) async {
+    File? proofPhoto, {
+    double? lat,
+    double? lng,
+    DateTime? eventTime,
+  }) async {
     final task = getTaskById(taskId);
     if (task == null) return false;
 
@@ -395,13 +411,16 @@ class TaskManager extends BaseController {
         permanentPhotoPath = await _savePhotoLocally(proofPhoto);
       }
 
-      // update task
+      // update task with worker's actual GPS and event time
       final updatedTask = task.copyWith(
         status: 'UnderReview',
         completionNotes: notes,
         photoUrl: permanentPhotoPath,
-        completedAt: DateTime.now(),
+        completedAt: eventTime ?? DateTime.now(),
         updatedAt: DateTime.now(),
+        latitude: lat ?? task.latitude,
+        longitude: lng ?? task.longitude,
+        eventTime: eventTime,
       );
 
       // save to local db
@@ -502,12 +521,12 @@ class TaskManager extends BaseController {
   // update task progress (for multi-day tasks)
   // Rate limited to once every 5 minutes per task
   Future<bool> updateTaskProgress(int taskId, int progressPercentage) async {
-    // Check rate limit - 5 minutes between updates
+    // Check rate limit
     final lastUpdate = _lastProgressUpdateTime[taskId];
     if (lastUpdate != null) {
       final timeSinceLastUpdate = DateTime.now().difference(lastUpdate);
-      if (timeSinceLastUpdate.inMinutes < 5) {
-        final remainingMinutes = 5 - timeSinceLastUpdate.inMinutes;
+      if (timeSinceLastUpdate.inMinutes < AppConstants.progressUpdateIntervalMinutes) {
+        final remainingMinutes = AppConstants.progressUpdateIntervalMinutes - timeSinceLastUpdate.inMinutes;
         setError('يرجى الانتظار $remainingMinutes دقائق قبل تحديث التقدم مرة أخرى');
         return false;
       }
@@ -562,9 +581,17 @@ class TaskManager extends BaseController {
     if (task == null) return false;
 
     try {
-      // update task locally
+      // update task locally — mirror backend status transitions
+      String newStatus = task.status;
+      if (progressPercentage == 100) {
+        newStatus = 'UnderReview';
+      } else if (progressPercentage > 0 && task.status.toLowerCase() == 'pending') {
+        newStatus = 'InProgress';
+      }
+
       final updatedTask = task.copyWith(
         progressPercentage: progressPercentage,
+        status: newStatus,
         updatedAt: DateTime.now(),
       );
 
@@ -635,5 +662,23 @@ class TaskManager extends BaseController {
   // Clear milestone message after showing
   void clearMilestoneMessage() {
     _lastMilestoneMessage = null;
+  }
+
+  // Whether enough time has passed since the last progress update
+  bool canUpdateProgress(int taskId) {
+    final lastUpdate = _lastProgressUpdateTime[taskId];
+    if (lastUpdate == null) return true;
+    return DateTime.now().difference(lastUpdate).inMinutes >=
+        AppConstants.progressUpdateIntervalMinutes;
+  }
+
+  // Minutes remaining until progress can be updated again (0 if no cooldown)
+  int progressCooldownMinutes(int taskId) {
+    final lastUpdate = _lastProgressUpdateTime[taskId];
+    if (lastUpdate == null) return 0;
+    final elapsed = DateTime.now().difference(lastUpdate).inMinutes;
+    final remaining =
+        AppConstants.progressUpdateIntervalMinutes - elapsed;
+    return remaining > 0 ? remaining : 0;
   }
 }

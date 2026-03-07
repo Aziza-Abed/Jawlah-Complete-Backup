@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/models/appeal_model.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../presentation/widgets/authenticated_image.dart';
 import '../../presentation/widgets/info_row.dart';
 
 class AppealDetailsScreen extends StatelessWidget {
@@ -15,20 +16,7 @@ class AppealDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color statusColor;
-    switch (appeal.statusColor) {
-      case 'green':
-        statusColor = Colors.green;
-        break;
-      case 'red':
-        statusColor = Colors.red;
-        break;
-      case 'orange':
-        statusColor = Colors.orange;
-        break;
-      default:
-        statusColor = Colors.grey;
-    }
+    final statusColor = appeal.statusColorValue;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -286,33 +274,11 @@ class AppealDetailsScreen extends StatelessWidget {
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                appeal.evidencePhotoUrl!,
+              child: AuthenticatedImage(
+                imageUrl: appeal.evidencePhotoUrl!,
+                width: double.infinity,
+                height: 200,
                 fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    height: 200,
-                    color: Colors.grey[200],
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Icon(Icons.error, size: 48, color: Colors.red),
-                    ),
-                  );
-                },
               ),
             ),
           ],

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { useToast } from "../contexts/ToastContext";
 import { STORAGE_KEYS } from "../constants/storageKeys";
 import { getWorkers, getMyWorkers } from "../api/users";
 import { getZones } from "../api/zones";
@@ -17,6 +19,7 @@ const priorityOptions: PriorityOption[] = [
   { value: "Low", label: "منخفضة" },
   { value: "Medium", label: "متوسطة" },
   { value: "High", label: "عالية" },
+  { value: "Urgent", label: "عاجلة" },
 ];
 
 
@@ -37,6 +40,7 @@ type FromIssue = {
 
 export default function CreateTask() {
   const location = useLocation();
+  const navigate = useNavigate();
   const fromIssue = (location.state as { fromIssue?: FromIssue } | null)?.fromIssue;
 
   const [employees, setEmployees] = useState<UserResponse[]>([]);
@@ -45,7 +49,8 @@ export default function CreateTask() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const { showToast } = useToast();
+  usePageTitle("تعيين مهمة جديدة");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -66,7 +71,8 @@ export default function CreateTask() {
   // ✅ NEW: helper to map severity -> priority
   const mapSeverityToPriority = (sev?: FromIssue["severity"]): TaskPriority | "" => {
     if (!sev) return "";
-    if (sev === "critical" || sev === "high") return "High";
+    if (sev === "critical") return "Urgent";
+    if (sev === "high") return "High";
     if (sev === "medium") return "Medium";
     return "Low";
   };
@@ -165,20 +171,51 @@ export default function CreateTask() {
     }
   }, [fromIssue, zones, zoneId]);
 
+  // Field-level validation errors
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!title.trim()) {
+      errors.title = "عنوان المهمة مطلوب";
+    } else if (title.trim().length < 3) {
+      errors.title = "العنوان يجب أن يكون 3 أحرف على الأقل";
+    }
+
+    if (!description.trim()) {
+      errors.description = "وصف المهمة مطلوب";
+    } else if (description.trim().length < 10) {
+      errors.description = "الوصف يجب أن يكون 10 أحرف على الأقل";
+    }
+
+    if (!priority) {
+      errors.priority = "يرجى اختيار الأولوية";
+    }
+
+    if (assignmentType === "individual" && !employeeId) {
+      errors.employee = "يرجى اختيار موظف";
+    }
+    if (assignmentType === "team" && !teamId) {
+      errors.team = "يرجى اختيار فريق";
+    }
+
+    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+      errors.endDate = "موعد الانتهاء يجب أن يكون بعد موعد البدء";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
-
-    // Validate assignment
-    if (assignmentType === "individual" && !employeeId) {
-      setError("يرجى اختيار موظف");
-      return;
-    }
-    if (assignmentType === "team" && !teamId) {
-      setError("يرجى اختيار فريق");
-      return;
-    }
+    if (!validateForm()) return;
 
     setSubmitting(true);
 
@@ -200,26 +237,11 @@ export default function CreateTask() {
         requiresPhotoProof,
       });
 
-      setSuccess(assignmentType === "team"
+      showToast(assignmentType === "team"
         ? "تم إنشاء المهمة الجماعية بنجاح - سيتم إشعار جميع أعضاء الفريق"
         : "تم إنشاء المهمة بنجاح");
 
-      // Reset form
-      setTitle("");
-      setDescription("");
-      setStartDate("");
-      setEndDate("");
-      setPriority("");
-      setAssignmentType("individual");
-      setEmployeeId("");
-      setTeamId("");
-      setZoneId("");
-
-      setLatitude(null);
-      setLongitude(null);
-      setLocationDescription("");
-
-      setRequiresPhotoProof(true);
+      navigate("/tasks");
     } catch (err) {
       setError("فشل في إنشاء المهمة");
     } finally {
@@ -239,7 +261,7 @@ export default function CreateTask() {
     <div className="h-full w-full bg-[#F3F1ED] overflow-auto">
       <div className="p-4 sm:p-6 md:p-8">
         <div className="max-w-[980px] mx-auto">
-          <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F] mb-6">
+          <h1 className="text-right font-black text-[28px] text-[#2F2F2F] tracking-tight mb-6">
             تعيين مهمة جديدة
           </h1>
 
@@ -255,31 +277,31 @@ export default function CreateTask() {
             </div>
           )}
 
-          {success && (
-            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-[10px] text-right">
-              {success}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="w-full">
             <div className="grid grid-cols-1 gap-6">
-              <FieldRow label="عنوان المهمة">
+              <FieldRow label="عنوان المهمة" error={fieldErrors.title}>
                 <Input
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => { setTitle(e.target.value); clearFieldError("title"); }}
                   placeholder="اسم المهمة"
                   required
+                  minLength={3}
+                  maxLength={200}
                   disabled={submitting}
+                  hasError={!!fieldErrors.title}
                 />
               </FieldRow>
 
-              <FieldRow label="وصف المهمة">
+              <FieldRow label="وصف المهمة" error={fieldErrors.description}>
                 <Textarea
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => { setDescription(e.target.value); clearFieldError("description"); }}
                   placeholder="يرجى كتابة وصف مختصر للمهمة..."
                   required
+                  minLength={10}
+                  maxLength={1000}
                   disabled={submitting}
+                  hasError={!!fieldErrors.description}
                 />
               </FieldRow>
 
@@ -287,18 +309,19 @@ export default function CreateTask() {
                 <DateTimeInput value={startDate} onChange={setStartDate} disabled={submitting} />
               </FieldRow>
 
-              <FieldRow label="موعد الانتهاء">
-                <DateTimeInput value={endDate} onChange={setEndDate} disabled={submitting} />
+              <FieldRow label="موعد الانتهاء" error={fieldErrors.endDate}>
+                <DateTimeInput value={endDate} onChange={(v) => { setEndDate(v); clearFieldError("endDate"); }} disabled={submitting} />
               </FieldRow>
 
-              <FieldRow label="الأولوية">
+              <FieldRow label="الأولوية" error={fieldErrors.priority}>
                 <Select
                   value={priority}
-                  onChange={(v) => setPriority(v as TaskPriority)}
+                  onChange={(v) => { setPriority(v as TaskPriority); clearFieldError("priority"); }}
                   placeholder="اختر درجة الأهمية..."
                   options={priorityOptions.map((p) => ({ value: p.value, label: p.label }))}
                   required
                   disabled={submitting}
+                  hasError={!!fieldErrors.priority}
                 />
               </FieldRow>
 
@@ -321,7 +344,7 @@ export default function CreateTask() {
                       className="w-4 h-4 text-[#7895B2] focus:ring-[#7895B2]"
                     />
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className={`flex items-center gap-2 ${teams.length > 0 ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
                     <span className={assignmentType === "team" ? "text-[#2F2F2F] font-semibold" : "text-[#6B7280]"}>
                       فريق عمل
                     </span>
@@ -333,7 +356,7 @@ export default function CreateTask() {
                         setAssignmentType("team");
                         setEmployeeId("");
                       }}
-                      disabled={submitting}
+                      disabled={submitting || teams.length === 0}
                       className="w-4 h-4 text-[#7895B2] focus:ring-[#7895B2]"
                     />
                   </label>
@@ -342,10 +365,10 @@ export default function CreateTask() {
 
               {/* Individual Worker Selection */}
               {assignmentType === "individual" && (
-                <FieldRow label="الموظف">
+                <FieldRow label="الموظف" error={fieldErrors.employee}>
                   <Select
                     value={employeeId}
-                    onChange={setEmployeeId}
+                    onChange={(v) => { setEmployeeId(v); clearFieldError("employee"); }}
                     placeholder="اسم الموظف..."
                     options={employees.map((e) => ({
                       value: e.userId.toString(),
@@ -353,16 +376,17 @@ export default function CreateTask() {
                     }))}
                     required
                     disabled={submitting}
+                    hasError={!!fieldErrors.employee}
                   />
                 </FieldRow>
               )}
 
               {/* Team Selection */}
               {assignmentType === "team" && (
-                <FieldRow label="الفريق">
+                <FieldRow label="الفريق" error={fieldErrors.team}>
                   <Select
                     value={teamId}
-                    onChange={setTeamId}
+                    onChange={(v) => { setTeamId(v); clearFieldError("team"); }}
                     placeholder="اختر الفريق..."
                     options={teams.map((t) => ({
                       value: t.teamId.toString(),
@@ -370,6 +394,7 @@ export default function CreateTask() {
                     }))}
                     required
                     disabled={submitting}
+                    hasError={!!fieldErrors.team}
                   />
                   {teamId && (
                     <p className="mt-2 text-xs text-[#6B7280] text-right">
@@ -428,6 +453,7 @@ export default function CreateTask() {
                   onChange={(e) => setLocationDescription(e.target.value)}
                   placeholder="مثال: بجانب مسجد الحي، شارع الملك فهد..."
                   disabled={submitting}
+                  maxLength={200}
                 />
               </FieldRow>
 
@@ -467,15 +493,16 @@ export default function CreateTask() {
 
 /* ---------- UI building blocks ---------- */
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] items-start gap-3 md:gap-4">
       <div className="text-right font-sans font-semibold text-[#2F2F2F] text-[16px] sm:text-[17px] md:text-[18px] pt-2">
         {label}
       </div>
 
-      <div className="flex">
+      <div className="flex flex-col">
         <div className="w-full max-w-[560px]">{children}</div>
+        {error && <p className="text-right text-red-500 text-[12px] mt-1 font-semibold max-w-[560px]">{error}</p>}
       </div>
     </div>
   );
@@ -487,12 +514,18 @@ function Input({
   placeholder,
   required,
   disabled,
+  hasError,
+  minLength,
+  maxLength,
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  hasError?: boolean;
+  minLength?: number;
+  maxLength?: number;
 }) {
   return (
     <input
@@ -501,7 +534,9 @@ function Input({
       placeholder={placeholder}
       required={required}
       disabled={disabled}
-      className="w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
+      minLength={minLength}
+      maxLength={maxLength}
+      className={`w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border ${hasError ? "border-red-400" : "border-black/10"} px-4 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50`}
     />
   );
 }
@@ -512,23 +547,38 @@ function Textarea({
   placeholder,
   required,
   disabled,
+  hasError,
+  minLength,
+  maxLength,
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  hasError?: boolean;
+  minLength?: number;
+  maxLength?: number;
 }) {
   return (
-    <textarea
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      required={required}
-      disabled={disabled}
-      rows={3}
-      className="w-full min-h-[78px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4 py-3 text-right outline-none resize-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
-    />
+    <div className="relative">
+      <textarea
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        disabled={disabled}
+        minLength={minLength}
+        maxLength={maxLength}
+        rows={3}
+        className={`w-full min-h-[78px] rounded-[10px] bg-[#F3F1ED] border ${hasError ? "border-red-400" : "border-black/10"} px-4 py-3 text-right outline-none resize-none focus:ring-2 focus:ring-black/10 disabled:opacity-50`}
+      />
+      {maxLength && (
+        <span className={`absolute bottom-2 left-3 text-[11px] ${value.length > maxLength * 0.9 ? "text-red-400" : "text-[#9CA3AF]"}`}>
+          {value.length}/{maxLength}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -563,6 +613,7 @@ function Select({
   options,
   required,
   disabled,
+  hasError,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -570,6 +621,7 @@ function Select({
   options: { value: string; label: string }[];
   required?: boolean;
   disabled?: boolean;
+  hasError?: boolean;
 }) {
   return (
     <div className="relative">
@@ -579,7 +631,7 @@ function Select({
         required={required}
         disabled={disabled}
         className={[
-          "w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border border-black/10 px-4",
+          `w-full h-[44px] rounded-[10px] bg-[#F3F1ED] border ${hasError ? "border-red-400" : "border-black/10"} px-4`,
           "text-right outline-none focus:ring-2 focus:ring-black/10",
           value ? "text-[#111827]" : "text-[#9CA3AF]",
           "appearance-none disabled:opacity-50",

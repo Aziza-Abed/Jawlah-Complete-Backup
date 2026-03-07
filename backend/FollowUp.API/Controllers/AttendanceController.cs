@@ -5,15 +5,15 @@ using FollowUp.Core.Entities;
 using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
-using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// this controller handles checkin and checkout for workers
 [Route("api/[controller]")]
+[Tags("Attendance")]
 public class AttendanceController : BaseApiController
 {
     private readonly IAttendanceRepository _attendance;
@@ -21,7 +21,7 @@ public class AttendanceController : BaseApiController
     private readonly IGisService _gis;
     private readonly ILogger<AttendanceController> _logger;
     private readonly IMapper _mapper;
-    private readonly AuditLogService _audit;
+    private readonly IAuditLogService _audit;
     private readonly IConfiguration _config;
     private readonly INotificationService _notifications;
 
@@ -31,7 +31,7 @@ public class AttendanceController : BaseApiController
         IGisService gis,
         ILogger<AttendanceController> logger,
         IMapper mapper,
-        AuditLogService audit,
+        IAuditLogService audit,
         IConfiguration config,
         INotificationService notifications)
     {
@@ -45,8 +45,9 @@ public class AttendanceController : BaseApiController
         _notifications = notifications;
     }
 
-    // worker checkin at the start of day
+    [Authorize(Roles = "Worker")]
     [HttpPost("checkin")]
+    [SwaggerOperation(Summary = "check in worker at start of day")]
     public async Task<IActionResult> CheckIn([FromBody] CheckInRequest request)
     {
         var userId = GetCurrentUserId();
@@ -146,8 +147,9 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم تسجيل الحضور بنجاح"));
     }
 
-    // worker checkout at end of day
+    [Authorize(Roles = "Worker")]
     [HttpPost("checkout")]
+    [SwaggerOperation(Summary = "check out worker at end of day")]
     public async Task<IActionResult> CheckOut([FromBody] CheckOutRequest request)
     {
         var userId = GetCurrentUserId();
@@ -245,8 +247,8 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم تسجيل الانصراف بنجاح"));
     }
 
-    // get today attendance for current user
     [HttpGet("today")]
+    [SwaggerOperation(Summary = "get today attendance for current user")]
     public async Task<IActionResult> GetTodayAttendance()
     {
         var userId = GetCurrentUserId();
@@ -261,8 +263,8 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response));
     }
 
-    // get attendance history for worker
     [HttpGet("history")]
+    [SwaggerOperation(Summary = "get attendance history for worker")]
     public async Task<IActionResult> GetAttendanceHistory(
         [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null,
@@ -292,8 +294,9 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<List<AttendanceResponse>>.SuccessResponse(responses));
     }
 
-    // request manual attendance (worker submits when GPS not available)
+    [Authorize(Roles = "Worker")]
     [HttpPost("manual")]
+    [SwaggerOperation(Summary = "request manual attendance without gps")]
     public async Task<IActionResult> RequestManualAttendance([FromBody] ManualAttendanceRequest request)
     {
         var userId = GetCurrentUserId();
@@ -338,9 +341,9 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<AttendanceResponse>.SuccessResponse(response, "تم إرسال طلب الحضور اليدوي"));
     }
 
-    // get pending manual attendance requests (supervisor)
     [HttpGet("pending-manual")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get pending manual attendance requests")]
     public async Task<IActionResult> GetPendingManualAttendance()
     {
         // query database directly instead of loading all records
@@ -371,9 +374,9 @@ public class AttendanceController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(response));
     }
 
-    // approve or reject manual attendance (supervisor)
     [HttpPost("{id}/approve")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "approve or reject manual attendance")]
     public async Task<IActionResult> ApproveManualAttendance(int id, [FromBody] ApproveAttendanceRequest request)
     {
         var supervisorId = GetCurrentUserId();

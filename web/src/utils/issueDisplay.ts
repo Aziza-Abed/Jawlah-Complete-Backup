@@ -1,5 +1,4 @@
-// Shared display types and mappers for issue pages
-// Maps backend enum values to frontend display values
+// issue display helpers
 
 export type Severity = "low" | "medium" | "high" | "critical";
 export type DisplayIssueStatus = "new" | "forwarded" | "converted" | "closed";
@@ -26,6 +25,7 @@ export const mapStatus = (status: string | null | undefined): DisplayIssueStatus
     // legacy support
     case "Reported": return "new";
     case "UnderReview": return "forwarded";
+    case "Rejected": return "closed";
     case "Dismissed": return "closed";
     default: return "new";
   }

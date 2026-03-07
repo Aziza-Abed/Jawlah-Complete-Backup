@@ -9,12 +9,14 @@ using Microsoft.AspNetCore.Mvc;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Swashbuckle.AspNetCore.Annotations;
 using TaskStatus = FollowUp.Core.Enums.TaskStatus;
 
 namespace FollowUp.API.Controllers;
 
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin,Supervisor")]
+[Tags("Reports")]
 public class ReportsController : BaseApiController
 {
     private readonly IAttendanceRepository _attendance;
@@ -40,9 +42,10 @@ public class ReportsController : BaseApiController
         _logger = logger;
     }
 
-    // ========== SUMMARY ENDPOINTS ==========
+    // summary endpoints
 
     [HttpGet("tasks/summary")]
+    [SwaggerOperation(Summary = "get tasks report summary")]
     public async Task<IActionResult> GetTasksReportSummary(
         [FromQuery] string period = "monthly",
         [FromQuery] string? status = null,
@@ -105,6 +108,7 @@ public class ReportsController : BaseApiController
     }
 
     [HttpGet("workers/summary")]
+    [SwaggerOperation(Summary = "get workers performance summary")]
     public async Task<IActionResult> GetWorkersReportSummary(
         [FromQuery] string period = "monthly",
         [FromQuery] DateTime? startDate = null,
@@ -199,6 +203,7 @@ public class ReportsController : BaseApiController
     }
 
     [HttpGet("zones/summary")]
+    [SwaggerOperation(Summary = "get zones activity summary")]
     public async Task<IActionResult> GetZonesReportSummary(
         [FromQuery] string period = "monthly",
         [FromQuery] DateTime? startDate = null,
@@ -259,10 +264,8 @@ public class ReportsController : BaseApiController
         }
     }
 
-    // ========== INDIVIDUAL WORKER REPORT ==========
-
-    // get detailed performance report for a specific worker
     [HttpGet("worker/{workerId}")]
+    [SwaggerOperation(Summary = "get individual worker performance report")]
     public async Task<IActionResult> GetIndividualWorkerReport(
         int workerId,
         [FromQuery] string period = "monthly",
@@ -278,7 +281,7 @@ public class ReportsController : BaseApiController
             if (worker.Role != UserRole.Worker)
                 return BadRequest(ApiResponse<object>.ErrorResponse("هذا التقرير للعمال فقط"));
 
-            // SECURITY: Supervisors can only view reports for their own workers
+            // supervisors can only view their workers' reports
             var currentUserId = GetCurrentUserId();
             var currentRole = GetCurrentUserRole();
             if (currentRole == "Supervisor" && currentUserId.HasValue)
@@ -404,10 +407,9 @@ public class ReportsController : BaseApiController
         }
     }
 
-    // ========== SUPERVISOR REPORT ==========
-
     [HttpGet("supervisors")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "get supervisors performance overview")]
     public async Task<IActionResult> GetSupervisorsPerformance()
     {
         try
@@ -467,12 +469,9 @@ public class ReportsController : BaseApiController
         }
     }
 
-    // ========== ADMIN SUPERVISOR MONITORING (ENHANCED) ==========
-
-    // admin-only: comprehensive supervisor monitoring
-    // shows workers under each supervisor, tasks they assigned, performance metrics, and alerts
     [HttpGet("admin/supervisors-monitoring")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "get admin supervisor monitoring dashboard")]
     public async Task<IActionResult> GetAdminSupervisorsMonitoring()
     {
         try
@@ -667,9 +666,8 @@ public class ReportsController : BaseApiController
         }
     }
 
-    // ========== RAW DATA EXPORT ==========
-
     [HttpGet("attendance")]
+    [SwaggerOperation(Summary = "get attendance report data")]
     public async Task<IActionResult> GetAttendanceReport(
         [FromQuery] int? workerId,
         [FromQuery] int? zoneId,
@@ -713,7 +711,7 @@ public class ReportsController : BaseApiController
                     row++;
                 }
 
-                ws.Columns().AdjustToContents();
+                try { ws.Columns().AdjustToContents(); } catch { /* font metrics may fail */ }
                 using var stream = new MemoryStream();
                 workbook.SaveAs(stream);
                 return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -742,6 +740,7 @@ public class ReportsController : BaseApiController
     }
 
     [HttpGet("tasks")]
+    [SwaggerOperation(Summary = "get tasks report data")]
     public async Task<IActionResult> GetTasksReport(
         [FromQuery] int? workerId,
         [FromQuery] int? zoneId,
@@ -788,7 +787,7 @@ public class ReportsController : BaseApiController
                     row++;
                 }
 
-                ws.Columns().AdjustToContents();
+                try { ws.Columns().AdjustToContents(); } catch { /* font metrics may fail */ }
                 using var stream = new MemoryStream();
                 workbook.SaveAs(stream);
                 return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -816,7 +815,7 @@ public class ReportsController : BaseApiController
         }
     }
 
-    // ========== HELPERS ==========
+    // helpers
 
     // get worker IDs visible to the current user (null = admin sees all)
     private async Task<HashSet<int>?> GetVisibleWorkerIdsAsync()
@@ -971,10 +970,8 @@ public class ReportsController : BaseApiController
         return Math.Max(1, days);
     }
 
-    // ========== PDF EXPORT ENDPOINTS ==========
-
-    // export attendance report as PDF
     [HttpGet("attendance/pdf")]
+    [SwaggerOperation(Summary = "export attendance report as pdf")]
     public async Task<IActionResult> ExportAttendancePdf(
         [FromQuery] string period = "monthly",
         [FromQuery] DateTime? startDate = null,
@@ -999,9 +996,6 @@ public class ReportsController : BaseApiController
                 workers = workers.Where(w => visibleWorkerIds.Contains(w.UserId)).ToList();
             }
 
-            // Configure QuestPDF license
-            QuestPDF.Settings.License = LicenseType.Community;
-
             // Generate PDF
             var document = Document.Create(container =>
             {
@@ -1009,7 +1003,8 @@ public class ReportsController : BaseApiController
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(40);
-                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
+                    page.ContentFromRightToLeft();
+                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Tahoma"));
 
                     // Header with supervisor name
                     page.Header().Element(c =>
@@ -1102,8 +1097,8 @@ public class ReportsController : BaseApiController
         }
     }
 
-    // export tasks report as PDF
     [HttpGet("tasks/pdf")]
+    [SwaggerOperation(Summary = "export tasks report as pdf")]
     public async Task<IActionResult> ExportTasksPdf(
         [FromQuery] string period = "monthly",
         [FromQuery] string? status = null,
@@ -1128,9 +1123,6 @@ public class ReportsController : BaseApiController
             var visibleTeamIds = await GetVisibleTeamIdsAsync();
             tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
-            // Configure QuestPDF license
-            QuestPDF.Settings.License = LicenseType.Community;
-
             // Generate PDF
             var document = Document.Create(container =>
             {
@@ -1138,7 +1130,8 @@ public class ReportsController : BaseApiController
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(40);
-                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Arial"));
+                    page.ContentFromRightToLeft();
+                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Tahoma"));
 
                     // Header with supervisor name
                     page.Header().Element(c =>
@@ -1226,10 +1219,8 @@ public class ReportsController : BaseApiController
         }
     }
 
-    // ========== EXCEL EXPORT ENDPOINTS ==========
-
-    // export attendance report as Excel
     [HttpGet("attendance/excel")]
+    [SwaggerOperation(Summary = "export attendance report as excel")]
     public async Task<IActionResult> ExportAttendanceExcel(
         [FromQuery] string period = "monthly",
         [FromQuery] DateTime? startDate = null,
@@ -1305,8 +1296,8 @@ public class ReportsController : BaseApiController
                 rowNumber++;
             }
 
-            // Auto-fit columns
-            worksheet.Columns().AdjustToContents();
+            // Auto-fit columns (may fail with Arabic fonts)
+            try { worksheet.Columns().AdjustToContents(); } catch { /* font metrics may fail */ }
 
             // Return file
             using var stream = new MemoryStream();
@@ -1319,12 +1310,12 @@ public class ReportsController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating attendance Excel");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("فشل إنشاء تقرير Excel"));
+            return StatusCode(500, ApiResponse<object>.ErrorResponse($"فشل إنشاء تقرير Excel: {ex.Message}"));
         }
     }
 
-    // export tasks report as Excel
     [HttpGet("tasks/excel")]
+    [SwaggerOperation(Summary = "export tasks report as excel")]
     public async Task<IActionResult> ExportTasksExcel(
         [FromQuery] string period = "monthly",
         [FromQuery] string? status = null,
@@ -1397,8 +1388,8 @@ public class ReportsController : BaseApiController
                 rowNumber++;
             }
 
-            // Auto-fit columns
-            worksheet.Columns().AdjustToContents();
+            // Auto-fit columns (may fail with Arabic fonts)
+            try { worksheet.Columns().AdjustToContents(); } catch { /* font metrics may fail */ }
 
             // Return file
             using var stream = new MemoryStream();
@@ -1411,7 +1402,7 @@ public class ReportsController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating tasks Excel");
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("فشل إنشاء تقرير Excel"));
+            return StatusCode(500, ApiResponse<object>.ErrorResponse($"فشل إنشاء تقرير Excel: {ex.Message}"));
         }
     }
 }

@@ -85,43 +85,4 @@ public class Task
     public User? AssignedByUser { get; set; }
     public Zone? Zone { get; set; }
     public Team? Team { get; set; }
-
-    // helper method to get all photos (both legacy PhotoUrl and Photos collection)
-    public IEnumerable<string> GetAllPhotoUrls()
-    {
-        var urls = new List<string>();
-
-        // add photos from Photos collection first (preferred)
-        urls.AddRange(Photos.OrderBy(p => p.OrderIndex).Select(p => p.PhotoUrl));
-
-        // fallback to legacy PhotoUrl if Photos collection is empty
-        if (urls.Count == 0 && !string.IsNullOrEmpty(PhotoUrl))
-        {
-            urls.AddRange(PhotoUrl.Split(';', StringSplitOptions.RemoveEmptyEntries));
-        }
-
-        return urls;
-    }
-
-    // helper method to migrate legacy PhotoUrl to Photos collection
-    public void MigratePhotosToCollection(int uploadedByUserId)
-    {
-        if (string.IsNullOrEmpty(PhotoUrl) || Photos.Any())
-            return;
-
-        var urls = PhotoUrl.Split(';', StringSplitOptions.RemoveEmptyEntries);
-        for (int i = 0; i < urls.Length; i++)
-        {
-            Photos.Add(new Photo
-            {
-                PhotoUrl = urls[i],
-                EntityType = "Task",
-                EntityId = TaskId,
-                OrderIndex = i,
-                UploadedAt = DateTime.UtcNow,
-                UploadedByUserId = uploadedByUserId,
-                CreatedAt = DateTime.UtcNow
-            });
-        }
-    }
 }

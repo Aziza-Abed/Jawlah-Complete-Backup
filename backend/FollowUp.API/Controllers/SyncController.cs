@@ -5,11 +5,12 @@ using FollowUp.Core.DTOs.Sync;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// this controller handle offline sync from mobile app
 [Route("api/[controller]")]
+[Tags("Sync")]
 public class SyncController : BaseApiController
 {
     private readonly ITaskRepository _tasks;
@@ -35,8 +36,8 @@ public class SyncController : BaseApiController
         _logger = logger;
     }
 
-    // sync attendance records from mobile
     [HttpPost("attendance/batch")]
+    [SwaggerOperation(Summary = "sync attendance records from mobile")]
     public async Task<IActionResult> SyncAttendanceBatch([FromBody] BatchSyncRequest<AttendanceSyncDto> request)
     {
         // get current user
@@ -87,17 +88,19 @@ public class SyncController : BaseApiController
                         continue;
                     }
 
-                    // update existing record
-                    existing.CheckOutEventTime = item.CheckOutEventTime;
-                    existing.CheckOutLatitude = item.CheckOutLatitude;
-                    existing.CheckOutLongitude = item.CheckOutLongitude;
-                    existing.CheckOutAccuracyMeters = item.CheckOutAccuracyMeters;
-                    existing.Status = item.CheckOutEventTime.HasValue ? Core.Enums.AttendanceStatus.CheckedOut : Core.Enums.AttendanceStatus.CheckedIn;
-                    existing.SyncVersion++;
-                    existing.CheckOutSyncTime = DateTime.UtcNow;
-
+                    // only update checkout fields if the synced item actually has checkout data
+                    // prevents nulling out existing checkout when syncing a check-in-only record
                     if (item.CheckOutEventTime.HasValue)
+                    {
+                        existing.CheckOutEventTime = item.CheckOutEventTime;
+                        existing.CheckOutLatitude = item.CheckOutLatitude;
+                        existing.CheckOutLongitude = item.CheckOutLongitude;
+                        existing.CheckOutAccuracyMeters = item.CheckOutAccuracyMeters;
+                        existing.Status = Core.Enums.AttendanceStatus.CheckedOut;
+                        existing.CheckOutSyncTime = DateTime.UtcNow;
                         ApplyCheckoutMetrics(existing, existing.CheckInEventTime, item.CheckOutEventTime.Value, user.ExpectedEndTime);
+                    }
+                    existing.SyncVersion++;
 
                     await _attendance.UpdateAsync(existing);
                     await _attendance.SaveChangesAsync();
@@ -159,8 +162,8 @@ public class SyncController : BaseApiController
         return Ok(ApiResponse<BatchSyncResponse>.SuccessResponse(new BatchSyncResponse { Results = results }));
     }
 
-    // sync task updates from mobile
     [HttpPost("tasks/batch")]
+    [SwaggerOperation(Summary = "sync task updates from mobile")]
     public async Task<IActionResult> SyncTasksBatch([FromBody] BatchSyncRequest<TaskSyncDto> request)
     {
         // get current user
@@ -221,17 +224,42 @@ public class SyncController : BaseApiController
                     continue;
                 }
 
+                // Validate status transition: workers can only move forward (Pending→InProgress→UnderReview)
+                var allowedTransitions = new Dictionary<Core.Enums.TaskStatus, HashSet<Core.Enums.TaskStatus>>
+                {
+                    { Core.Enums.TaskStatus.Pending, new() { Core.Enums.TaskStatus.InProgress } },
+                    { Core.Enums.TaskStatus.Assigned, new() { Core.Enums.TaskStatus.InProgress } },
+                    { Core.Enums.TaskStatus.Accepted, new() { Core.Enums.TaskStatus.InProgress } },
+                    { Core.Enums.TaskStatus.InProgress, new() { Core.Enums.TaskStatus.UnderReview } },
+                    { Core.Enums.TaskStatus.Rejected, new() { Core.Enums.TaskStatus.InProgress } },
+                };
+
+                if (item.Status != task.Status)
+                {
+                    if (!allowedTransitions.TryGetValue(task.Status, out var allowed) || !allowed.Contains(item.Status))
+                    {
+                        results.Add(new SyncResult { ClientId = item.ClientId, ServerId = task.TaskId, Success = false, Message = "انتقال حالة غير مسموح" });
+                        continue;
+                    }
+                }
+
                 // update task data
                 task.Status = item.Status;
                 task.CompletionNotes = InputSanitizer.SanitizeString(item.CompletionNotes, 1000);
                 task.CompletedAt = item.CompletedAt;
                 task.EventTime = item.EventTime ?? item.CompletedAt ?? task.EventTime; // device time sent by mobile; fall back to CompletedAt if not provided
-                task.Latitude = item.Latitude;
-                task.Longitude = item.Longitude;
+
+                // Only update GPS coordinates on completion (preserve task's assigned location otherwise)
+                if (item.Status == Core.Enums.TaskStatus.UnderReview)
+                {
+                    task.Latitude = item.Latitude;
+                    task.Longitude = item.Longitude;
+                }
                 task.SyncTime = DateTime.UtcNow;
                 task.SyncVersion++;
 
                 await _tasks.UpdateAsync(task);
+                await _tasks.SaveChangesAsync();
                 results.Add(new SyncResult { ClientId = item.ClientId, ServerId = task.TaskId, Success = true, ServerVersion = task.SyncVersion });
             }
             catch (Exception ex)
@@ -241,12 +269,11 @@ public class SyncController : BaseApiController
             }
         }
 
-        await _tasks.SaveChangesAsync();
         return Ok(ApiResponse<BatchSyncResponse>.SuccessResponse(new BatchSyncResponse { Results = results }));
     }
 
-    // sync issues from mobile
     [HttpPost("issues/batch")]
+    [SwaggerOperation(Summary = "sync issues from mobile")]
     public async Task<IActionResult> SyncIssuesBatch([FromBody] BatchSyncRequest<IssueSyncDto> request)
     {
         var userId = GetCurrentUserId();
@@ -316,7 +343,7 @@ public class SyncController : BaseApiController
                     Latitude = item.Latitude,
                     Longitude = item.Longitude,
                     LocationDescription = InputSanitizer.SanitizeString(item.LocationDescription, 500),
-                    PhotoUrl = item.PhotoUrl,
+                    PhotoUrl = InputSanitizer.SanitizeString(item.PhotoUrl, 500),
                     ReportedAt = item.ReportedAt,
                     EventTime = item.ReportedAt,
                     SyncTime = DateTime.UtcNow,
@@ -366,8 +393,8 @@ public class SyncController : BaseApiController
         }
     }
 
-    // get changes since last sync
     [HttpGet("changes")]
+    [SwaggerOperation(Summary = "get changes since last sync")]
     public async Task<IActionResult> GetChanges([FromQuery] DateTime lastSyncTime)
     {
         var userId = GetCurrentUserId();

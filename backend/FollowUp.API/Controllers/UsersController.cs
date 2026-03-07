@@ -6,10 +6,10 @@ using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using FollowUp.Infrastructure.Data;
-using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Swashbuckle.AspNetCore.Annotations;
 using TaskStatus = FollowUp.Core.Enums.TaskStatus;
 using AttendanceStatus = FollowUp.Core.Enums.AttendanceStatus;
 
@@ -17,6 +17,7 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle user managment
 [Route("api/[controller]")]
+[Tags("Users")]
 public class UsersController : BaseApiController
 {
     private readonly IUserRepository _users;
@@ -26,7 +27,8 @@ public class UsersController : BaseApiController
     private readonly INotificationService _notifications;
     private readonly ILogger<UsersController> _logger;
     private readonly IMapper _mapper;
-    private readonly AuditLogService _audit;
+    private readonly IAuditLogService _audit;
+    private readonly IFileStorageService _files;
 
     // battery threshold for low battery warning
     private const int LowBatteryThreshold = 20;
@@ -39,7 +41,8 @@ public class UsersController : BaseApiController
         INotificationService notifications,
         ILogger<UsersController> logger,
         IMapper mapper,
-        AuditLogService audit)
+        IAuditLogService audit,
+        IFileStorageService files)
     {
         _users = users;
         _zones = zones;
@@ -49,19 +52,22 @@ public class UsersController : BaseApiController
         _logger = logger;
         _mapper = mapper;
         _audit = audit;
+        _files = files;
     }
 
     // get all users with pagination
     [HttpGet]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get all users with pagination")]
     public async Task<IActionResult> GetAllUsers(
         [FromQuery] UserStatus? status = null,
+        [FromQuery] UserRole? role = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
-        (page, pageSize) = NormalizePagination(page, pageSize);
+        (page, pageSize) = NormalizePagination(page, pageSize, maxPageSize: 500);
 
-        // SECURITY: Supervisors can only see their supervised workers
+        // supervisors can only see their own workers
         var currentUserId = GetCurrentUserId();
         var currentUserRole = GetCurrentUserRole();
 
@@ -73,6 +79,12 @@ public class UsersController : BaseApiController
         else
         {
             users = await _users.GetAllAsync();
+        }
+
+        // filter by role if specified
+        if (role.HasValue)
+        {
+            users = users.Where(u => u.Role == role.Value);
         }
 
         // filter by status if needed
@@ -100,13 +112,14 @@ public class UsersController : BaseApiController
     // get single user by id
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get single user by id")]
     public async Task<IActionResult> GetUserById(int id)
     {
         var user = await _users.GetByIdAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
-        // SECURITY: Supervisors can only view their supervised workers
+        // supervisors can only view their own workers
         var currentUserId = GetCurrentUserId();
         var currentUserRole = GetCurrentUserRole();
 
@@ -127,9 +140,10 @@ public class UsersController : BaseApiController
     // get users by role
     [HttpGet("by-role/{role}")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get users filtered by role")]
     public async Task<IActionResult> GetUsersByRole(UserRole role)
     {
-        // SECURITY: Supervisors can only see their supervised workers
+        // supervisors can only see their own workers
         var currentUserId = GetCurrentUserId();
         var currentUserRole = GetCurrentUserRole();
 
@@ -150,8 +164,25 @@ public class UsersController : BaseApiController
             users.Select(u => _mapper.Map<UserResponse>(u))));
     }
 
+    // get current user's full profile (with department, supervisor, lastLogin etc.)
+    [HttpGet("me")]
+    [SwaggerOperation(Summary = "get current user full profile")]
+    public async Task<IActionResult> GetMyProfile()
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+            return Unauthorized(ApiResponse<UserResponse>.ErrorResponse("رمز دخول غير صالح"));
+
+        var user = await _users.GetByIdAsync(userId.Value);
+        if (user == null)
+            return NotFound(ApiResponse<UserResponse>.ErrorResponse("المستخدم غير موجود"));
+
+        return Ok(ApiResponse<UserResponse>.SuccessResponse(_mapper.Map<UserResponse>(user)));
+    }
+
     // update user profile
     [HttpPut("profile")]
+    [SwaggerOperation(Summary = "update current user profile")]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
     {
         // get current user
@@ -180,8 +211,52 @@ public class UsersController : BaseApiController
         return Ok(ApiResponse<UserResponse>.SuccessResponse(_mapper.Map<UserResponse>(user)));
     }
 
+    // upload/replace profile photo for the current user
+    [HttpPut("profile-photo")]
+    [Authorize]
+    [DisableRequestSizeLimit]
+    [SwaggerOperation(Summary = "upload or replace profile photo")]
+    public async Task<IActionResult> UpdateProfilePhoto(IFormFile photo)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return Unauthorized();
+
+        if (photo == null || photo.Length == 0)
+            return BadRequest(ApiResponse<object>.ErrorResponse("الصورة مطلوبة"));
+
+        if (!_files.ValidateImage(photo))
+            return BadRequest(ApiResponse<object>.ErrorResponse("صيغة الصورة غير صالحة"));
+
+        var user = await _users.GetByIdAsync(userId.Value);
+        if (user == null) return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
+
+        try
+        {
+            // upload new photo first, then delete old (so failure doesn't lose both)
+            var oldPhotoUrl = user.ProfilePhotoUrl;
+            user.ProfilePhotoUrl = await _files.UploadImageAsync(photo, "profiles", userId.Value);
+            await _users.UpdateAsync(user);
+            await _users.SaveChangesAsync();
+
+            // only delete old photo after new one is saved successfully
+            if (!string.IsNullOrEmpty(oldPhotoUrl))
+            {
+                try { await _files.DeleteImageAsync(oldPhotoUrl); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete old profile photo: {Url}", oldPhotoUrl); }
+            }
+
+            return Ok(ApiResponse<object>.SuccessResponse(new { profilePhotoUrl = user.ProfilePhotoUrl }));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload profile photo for user {UserId}", userId.Value);
+            return BadRequest(ApiResponse<object>.ErrorResponse($"فشل رفع الصورة: {ex.Message}"));
+        }
+    }
+
     // change password
     [HttpPut("change-password")]
+    [SwaggerOperation(Summary = "change current user password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
         var userId = GetCurrentUserId();
@@ -220,6 +295,7 @@ public class UsersController : BaseApiController
     // update user (admin only) - supports updating supervisorId for worker transfer
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "update user details (admin only)")]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserRequest request)
     {
         var user = await _users.GetByIdAsync(id);
@@ -277,6 +353,7 @@ public class UsersController : BaseApiController
     // update user status admin only
     [HttpPut("{id}/status")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "update user active or inactive status")]
     public async Task<IActionResult> UpdateUserStatus(int id, [FromBody] UpdateUserStatusRequest request)
     {
         // prevent admin from deactivating themselves
@@ -300,6 +377,7 @@ public class UsersController : BaseApiController
     // get count of active workers
     [HttpGet("active-workers-count")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get count of active workers")]
     public async Task<IActionResult> GetActiveWorkersCount()
     {
         var workers = await _users.GetByRoleAsync(UserRole.Worker);
@@ -311,6 +389,7 @@ public class UsersController : BaseApiController
     // soft delete user
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "soft delete a user (deactivate)")]
     public async Task<IActionResult> DeleteUser(int id)
     {
         // prevent admin from deleting themselves
@@ -355,6 +434,7 @@ public class UsersController : BaseApiController
     // admin can reset user password
     [HttpPost("{id}/reset-password")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "admin reset user password")]
     public async Task<IActionResult> ResetUserPassword(int id, [FromBody] AdminResetPasswordRequest request)
     {
         var user = await _users.GetByIdAsync(id);
@@ -389,11 +469,16 @@ public class UsersController : BaseApiController
     // get zones assigned to user
     [HttpGet("{id}/zones")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get zones assigned to a user")]
     public async Task<IActionResult> GetUserZones(int id)
     {
         var user = await _users.GetUserWithZonesAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
+
+        // supervisors can only view their workers' zones
+        if (GetCurrentUserRole() == "Supervisor" && user.SupervisorId != GetCurrentUserId())
+            return Forbid();
 
         // get active zones only
         var zones = user.AssignedZones
@@ -409,18 +494,23 @@ public class UsersController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(zones));
     }
 
-    // assign zones to worker
+    // assign zones to worker or supervisor
     [HttpPost("{id}/zones")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "assign zones to a worker or supervisor")]
     public async Task<IActionResult> AssignZones(int id, [FromBody] AssignZonesRequest request)
     {
         var user = await _users.GetUserWithZonesAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
-        // only workers can have zones
-        if (user.Role != UserRole.Worker)
-            return BadRequest(ApiResponse<object>.ErrorResponse("يمكن تعيين المناطق للعمال فقط"));
+        // supervisors can only assign zones to their workers
+        if (GetCurrentUserRole() == "Supervisor" && user.Role == UserRole.Worker && user.SupervisorId != GetCurrentUserId())
+            return Forbid();
+
+        // only workers and supervisors can have zones
+        if (user.Role != UserRole.Worker && user.Role != UserRole.Supervisor)
+            return BadRequest(ApiResponse<object>.ErrorResponse("يمكن تعيين المناطق للعمال والمشرفين فقط"));
 
         // need at least one zone
         if (request.ZoneIds == null || !request.ZoneIds.Any())
@@ -482,11 +572,16 @@ public class UsersController : BaseApiController
     // remove zone from worker
     [HttpDelete("{id}/zones/{zoneId}")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "remove a zone from a worker")]
     public async Task<IActionResult> RemoveZoneAssignment(int id, int zoneId)
     {
         var user = await _users.GetUserWithZonesAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
+
+        // supervisors can only remove zones from their workers
+        if (GetCurrentUserRole() == "Supervisor" && user.SupervisorId != GetCurrentUserId())
+            return Forbid();
 
         var assignment = user.AssignedZones.FirstOrDefault(uz => uz.ZoneId == zoneId && uz.IsActive);
         if (assignment == null)
@@ -511,11 +606,16 @@ public class UsersController : BaseApiController
     // reset device binding for a worker (when they get a new phone)
     [HttpPost("{id}/reset-device")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "reset device binding for a worker")]
     public async Task<IActionResult> ResetDeviceBinding(int id)
     {
         var user = await _users.GetByIdAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
+
+        // supervisors can only reset their workers' devices
+        if (GetCurrentUserRole() == "Supervisor" && user.SupervisorId != GetCurrentUserId())
+            return Forbid();
 
         // only workers need device binding
         if (user.Role != UserRole.Worker)
@@ -540,11 +640,16 @@ public class UsersController : BaseApiController
     // update device ID for a worker (admin can manually set device binding)
     [HttpPut("{id}/device-id")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "update device id for a worker")]
     public async Task<IActionResult> UpdateDeviceId(int id, [FromBody] UpdateDeviceIdRequest request)
     {
         var user = await _users.GetByIdAsync(id);
         if (user == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
+
+        // supervisors can only update their workers' devices
+        if (GetCurrentUserRole() == "Supervisor" && user.SupervisorId != GetCurrentUserId())
+            return Forbid();
 
         // only workers need device binding
         if (user.Role != UserRole.Worker)
@@ -568,6 +673,7 @@ public class UsersController : BaseApiController
     // worker reports battery level - save to DB and notify supervisor if low
     [HttpPost("battery-status")]
     [Authorize(Roles = "Worker")]
+    [SwaggerOperation(Summary = "report battery level from worker device")]
     public async Task<IActionResult> ReportBattery([FromBody] BatteryReportRequest request)
     {
         var userId = GetCurrentUserId();
@@ -647,6 +753,7 @@ public class UsersController : BaseApiController
     // get workers assigned to current supervisor
     [HttpGet("my-workers")]
     [Authorize(Roles = "Supervisor")]
+    [SwaggerOperation(Summary = "get workers under current supervisor")]
     public async Task<IActionResult> GetMyWorkers()
     {
         var userId = GetCurrentUserId();
@@ -721,6 +828,7 @@ public class UsersController : BaseApiController
     // get detailed user profile (for supervisor viewing worker profile)
     [HttpGet("{id}/profile")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get detailed user profile with stats")]
     public async Task<IActionResult> GetUserProfile(int id)
     {
         var user = await _context.Users
@@ -827,10 +935,29 @@ public class UsersController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(profile));
     }
 
+    // bulk reassign specific workers to a new supervisor in one DB round-trip
+    [HttpPost("bulk-reassign-supervisor")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "bulk reassign workers to new supervisor")]
+    public async Task<IActionResult> BulkReassignSupervisor([FromBody] BulkReassignSupervisorRequest request)
+    {
+        var newSupervisor = await _users.GetByIdAsync(request.NewSupervisorId);
+        if (newSupervisor == null || newSupervisor.Role != UserRole.Supervisor)
+            return BadRequest(ApiResponse<object>.ErrorResponse("المشرف الجديد غير صالح"));
+
+        var affected = await _context.Users
+            .Where(u => request.WorkerIds.Contains(u.UserId) && u.Role == UserRole.Worker)
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.SupervisorId, request.NewSupervisorId));
+
+        _logger.LogInformation("Bulk reassigned {Count} workers to supervisor {SupervisorId}", affected, request.NewSupervisorId);
+        return Ok(ApiResponse<object>.SuccessResponse(new { affected }));
+    }
+
     // FIX 9 ENHANCEMENT: Transfer workers from one supervisor to another
     // This helps admins reassign workers before deleting/deactivating a supervisor
     [HttpPost("supervisors/{oldSupervisorId}/transfer-workers")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "transfer all workers between supervisors")]
     public async Task<IActionResult> TransferWorkers(
         int oldSupervisorId,
         [FromBody] TransferWorkersRequest request)
@@ -915,6 +1042,7 @@ public class UsersController : BaseApiController
     // bulk role assignment - admin can assign roles to multiple users at once
     [HttpPost("bulk-role-assignment")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "bulk assign role to multiple users")]
     public async Task<IActionResult> BulkRoleAssignment([FromBody] BulkRoleAssignmentRequest request)
     {
         if (!ModelState.IsValid)
@@ -968,6 +1096,7 @@ public class UsersController : BaseApiController
     // bulk enable/disable users
     [HttpPost("bulk-status")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "bulk enable or disable multiple users")]
     public async Task<IActionResult> BulkStatusChange([FromBody] BulkStatusRequest request)
     {
         if (!ModelState.IsValid)

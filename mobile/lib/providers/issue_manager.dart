@@ -24,6 +24,15 @@ class IssueManager extends BaseController {
   IssueModel? currentIssue; // issue user is looking at
   String? filterStatus;
 
+  /// Clear all in-memory cached data (call on logout)
+  void clearCache() {
+    myIssues.clear();
+    currentIssue = null;
+    filterStatus = null;
+    clearError();
+    notifyListeners();
+  }
+
   // set the sync manager
   void setSyncManager(SyncManager manager) {
     _syncManager = manager;
@@ -43,8 +52,8 @@ class IssueManager extends BaseController {
     Position? position,
   }) async {
     // get coordinates: use provided position or fetch current GPS
-    double lat = 0.0;
-    double lng = 0.0;
+    double? lat;
+    double? lng;
     if (position != null) {
       lat = position.latitude;
       lng = position.longitude;
@@ -58,7 +67,7 @@ class IssueManager extends BaseController {
         }
       } catch (e) {
         if (kDebugMode) {
-          debugPrint('GPS Fetch Error (reporting anyway with 0,0): $e');
+          debugPrint('GPS Fetch Error (reporting without coordinates): $e');
         }
       }
     }
@@ -74,8 +83,8 @@ class IssueManager extends BaseController {
         photo1: photo1,
         photo2: photo2,
         photo3: photo3,
-        latitude: lat != 0.0 ? lat : null,
-        longitude: lng != 0.0 ? lng : null,
+        latitude: lat,
+        longitude: lng,
       );
 
       myIssues.insert(0, issue);
@@ -133,8 +142,8 @@ class IssueManager extends BaseController {
         type: type,
         severity: severity,
         reportedByUserId: user.userId,
-        latitude: lat,
-        longitude: lng,
+        latitude: lat ?? 0.0,
+        longitude: lng ?? 0.0,
         locationDescription: locationDescription ?? '',
         photoUrl: permanentPaths.join(';'),
         reportedAt: DateTime.now(),
@@ -154,8 +163,8 @@ class IssueManager extends BaseController {
         severity: issueLocal.severity,
         status: 'New',
         reportedByUserId: issueLocal.reportedByUserId,
-        latitude: issueLocal.latitude,
-        longitude: issueLocal.longitude,
+        latitude: issueLocal.latitude != 0.0 ? issueLocal.latitude : null,
+        longitude: issueLocal.longitude != 0.0 ? issueLocal.longitude : null,
         photoUrl: photo1.path,
         createdAt: issueLocal.createdAt,
         updatedAt: issueLocal.createdAt,
@@ -195,8 +204,12 @@ class IssueManager extends BaseController {
     if (issueslist != null) {
       myIssues = issueslist;
     } else {
-      // server failed, fallback to local
-      await _loadIssuesFromLocal(status);
+      // only show offline mode if actually offline
+      final actuallyOffline = !(_syncManager?.isOnline ?? true);
+      if (actuallyOffline) {
+        await _loadIssuesFromLocal(status);
+      }
+      // if online but server failed, error is already set by executeWithErrorHandling
     }
   }
 

@@ -6,12 +6,15 @@ import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/offline_banner.dart';
 import '../../presentation/widgets/not_checked_in_banner.dart';
 import '../../presentation/widgets/fade_in_animation.dart';
+import '../../core/utils/sync_toast_helper.dart';
 import '../../providers/attendance_manager.dart';
 import '../../providers/task_manager.dart';
 import '../../providers/sync_manager.dart';
 import '../../providers/notice_manager.dart';
 import '../../core/routing/app_router.dart';
+import '../../data/services/battery_service.dart';
 import '../../data/services/location_service.dart';
+import '../../data/services/tracking_service.dart';
 import 'widgets/greeting_card.dart';
 import 'widgets/sync_status_card.dart';
 import 'widgets/attendance_card.dart';
@@ -26,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Timer? _workDurationTimer;
+  AttendanceManager? _attendanceManager;
 
   @override
   void initState() {
@@ -36,15 +40,18 @@ class _HomeScreenState extends State<HomeScreen> {
       // Request GPS permission from foreground UI — background service cannot show dialogs
       await LocationService.requestPermissions();
 
+      // Request battery optimization exemption so Android doesn't kill background tracking
+      await BatteryService().requestBatteryOptimizationExemption();
+
       if (!mounted) return;
 
       final syncManager = context.read<SyncManager>();
-      final attendanceManager = context.read<AttendanceManager>();
+      _attendanceManager = context.read<AttendanceManager>();
 
-      attendanceManager.setSyncManager(syncManager);
+      _attendanceManager!.setSyncManager(syncManager);
 
-      attendanceManager.loadTodayRecord();
-      attendanceManager.listenToBackgroundUpdates();
+      _attendanceManager!.loadTodayRecord();
+      _attendanceManager!.listenToBackgroundUpdates();
       context.read<TaskManager>().loadTasks();
       context.read<NoticeManager>().loadNotices();
     });
@@ -62,14 +69,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _workDurationTimer?.cancel();
-    context.read<AttendanceManager>().cancelBackgroundListener();
+    _attendanceManager?.cancelBackgroundListener();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return BaseScreen(
-      title: 'فولو أب',
+      title: 'FollowUp',
       showBackButton: false,
       actions: [
         Stack(
@@ -141,6 +148,32 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const OfflineBanner(),
           const NotCheckedInBanner(),
+          ValueListenableBuilder<bool>(
+            valueListenable: TrackingService.isBuffering,
+            builder: (context, buffering, _) {
+              if (!buffering) return const SizedBox.shrink();
+              return Container(
+                width: double.infinity,
+                color: Colors.orange.shade700,
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'تخزين الموقع مؤقتاً — سيُرسل عند الاتصال',
+                      style: TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'Cairo'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _handleRefresh,
@@ -213,28 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final result = await connectivity.startSync();
 
     if (context.mounted) {
-      String message;
-      Color bgColor;
-
-      if (result.totalFailed > 0) {
-        message = 'تم رفع ${result.totalSynced}، فشل ${result.totalFailed}';
-        bgColor = Colors.orange;
-      } else if (result.success) {
-        message = result.totalSynced > 0
-            ? 'تمت المزامنة (${result.totalSynced})'
-            : 'لا توجد عناصر';
-        bgColor = Colors.green;
-      } else {
-        message = 'فشلت المزامنة';
-        bgColor = Colors.red;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message, style: const TextStyle(fontFamily: 'Cairo')),
-          backgroundColor: bgColor,
-        ),
-      );
+      showSyncResultToast(context, result);
     }
   }
 }

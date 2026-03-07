@@ -59,6 +59,10 @@ public class ZoneConfiguration : IEntityTypeConfiguration<Zone>
         builder.Property(e => e.IsActive)
             .IsRequired();
 
+        builder.Property(e => e.ZoneType)
+            .HasConversion<int?>()
+            .IsRequired(false);
+
         builder.Property(e => e.CreatedAt)
             .IsRequired();
 
@@ -70,5 +74,8 @@ public class ZoneConfiguration : IEntityTypeConfiguration<Zone>
             .HasDatabaseName("IX_Zone_IsActive");
 
         builder.HasIndex(e => e.District);
+
+        builder.HasIndex(e => e.ZoneType)
+            .HasDatabaseName("IX_Zone_ZoneType");
     }
 }

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { getIssues } from "../api/issues";
 import type { IssueResponse } from "../types/issue";
 import { RefreshCw, ChevronLeft } from "lucide-react";
 import { mapSeverity, mapStatus, mapTypeToArabic, type Severity, type DisplayIssueStatus } from "../utils/issueDisplay";
+import MiniStat from "../components/common/MiniStat";
+import FilterChip from "../components/common/FilterChip";
 
 type IssueListItem = {
   id: string;
@@ -38,7 +41,8 @@ const mapIssueToListItem = (issue: IssueResponse): IssueListItem => {
   };
 };
 
-export default function Issues() {
+export default function SupervisorIssues() {
+  usePageTitle("البلاغات");
   const navigate = useNavigate();
 
   const [items, setItems] = useState<IssueListItem[]>([]);
@@ -99,7 +103,7 @@ export default function Issues() {
         <div className="max-w-[1100px] mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between gap-3">
-             <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F]">
+             <h1 className="text-right font-black text-[28px] text-[#2F2F2F] tracking-tight">
                 البلاغات الواردة
              </h1>
              <button
@@ -164,33 +168,6 @@ export default function Issues() {
         </div>
       </div>
     </div>
-  );
-}
-
-function MiniStat({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="bg-[#F3F1ED] rounded-[14px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.06)] p-4">
-      <div className="text-right text-[12px] text-[#6B7280] font-sans font-semibold">{title}</div>
-      <div className="mt-2 text-right text-[18px] text-[#2F2F2F] font-sans font-bold">{value}</div>
-    </div>
-  );
-}
-
-function FilterChip({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count: number }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "h-[34px] px-3 rounded-[10px] font-sans font-semibold text-[13px] border flex items-center gap-2 transition-all",
-        active ? "bg-[#7895B2] text-white border-black/10" : "bg-white text-[#2F2F2F] border-black/10 hover:opacity-95",
-      ].join(" ")}
-    >
-      <span>{label}</span>
-      <span className={["min-w-[20px] h-[20px] px-1 rounded-full text-[11px] font-bold grid place-items-center", active ? "bg-white/20" : "bg-black/5"].join(" ")}>
-        {count}
-      </span>
-    </button>
   );
 }
 

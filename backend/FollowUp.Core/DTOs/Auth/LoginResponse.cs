@@ -22,4 +22,7 @@ public class LoginResponse
 
     // refresh token for obtaining new access tokens without re-login
     public string? RefreshToken { get; set; }
+
+    // OTP code for demo/testing (only set when MockSms is enabled, null in production)
+    public string? DemoOtpCode { get; set; }
 }

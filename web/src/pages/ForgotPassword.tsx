@@ -35,8 +35,12 @@ export default function ForgotPassword() {
             sessionToken: result.sessionToken,
             maskedPhone: result.maskedPhone || "****",
             username: username.trim(),
+            demoOtpCode: result.demoOtpCode,
           },
         });
+      } else if (result.success) {
+        // Account may not exist — show neutral info, not error
+        setInfo(result.message || "إذا كان الحساب موجوداً، سيتم إرسال رمز التحقق.");
       } else {
         setError(result.message || "فشل إرسال رمز التحقق.");
       }

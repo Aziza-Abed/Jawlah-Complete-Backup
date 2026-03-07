@@ -10,20 +10,13 @@ namespace FollowUp.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "FailedCompletionAttempts",
-                table: "Tasks",
-                type: "int",
-                nullable: false,
-                defaultValue: 0);
+            // No-op: FailedCompletionAttempts was already added in AddSupervisorIdToUsers migration
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "FailedCompletionAttempts",
-                table: "Tasks");
+            // No-op: column removal handled by AddSupervisorIdToUsers.Down()
         }
     }
 }

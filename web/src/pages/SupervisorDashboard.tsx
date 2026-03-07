@@ -17,7 +17,7 @@ type ActivityItem = {
   icon: "pin" | "user" | "map";
 };
 
-const Dashboard: React.FC = () => {
+const SupervisorDashboard: React.FC = () => {
     const navigate = useNavigate();
     const [overview, setOverview] = useState<DashboardOverview | null>(null);
     const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -122,21 +122,21 @@ const Dashboard: React.FC = () => {
             {/* Header with Title (Title Left, Date Right) */}
             <div className="flex items-center justify-between">
                 <div className="text-right">
-                  <h1 className="text-3xl font-black text-[#2F2F2F]">لوحة التحكم</h1>
+                  <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">لوحة التحكم</h1>
                   <p className="text-[#6B7280] text-[15px] mt-1 font-medium italic">مرحباً بك مجدداً، {userName}</p>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button 
+                    <div className="text-[14px] bg-white px-5 py-2.5 rounded-xl text-[#6B7280] font-black border border-black/5 shadow-sm">
+                      {new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </div>
+                    <button
                       onClick={() => setShowWelcome(true)}
                       className="p-3 text-[#7895B2] hover:bg-[#7895B2]/10 rounded-xl transition-all bg-white shadow-sm border border-black/5 group"
                       title="المساعدة"
                     >
                       <CircleHelp size={22} className="group-hover:rotate-12 transition-transform" />
                     </button>
-                    <div className="text-[14px] bg-white px-5 py-2.5 rounded-xl text-[#6B7280] font-black border border-black/5 shadow-sm">
-                      {new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </div>
                 </div>
             </div>
 
@@ -167,7 +167,7 @@ const Dashboard: React.FC = () => {
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="text-[18px] font-bold text-[#2F2F2F]">حالة الفريق</h2>
                   {workerStatuses.length > 5 && (
-                    <button onClick={() => navigate('/supervisors')} className="text-sm text-[#7895B2] font-semibold hover:underline">عرض الكل</button>
+                    <button onClick={() => navigate('/my-workers')} className="text-sm text-[#7895B2] font-semibold hover:underline">عرض الكل</button>
                   )}
                 </div>
                 {workerStatuses.length > 0 ? (
@@ -245,7 +245,7 @@ const Dashboard: React.FC = () => {
     );
 };
 
-export default Dashboard;
+export default SupervisorDashboard;
 
 function DashboardStatItem({ icon: Icon, label, value, color }: { icon: React.ComponentType<{ size?: number }>; label: string; value: number | string | undefined; color: string }) {
   return (

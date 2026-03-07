@@ -1,4 +1,4 @@
-// Appeal types matching backend DTOs
+// appeal types
 
 export type AppealType = "TaskRejection" | "AttendanceFailure";
 export type AppealStatus = "Pending" | "Approved" | "Rejected";

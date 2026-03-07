@@ -1,3 +1,4 @@
+using FollowUp.Core.Constants;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Gis;
 using FollowUp.Core.Entities;
@@ -7,12 +8,14 @@ using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Swashbuckle.AspNetCore.Annotations;
 using System.IO.Compression;
 using System.Text.Json;
 
 namespace FollowUp.API.Controllers;
 
 [Route("api/[controller]")]
+[Tags("GIS")]
 public class GisController : BaseApiController
 {
     private readonly IGisService _gisService;
@@ -22,7 +25,7 @@ public class GisController : BaseApiController
     private readonly ILogger<GisController> _logger;
     private readonly string _storagePath;
 
-    private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
+    private const long MaxFileSize = AppConstants.MaxGisFileSizeBytes;
 
     public GisController(
         IGisService gisService,
@@ -45,9 +48,9 @@ public class GisController : BaseApiController
         }
     }
 
-    // get current status of all GIS files
     [HttpGet("status")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "get status of all gis files")]
     public async Task<IActionResult> GetGisFilesStatus()
     {
         var quarters = await _gisFiles.GetActiveByTypeAsync(GisFileType.Quarters);
@@ -66,9 +69,9 @@ public class GisController : BaseApiController
         });
     }
 
-    // get all uploaded GIS files (history)
     [HttpGet("files")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "get all uploaded gis files")]
     public async Task<IActionResult> GetAllGisFiles()
     {
         var files = await _gisFiles.GetAllAsync();
@@ -80,11 +83,11 @@ public class GisController : BaseApiController
         });
     }
 
-    // upload a new GIS file (replaces existing file of same type)
     [HttpPost("upload")]
     [Authorize(Roles = "Admin")]
     [EnableRateLimiting("upload")]
     [RequestSizeLimit(MaxFileSize)]
+    [SwaggerOperation(Summary = "upload a new gis file")]
     public async Task<IActionResult> UploadGisFile(
         IFormFile file,
         [FromForm] GisFileType fileType,
@@ -208,7 +211,7 @@ public class GisController : BaseApiController
                 {
                     try
                     {
-                        await _gisService.ImportShapefileAsync(shpBasePath + ".shp", user.MunicipalityId);
+                        await _gisService.ImportShapefileAsync(shpBasePath + ".shp", user.MunicipalityId, fileType);
 
                         gisFile.LastImportedAt = DateTime.UtcNow;
                         await _gisFiles.UpdateAsync(gisFile);
@@ -242,7 +245,7 @@ public class GisController : BaseApiController
 
             // Handle GeoJSON upload
             string jsonContent;
-            using (var reader = new StreamReader(file.OpenReadStream()))
+            using (var reader = new StreamReader(file.OpenReadStream(), System.Text.Encoding.UTF8))
             {
                 jsonContent = await reader.ReadToEndAsync();
             }
@@ -279,14 +282,8 @@ public class GisController : BaseApiController
             storedFileName = $"{fileType.ToString().ToLower()}.geojson";
             storedFilePath = Path.Combine(_storagePath, storedFileName);
 
-            // Delete old file if exists
-            if (System.IO.File.Exists(storedFilePath))
-            {
-                System.IO.File.Delete(storedFilePath);
-            }
-
-            // Save new file
-            await System.IO.File.WriteAllTextAsync(storedFilePath, jsonContent);
+            // Save new file (overwrite if exists, with retry for file locks)
+            await WriteFileWithRetryAsync(storedFilePath, jsonContent);
 
             // Create database record
             var geoJsonFile = new GisFile
@@ -318,7 +315,7 @@ public class GisController : BaseApiController
                     }
                     else
                     {
-                        await _gisService.ImportGeoJsonAsync(storedFilePath, user.MunicipalityId);
+                        await _gisService.ImportGeoJsonAsync(storedFilePath, user.MunicipalityId, fileType);
                     }
 
                     geoJsonFile.LastImportedAt = DateTime.UtcNow;
@@ -351,14 +348,14 @@ public class GisController : BaseApiController
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to upload GIS file");
-            return BadRequest(ApiResponse<object>.ErrorResponse("فشل رفع الملف. يرجى التحقق من صيغة الملف والمحاولة مرة أخرى"));
+            _logger.LogError(ex, "Failed to upload GIS file: {Message}", ex.Message);
+            return BadRequest(ApiResponse<object>.ErrorResponse($"فشل رفع الملف: {ex.Message}"));
         }
     }
 
-    // import a previously uploaded GIS file to zones
     [HttpPost("import/{fileId}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "import gis file to zones")]
     public async Task<IActionResult> ImportGisFile(int fileId)
     {
         var userId = GetCurrentUserId();
@@ -373,7 +370,8 @@ public class GisController : BaseApiController
         if (gisFile == null)
             return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود"));
 
-        var filePath = Path.Combine(_storagePath, gisFile.StoredFileName);
+        var safeFileName = Path.GetFileName(gisFile.StoredFileName);
+        var filePath = Path.Combine(_storagePath, safeFileName);
         if (!System.IO.File.Exists(filePath))
             return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود على السيرفر"));
 
@@ -385,7 +383,7 @@ public class GisController : BaseApiController
             }
             else
             {
-                await _gisService.ImportGeoJsonAsync(filePath, user.MunicipalityId);
+                await _gisService.ImportGeoJsonAsync(filePath, user.MunicipalityId, gisFile.FileType);
             }
 
             gisFile.LastImportedAt = DateTime.UtcNow;
@@ -404,9 +402,9 @@ public class GisController : BaseApiController
         }
     }
 
-    // delete a GIS file
     [HttpDelete("files/{fileId}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "delete a gis file")]
     public async Task<IActionResult> DeleteGisFile(int fileId)
     {
         var gisFile = await _gisFiles.GetByIdAsync(fileId);
@@ -416,7 +414,8 @@ public class GisController : BaseApiController
         try
         {
             // Delete physical file if it exists
-            var filePath = Path.Combine(_storagePath, gisFile.StoredFileName);
+            var safeFileName = Path.GetFileName(gisFile.StoredFileName);
+            var filePath = Path.Combine(_storagePath, safeFileName);
             if (System.IO.File.Exists(filePath))
             {
                 System.IO.File.Delete(filePath);
@@ -433,26 +432,34 @@ public class GisController : BaseApiController
         }
     }
 
-    // download a GIS file
     [HttpGet("files/{fileId}/download")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "download a gis file")]
     public async Task<IActionResult> DownloadGisFile(int fileId)
     {
         var gisFile = await _gisFiles.GetByIdAsync(fileId);
         if (gisFile == null)
             return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود"));
 
-        var filePath = Path.Combine(_storagePath, gisFile.StoredFileName);
+        var safeFileName = Path.GetFileName(gisFile.StoredFileName);
+        var filePath = Path.Combine(_storagePath, safeFileName);
         if (!System.IO.File.Exists(filePath))
             return NotFound(ApiResponse<object>.ErrorResponse("الملف غير موجود على السيرفر"));
 
-        var content = await System.IO.File.ReadAllBytesAsync(filePath);
+        // Use FileShare.ReadWrite so downloads don't block uploads
+        byte[] content;
+        using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var ms = new MemoryStream())
+        {
+            await fs.CopyToAsync(ms);
+            content = ms.ToArray();
+        }
         return File(content, "application/geo+json", gisFile.OriginalFileName);
     }
 
-    // get zones count by type
     [HttpGet("zones-summary")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get zones count grouped by type")]
     public async Task<IActionResult> GetZonesSummary()
     {
         var zones = await _zones.GetActiveZonesAsync();
@@ -464,10 +471,30 @@ public class GisController : BaseApiController
             data = new
             {
                 totalZones = zonesList.Count,
-                byType = zonesList.GroupBy(z => z.District ?? "غير محدد")
+                byType = zonesList.GroupBy(z => z.ZoneType?.ToString() ?? "غير محدد")
                     .Select(g => new { type = g.Key, count = g.Count() })
             }
         });
+    }
+
+    // Write file with retry to handle transient file locks from antivirus, indexers, etc.
+    private static async System.Threading.Tasks.Task WriteFileWithRetryAsync(string path, string content, int maxRetries = 3)
+    {
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                // Use FileStream with FileShare.None to get exclusive access, then write
+                using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+                using var writer = new StreamWriter(fs, System.Text.Encoding.UTF8);
+                await writer.WriteAsync(content);
+                return;
+            }
+            catch (IOException) when (attempt < maxRetries)
+            {
+                await System.Threading.Tasks.Task.Delay(500 * (attempt + 1)); // 500ms, 1s, 1.5s
+            }
+        }
     }
 
     private static GisFileDto MapToDto(GisFile gisFile)

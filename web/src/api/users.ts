@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { DEFAULT_PAGE_SIZE } from "../constants/appConstants";
 import type { UserResponse, UsersListResponse, UserRole, User } from "../types/user";
 
 // Re-export User type for convenience
@@ -6,7 +7,7 @@ export type { User };
 
 // Get current user profile
 export async function getProfile(): Promise<UserResponse> {
-  const response = await apiClient.get<{ data: UserResponse }>("/auth/me");
+  const response = await apiClient.get<{ data: UserResponse }>("/users/me");
   return response.data.data;
 }
 
@@ -27,14 +28,27 @@ export async function updateProfile(data: {
 export async function changePassword(data: {
   oldPassword: string;
   newPassword: string;
+  confirmPassword: string;
 }): Promise<void> {
   await apiClient.put("/users/change-password", data);
+}
+
+// Upload profile photo
+export async function uploadProfilePhoto(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("photo", file);
+  const response = await apiClient.put<{ data: { profilePhotoUrl: string } }>(
+    "/users/profile-photo",
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return response.data.data.profilePhotoUrl;
 }
 
 // Get all users (for admin)
 export async function getUsers(
   page = 1,
-  pageSize = 50,
+  pageSize = DEFAULT_PAGE_SIZE,
   role?: UserRole,
 ): Promise<UsersListResponse> {
   const params = new URLSearchParams({
@@ -99,19 +113,8 @@ export async function updateUser(userId: number, data: Partial<UserResponse> & {
   return response.data.data;
 }
 
-// Transfer specific workers to a different supervisor (updates each worker individually)
-export async function transferWorkers(workerIds: number[], newSupervisorId: number | null): Promise<void> {
-  // Update each worker's supervisorId
-  await Promise.all(workerIds.map(workerId =>
-    apiClient.put(`/users/${workerId}`, { supervisorId: newSupervisorId })
-  ));
-}
-
-// Transfer ALL workers from one supervisor to another (bulk operation)
-export async function transferAllWorkers(oldSupervisorId: number, newSupervisorId: number, reason?: string): Promise<void> {
-  await apiClient.post(`/users/supervisors/${oldSupervisorId}/transfer-workers`, {
-    newSupervisorId,
-    transferReason: reason
-  });
+// Transfer specific workers to a different supervisor in a single bulk request
+export async function transferWorkers(workerIds: number[], newSupervisorId: number): Promise<void> {
+  await apiClient.post('/users/bulk-reassign-supervisor', { workerIds, newSupervisorId });
 }
 

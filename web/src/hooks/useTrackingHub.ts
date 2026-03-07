@@ -20,10 +20,7 @@ export type UserStatusUpdate = {
   status: "online" | "offline";
 };
 
-/**
- * Simple hook that connects to the SignalR TrackingHub
- * and calls your callbacks when live data arrives.
- */
+// Hook that connects to the SignalR TrackingHub and calls callbacks when live data arrives
 export function useTrackingHub(callbacks: {
   onLocationUpdate?: (update: LiveLocationUpdate) => void;
   onUserStatus?: (update: UserStatusUpdate) => void;
@@ -38,7 +35,7 @@ export function useTrackingHub(callbacks: {
 
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(HUB_URL, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: () => localStorage.getItem(STORAGE_KEYS.TOKEN) || "",
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
       .configureLogging(signalR.LogLevel.Warning)
@@ -62,10 +59,11 @@ export function useTrackingHub(callbacks: {
     connection.on(
       "ReceiveUserStatus",
       (userId: number, userName: string, status: string) => {
+        const safeStatus = status === "online" ? "online" : "offline";
         callbacksRef.current.onUserStatus?.({
           userId,
           userName,
-          status: status as "online" | "offline",
+          status: safeStatus,
         });
       }
     );
@@ -73,11 +71,10 @@ export function useTrackingHub(callbacks: {
     connection
       .start()
       .then(() => {
-        console.log("SignalR TrackingHub connected");
         // Join supervisors group to receive worker updates
         connection.invoke("JoinSupervisorsGroup").catch(() => {});
       })
-      .catch((err) => console.warn("SignalR connect failed:", err));
+      .catch(() => {});
 
     connectionRef.current = connection;
   }, []);

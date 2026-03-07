@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using FollowUp.Core.Enums;
 using NetTopologySuite.Geometries;
 
 namespace FollowUp.Core.Entities;
@@ -13,6 +15,7 @@ public class Zone
     public string ZoneName { get; set; } = string.Empty;
     public string ZoneCode { get; set; } = string.Empty;
     public string? Description { get; set; }
+    [JsonIgnore]
     public Geometry? Boundary { get; set; }
     public string? BoundaryGeoJson { get; set; }
     public double CenterLatitude { get; set; }
@@ -23,6 +26,8 @@ public class Zone
     public DateTime VersionDate { get; set; }
     public string? VersionNotes { get; set; }
     public bool IsActive { get; set; }
+    // GIS source type: Quarters, Borders, or Blocks (null for manual/legacy zones)
+    public GisFileType? ZoneType { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public ICollection<UserZone> AssignedUsers { get; set; } = new List<UserZone>();

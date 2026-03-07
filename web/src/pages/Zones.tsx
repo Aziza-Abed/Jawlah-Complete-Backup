@@ -7,7 +7,7 @@ import { getZonesMapData } from "../api/zones";
 import { getMyWorkers } from "../api/users";
 import type { WorkerLocation as ApiWorkerLocation } from "../types/tracking";
 import type { UserResponse } from "../types/user";
-import { Battery, BatteryLow, BatteryMedium, BatteryFull, Wifi, WifiOff, RefreshCcw, MapPin, Clock } from "lucide-react";
+import { Battery, BatteryLow, BatteryMedium, BatteryFull, Wifi, WifiOff, RefreshCcw, MapPin, Clock, Search } from "lucide-react";
 import { useMunicipality } from "../contexts/MunicipalityContext";
 import { useTrackingHub, type LiveLocationUpdate, type UserStatusUpdate } from "../hooks/useTrackingHub";
 
@@ -45,24 +45,26 @@ const OfflineIcon = L.divIcon({
 
 function FlyAndOpenPopup({
   worker,
+  selectedId,
   markerRefs,
 }: {
   worker: WorkerLocation | null;
+  selectedId: string;
   markerRefs: React.MutableRefObject<Record<string, L.Marker | null>>;
 }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!worker) return;
+    if (!worker || !selectedId) return;
 
     map.flyTo([worker.lat, worker.lng], 16, { duration: 0.8 });
 
-    // Open popup after the map starts moving (small delay is more reliable)
+    // Open popup after fly animation completes
     window.setTimeout(() => {
       const marker = markerRefs.current[worker.id];
       marker?.openPopup();
-    }, 250);
-  }, [worker, map, markerRefs]);
+    }, 850);
+  }, [selectedId, worker, map, markerRefs]);
 
   return null;
 }
@@ -88,6 +90,7 @@ export default function Zones() {
 
   const [selectedId, setSelectedId] = useState<string>("");
   const [showPanel, setShowPanel] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const selectedWorker = workers.find((w) => w.id === selectedId) || null;
 
@@ -197,6 +200,13 @@ export default function Zones() {
         {/* Panel Header */}
         <div className="p-4 border-b border-[#7895B2]/10 bg-[#7895B2]/5">
           <div className="flex items-center justify-between mb-2">
+            <div className="text-right">
+              <h2 className="font-bold text-[#2F2F2F] text-lg">الخريطة الحية</h2>
+              <p className="text-[10px] text-[#6B7280] font-medium flex items-center justify-end gap-1 mt-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                آخر تحديث: {lastUpdate.toLocaleTimeString('ar-EG')}
+              </p>
+            </div>
             <button
               onClick={() => fetchMapData(true)}
               disabled={refreshing}
@@ -205,13 +215,6 @@ export default function Zones() {
             >
               <RefreshCcw size={18} />
             </button>
-            <div className="text-right">
-              <h2 className="font-bold text-[#2F2F2F] text-lg">الخريطة الحية</h2>
-              <p className="text-[10px] text-[#6B7280] font-medium flex items-center justify-end gap-1 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                آخر تحديث: {lastUpdate.toLocaleTimeString('ar-EG')}
-              </p>
-            </div>
           </div>
 
           {/* Stats */}
@@ -227,6 +230,20 @@ export default function Zones() {
           </div>
         </div>
 
+        {/* Search */}
+        <div className="px-3 pt-3">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="بحث عن عامل..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-[38px] pr-9 pl-3 bg-white rounded-[10px] border border-[#7895B2]/15 text-right text-[13px] text-[#2F2F2F] placeholder:text-[#6B7280]/50 outline-none focus:ring-2 focus:ring-[#7895B2]/20"
+            />
+            <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]/50" />
+          </div>
+        </div>
+
         {/* Workers List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {workers.length === 0 ? (
@@ -235,7 +252,7 @@ export default function Zones() {
               لا يوجد عمال متصلين حالياً
             </div>
           ) : (
-            workers.map(w => (
+            workers.filter(w => !searchQuery || w.name.includes(searchQuery) || w.zoneName?.includes(searchQuery)).map(w => (
               <div
                 key={w.id}
                 onClick={() => setSelectedId(w.id)}
@@ -260,7 +277,7 @@ export default function Zones() {
                   </div>
                 </div>
 
-                {w.isLowBattery && (
+                {w.batteryLevel !== undefined && w.batteryLevel <= 20 && (
                   <div className="mt-2 flex items-center justify-end gap-1.5 text-[9px] font-bold text-red-600 bg-red-50 py-1.5 px-2 rounded-lg border border-red-200">
                     <span>تحذير: طاقة منخفضة</span>
                     <BatteryLow size={10} />
@@ -295,7 +312,7 @@ export default function Zones() {
           zoom={13}
           className="absolute inset-0"
           style={{ height: '100%', width: '100%' }}
-          zoomControl={false}
+          zoomControl={true}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -304,23 +321,26 @@ export default function Zones() {
 
           {zonesData && (
             <GeoJSON
+              key={JSON.stringify(zonesData).length}
               data={zonesData}
-              style={{
-                fillColor: "#7895B2",
-                weight: 2,
-                opacity: 0.8,
-                color: "#7895B2",
-                fillOpacity: 0.1,
+              style={(feature) => {
+                const zt = feature?.properties?.zoneType;
+                const color = zt === 'Borders' ? '#EF4444' : zt === 'Blocks' ? '#22C55E' : '#7895B2';
+                return { fillColor: color, weight: 2, opacity: 0.8, color, fillOpacity: 0.1 };
               }}
               onEachFeature={(feature, layer) => {
                 if (feature.properties && feature.properties.zoneName) {
-                  layer.bindPopup(`<div class="text-right font-sans p-2"><b>${feature.properties.zoneName}</b></div>`);
+                  const typeLabel = feature.properties.zoneType === 'Quarters' ? 'حي' :
+                    feature.properties.zoneType === 'Borders' ? 'حدود' :
+                    feature.properties.zoneType === 'Blocks' ? 'بلوك' : '';
+                  const typeTag = typeLabel ? ` <span style="font-size:10px;opacity:0.6">(${typeLabel})</span>` : '';
+                  layer.bindPopup(`<div class="text-right font-sans p-2"><b>${feature.properties.zoneName}</b>${typeTag}</div>`);
                 }
               }}
             />
           )}
 
-          <FlyAndOpenPopup worker={selectedWorker} markerRefs={markerRefs} />
+          <FlyAndOpenPopup worker={selectedWorker} selectedId={selectedId} markerRefs={markerRefs} />
 
           {workers.map((w) => (
             <Marker
@@ -367,6 +387,14 @@ export default function Zones() {
         </MapContainer>
 
 
+
+        {/* Map Legend */}
+        <div className="absolute bottom-4 left-4 z-[1000] bg-white/90 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-gray-200 text-right text-[11px]">
+          <div className="font-bold mb-2 text-[#2F2F2F]">دليل الخريطة</div>
+          <div className="flex items-center gap-2 mb-1"><span className="w-3 h-3 rounded-sm bg-[#7895B2]"></span><span className="text-[#6B7280]">أحياء</span></div>
+          <div className="flex items-center gap-2 mb-1"><span className="w-3 h-3 rounded-sm bg-[#EF4444]"></span><span className="text-[#6B7280]">حدود</span></div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-[#22C55E]"></span><span className="text-[#6B7280]">بلوكات</span></div>
+        </div>
 
         {/* Toggle Panel Button (Mobile) */}
         <button

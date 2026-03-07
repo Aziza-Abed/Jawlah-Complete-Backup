@@ -1,4 +1,4 @@
-import { MessageSquare, CheckCircle2, Circle } from "lucide-react";
+import { MessageSquare, Circle } from "lucide-react";
 
 interface IssuesWidgetProps {
   reportedToday: number;
@@ -19,12 +19,6 @@ export default function IssuesWidget({ reportedToday, unresolved }: IssuesWidget
       icon: <MessageSquare size={14} className="text-[#7895B2]" />,
       color: "bg-[#7895B2]/10",
     },
-    {
-      label: "مغلقة اليوم",
-      value: Math.max(0, reportedToday - 2), // Mocking some progress for demo logic if no backend field
-      icon: <CheckCircle2 size={14} className="text-[#8FA36A]" />,
-      color: "bg-[#8FA36A]/10",
-    },
   ];
 
   return (
@@ -34,7 +28,7 @@ export default function IssuesWidget({ reportedToday, unresolved }: IssuesWidget
         <MessageSquare size={18} className="text-[#6B7280]/40" />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {stats.map((stat, idx) => (
           <div key={idx} className="flex flex-col items-center">
             <div className={`w-full py-4 rounded-[12px] ${stat.color} flex flex-col items-center justify-center gap-2 border border-black/5`}>

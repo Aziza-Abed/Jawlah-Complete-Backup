@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/models/task_model.dart';
 import '../../providers/appeal_manager.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../core/utils/photo_picker_helper.dart';
 import '../../presentation/widgets/info_row.dart';
 
 class SubmitAppealScreen extends StatefulWidget {
@@ -23,7 +23,6 @@ class SubmitAppealScreen extends StatefulWidget {
 class _SubmitAppealScreenState extends State<SubmitAppealScreen> {
   final _formKey = GlobalKey<FormState>();
   final _explanationController = TextEditingController();
-  final _picker = ImagePicker();
   File? _evidencePhoto;
   bool _isSubmitting = false;
 
@@ -34,48 +33,16 @@ class _SubmitAppealScreenState extends State<SubmitAppealScreen> {
   }
 
   Future<void> _pickImage() async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
-      );
-
-      if (pickedFile != null) {
-        setState(() {
-          _evidencePhoto = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل التقاط الصورة')),
-        );
-      }
+    final file = await PhotoPickerHelper.pickImageCameraOnly(context);
+    if (file != null && mounted) {
+      setState(() => _evidencePhoto = file);
     }
   }
 
   Future<void> _pickFromGallery() async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
-      );
-
-      if (pickedFile != null) {
-        setState(() {
-          _evidencePhoto = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل اختيار الصورة')),
-        );
-      }
+    final file = await PhotoPickerHelper.pickImageWithChoice(context);
+    if (file != null && mounted) {
+      setState(() => _evidencePhoto = file);
     }
   }
 

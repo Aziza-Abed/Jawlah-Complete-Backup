@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/utils/sync_toast_helper.dart';
 import '../../providers/sync_manager.dart';
 
 class OfflineBanner extends StatelessWidget {
@@ -48,28 +49,7 @@ class OfflineBanner extends StatelessWidget {
                     onPressed: () async {
                       final result = await connectivity.startSync();
                       if (context.mounted) {
-                        String message;
-                        Color bgColor;
-
-                        if (result.totalFailed > 0) {
-                          message = 'تم رفع ${result.totalSynced}، فشل ${result.totalFailed}';
-                          bgColor = Colors.orange;
-                        } else if (result.success) {
-                          message = result.totalSynced > 0
-                              ? 'تمت المزامنة (${result.totalSynced})'
-                              : 'لا توجد عناصر';
-                          bgColor = Colors.green;
-                        } else {
-                          message = 'فشلت المزامنة';
-                          bgColor = Colors.red;
-                        }
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(message, style: const TextStyle(fontFamily: 'Cairo')),
-                            backgroundColor: bgColor,
-                          ),
-                        );
+                        showSyncResultToast(context, result);
                       }
                     },
                     child: const Text(

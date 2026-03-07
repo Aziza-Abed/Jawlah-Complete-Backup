@@ -30,10 +30,4 @@ class DeviceService {
 
     return newDeviceId;
   }
-
-  // clear device ID (only for testing/debugging)
-  static Future<void> clearDeviceId() async {
-    _cachedDeviceId = null;
-    await SecureStorageHelper.removeString(_keyDeviceId);
-  }
 }

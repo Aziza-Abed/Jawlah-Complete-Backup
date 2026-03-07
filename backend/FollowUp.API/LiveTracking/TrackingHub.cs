@@ -129,7 +129,8 @@ public class TrackingHub : Hub<ITrackingClient>
     #region Location Tracking
 
     // worker sends real-time location update
-    public async Task SendLocationUpdate(double latitude, double longitude)
+    public async Task SendLocationUpdate(double latitude, double longitude,
+        double? accuracy = null, double? speed = null, double? heading = null)
     {
         var (userId, userName, _) = GetCurrentHubUser();
 
@@ -155,7 +156,7 @@ public class TrackingHub : Hub<ITrackingClient>
             conn.LastActivity = timestamp;
         }
 
-        // save to database so REST API can retrieve locations
+        // save to database so REST API can retrieve locations (including accuracy/speed/heading for quality analysis)
         try
         {
             var history = new Core.Entities.LocationHistory
@@ -163,6 +164,9 @@ public class TrackingHub : Hub<ITrackingClient>
                 UserId = userId.Value,
                 Latitude = latitude,
                 Longitude = longitude,
+                Accuracy = accuracy,
+                Speed = speed,
+                Heading = heading,
                 Timestamp = timestamp,
                 IsSync = true
             };
@@ -188,6 +192,10 @@ public class TrackingHub : Hub<ITrackingClient>
 
         if (!userId.HasValue || locations == null || !locations.Any())
             return;
+
+        // Cap batch size to prevent memory exhaustion
+        if (locations.Count > 500)
+            locations = locations.Take(500).ToList();
 
         // sort once, filter invalid coordinates
         var validLocations = locations
@@ -347,6 +355,10 @@ public class TrackingHub : Hub<ITrackingClient>
 
         return Task.CompletedTask;
     }
+
+    // Check if a user is currently connected via SignalR
+    public static bool IsUserConnected(int userId)
+        => _connections.Values.Any(c => c.UserId == userId);
 
     #endregion
 

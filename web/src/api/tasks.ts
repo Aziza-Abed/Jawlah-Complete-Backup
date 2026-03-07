@@ -48,15 +48,13 @@ export async function deleteTask(id: number): Promise<void> {
 }
 
 // Approve completed task (supervisor)
-export async function approveTask(id: number, notes?: string): Promise<TaskResponse> {
-  const response = await apiClient.put<{ data: TaskResponse }>(`/tasks/${id}/approve`, { notes });
-  return response.data.data;
+export async function approveTask(id: number, notes?: string): Promise<void> {
+  await apiClient.put(`/tasks/${id}/approve`, { comments: notes });
 }
 
 // Reject completed task (supervisor)
-export async function rejectTask(id: number, reason: string): Promise<TaskResponse> {
-  const response = await apiClient.put<{ data: TaskResponse }>(`/tasks/${id}/reject`, { reason });
-  return response.data.data;
+export async function rejectTask(id: number, reason: string): Promise<void> {
+  await apiClient.put(`/tasks/${id}/reject`, { reason });
 }
 
 // Reassign task to another worker

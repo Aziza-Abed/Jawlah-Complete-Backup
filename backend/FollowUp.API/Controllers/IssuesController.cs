@@ -1,6 +1,7 @@
 using AutoMapper;
 using FollowUp.API.Models;
 using FollowUp.API.Utils;
+using FollowUp.Core.Constants;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Issues;
 using FollowUp.Core.Entities;
@@ -8,10 +9,10 @@ using TaskEntity = FollowUp.Core.Entities.Task;
 using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
-using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Swashbuckle.AspNetCore.Annotations;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -20,33 +21,40 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle issue reporting and managment
 [Route("api/[controller]")]
+[Tags("Issues")]
 public class IssuesController : BaseApiController
 {
     private readonly IIssueRepository _issues;
     private readonly IPhotoRepository _photos;
     private readonly IUserRepository _users;
     private readonly IMunicipalityRepository _municipalities;
+    private readonly IDepartmentRepository _departments;
+    private readonly ITaskRepository _tasks;
     private readonly ILogger<IssuesController> _logger;
     private readonly IFileStorageService _files;
     private readonly INotificationService _notifications;
     private readonly IMapper _mapper;
-    private readonly AuditLogService _audit;
+    private readonly IAuditLogService _audit;
 
     public IssuesController(
         IIssueRepository issues,
         IPhotoRepository photos,
         IUserRepository users,
         IMunicipalityRepository municipalities,
+        IDepartmentRepository departments,
+        ITaskRepository tasks,
         ILogger<IssuesController> logger,
         IFileStorageService files,
         INotificationService notifications,
         IMapper mapper,
-        AuditLogService audit)
+        IAuditLogService audit)
     {
         _issues = issues;
         _photos = photos;
         _users = users;
         _municipalities = municipalities;
+        _departments = departments;
+        _tasks = tasks;
         _logger = logger;
         _files = files;
         _notifications = notifications;
@@ -57,6 +65,7 @@ public class IssuesController : BaseApiController
     // report issue with photo upload
     [HttpPost("report-with-photo")]
     [Consumes("multipart/form-data")]
+    [SwaggerOperation(Summary = "report an issue with photo upload")]
     public async Task<IActionResult> ReportIssueWithPhoto([FromForm] ReportIssueWithPhotoRequest request)
     {
         var userId = GetCurrentUserId();
@@ -96,15 +105,27 @@ public class IssuesController : BaseApiController
         if (gpsValidation != null)
             return gpsValidation;
 
+        // Idempotent check: if clientId is provided, return existing issue instead of creating duplicate
+        if (!string.IsNullOrWhiteSpace(request.ClientId))
+        {
+            var existing = await _issues.GetByClientIdAsync(userId.Value, request.ClientId.Trim());
+            if (existing != null)
+            {
+                _logger.LogInformation("Issue with ClientId {ClientId} already exists (IssueId {IssueId}), returning existing",
+                    request.ClientId, existing.IssueId);
+                return Ok(ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(existing)));
+            }
+        }
+
         // clean and default title
-        var title = InputSanitizer.SanitizeString(request.Title, 200);
+        var title = InputSanitizer.SanitizeString(request.Title, AppConstants.TitleMaxLength);
         if (string.IsNullOrWhiteSpace(title))
         {
             title = $"{issueType} - {DateTime.UtcNow:yyyy-MM-dd HH:mm}";
         }
 
-        var sanitizedDescription = InputSanitizer.SanitizeString(request.Description, 2000);
-        var sanitizedLocation = InputSanitizer.SanitizeString(request.LocationDescription, 500);
+        var sanitizedDescription = InputSanitizer.SanitizeString(request.Description, AppConstants.DescriptionMaxLength);
+        var sanitizedLocation = InputSanitizer.SanitizeString(request.LocationDescription, AppConstants.LocationMaxLength);
 
         // validate and upload photos (only after all input validation passed)
         var photoUrls = new List<string>();
@@ -138,6 +159,7 @@ public class IssuesController : BaseApiController
             // create issue entity
             issue = new Issue
             {
+                ClientId = request.ClientId?.Trim(),
                 Title = title,
                 Description = sanitizedDescription,
                 Type = issueType,
@@ -215,6 +237,7 @@ public class IssuesController : BaseApiController
 
     // get single issue by id
     [HttpGet("{id}")]
+    [SwaggerOperation(Summary = "get a single issue by id")]
     public async Task<IActionResult> GetIssueById(int id)
     {
         var userId = GetCurrentUserId();
@@ -244,6 +267,7 @@ public class IssuesController : BaseApiController
 
     // get all issues with filtering
     [HttpGet]
+    [SwaggerOperation(Summary = "get all issues with optional filtering")]
     public async Task<IActionResult> GetAllIssues(
         [FromQuery] IssueStatus? status = null,
         [FromQuery] int page = 1,
@@ -266,10 +290,9 @@ public class IssuesController : BaseApiController
         }
         else if (userRole == "Supervisor")
         {
-            // supervisors see only issues from their workers
+            // supervisors see only issues from their workers (filtered at DB level)
             var workerIds = await GetSupervisorWorkerIdsAsync(userId.Value);
-            var allIssues = await _issues.GetAllAsync();
-            issues = allIssues.Where(i => workerIds.Contains(i.ReportedByUserId));
+            issues = await _issues.GetIssuesByWorkerIdsAsync(workerIds);
         }
         else
         {
@@ -295,6 +318,7 @@ public class IssuesController : BaseApiController
     // get critical issues for supervisors
     [HttpGet("critical")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get critical severity issues")]
     public async Task<IActionResult> GetCriticalIssues()
     {
         var issues = await _issues.GetCriticalIssuesAsync();
@@ -314,6 +338,7 @@ public class IssuesController : BaseApiController
     // update issue status
     [HttpPut("{id}/status")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "update issue status")]
     public async Task<IActionResult> UpdateIssueStatus(int id, [FromBody] UpdateIssueStatusRequest request)
     {
         var issue = await _issues.GetByIdAsync(id);
@@ -336,7 +361,7 @@ public class IssuesController : BaseApiController
         {
             issue.ResolvedAt = DateTime.UtcNow;
             issue.ResolvedByUserId = userId;
-            issue.ResolutionNotes = InputSanitizer.SanitizeString(request.ResolutionNotes, 2000);
+            issue.ResolutionNotes = InputSanitizer.SanitizeString(request.ResolutionNotes, AppConstants.DescriptionMaxLength);
         }
 
         try
@@ -381,6 +406,7 @@ public class IssuesController : BaseApiController
     // forward issue to a municipal department
     [HttpPost("{id}/forward")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "forward issue to a department")]
     public async Task<IActionResult> ForwardIssue(int id, [FromBody] ForwardIssueRequest request)
     {
         var userId = GetCurrentUserId();
@@ -399,8 +425,7 @@ public class IssuesController : BaseApiController
         var currentUser = await _users.GetByIdAsync(userId.Value);
         if (currentUser == null) return Unauthorized();
 
-        var dbContext = HttpContext.RequestServices.GetRequiredService<FollowUp.Infrastructure.Data.FollowUpDbContext>();
-        var department = await dbContext.Departments.FindAsync(request.DepartmentId);
+        var department = await _departments.GetByIdAsync(request.DepartmentId);
         if (department == null)
             return BadRequest(ApiResponse<object>.ErrorResponse("القسم المحدد غير موجود"));
 
@@ -427,6 +452,17 @@ public class IssuesController : BaseApiController
         _logger.LogInformation("Issue {IssueId} forwarded to department {DepartmentId} by user {UserId}",
             id, request.DepartmentId, userId.Value);
 
+        // notify supervisors/admins about the forwarded issue
+        try
+        {
+            await _notifications.SendIssueForwardedNotificationAsync(
+                issue.IssueId, issue.Title, department.Name, currentUser.MunicipalityId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send issue forwarded notification for issue {IssueId}", issue.IssueId);
+        }
+
         return Ok(ApiResponse<IssueResponse>.SuccessResponse(_mapper.Map<IssueResponse>(issue),
             $"تم تحويل البلاغ إلى {department.Name}"));
     }
@@ -434,21 +470,22 @@ public class IssuesController : BaseApiController
     // get count of unresolved issues
     [HttpGet("unresolved-count")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get count of unresolved issues")]
     public async Task<IActionResult> GetUnresolvedCount()
     {
-        var issues = await _issues.GetAllAsync();
-
-        // supervisors see only their workers' issues
         var currentUserId = GetCurrentUserId();
+        int unresolvedCount;
+
+        // supervisors see only their workers' issues — use lightweight DB count
         if (GetCurrentUserRole() == "Supervisor" && currentUserId.HasValue)
         {
             var workerIds = await GetSupervisorWorkerIdsAsync(currentUserId.Value);
-            issues = issues.Where(i => workerIds.Contains(i.ReportedByUserId));
+            unresolvedCount = await _issues.CountUnresolvedAsync(workerIds);
         }
-
-        // only New and Forwarded issues are truly "open" — Resolved, Closed, and ConvertedToTask are all handled
-        var unresolvedCount = issues.Count(i =>
-            i.Status == IssueStatus.New || i.Status == IssueStatus.Forwarded || i.Status == IssueStatus.InProgress);
+        else
+        {
+            unresolvedCount = await _issues.CountUnresolvedAsync();
+        }
 
         return Ok(ApiResponse<int>.SuccessResponse(unresolvedCount));
     }
@@ -456,6 +493,7 @@ public class IssuesController : BaseApiController
     // delete issue
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "delete an issue")]
     public async Task<IActionResult> DeleteIssue(int id)
     {
         var issue = await _issues.GetByIdAsync(id);
@@ -473,13 +511,7 @@ public class IssuesController : BaseApiController
             photoUrls.AddRange(legacyUrls);
         }
 
-        // delete photo files from disk
-        if (photoUrls.Any())
-        {
-            await _files.DeleteImagesAsync(photoUrls!);
-        }
-
-        // delete photo records from db
+        // delete DB records first — if this fails, files on disk are still intact
         foreach (var photo in photos)
         {
             await _photos.DeleteAsync(photo);
@@ -488,6 +520,13 @@ public class IssuesController : BaseApiController
         await _issues.DeleteAsync(issue);
         await _issues.SaveChangesAsync();
 
+        // delete photo files from disk only after DB commit succeeded
+        if (photoUrls.Any())
+        {
+            try { await _files.DeleteImagesAsync(photoUrls!); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete photo files for issue {IssueId}", id); }
+        }
+
         _logger.LogInformation("Issue {IssueId} deleted with {PhotoCount} photos", id, photoUrls.Count);
         return NoContent();
     }
@@ -495,6 +534,7 @@ public class IssuesController : BaseApiController
     // convert an issue into a task (supervisor/admin only)
     [HttpPost("{id}/create-task")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "convert an issue into a task")]
     public async Task<IActionResult> CreateTaskFromIssue(int id, [FromBody] CreateTaskFromIssueRequest request)
     {
         var currentUserId = GetCurrentUserId();
@@ -522,12 +562,10 @@ public class IssuesController : BaseApiController
         if (assignedUser.Role != UserRole.Worker)
             return BadRequest(ApiResponse<object>.ErrorResponse("يمكن تعيين المهام للعمال فقط"));
 
-        var dbContext = HttpContext.RequestServices.GetRequiredService<FollowUp.Infrastructure.Data.FollowUpDbContext>();
-
         var task = new TaskEntity
         {
-            Title = InputSanitizer.SanitizeString(issue.Title, 200),
-            Description = InputSanitizer.SanitizeString(issue.Description, 2000),
+            Title = InputSanitizer.SanitizeString(issue.Title, AppConstants.TitleMaxLength),
+            Description = InputSanitizer.SanitizeString(issue.Description, AppConstants.DescriptionMaxLength),
             MunicipalityId = currentUser.MunicipalityId,
             AssignedToUserId = request.AssignedToUserId,
             AssignedByUserId = currentUserId.Value,
@@ -547,7 +585,7 @@ public class IssuesController : BaseApiController
             SyncVersion = 1
         };
 
-        dbContext.Tasks.Add(task);
+        await _tasks.AddAsync(task);
 
         // mark issue as converted to task (distinct from InProgress review state)
         issue.Status = IssueStatus.ConvertedToTask;
@@ -556,7 +594,7 @@ public class IssuesController : BaseApiController
 
         try
         {
-            await dbContext.SaveChangesAsync();
+            await _issues.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -592,11 +630,12 @@ public class IssuesController : BaseApiController
             "تم تحويل البلاغ إلى مهمة بنجاح"));
     }
 
-    // ============ PDF Generation ============
+    // pdf generation
 
     // generate and download PDF report for an issue
     [HttpGet("{id}/pdf")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "download issue report as pdf")]
     public async Task<IActionResult> DownloadIssuePdf(int id)
     {
         var userId = GetCurrentUserId();
@@ -627,9 +666,6 @@ public class IssuesController : BaseApiController
             ? await _municipalities.GetByIdAsync(reporter.MunicipalityId)
             : null;
         var municipalityName = municipality?.Name ?? "FollowUp";
-
-        // Configure QuestPDF license (Community license for open source)
-        QuestPDF.Settings.License = LicenseType.Community;
 
         // Arabic text mappings for PDF display
         var severityMap = new Dictionary<IssueSeverity, string>
@@ -669,7 +705,8 @@ public class IssuesController : BaseApiController
             {
                 page.Size(PageSizes.A4);
                 page.Margin(40);
-                page.DefaultTextStyle(x => x.FontSize(12));
+                page.ContentFromRightToLeft();
+                page.DefaultTextStyle(x => x.FontSize(12).FontFamily("Tahoma"));
 
                 // Header
                 page.Header().Column(col =>
@@ -750,7 +787,7 @@ public class IssuesController : BaseApiController
                         {
                             try
                             {
-                                // SECURITY: Validate photo path to prevent path traversal attacks
+                                // validate photo path
                                 var fullPath = GetSafePhotoPath(photoUrl);
                                 if (fullPath != null && System.IO.File.Exists(fullPath))
                                 {
@@ -849,7 +886,7 @@ public class IssuesController : BaseApiController
         var storageRoot = Path.Combine(Directory.GetCurrentDirectory(), "Storage", "uploads");
         var fullPath = Path.GetFullPath(Path.Combine(storageRoot, relativePath));
 
-        // SECURITY: Ensure the resolved path is still within our storage directory
+        // make sure path is inside storage dir
         if (!fullPath.StartsWith(Path.GetFullPath(storageRoot), StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Blocked path traversal attempt: {PhotoUrl}", photoUrl);

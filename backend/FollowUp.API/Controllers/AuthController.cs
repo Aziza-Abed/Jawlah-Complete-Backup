@@ -5,15 +5,15 @@ using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
-using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
 [Route("api/[controller]")]
+[Tags("Auth")]
 public class AuthController : BaseApiController
 {
     private readonly IAuthService _auth;
@@ -22,7 +22,8 @@ public class AuthController : BaseApiController
     private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _config;
     private readonly IMapper _mapper;
-    private readonly AuditLogService _audit;
+    private readonly IAuditLogService _audit;
+    private readonly IMunicipalityRepository _municipalities;
 
     public AuthController(
         IAuthService auth,
@@ -31,7 +32,8 @@ public class AuthController : BaseApiController
         ILogger<AuthController> logger,
         IConfiguration config,
         IMapper mapper,
-        AuditLogService audit)
+        IAuditLogService audit,
+        IMunicipalityRepository municipalities)
     {
         _auth = auth;
         _users = users;
@@ -40,19 +42,19 @@ public class AuthController : BaseApiController
         _config = config;
         _mapper = mapper;
         _audit = audit;
+        _municipalities = municipalities;
     }
 
-    // this method handle normal login with username and password
-    // For Admin/Supervisor: Always requires OTP
-    // For Worker: OTP only on new device
+    // login with username and password, OTP required on new devices
     [AllowAnonymous]
     [HttpPost("login")]
     [EnableRateLimiting("auth")]
+    [SwaggerOperation(Summary = "login with username and password")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         if (!ModelState.IsValid)
         {
-            // Provide specific validation error details
+            // return validation errors
             var errors = ModelState.Values
                 .SelectMany(v => v.Errors)
                 .Select(e => e.ErrorMessage)
@@ -75,12 +77,18 @@ public class AuthController : BaseApiController
         var user = await _users.GetByUsernameAsync(request.Username);
         if (user == null)
         {
-            // SECURITY: Don't reveal if username exists - use generic message
+            // don't reveal if username exists
             return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse("اسم المستخدم أو كلمة المرور غير صحيحة"));
         }
 
-        // Validate device ID format (must be valid GUID)
-        // Accept from request body (mobile sends it there) or X-Device-Id header (fallback)
+        // check if active
+        if (user.Status != Core.Enums.UserStatus.Active)
+        {
+            _logger.LogWarning("Login failed - User {UserId} is not active (Status: {Status})", user.UserId, user.Status);
+            return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse("حساب المستخدم غير نشط"));
+        }
+
+        // device ID from body (mobile) or header (web)
         var deviceId = request.DeviceId ?? Request.Headers["X-Device-Id"].FirstOrDefault();
         if (!string.IsNullOrEmpty(deviceId) && !Guid.TryParse(deviceId, out _))
         {
@@ -88,38 +96,29 @@ public class AuthController : BaseApiController
             return BadRequest(ApiResponse<LoginResponse>.ErrorResponse("معرّف الجهاز غير صالح"));
         }
 
-        // Check if OTP is required (Admin/Supervisor always, Worker on new device)
+        // check if OTP needed
         var requiresOtp = _otp.RequiresOtp(user, deviceId);
 
         if (requiresOtp)
         {
             // Generate and send OTP
-            var sessionToken = await _otp.GenerateAndSendOtpAsync(user, "Login", deviceId);
-            if (sessionToken == null)
+            var (otpSessionToken, demoOtpCode) = await _otp.GenerateAndSendOtpAsync(user, "Login", deviceId);
+            if (otpSessionToken == null)
             {
                 return StatusCode(500, ApiResponse<LoginResponse>.ErrorResponse("فشل إرسال رمز التحقق. يرجى المحاولة مرة أخرى"));
             }
 
-            // Store pending JWT token in database (load-balancer safe)
-            try
-            {
-                await _otp.StorePendingTokenAsync(sessionToken, token!);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to store pending JWT token for user {UserId}", user.UserId);
-                return StatusCode(500, ApiResponse<LoginResponse>.ErrorResponse("حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى"));
-            }
-
+            // JWT will be regenerated after OTP verification (not stored in DB)
             _logger.LogInformation("OTP required for user {UserId} ({Role})", user.UserId, user.Role);
 
             var otpResponse = new LoginResponse
             {
                 Success = true,
                 RequiresOtp = true,
-                SessionToken = sessionToken,
+                SessionToken = otpSessionToken,
                 MaskedPhone = _otp.MaskPhoneNumber(user.PhoneNumber),
-                User = _mapper.Map<UserDto>(user) // Include basic user info
+                User = _mapper.Map<UserDto>(user),
+                DemoOtpCode = demoOtpCode // only set when MockSms is enabled
             };
 
             return Ok(ApiResponse<LoginResponse>.SuccessResponse(otpResponse, "يرجى إدخال رمز التحقق المرسل إلى هاتفك"));
@@ -156,6 +155,7 @@ public class AuthController : BaseApiController
     [AllowAnonymous]
     [HttpPost("verify-otp")]
     [EnableRateLimiting("auth")]
+    [SwaggerOperation(Summary = "verify otp code and complete login")]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
     {
         if (!ModelState.IsValid)
@@ -175,22 +175,22 @@ public class AuthController : BaseApiController
         var (success, userId, error, remaining) = await _otp.VerifyOtpAsync(request.SessionToken, request.OtpCode, ipAddress);
 
         if (!success)
-            return Unauthorized(ApiResponse<VerifyOtpResponse>.ErrorResponse(error ?? "رمز التحقق غير صحيح"));
-
-        // Get the stored JWT token from database (load-balancer safe)
-        var storedToken = await _otp.GetAndClearPendingTokenAsync(request.SessionToken);
-        if (string.IsNullOrEmpty(storedToken))
         {
-            return Unauthorized(ApiResponse<VerifyOtpResponse>.ErrorResponse("انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى"));
+            return Unauthorized(ApiResponse<VerifyOtpResponse>.ErrorResponse(error ?? "رمز التحقق غير صحيح"));
         }
 
         var user = await _users.GetByIdAsync(userId!.Value);
         if (user == null)
         {
-            // This should never happen - OTP was valid but user doesn't exist
-            // Indicates data inconsistency (user was deleted after OTP was generated)
             _logger.LogError("Data inconsistency: OTP verified for user {UserId} but user not found", userId);
             return StatusCode(500, ApiResponse<VerifyOtpResponse>.ErrorResponse("حدث خطأ في النظام. يرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني"));
+        }
+
+        // Check if user was deactivated between login and OTP verification
+        if (user.Status != Core.Enums.UserStatus.Active)
+        {
+            _logger.LogWarning("OTP verification failed - User {UserId} is not active", user.UserId);
+            return Unauthorized(ApiResponse<VerifyOtpResponse>.ErrorResponse("حساب المستخدم غير نشط"));
         }
 
         // If device ID provided, register it for the user (for workers)
@@ -211,6 +211,14 @@ public class AuthController : BaseApiController
             _logger.LogInformation("Device {DeviceId} registered for user {UserId} after OTP verification", deviceId, user.UserId);
         }
 
+        // Generate a fresh JWT after OTP verification (never store JWT in DB)
+        var (tokenSuccess, freshToken, tokenError) = await _auth.GenerateTokenForUserAsync(user);
+        if (!tokenSuccess || string.IsNullOrEmpty(freshToken))
+        {
+            _logger.LogError("Failed to generate JWT after OTP verification for user {UserId}: {Error}", user.UserId, tokenError);
+            return StatusCode(500, ApiResponse<VerifyOtpResponse>.ErrorResponse("حدث خطأ أثناء إنشاء رمز الدخول"));
+        }
+
         // Log successful 2FA login
         await _audit.LogAsync(user.UserId, user.Username, "Login2FA", "تسجيل دخول ناجح مع التحقق الثنائي", ipAddress, userAgent);
 
@@ -228,7 +236,7 @@ public class AuthController : BaseApiController
         var response = new VerifyOtpResponse
         {
             Success = true,
-            Token = storedToken,
+            Token = freshToken,
             RefreshToken = otpRefreshToken,
             ExpiresAt = DateTime.UtcNow.AddMinutes(GetTokenExpirationMinutes()),
             User = _mapper.Map<UserDto>(user)
@@ -241,14 +249,15 @@ public class AuthController : BaseApiController
     [AllowAnonymous]
     [HttpPost("resend-otp")]
     [EnableRateLimiting("auth")]
+    [SwaggerOperation(Summary = "resend otp code to user phone")]
     public async Task<IActionResult> ResendOtp([FromBody] SendOtpRequest request)
     {
         if (string.IsNullOrEmpty(request.SessionToken))
             return BadRequest(ApiResponse<SendOtpResponse>.ErrorResponse("رمز الجلسة مطلوب"));
 
-        // Get session info from database (load-balancer safe)
-        var (userId, jwtToken) = await _otp.GetSessionInfoAsync(request.SessionToken);
-        if (userId == null || string.IsNullOrEmpty(jwtToken))
+        // Get user from session (load-balancer safe)
+        var userId = await _otp.GetSessionUserIdAsync(request.SessionToken);
+        if (userId == null)
         {
             return Unauthorized(ApiResponse<SendOtpResponse>.ErrorResponse("الجلسة غير صالحة. يرجى تسجيل الدخول مرة أخرى"));
         }
@@ -259,23 +268,22 @@ public class AuthController : BaseApiController
             return Unauthorized(ApiResponse<SendOtpResponse>.ErrorResponse("المستخدم غير موجود"));
         }
 
-        // Generate and send new OTP
-        var newSessionToken = await _otp.GenerateAndSendOtpAsync(user, "Login", request.DeviceId);
+        // Generate and send new OTP (JWT is regenerated fresh after verification, not stored)
+        var (newSessionToken, resendDemoOtp) = await _otp.GenerateAndSendOtpAsync(user, "Login", request.DeviceId);
         if (newSessionToken == null)
         {
             return StatusCode(500, ApiResponse<SendOtpResponse>.ErrorResponse("فشل إرسال رمز التحقق"));
         }
 
-        // Store the JWT token in the new session
-        await _otp.StorePendingTokenAsync(newSessionToken, jwtToken);
-
         var response = new SendOtpResponse
         {
             Success = true,
+            SessionToken = newSessionToken, // client must use this new token for verify-otp
             MaskedPhone = _otp.MaskPhoneNumber(user.PhoneNumber),
             ExpiresAt = DateTime.UtcNow.AddMinutes(AppConstants.OtpExpirationMinutes),
             Message = "تم إرسال رمز التحقق",
-            ResendCooldownSeconds = AppConstants.OtpResendCooldownSeconds
+            ResendCooldownSeconds = AppConstants.OtpResendCooldownSeconds,
+            DemoOtpCode = resendDemoOtp
         };
 
         return Ok(ApiResponse<SendOtpResponse>.SuccessResponse(response, "تم إرسال رمز التحقق"));
@@ -287,6 +295,7 @@ public class AuthController : BaseApiController
     [AllowAnonymous]
     [HttpPost("login-gps")]
     [EnableRateLimiting("auth")]
+    [SwaggerOperation(Summary = "gps-based login for mobile workers")]
     public async Task<IActionResult> LoginWithGPS([FromBody] LoginWithGPSRequest request)
     {
         try
@@ -313,7 +322,7 @@ public class AuthController : BaseApiController
             var user = await _users.GetByUsernameAsync(request.Username);
             if (user == null)
             {
-                // SECURITY: Don't reveal if username exists - use generic message
+                // don't reveal if username exists
                 return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("اسم المستخدم أو كلمة المرور غير صحيحة"));
             }
 
@@ -331,21 +340,7 @@ public class AuthController : BaseApiController
                 return BadRequest(ApiResponse<LoginWithGPSResponse>.ErrorResponse("معرّف الجهاز غير صالح"));
             }
 
-            /*
-             * DEVICE BINDING SECURITY (2FA)
-             *
-             * Purpose: Prevent account theft by binding user account to their physical mobile device
-             *
-             * How it works:
-             * 1. First Login: Device ID is automatically registered for the user
-             * 2. Subsequent Logins: Device ID must match the registered device
-             * 3. If different device: Login is rejected (requires admin to reset device binding)
-             *
-             * This adds a layer of security - even if someone steals the password,
-             * they cannot login from a different device without admin intervention.
-             *
-             * Note: Can be disabled in development mode for testing purposes
-             */
+            // device binding: lock account to one phone, reject if different device
             var disableDeviceBinding = _config.GetValue<bool>("DeveloperMode:DisableDeviceBinding");
             if (disableDeviceBinding)
             {
@@ -411,6 +406,7 @@ public class AuthController : BaseApiController
     [HttpPost("register")]
     //[AllowAnonymous] // SECURITY FIX: Removed - Anyone could become admin!
     [Authorize(Roles = "Admin")] // REQUIRED: Only admins can create users
+    [SwaggerOperation(Summary = "register a new user (admin only)")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         // SECURITY NOTE: If you need to create the first admin:
@@ -432,16 +428,23 @@ public class AuthController : BaseApiController
         if (!Utils.InputSanitizer.IsStrongPassword(request.Password))
             return BadRequest(ApiResponse<UserDto>.ErrorResponse("كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم ورمز خاص"));
 
+        // Validate phone number format (must start with + and have 10-15 digits)
+        if (!string.IsNullOrEmpty(request.PhoneNumber))
+        {
+            var cleanPhone = request.PhoneNumber.Replace("-", "").Replace(" ", "");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^\+\d{10,15}$"))
+                return BadRequest(ApiResponse<UserDto>.ErrorResponse("رقم الهاتف غير صالح. يجب أن يبدأ بـ + ويحتوي 10-15 رقم"));
+        }
+
         // Validate: Workers must have a supervisor assigned
         if (request.Role == Core.Enums.UserRole.Worker && !request.SupervisorId.HasValue)
             return BadRequest(ApiResponse<UserDto>.ErrorResponse("يجب تحديد المشرف عند إنشاء حساب عامل"));
 
-        // TEMP: Auto-create default municipality if none exists
-        var dbContext = HttpContext.RequestServices.GetRequiredService<FollowUp.Infrastructure.Data.FollowUpDbContext>();
-        var municipality = await dbContext.Municipalities.FirstOrDefaultAsync();
+        // Bootstrap: Auto-create default municipality if none exists (first-time setup only)
+        var allMunicipalities = await _municipalities.GetAllAsync();
+        var municipality = allMunicipalities.FirstOrDefault();
         if (municipality == null)
         {
-            // Get default municipality settings from configuration
             var municipalitySettings = _config.GetSection("MunicipalitySettings");
             municipality = new Municipality
             {
@@ -452,8 +455,9 @@ public class AuthController : BaseApiController
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            dbContext.Municipalities.Add(municipality);
-            await dbContext.SaveChangesAsync();
+            await _municipalities.AddAsync(municipality);
+            await _municipalities.SaveChangesAsync();
+            _logger.LogWarning("Auto-created default municipality '{Name}' during first user registration", municipality.Name);
         }
 
         // create user object
@@ -490,6 +494,7 @@ public class AuthController : BaseApiController
     // get current user profile (alias: /me for frontend compatibility)
     [HttpGet("me")]
     [HttpGet("profile")]
+    [SwaggerOperation(Summary = "get current user profile")]
     public async Task<IActionResult> GetProfile()
     {
         var userId = GetCurrentUserId();
@@ -508,6 +513,7 @@ public class AuthController : BaseApiController
     [AllowAnonymous]
     [HttpPost("refresh")]
     [EnableRateLimiting("auth")]
+    [SwaggerOperation(Summary = "refresh access token using refresh token")]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
     {
         if (string.IsNullOrEmpty(request?.RefreshToken))
@@ -530,6 +536,7 @@ public class AuthController : BaseApiController
     // logout the user
     [HttpPost("logout")]
     [Authorize]
+    [SwaggerOperation(Summary = "logout the current user")]
     public async Task<IActionResult> Logout()
     {
         var userId = GetCurrentUserId();
@@ -552,6 +559,7 @@ public class AuthController : BaseApiController
     [AllowAnonymous]
     [HttpPost("forgot-password")]
     [EnableRateLimiting("auth")]
+    [SwaggerOperation(Summary = "send password reset otp to phone")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         if (!ModelState.IsValid)
@@ -560,7 +568,7 @@ public class AuthController : BaseApiController
         var user = await _users.GetByUsernameAsync(request.Username);
         if (user == null)
         {
-            // SECURITY: Don't reveal if username exists - always return success
+            // don't reveal if username exists
             return Ok(ApiResponse<SendOtpResponse>.SuccessResponse(new SendOtpResponse
             {
                 Success = true,
@@ -579,8 +587,8 @@ public class AuthController : BaseApiController
             }));
         }
 
-        var sessionToken = await _otp.GenerateAndSendOtpAsync(user, "PasswordReset");
-        if (sessionToken == null)
+        var (resetSessionToken, resetDemoOtp) = await _otp.GenerateAndSendOtpAsync(user, "PasswordReset");
+        if (resetSessionToken == null)
         {
             return StatusCode(500, ApiResponse<SendOtpResponse>.ErrorResponse("فشل إرسال رمز التحقق"));
         }
@@ -590,11 +598,12 @@ public class AuthController : BaseApiController
         return Ok(ApiResponse<SendOtpResponse>.SuccessResponse(new SendOtpResponse
         {
             Success = true,
-            SessionToken = sessionToken,
+            SessionToken = resetSessionToken,
             MaskedPhone = _otp.MaskPhoneNumber(user.PhoneNumber),
             Message = "تم إرسال رمز التحقق",
             ExpiresAt = DateTime.UtcNow.AddMinutes(Core.Constants.AppConstants.OtpExpirationMinutes),
-            ResendCooldownSeconds = Core.Constants.AppConstants.OtpResendCooldownSeconds
+            ResendCooldownSeconds = Core.Constants.AppConstants.OtpResendCooldownSeconds,
+            DemoOtpCode = resetDemoOtp // only set when MockSms is enabled
         }));
     }
 
@@ -602,6 +611,7 @@ public class AuthController : BaseApiController
     [AllowAnonymous]
     [HttpPost("reset-password")]
     [EnableRateLimiting("auth")]
+    [SwaggerOperation(Summary = "reset password using otp verification")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         if (!ModelState.IsValid)
@@ -644,6 +654,7 @@ public class AuthController : BaseApiController
     // save fcm token for push notifications
     [HttpPost("register-fcm-token")]
     [Authorize]
+    [SwaggerOperation(Summary = "save fcm token for push notifications")]
     public async Task<IActionResult> RegisterFcmToken([FromBody] RegisterFcmTokenRequest request)
     {
         if (!ModelState.IsValid)

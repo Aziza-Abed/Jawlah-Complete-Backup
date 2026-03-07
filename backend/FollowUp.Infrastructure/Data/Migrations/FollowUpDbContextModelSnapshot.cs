@@ -1065,10 +1065,19 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("DefaultAssignedToUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DefaultTeamId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int?>("EstimatedDurationMinutes")
+                        .HasColumnType("int");
 
                     b.Property<string>("Frequency")
                         .IsRequired()
@@ -1078,10 +1087,26 @@ namespace FollowUp.Infrastructure.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsTeamTask")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("LastGeneratedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("LocationDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<int>("MunicipalityId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("RequiresPhotoProof")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("TaskType")
                         .HasColumnType("int");
 
                     b.Property<TimeSpan>("Time")
@@ -1097,9 +1122,18 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("MunicipalityId");
+                    b.HasIndex("DefaultAssignedToUserId");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("IX_TaskTemplate_IsActive");
+
+                    b.HasIndex("MunicipalityId")
+                        .HasDatabaseName("IX_TaskTemplate_MunicipalityId");
 
                     b.HasIndex("ZoneId");
+
+                    b.HasIndex("MunicipalityId", "IsActive")
+                        .HasDatabaseName("IX_TaskTemplate_Municipality_Active");
 
                     b.ToTable("TaskTemplates");
                 });
@@ -1301,6 +1335,9 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("ProfilePhotoUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("RegisteredDeviceId")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -1442,12 +1479,18 @@ namespace FollowUp.Infrastructure.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int?>("ZoneType")
+                        .HasColumnType("int");
+
                     b.HasKey("ZoneId");
 
                     b.HasIndex("District");
 
                     b.HasIndex("IsActive")
                         .HasDatabaseName("IX_Zone_IsActive");
+
+                    b.HasIndex("ZoneType")
+                        .HasDatabaseName("IX_Zone_ZoneType");
 
                     b.HasIndex("MunicipalityId", "ZoneCode")
                         .IsUnique()
@@ -1694,15 +1737,23 @@ namespace FollowUp.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("FollowUp.Core.Entities.TaskTemplate", b =>
                 {
+                    b.HasOne("FollowUp.Core.Entities.User", "DefaultAssignedTo")
+                        .WithMany()
+                        .HasForeignKey("DefaultAssignedToUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("FollowUp.Core.Entities.Municipality", "Municipality")
                         .WithMany()
                         .HasForeignKey("MunicipalityId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("FollowUp.Core.Entities.Zone", "Zone")
                         .WithMany()
-                        .HasForeignKey("ZoneId");
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("DefaultAssignedTo");
 
                     b.Navigation("Municipality");
 

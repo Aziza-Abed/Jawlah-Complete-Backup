@@ -1,4 +1,4 @@
-// Auth types matching backend DTOs
+// auth types
 
 export type LoginRequest = {
   username: string;
@@ -16,6 +16,7 @@ export type LoginResponse = {
   requiresOtp?: boolean;
   sessionToken?: string;
   maskedPhone?: string;
+  demoOtpCode?: string; // only set when MockSms is enabled (dev/demo mode)
 };
 
 export type VerifyOtpRequest = {
@@ -41,10 +42,12 @@ export type ResendOtpRequest = {
 
 export type ResendOtpResponse = {
   success: boolean;
+  sessionToken?: string;
   maskedPhone?: string;
   expiresAt?: string;
   message?: string;
   resendCooldownSeconds?: number;
+  demoOtpCode?: string;
 };
 
 export type ForgotPasswordRequest = {
@@ -58,6 +61,7 @@ export type ForgotPasswordResponse = {
   message?: string;
   expiresAt?: string;
   resendCooldownSeconds?: number;
+  demoOtpCode?: string;
 };
 
 export type ResetPasswordRequest = {

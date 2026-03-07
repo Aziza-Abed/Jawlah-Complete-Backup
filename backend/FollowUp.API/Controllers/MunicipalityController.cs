@@ -6,11 +6,12 @@ using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// manages municipalities (admin-only endpoints for creating, updating, and managing)
 [Route("api/[controller]")]
+[Tags("Municipality")]
 public class MunicipalityController : BaseApiController
 {
     private readonly IMunicipalityRepository _municipalities;
@@ -33,9 +34,9 @@ public class MunicipalityController : BaseApiController
         _logger = logger;
     }
 
-    // get all municipalities (admin only)
     [HttpGet]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "get all municipalities")]
     public async Task<IActionResult> GetAll()
     {
         try
@@ -60,8 +61,8 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // get the current user's municipality settings (for map display and app configuration)
     [HttpGet("current")]
+    [SwaggerOperation(Summary = "get current user municipality settings")]
     public async Task<IActionResult> GetCurrent()
     {
         try
@@ -121,9 +122,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // get default/first municipality settings (for login screen, anonymous access)
     [HttpGet("default")]
     [AllowAnonymous]
+    [SwaggerOperation(Summary = "get default municipality settings")]
     public async Task<IActionResult> GetDefault()
     {
         try
@@ -165,9 +166,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // get active municipalities only (for public/mobile use)
     [HttpGet("active")]
     [AllowAnonymous]
+    [SwaggerOperation(Summary = "get active municipalities")]
     public async Task<IActionResult> GetActive()
     {
         try
@@ -193,9 +194,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // get municipality by ID (admin only)
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "get municipality by id")]
     public async Task<IActionResult> GetById(int id)
     {
         try
@@ -219,9 +220,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // create a new municipality (admin only)
     [HttpPost]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "create a new municipality")]
     public async Task<IActionResult> Create([FromBody] CreateMunicipalityRequest request)
     {
         try
@@ -288,9 +289,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // update a municipality (admin only)
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "update a municipality")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMunicipalityRequest request)
     {
         try
@@ -375,9 +376,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // import zones from GeoJSON for a municipality (admin only)
     [HttpPost("{id}/import-geojson")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "import zones from geojson")]
     public async Task<IActionResult> ImportGeoJson(int id, [FromBody] ImportGeoJsonRequest request)
     {
         try
@@ -410,9 +411,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // get zones for a municipality
     [HttpGet("{id}/zones")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get zones for a municipality")]
     public async Task<IActionResult> GetZones(int id)
     {
         try
@@ -446,9 +447,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // deactivate a municipality (admin only)
     [HttpPost("{id}/deactivate")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "deactivate a municipality")]
     public async Task<IActionResult> Deactivate(int id)
     {
         try
@@ -476,9 +477,9 @@ public class MunicipalityController : BaseApiController
         }
     }
 
-    // activate a municipality (admin only)
     [HttpPost("{id}/activate")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "activate a municipality")]
     public async Task<IActionResult> Activate(int id)
     {
         try

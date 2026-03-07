@@ -1,4 +1,4 @@
-// Tracking types matching backend response
+// tracking types
 
 export type WorkerLocation = {
   userId: number;
@@ -11,5 +11,16 @@ export type WorkerLocation = {
   timestamp: string;
   isOnline: boolean;
   status: "Online" | "Offline";
+  zoneName?: string;
+};
+
+// Backend GET /tracking/history/{userId} returns LocationUpdateDto[]
+export type LocationHistoryPoint = {
+  latitude: number;
+  longitude: number;
+  speed?: number;
+  accuracy?: number;
+  heading?: number;
+  timestamp: string;
   zoneName?: string;
 };

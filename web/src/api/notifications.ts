@@ -8,12 +8,6 @@ export async function getNotifications(): Promise<NotificationResponse[]> {
   return response.data.data || [];
 }
 
-// Get unread notifications
-export async function getUnreadNotifications(): Promise<NotificationResponse[]> {
-  const response = await apiClient.get<ApiResponse<NotificationResponse[]>>("/notifications/unread");
-  return response.data.data || [];
-}
-
 // Get unread notifications count
 export async function getUnreadNotificationsCount(): Promise<number> {
   const response = await apiClient.get<ApiResponse<number>>("/notifications/unread-count");

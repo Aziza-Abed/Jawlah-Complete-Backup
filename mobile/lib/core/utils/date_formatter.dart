@@ -12,11 +12,6 @@ class DateFormatter {
     return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  // format time only (e.g., "08:05")
-  static String formatTime(DateTime date) {
-    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
   // format time in 12-hour Arabic format (e.g., "2:30 م")
   static String formatTime12h(DateTime utcTime) {
     final local = utcTime.toLocal();
@@ -28,8 +23,14 @@ class DateFormatter {
   }
 
   // parse a date string as UTC - ensures Z suffix for correct parsing
+  // handles timezone offsets like +03:00 by parsing then converting to UTC
   static DateTime parseUtc(String dateStr) {
-    return DateTime.parse(dateStr.endsWith('Z') ? dateStr : '${dateStr}Z');
+    // If already has timezone info (Z or +/-offset), parse directly and convert to UTC
+    if (dateStr.endsWith('Z') || RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(dateStr)) {
+      return DateTime.parse(dateStr).toUtc();
+    }
+    // No timezone info — assume UTC by appending Z
+    return DateTime.parse('${dateStr}Z');
   }
 
   // safe parse that handles nulls and malformed dates gracefully

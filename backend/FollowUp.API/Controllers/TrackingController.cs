@@ -7,29 +7,33 @@ using FollowUp.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// this controller handle gps tracking for workers
 [Route("api/[controller]")]
+[Tags("Tracking")]
 public class TrackingController : BaseApiController
 {
     private readonly ILocationHistoryRepository _history;
+    private readonly IUserRepository _users;
     private readonly IHubContext<TrackingHub, ITrackingClient> _hub;
     private readonly ILogger<TrackingController> _logger;
 
     public TrackingController(
         ILocationHistoryRepository history,
+        IUserRepository users,
         IHubContext<TrackingHub, ITrackingClient> hub,
         ILogger<TrackingController> logger)
     {
         _history = history;
+        _users = users;
         _hub = hub;
         _logger = logger;
     }
 
-    // save worker location and send to supervisor
     [HttpPost("location")]
+    [SwaggerOperation(Summary = "update worker gps location")]
     public async Task<IActionResult> UpdateLocation([FromBody] LocationUpdateDto dto)
     {
         var userId = GetCurrentUserId();
@@ -69,9 +73,9 @@ public class TrackingController : BaseApiController
         return Ok(ApiResponse<object?>.SuccessResponse(null));
     }
 
-    // get current locations for all workers (for live map)
     [Authorize(Roles = "Admin,Supervisor")]
     [HttpGet("locations")]
+    [SwaggerOperation(Summary = "get latest location of all workers")]
     public async Task<IActionResult> GetWorkerLocations()
     {
         var now = DateTime.UtcNow;
@@ -79,10 +83,23 @@ public class TrackingController : BaseApiController
         // get latest location for each worker (regardless of date, show last known position)
         var locations = await _history.GetLatestLocationsAsync(DateTime.MinValue);
 
+        // Supervisors can only see their own workers' locations
+        var currentRole = GetCurrentUserRole();
+        var currentUserId = GetCurrentUserId();
+        if (currentRole == "Supervisor" && currentUserId.HasValue)
+        {
+            var myWorkers = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
+            var myWorkerIds = myWorkers.Select(w => w.UserId).ToHashSet();
+            locations = locations.Where(loc => myWorkerIds.Contains(loc.UserId));
+        }
+
         // map to response with worker info
+        // Use both SignalR connection state AND timestamp to determine online status
         var result = locations.Select(loc =>
         {
-            var isOnline = (now - loc.Timestamp).TotalMinutes <= AppConstants.OnlineThresholdMinutes;
+            var recentLocation = (now - loc.Timestamp).TotalMinutes <= AppConstants.OnlineThresholdMinutes;
+            var hubConnected = TrackingHub.IsUserConnected(loc.UserId);
+            var isOnline = recentLocation || hubConnected;
             return new
             {
                 UserId = loc.UserId,
@@ -102,11 +119,21 @@ public class TrackingController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(result));
     }
 
-    // get location history for worker
     [Authorize(Roles = "Admin,Supervisor")]
     [HttpGet("history/{userId}")]
+    [SwaggerOperation(Summary = "get location history for a worker")]
     public async Task<IActionResult> GetHistory(int userId, [FromQuery] DateTime? date)
     {
+        // Supervisors can only view their own workers' history
+        var currentRole = GetCurrentUserRole();
+        var currentUserId = GetCurrentUserId();
+        if (currentRole == "Supervisor" && currentUserId.HasValue)
+        {
+            var worker = await _users.GetByIdAsync(userId);
+            if (worker?.SupervisorId != currentUserId.Value)
+                return Forbid();
+        }
+
         // use today if no date given
         var targetDate = date ?? DateTime.UtcNow.Date;
         var startOfDay = targetDate.Date;

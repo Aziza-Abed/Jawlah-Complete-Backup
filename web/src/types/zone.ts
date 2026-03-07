@@ -1,4 +1,4 @@
-// Zone types matching backend DTOs
+// zone types
 
 export type ZoneResponse = {
   zoneId: number;
@@ -12,8 +12,9 @@ export type ZoneResponse = {
   district?: string;
   version: number;
   isActive: boolean;
-  geometryJson?: string;
   // GeoJSON boundary for map display
   boundaryGeoJson?: string;
+  // GIS source type: "Quarters", "Borders", "Blocks", or undefined for manual zones
+  zoneType?: string;
   createdAt: string;
 };

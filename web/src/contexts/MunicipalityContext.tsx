@@ -90,9 +90,7 @@ export function MunicipalityProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Hook to access municipality settings throughout the app
- */
+// Hook to access municipality settings throughout the app
 export function useMunicipality() {
   const context = useContext(MunicipalityContext);
   if (!context) {

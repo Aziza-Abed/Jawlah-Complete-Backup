@@ -3,34 +3,38 @@ using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using TaskStatus = FollowUp.Core.Enums.TaskStatus;
 
 namespace FollowUp.API.Controllers;
 
-// this controller provide dashboard stats for supervisors
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin,Supervisor")]
+[Tags("Dashboard")]
 public class DashboardController : BaseApiController
 {
     private readonly IUserRepository _users;
     private readonly IAttendanceRepository _attendance;
     private readonly ITaskRepository _tasks;
     private readonly IIssueRepository _issues;
+    private readonly ILogger<DashboardController> _logger;
 
     public DashboardController(
         IUserRepository users,
         IAttendanceRepository attendance,
         ITaskRepository tasks,
-        IIssueRepository issues)
+        IIssueRepository issues,
+        ILogger<DashboardController> logger)
     {
         _users = users;
         _attendance = attendance;
         _tasks = tasks;
         _issues = issues;
+        _logger = logger;
     }
 
-    // get overview stats for today (filtered by supervisor's workers if not admin)
     [HttpGet("overview")]
+    [SwaggerOperation(Summary = "get today overview stats")]
     public async Task<IActionResult> GetOverview()
     {
         var today = DateTime.UtcNow.Date;
@@ -79,8 +83,8 @@ public class DashboardController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(overview));
     }
 
-    // get status of all workers (filtered by supervisor's workers if not admin)
     [HttpGet("worker-status")]
+    [SwaggerOperation(Summary = "get all workers current status")]
     public async Task<IActionResult> GetWorkerStatus()
     {
         var today = DateTime.UtcNow.Date;
@@ -122,7 +126,7 @@ public class DashboardController : BaseApiController
                 Status = attendance?.Status.ToString() ?? "NotCheckedIn",
                 CheckInTime = attendance?.CheckInEventTime,
                 ZoneName = attendance?.Zone?.ZoneName,
-                TodayTasksCount = workerTasks.Count(t => t.CreatedAt >= today),
+                TodayTasksCount = workerTasks.Count(t => t.CreatedAt >= today && t.CreatedAt < today.AddDays(1)),
                 PendingTasksCount = workerTasks.Count(t => t.Status == TaskStatus.Pending),
                 CompletedTasksCount = workerTasks.Count(t => t.Status == TaskStatus.Completed)
             };

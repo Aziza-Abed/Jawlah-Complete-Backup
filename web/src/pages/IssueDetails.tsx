@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import AuthImage from "../components/common/AuthImage";
+import ImageLightbox from "../components/common/ImageLightbox";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getIssue, updateIssueStatus, forwardIssue, createTaskFromIssue } from "../api/issues";
-import { getMyWorkers } from "../api/users";
+import { getMyWorkers, getWorkers } from "../api/users";
+import { STORAGE_KEYS } from "../constants/storageKeys";
 import type { UserResponse } from "../types/user";
 import { getDepartments } from "../api/departments";
 import type { IssueResponse } from "../types/issue";
 import type { Department } from "../api/departments";
 import { mapSeverity, mapStatus, mapTypeToArabic, type Severity, type DisplayIssueStatus } from "../utils/issueDisplay";
+import { useToast } from "../contexts/ToastContext";
 
 const IssueLocationIcon = L.divIcon({
   className: "custom-marker",
@@ -70,6 +74,7 @@ const mapIssueResponseToDTO = (issue: IssueResponse): IssueDTO => {
 
 export default function IssueDetails() {
   const { id } = useParams(); // /issues/:id
+  const { showToast } = useToast();
   const [issue, setIssue] = useState<IssueDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -78,9 +83,12 @@ export default function IssueDetails() {
   const [rawIssue, setRawIssue] = useState<IssueResponse | null>(null);
 
   // Modals
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
   const [forwardOpen, setForwardOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [forwardSubmitting, setForwardSubmitting] = useState(false);
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   // Convert modal state
   const [workers, setWorkers] = useState<UserResponse[]>([]);
@@ -101,10 +109,18 @@ export default function IssueDetails() {
         const numericId = id?.startsWith("i-") ? id.slice(2) : id;
         if (!numericId) throw new Error("Invalid issue ID");
 
+        // Check if user is admin to use the right workers endpoint
+        let userRole = '';
+        try {
+          const u = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}');
+          userRole = u.role?.toLowerCase() || '';
+        } catch { /* ignore */ }
+        const fetchWorkers = userRole === 'admin' ? getWorkers : getMyWorkers;
+
         const [issueData, deptData, workerData] = await Promise.all([
           getIssue(Number(numericId)),
           getDepartments(true).catch(() => []),
-          getMyWorkers().catch(() => [])
+          fetchWorkers().catch(() => [])
         ]);
 
         const dto = mapIssueResponseToDTO(issueData);
@@ -146,16 +162,16 @@ export default function IssueDetails() {
       setConvertOpen(false);
     } catch (err) {
       console.error("Failed to convert issue to task:", err);
-      alert("فشل في تحويل البلاغ إلى مهمة");
+      showToast("فشل في تحويل البلاغ إلى مهمة", "error");
     } finally {
       setConvertSubmitting(false);
     }
   };
 
   const submitForwardToDepartment = async () => {
-    if (!issue) return;
-    if (!selectedDepartmentId) return;
+    if (!issue || !selectedDepartmentId || forwardSubmitting) return;
 
+    setForwardSubmitting(true);
     try {
       const numericId = id?.startsWith("i-") ? id.slice(2) : id;
       if (!numericId) return;
@@ -173,14 +189,16 @@ export default function IssueDetails() {
       setSelectedDepartmentId("");
     } catch (err) {
       console.error("Failed to forward issue:", err);
-      alert("فشل في تحويل البلاغ");
+      showToast("فشل في تحويل البلاغ", "error");
+    } finally {
+      setForwardSubmitting(false);
     }
   };
 
   const submitReject = async () => {
-    if (!issue) return;
-    if (!rejectReason.trim()) return;
+    if (!issue || !rejectReason.trim() || rejectSubmitting) return;
 
+    setRejectSubmitting(true);
     try {
       const numericId = id?.startsWith("i-") ? id.slice(2) : id;
       if (!numericId) return;
@@ -196,7 +214,9 @@ export default function IssueDetails() {
       setRejectReason("");
     } catch (err) {
       console.error("Failed to reject issue:", err);
-      alert("فشل في رفض البلاغ");
+      showToast("فشل في رفض البلاغ", "error");
+    } finally {
+      setRejectSubmitting(false);
     }
   };
 
@@ -227,7 +247,7 @@ export default function IssueDetails() {
          <div className="flex items-start justify-between gap-3" dir="rtl">
   {/* RIGHT: Title */}
   <div className="text-right">
-    <h1 className="font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F]">
+    <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">
       تفاصيل البلاغ
     </h1>
     <div className="mt-1 text-[12px] text-[#6B7280]">
@@ -238,6 +258,13 @@ export default function IssueDetails() {
   {/* LEFT: Status */}
   <StatusBadge status={issue.status} />
 </div>
+
+          {error && (
+            <div className="mt-4 bg-[#C86E5D]/10 border border-[#C86E5D]/30 rounded-[12px] p-4 text-right flex items-center justify-between gap-4">
+              <button onClick={() => setError("")} className="text-[#6B7280] hover:text-[#2F2F2F] text-sm shrink-0">✕</button>
+              <p className="text-[#C86E5D] font-semibold text-[14px]">{error}</p>
+            </div>
+          )}
 
           <Card className="mt-4">
             {/* Title */}
@@ -294,7 +321,7 @@ export default function IssueDetails() {
                   موقع البلاغ على الخريطة
                 </div>
                 {issue.gps ? (
-                  <div className="mt-2 h-[180px] rounded-[10px] overflow-hidden border border-black/5">
+                  <div className="mt-2 h-[180px] rounded-[10px] overflow-hidden border border-black/5 relative z-0">
                     <MapContainer
                       center={[issue.gps.lat, issue.gps.lng]}
                       zoom={15}
@@ -345,10 +372,10 @@ export default function IssueDetails() {
                       key={src + idx}
                       type="button"
                       className="bg-white rounded-[12px] border border-black/10 overflow-hidden hover:opacity-95 transition"
-                      onClick={() => window.open(src, "_blank")}
+                      onClick={() => setLightbox({ images: issue.images, index: idx })}
                       aria-label={`فتح الصورة ${idx + 1}`}
                     >
-                      <img src={src} alt={`issue-${idx + 1}`} className="w-full h-[110px] object-cover" />
+                      <AuthImage src={src} alt={`issue-${idx + 1}`} className="w-full h-[110px] object-cover" />
                     </button>
                   ))}
                 </div>
@@ -379,7 +406,8 @@ export default function IssueDetails() {
                 <button
                   type="button"
                   onClick={() => setForwardOpen(true)}
-                  className="h-[44px] px-4 rounded-[12px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[14px] hover:opacity-95"
+                  disabled={issue.status === "converted" || issue.status === "closed" || issue.status === "forwarded"}
+                  className="h-[44px] px-4 rounded-[12px] bg-white border border-black/10 text-[#2F2F2F] font-sans font-semibold text-[14px] hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   تحويل لقسم آخر
                 </button>
@@ -387,7 +415,8 @@ export default function IssueDetails() {
                 <button
                   type="button"
                   onClick={() => setRejectOpen(true)}
-                  className="h-[44px] px-4 rounded-[12px] bg-white border border-[#C86E5D]/40 text-[#C86E5D] font-sans font-semibold text-[14px] hover:opacity-95"
+                  disabled={issue.status === "converted" || issue.status === "closed" || issue.status === "forwarded"}
+                  className="h-[44px] px-4 rounded-[12px] bg-white border border-[#C86E5D]/40 text-[#C86E5D] font-sans font-semibold text-[14px] hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   رفض البلاغ
                 </button>
@@ -435,7 +464,7 @@ export default function IssueDetails() {
                   type="button"
                   className="h-[40px] px-4 rounded-[10px] bg-[#7895B2] text-white font-sans font-semibold disabled:opacity-50"
                   onClick={submitForwardToDepartment}
-                  disabled={!selectedDepartmentId}
+                  disabled={!selectedDepartmentId || forwardSubmitting}
                 >
                   تأكيد التحويل
                 </button>
@@ -489,7 +518,7 @@ export default function IssueDetails() {
                   type="button"
                   className="h-[40px] px-4 rounded-[10px] bg-[#C86E5D] text-white font-sans font-semibold disabled:opacity-50"
                   onClick={submitReject}
-                  disabled={!rejectReason.trim()}
+                  disabled={!rejectReason.trim() || rejectSubmitting}
                 >
                   تأكيد الرفض
                 </button>
@@ -588,6 +617,15 @@ export default function IssueDetails() {
           <div className="mt-6" />
         </div>
       </div>
+
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          currentIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onNavigate={(i) => setLightbox({ ...lightbox, index: i })}
+        />
+      )}
     </div>
   );
 }
@@ -657,7 +695,6 @@ function StatusBadge({ status }: { status: DisplayIssueStatus }) {
     reviewing: { label: "قيد المراجعة", bg: "#F3F1ED", text: "#2F2F2F" },
     converted: { label: "تم تحويله لمهمة", bg: "#8FA36A", text: "#FFFFFF" },
     forwarded: { label: "تم تحويله لمشرف", bg: "#7895B2", text: "#FFFFFF" },
-    rejected: { label: "مرفوض", bg: "#C86E5D", text: "#FFFFFF" },
     closed: { label: "مغلق", bg: "#6B7280", text: "#FFFFFF" },
   };
   const s = map[status] || { label: status, bg: "#E5E7EB", text: "#2F2F2F" };

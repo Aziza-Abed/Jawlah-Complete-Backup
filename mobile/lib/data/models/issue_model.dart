@@ -108,23 +108,17 @@ class IssueModel {
           [],
       resolutionNotes: json['resolutionNotes'] as String? ??
           json['ResolutionNotes'] as String?,
-      resolvedAt: (json['resolvedAt'] ?? json['ResolvedAt']) != null
-          ? DateFormatter.parseUtc(
-              (json['resolvedAt'] ?? json['ResolvedAt']) as String)
-          : null,
-      createdAt: (json['createdAt'] ?? json['reportedAt']) != null
-          ? DateFormatter.parseUtc(
-              (json['createdAt'] ?? json['reportedAt']) as String)
-          : DateTime.now().toUtc(),
-      updatedAt: (json['updatedAt'] ?? json['syncTime']) != null
-          ? DateFormatter.parseUtc(
-              (json['updatedAt'] ?? json['syncTime']) as String)
-          : DateTime.now().toUtc(),
+      resolvedAt: DateFormatter.tryParseUtc(
+          json['resolvedAt'] ?? json['ResolvedAt']),
+      createdAt: DateFormatter.tryParseUtc(
+              json['createdAt'] ?? json['reportedAt']) ??
+          DateTime.now().toUtc(),
+      updatedAt: DateFormatter.tryParseUtc(
+              json['updatedAt'] ?? json['syncTime']) ??
+          DateTime.now().toUtc(),
       forwardedToDepartmentId: json['forwardedToDepartmentId'] as int?,
       forwardedToDepartmentName: json['forwardedToDepartmentName'] as String?,
-      forwardedAt: json['forwardedAt'] != null
-          ? DateFormatter.parseUtc(json['forwardedAt'] as String)
-          : null,
+      forwardedAt: DateFormatter.tryParseUtc(json['forwardedAt']),
       forwardingNotes: json['forwardingNotes'] as String?,
     );
   }
@@ -155,74 +149,20 @@ class IssueModel {
     };
   }
 
-  IssueModel copyWith({
-    int? issueId,
-    String? title,
-    String? description,
-    String? type,
-    String? severity,
-    String? status,
-    int? reportedByUserId,
-    String? reportedByName,
-    String? location,
-    double? latitude,
-    double? longitude,
-    String? photoUrl,
-    List<String>? photos,
-    String? resolutionNotes,
-    DateTime? resolvedAt,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    int? forwardedToDepartmentId,
-    String? forwardedToDepartmentName,
-    DateTime? forwardedAt,
-    String? forwardingNotes,
-  }) {
-    return IssueModel(
-      issueId: issueId ?? this.issueId,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      type: type ?? this.type,
-      severity: severity ?? this.severity,
-      status: status ?? this.status,
-      reportedByUserId: reportedByUserId ?? this.reportedByUserId,
-      reportedByName: reportedByName ?? this.reportedByName,
-      location: location ?? this.location,
-      latitude: latitude ?? this.latitude,
-      longitude: longitude ?? this.longitude,
-      photoUrl: photoUrl ?? this.photoUrl,
-      photos: photos ?? this.photos,
-      resolutionNotes: resolutionNotes ?? this.resolutionNotes,
-      resolvedAt: resolvedAt ?? this.resolvedAt,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      forwardedToDepartmentId: forwardedToDepartmentId ?? this.forwardedToDepartmentId,
-      forwardedToDepartmentName: forwardedToDepartmentName ?? this.forwardedToDepartmentName,
-      forwardedAt: forwardedAt ?? this.forwardedAt,
-      forwardingNotes: forwardingNotes ?? this.forwardingNotes,
-    );
-  }
-
   bool get hasPhoto => photos.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
 
   // get all photo URLs (combines photos list and legacy photoUrl)
   List<String> get allPhotos {
     final result = <String>[];
-    result.addAll(photos);
-    if (photoUrl != null && photoUrl!.isNotEmpty && !photos.contains(photoUrl)) {
+    result.addAll(photos.where((p) => p.isNotEmpty));
+    if (photoUrl != null && photoUrl!.isNotEmpty && !result.contains(photoUrl)) {
       result.add(photoUrl!);
     }
     return result;
   }
 
   bool get isResolved => status.toLowerCase() == 'resolved';
-
-  bool get isNew => status.toLowerCase() == 'new';
-
   bool get isForwarded => status.toLowerCase() == 'forwarded';
-
-  // legacy support
-  bool get isDismissed => status.toLowerCase() == 'dismissed';
   bool get isRejected => status.toLowerCase() == 'rejected' || status.toLowerCase() == 'dismissed';
   bool get isInProgress => status.toLowerCase() == 'inprogress';
   bool get isUnderReview => status.toLowerCase() == 'underreview' || status.toLowerCase() == 'forwarded';

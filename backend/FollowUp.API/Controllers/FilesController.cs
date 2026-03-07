@@ -1,13 +1,14 @@
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.Interfaces.Repositories;
-using FollowUp.Infrastructure.Services;
+using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// this controller serve uploaded files securely
 [Route("api/[controller]")]
+[Tags("Files")]
 public class FilesController : BaseApiController
 {
     private readonly IWebHostEnvironment _env;
@@ -17,7 +18,7 @@ public class FilesController : BaseApiController
     private readonly IIssueRepository _issues;
     private readonly IAppealRepository _appeals;
     private readonly IUserRepository _users;
-    private readonly AuditLogService _audit;
+    private readonly IAuditLogService _audit;
     private const string SecureStorageFolder = "Storage";
     private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".gif" };
 
@@ -29,7 +30,7 @@ public class FilesController : BaseApiController
         IIssueRepository issues,
         IAppealRepository appeals,
         IUserRepository users,
-        AuditLogService audit)
+        IAuditLogService audit)
     {
         _env = env;
         _logger = logger;
@@ -41,8 +42,9 @@ public class FilesController : BaseApiController
         _audit = audit;
     }
 
-    // get file by folder and filename
     [HttpGet("{folder}/{filename}")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "serve an uploaded file")]
     public async Task<IActionResult> GetFile(string folder, string filename)
     {
         try
@@ -59,8 +61,12 @@ public class FilesController : BaseApiController
             var userRole = GetCurrentUserRole();
             var userId = GetCurrentUserId();
 
-            // Admins can access all files
-            if (userRole != "Admin")
+            // Profile photos are accessible to any authenticated user (no ownership check needed)
+            // With [AllowAnonymous], browser <img> tags can also load them directly
+            bool isProfilePhoto = folder.Equals("profiles", StringComparison.OrdinalIgnoreCase);
+
+            // Admins can access all files; profile photos skip ownership checks
+            if (userRole != "Admin" && !isProfilePhoto)
             {
                 if (!userId.HasValue)
                 {
@@ -180,7 +186,6 @@ public class FilesController : BaseApiController
             Response.Headers["Cache-Control"] = "private, no-store";
             Response.Headers["Pragma"] = "no-cache";
 
-            // return file
             var fileStream = System.IO.File.OpenRead(filePath);
 
             return File(fileStream, contentType, filename);

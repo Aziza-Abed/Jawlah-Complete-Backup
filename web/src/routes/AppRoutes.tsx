@@ -9,7 +9,7 @@ const Login = lazy(() => import("../pages/Login"));
 const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
 const VerifyOtp = lazy(() => import("../pages/VerifyOtp"));
 const ResetPassword = lazy(() => import("../pages/ResetPassword"));
-const Dashboard = lazy(() => import("../pages/Dashboard"));
+const SupervisorDashboard = lazy(() => import("../pages/SupervisorDashboard"));
 const Reports = lazy(() => import("../pages/Reports"));
 const Zones = lazy(() => import("../pages/Zones"));
 const CreateTask = lazy(() => import("../pages/CreateTask"));
@@ -17,40 +17,47 @@ const Notifications = lazy(() => import("../pages/Notifications"));
 const TaskDetails = lazy(() => import("../pages/TaskDetails"));
 const IssueDetails = lazy(() => import("../pages/IssueDetails"));
 const TasksList = lazy(() => import("../pages/Tasks"));
-const Issues = lazy(() => import("../pages/Issues"));
+const SupervisorIssues = lazy(() => import("../pages/SupervisorIssues"));
 const Profile = lazy(() => import("../pages/Profile"));
 const Settings = lazy(() => import("../pages/Settings"));
 const AdminZones = lazy(() => import("../pages/AdminZones"));
 const AdminDepartments = lazy(() => import("../pages/AdminDepartments"));
 const AdminTeams = lazy(() => import("../pages/AdminTeams"));
 const AdminTasks = lazy(() => import("../pages/AdminTasks"));
-const AdminMonitoring = lazy(() => import("../pages/AdminMonitoring"));
 const AdminAuditLogs = lazy(() => import("../pages/AdminAuditLogs"));
 const AdminAccounts = lazy(() => import("../pages/AdminAccounts"));
 const AdminDashboard = lazy(() => import("../pages/AdminDashboard"));
 const AdminSupervisors = lazy(() => import("../pages/AdminSupervisors"));
 const AdminIssues = lazy(() => import("../pages/AdminIssues"));
-const AdminAppeals = lazy(() => import("../pages/AdminAppeals"));
-const AdminTaskTemplates = lazy(() => import("../pages/AdminTaskTemplates"));
+const SupervisorAppeals = lazy(() => import("../pages/SupervisorAppeals"));
+const TaskTemplates = lazy(() => import("../pages/TaskTemplates"));
 const MyWorkers = lazy(() => import("../pages/MyWorkers"));
 const LocationHistory = lazy(() => import("../pages/LocationHistory"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 
-export default function AppRoutes() {
-  const getUserRole = (): string | null => {
-    try {
-      const userStr = localStorage.getItem(STORAGE_KEYS.USER);
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        return user.role?.toLowerCase() || null;
-      }
-    } catch (err) {}
-    // FIX: Return null instead of "supervisor" to prevent privilege escalation
-    // Unauthenticated users should not get supervisor privileges
-    return null;
-  };
+function useUserRole(): string | null {
+  try {
+    const userStr = localStorage.getItem(STORAGE_KEYS.USER);
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return user.role?.toLowerCase() || null;
+    }
+  } catch (err) {}
+  return null;
+}
 
-  const role = getUserRole();
+// Wrapper components that read role at render time (not at mount time)
+function DashboardSwitch() {
+  const role = useUserRole();
+  return role === "admin" ? <AdminDashboard /> : <SupervisorDashboard />;
+}
+
+function IssuesSwitch() {
+  const role = useUserRole();
+  return role === "admin" ? <AdminIssues /> : <SupervisorIssues />;
+}
+
+export default function AppRoutes() {
 
   return (
     <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-[#F3F1ED]" />}>
@@ -74,29 +81,29 @@ export default function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
 
         {/* Dashboard */}
-        <Route path="dashboard" element={(role === "admin" || role === "manager") ? <AdminDashboard /> : <Dashboard />} />
+        <Route path="dashboard" element={<DashboardSwitch />} />
 
-        {/* Task Creation */}
-        <Route path="tasks/new" element={<CreateTask />} />
+        {/* Task Creation - Admin/Supervisor only */}
+        <Route path="tasks/new" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><CreateTask /></AdminRoute>} />
 
-        {/* Reports */}
-        <Route path="reports" element={<Reports />} />
+        {/* Reports - Admin/Supervisor only */}
+        <Route path="reports" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><Reports /></AdminRoute>} />
 
-        {/* Zones */}
-        <Route path="zones" element={<Zones />} />
+        {/* Zones (Live Map) - Admin/Supervisor only */}
+        <Route path="zones" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><Zones /></AdminRoute>} />
 
         <Route path="tasks/:id" element={<TaskDetails />} />
         <Route path="tasks" element={<TasksList />} />
 
         <Route path="issues/:id" element={<IssueDetails />} />
-        <Route path="issues" element={role === "admin" ? <AdminIssues /> : <Issues />} />
+        <Route path="issues" element={<IssuesSwitch />} />
 
-        {/* Appeals - for supervisors and admin */}
-        <Route path="appeals" element={<AdminAppeals />} />
+        {/* Appeals - supervisor only (workers appeal to their supervisor) */}
+        <Route path="appeals" element={<AdminRoute allowedRoles={['supervisor']}><SupervisorAppeals /></AdminRoute>} />
 
         {/* Supervisor: My Workers and Location History */}
-        <Route path="my-workers" element={<MyWorkers />} />
-        <Route path="location-history/:workerId" element={<LocationHistory />} />
+        <Route path="my-workers" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><MyWorkers /></AdminRoute>} />
+        <Route path="location-history/:workerId" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><LocationHistory /></AdminRoute>} />
 
         {/* Notifications */}
         <Route path="notifications" element={<Notifications />} />
@@ -108,11 +115,10 @@ export default function AppRoutes() {
         {/* Admin only - Protected by role */}
         <Route path="accounts" element={<AdminRoute><AdminAccounts /></AdminRoute>} />
         <Route path="departments" element={<AdminRoute><AdminDepartments /></AdminRoute>} />
-        <Route path="teams" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><AdminTeams /></AdminRoute>} />
+        <Route path="teams" element={<AdminRoute><AdminTeams /></AdminRoute>} />
         <Route path="zones-admin" element={<AdminRoute><AdminZones /></AdminRoute>} />
         <Route path="task-oversight" element={<AdminRoute><AdminTasks /></AdminRoute>} />
-        <Route path="task-templates" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><AdminTaskTemplates /></AdminRoute>} />
-        <Route path="monitoring" element={<AdminRoute><AdminMonitoring /></AdminRoute>} />
+        <Route path="task-templates" element={<AdminRoute allowedRoles={['admin', 'supervisor']}><TaskTemplates /></AdminRoute>} />
         <Route path="supervisors" element={<AdminRoute><AdminSupervisors /></AdminRoute>} />
         <Route path="audit-logs" element={<AdminRoute><AdminAuditLogs /></AdminRoute>} />
       </Route>

@@ -1,18 +1,22 @@
 using FollowUp.Core.Entities;
+using FollowUp.Core.Interfaces.Services;
 using FollowUp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
 
 namespace FollowUp.Infrastructure.Services;
 
 // simple audit logging service
-public class AuditLogService
+public class AuditLogService : IAuditLogService
 {
     private readonly FollowUpDbContext _context;
+    private readonly ILogger<AuditLogService> _logger;
 
-    public AuditLogService(FollowUpDbContext context)
+    public AuditLogService(FollowUpDbContext context, ILogger<AuditLogService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     // Log an action
@@ -42,7 +46,7 @@ public class AuditLogService
             query = query.Where(l => l.UserId == userId);
 
         if (!string.IsNullOrEmpty(action))
-            query = query.Where(l => l.Action == action);
+            query = query.Where(l => l.Action.Contains(action));
 
         return await query
             .Include(l => l.User)  // FIXED: Include BEFORE materialization

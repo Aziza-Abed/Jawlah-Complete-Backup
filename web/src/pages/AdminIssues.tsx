@@ -172,7 +172,7 @@ export default function AdminIssues() {
                 <AlertTriangle size={22} className="text-[#C86E5D]" />
               </div>
               <div className="text-right">
-                <h1 className="font-sans font-bold text-[22px] sm:text-[24px] text-[#2F2F2F]">
+                <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">
                   البلاغات
                 </h1>
                 <p className="text-[13px] text-[#6B7280]">إدارة ومتابعة البلاغات المرسلة من العمال</p>

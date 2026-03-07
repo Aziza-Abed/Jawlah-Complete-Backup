@@ -1,4 +1,4 @@
-// Task types matching backend DTOs
+// task types
 
 export type TaskStatus = "Pending" | "InProgress" | "UnderReview" | "Completed" | "Rejected" | "Created" | "Assigned" | "Accepted" | "Submitted" | "Synced" | "Cancelled" | "FailedSync";
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
@@ -15,6 +15,8 @@ export type TaskResponse = {
   assignedByUserName?: string;
   zoneId?: number;
   zoneName?: string;
+  zoneCenterLatitude?: number;
+  zoneCenterLongitude?: number;
   // Team task support
   teamId?: number;
   teamName?: string;

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/storage_helper.dart';
+import '../../providers/auth_manager.dart';
+import '../../providers/task_manager.dart';
+import '../../providers/issue_manager.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -24,17 +27,24 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigateToHome() async {
-    // wait 2 seconds to show logo
-    await Future.delayed(const Duration(seconds: 2));
+    final authManager = context.read<AuthManager>();
 
-    final token = await StorageHelper.getToken();
+    // Register logout callbacks so provider caches are cleared on logout
+    authManager.addLogoutCallback(() => context.read<TaskManager>().clearCache());
+    authManager.addLogoutCallback(() => context.read<IssueManager>().clearCache());
 
-    if (mounted) {
-      if (token != null && token.isNotEmpty) {
-        Navigator.of(context).pushReplacementNamed(Routes.home);
-      } else {
-        Navigator.of(context).pushReplacementNamed(Routes.login);
-      }
+    // wait for both: minimum splash display (1.5s) AND session restore to finish
+    await Future.wait([
+      Future.delayed(const Duration(milliseconds: 1500)),
+      authManager.sessionRestored,
+    ]);
+
+    if (!mounted) return;
+
+    if (authManager.token != null) {
+      Navigator.of(context).pushReplacementNamed(Routes.home);
+    } else {
+      Navigator.of(context).pushReplacementNamed(Routes.login);
     }
   }
 
@@ -91,17 +101,6 @@ class _SplashScreenState extends State<SplashScreen> {
                     color: Colors.white,
                     fontFamily: 'Cairo',
                     letterSpacing: 2,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'نظام متابعة العمل الميداني',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withOpacity(0.8),
-                    fontFamily: 'Cairo',
                   ),
                 ),
                 const SizedBox(height: 48),

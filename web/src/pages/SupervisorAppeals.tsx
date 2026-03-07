@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Scale, Search, CheckCircle, XCircle, Eye, Filter, X, MapPin, Clock, User, FileText } from "lucide-react";
+import ImageLightbox from "../components/common/ImageLightbox";
+import { useConfirm } from "../components/common/ConfirmDialog";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { useToast } from "../contexts/ToastContext";
 import { getPendingAppeals, approveAppeal, rejectAppeal } from "../api/appeals";
 import type { AppealResponse } from "../types/appeal";
 
 type FilterKey = "all" | "Pending";
 
-export default function AdminAppeals() {
+export default function SupervisorAppeals() {
+  usePageTitle("مركز المراجعة");
+  const { showToast } = useToast();
+  const [confirm, ConfirmDialog] = useConfirm();
   const [items, setItems] = useState<AppealResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -15,6 +22,8 @@ export default function AdminAppeals() {
 
   const [selectedAppeal, setSelectedAppeal] = useState<AppealResponse | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
+  const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
 
   useEffect(() => {
     fetchAppeals();
@@ -35,7 +44,7 @@ export default function AdminAppeals() {
   };
 
   const handleApprove = async (appeal: AppealResponse) => {
-    if (!confirm("هل أنت متأكد من الموافقة على هذا الطعن؟ سيتم إعادة المهمة لحالة مكتملة.")) return;
+    if (!await confirm("هل أنت متأكد من الموافقة على هذا الطعن؟ سيتم إعادة المهمة لحالة مكتملة.", false)) return;
 
     try {
       setProcessing(appeal.appealId);
@@ -43,9 +52,10 @@ export default function AdminAppeals() {
       setItems(prev => prev.filter(item => item.appealId !== appeal.appealId));
       setSelectedAppeal(null);
       setReviewNotes("");
+      showToast("تم قبول الطعن بنجاح");
     } catch (err) {
       console.error("Failed to approve appeal:", err);
-      alert("فشل في الموافقة على الطعن");
+      setActionMsg({ type: "error", text: "فشل في الموافقة على الطعن" });
     } finally {
       setProcessing(null);
     }
@@ -53,10 +63,10 @@ export default function AdminAppeals() {
 
   const handleReject = async (appeal: AppealResponse) => {
     if (!reviewNotes.trim()) {
-      alert("يرجى كتابة سبب الرفض");
+      setActionMsg({ type: "error", text: "يرجى كتابة سبب الرفض" });
       return;
     }
-    if (!confirm("هل أنت متأكد من رفض هذا الطعن؟")) return;
+    if (!await confirm("هل أنت متأكد من رفض هذا الطعن؟")) return;
 
     try {
       setProcessing(appeal.appealId);
@@ -64,9 +74,10 @@ export default function AdminAppeals() {
       setItems(prev => prev.filter(item => item.appealId !== appeal.appealId));
       setSelectedAppeal(null);
       setReviewNotes("");
+      showToast("تم رفض الطعن");
     } catch (err) {
       console.error("Failed to reject appeal:", err);
-      alert("فشل في رفض الطعن");
+      setActionMsg({ type: "error", text: "فشل في رفض الطعن" });
     } finally {
       setProcessing(null);
     }
@@ -128,19 +139,19 @@ export default function AdminAppeals() {
         <div className="max-w-[1400px] mx-auto space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <div className="text-[#6B7280] text-[13px]">
-              العدد الإجمالي: <span className="text-[#F5B300] font-bold">{counts.Pending}</span>
-            </div>
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-[12px] bg-[#7895B2]/20">
                 <Scale size={22} className="text-[#7895B2]" />
               </div>
               <div>
-                <h1 className="font-sans font-bold text-[22px] sm:text-[24px] text-[#2F2F2F]">
+                <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">
                   مركز المراجعة
                 </h1>
                 <p className="text-[13px] text-[#6B7280]">مراجعة طلبات التظلم والاعتراضات على المهام</p>
               </div>
+            </div>
+            <div className="text-[#6B7280] text-[13px]">
+              العدد الإجمالي: <span className="text-[#F5B300] font-bold">{counts.Pending}</span>
             </div>
           </div>
 
@@ -188,6 +199,20 @@ export default function AdminAppeals() {
               </div>
             </div>
           </div>
+
+          {/* Action Message */}
+          {actionMsg && (
+            <div className={`rounded-[12px] p-4 text-center flex items-center justify-between ${
+              actionMsg.type === "error"
+                ? "bg-[#C86E5D]/10 border border-[#C86E5D]/30"
+                : "bg-[#8FA36A]/10 border border-[#8FA36A]/30"
+            }`}>
+              <button onClick={() => setActionMsg(null)} className="text-[#6B7280] hover:text-[#2F2F2F] text-sm">✕</button>
+              <p className={`font-medium text-[14px] ${actionMsg.type === "error" ? "text-[#C86E5D]" : "text-[#8FA36A]"}`}>
+                {actionMsg.text}
+              </p>
+            </div>
+          )}
 
           {/* Error State */}
           {error && (
@@ -327,11 +352,9 @@ export default function AdminAppeals() {
                       {selectedAppeal.evidencePhotoUrl && (
                         <div className="text-right">
                           <p className="text-[#6B7280] text-[11px] mb-2">صورة الإثبات</p>
-                          <img
+                          <EvidenceImage
                             src={selectedAppeal.evidencePhotoUrl}
-                            alt="Evidence"
-                            className="w-full rounded-[12px] border border-[#E5E7EB] cursor-pointer hover:opacity-90"
-                            onClick={() => window.open(selectedAppeal.evidencePhotoUrl, "_blank")}
+                            onClick={() => setLightbox({ images: [selectedAppeal.evidencePhotoUrl!], index: 0 })}
                           />
                         </div>
                       )}
@@ -396,6 +419,39 @@ export default function AdminAppeals() {
           )}
         </div>
       </div>
+
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          currentIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onNavigate={(i) => setLightbox({ ...lightbox, index: i })}
+        />
+      )}
+
+      {ConfirmDialog}
     </div>
+  );
+}
+
+function EvidenceImage({ src, onClick }: { src: string; onClick: () => void }) {
+  const [failed, setFailed] = React.useState(false);
+
+  if (failed) {
+    return (
+      <p className="text-[#C86E5D] text-[12px] bg-[#C86E5D]/10 rounded-[12px] p-3 border border-[#C86E5D]/20">
+        تعذّر تحميل الصورة
+      </p>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt="صورة الإثبات"
+      className="w-full rounded-[12px] border border-[#E5E7EB] cursor-pointer hover:opacity-90"
+      onClick={onClick}
+      onError={() => setFailed(true)}
+    />
   );
 }

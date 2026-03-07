@@ -59,6 +59,7 @@ class AuthService {
           requiresOtp: true,
           sessionToken: data['sessionToken'] as String?,
           maskedPhone: data['maskedPhone'] as String?,
+          demoOtpCode: data['demoOtpCode'] as String?,
           message: responseData['message'] as String?,
         );
       }
@@ -206,9 +207,11 @@ class AuthService {
 
       return OtpResendResult(
         success: true,
+        sessionToken: data?['sessionToken'] as String?,
         maskedPhone: data?['maskedPhone'] as String? ?? '',
         message: responseData['message'] as String? ?? 'تم إرسال رمز التحقق',
         cooldownSeconds: data?['resendCooldownSeconds'] as int? ?? 60,
+        demoOtpCode: data?['demoOtpCode'] as String?,
       );
     } catch (e) {
       if (e is AppException) rethrow;
@@ -244,6 +247,7 @@ class AuthService {
         message: data?['message'] as String? ??
             responseData['message'] as String? ??
             '',
+        demoOtpCode: data?['demoOtpCode'] as String?,
       );
     } catch (e) {
       if (e is AppException) rethrow;
@@ -305,27 +309,33 @@ class ForgotPasswordResult {
   final String? sessionToken;
   final String maskedPhone;
   final String message;
+  final String? demoOtpCode;
 
   ForgotPasswordResult({
     required this.success,
     this.sessionToken,
     required this.maskedPhone,
     required this.message,
+    this.demoOtpCode,
   });
 }
 
 // Result class for OTP resend
 class OtpResendResult {
   final bool success;
+  final String? sessionToken;
   final String maskedPhone;
   final String message;
   final int cooldownSeconds;
+  final String? demoOtpCode;
 
   OtpResendResult({
     required this.success,
+    this.sessionToken,
     required this.maskedPhone,
     required this.message,
     required this.cooldownSeconds,
+    this.demoOtpCode,
   });
 }
 
@@ -340,6 +350,7 @@ class AuthResult {
   final bool requiresOtp;
   final String? sessionToken;
   final String? maskedPhone;
+  final String? demoOtpCode;
 
   AuthResult({
     this.user,
@@ -349,5 +360,6 @@ class AuthResult {
     this.requiresOtp = false,
     this.sessionToken,
     this.maskedPhone,
+    this.demoOtpCode,
   });
 }

@@ -4,24 +4,27 @@ using FollowUp.Core.DTOs.Notifications;
 using FollowUp.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// this controller handle user notifications
 [Route("api/[controller]")]
+[Tags("Notifications")]
 public class NotificationsController : BaseApiController
 {
     private readonly INotificationRepository _notices;
     private readonly IMapper _mapper;
+    private readonly ILogger<NotificationsController> _logger;
 
-    public NotificationsController(INotificationRepository notices, IMapper mapper)
+    public NotificationsController(INotificationRepository notices, IMapper mapper, ILogger<NotificationsController> logger)
     {
         _notices = notices;
         _mapper = mapper;
+        _logger = logger;
     }
 
-    // get all notifications for current user
     [HttpGet]
+    [SwaggerOperation(Summary = "get all notifications for current user")]
     public async Task<IActionResult> GetMyNotifications()
     {
         // get user id from token
@@ -31,14 +34,12 @@ public class NotificationsController : BaseApiController
 
         // get all notifications
         var notifications = await _notices.GetUserNotificationsAsync(userId.Value);
-
-        // return as list
         return Ok(ApiResponse<IEnumerable<NotificationResponse>>.SuccessResponse(
             notifications.Select(n => _mapper.Map<NotificationResponse>(n))));
     }
 
-    // get only unread notifications
     [HttpGet("unread")]
+    [SwaggerOperation(Summary = "get unread notifications only")]
     public async Task<IActionResult> GetUnreadNotifications()
     {
         var userId = GetCurrentUserId();
@@ -51,8 +52,8 @@ public class NotificationsController : BaseApiController
             notifications.Select(n => _mapper.Map<NotificationResponse>(n))));
     }
 
-    // get count of unread notifications
     [HttpGet("unread-count")]
+    [SwaggerOperation(Summary = "get unread notifications count")]
     public async Task<IActionResult> GetUnreadCount()
     {
         var userId = GetCurrentUserId();
@@ -64,8 +65,8 @@ public class NotificationsController : BaseApiController
         return Ok(ApiResponse<int>.SuccessResponse(count));
     }
 
-    // mark single notification as read
     [HttpPut("{id}/mark-read")]
+    [SwaggerOperation(Summary = "mark one notification as read")]
     public async Task<IActionResult> MarkAsRead(int id)
     {
         var userId = GetCurrentUserId();
@@ -86,8 +87,8 @@ public class NotificationsController : BaseApiController
         return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تحديد الإشعار كمقروء"));
     }
 
-    // mark all notifications as read
     [HttpPut("mark-all-read")]
+    [SwaggerOperation(Summary = "mark all notifications as read")]
     public async Task<IActionResult> MarkAllAsRead()
     {
         var userId = GetCurrentUserId();
@@ -100,8 +101,8 @@ public class NotificationsController : BaseApiController
         return Ok(ApiResponse<object?>.SuccessResponse(null, "تم تحديد جميع الإشعارات كمقروءة"));
     }
 
-    // delete single notification
     [HttpDelete("{id}")]
+    [SwaggerOperation(Summary = "delete a notification")]
     public async Task<IActionResult> DeleteNotification(int id)
     {
         var userId = GetCurrentUserId();

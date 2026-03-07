@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:followup/core/config/api_config.dart';
+import 'package:followup/core/config/app_constants.dart';
 import 'package:followup/core/utils/hive_init.dart';
 import 'package:followup/data/services/tracking_service.dart';
 import 'package:followup/data/services/location_service.dart';
@@ -186,7 +187,7 @@ class BackgroundServiceUtils {
           // get current position
           Position position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationService.defaultAccuracy,
-            timeLimit: const Duration(seconds: 15),
+            timeLimit: const Duration(seconds: AppConstants.backgroundHttpTimeoutSeconds),
           );
 
           // calculate next interval
@@ -266,10 +267,10 @@ class BackgroundServiceUtils {
 
         // Require 2 consecutive readings to avoid GPS jitter false positives
         if (geofenceState.consecutiveInsideCount >= 2) {
-          // Check if not already checked in recently (within 30 min)
+          // Check if not already checked in recently
           final now = DateTime.now();
           if (geofenceState.lastCheckInTime == null ||
-              now.difference(geofenceState.lastCheckInTime!).inMinutes > 30) {
+              now.difference(geofenceState.lastCheckInTime!).inMinutes > AppConstants.geofenceCheckInCooldownMinutes) {
             // Auto check-in
             final success = await _autoCheckIn(position);
             if (success) {
@@ -341,10 +342,10 @@ class BackgroundServiceUtils {
 
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        connectTimeout: const Duration(seconds: AppConstants.backgroundHttpTimeoutSeconds),
+        receiveTimeout: const Duration(seconds: AppConstants.backgroundHttpTimeoutSeconds),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
           'Authorization': 'Bearer $token',
         },
       ));
@@ -374,10 +375,10 @@ class BackgroundServiceUtils {
 
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        connectTimeout: const Duration(seconds: AppConstants.backgroundHttpTimeoutSeconds),
+        receiveTimeout: const Duration(seconds: AppConstants.backgroundHttpTimeoutSeconds),
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
           'Authorization': 'Bearer $token',
         },
       ));

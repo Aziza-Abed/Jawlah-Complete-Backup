@@ -46,7 +46,7 @@ export async function getZonesReport(filters: ReportFilters): Promise<ZonesRepor
   return response.data.data;
 }
 
-// ========== ADMIN SUPERVISOR MONITORING ==========
+// admin supervisor monitoring
 
 export interface SupervisorMonitoringItem {
     userId: number;
@@ -113,7 +113,31 @@ async function downloadReport(
   if (filters?.status && filters.status !== "all") params.append("status", filters.status);
 
   const endpoint = `/reports/${reportType}/${format === "pdf" ? "pdf" : "excel"}`;
-  const response = await apiClient.get(`${endpoint}?${params.toString()}`, { responseType: "blob" });
+  let response;
+  try {
+    response = await apiClient.get(`${endpoint}?${params.toString()}`, { responseType: "blob", timeout: 120000 });
+  } catch (err: any) {
+    // Extract error message from blob error response
+    if (err.response?.data instanceof Blob) {
+      try {
+        const text = await err.response.data.text();
+        const parsed = JSON.parse(text);
+        throw new Error(parsed.message || "فشل إنشاء التقرير");
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message !== "فشل إنشاء التقرير") {
+          throw parseErr;
+        }
+      }
+    }
+    throw err;
+  }
+
+  // If server returned JSON error instead of file, parse and throw
+  if (response.data instanceof Blob && response.data.type === "application/json") {
+    const text = await response.data.text();
+    const error = JSON.parse(text);
+    throw new Error(error.message || "فشل إنشاء التقرير");
+  }
 
   const blob = new Blob([response.data], {
     type: format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

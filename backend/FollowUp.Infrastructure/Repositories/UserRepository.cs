@@ -16,6 +16,7 @@ public class UserRepository : Repository<User>, IUserRepository
     public override async Task<IEnumerable<User>> GetAllAsync()
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(u => u.Department)
             .Include(u => u.Supervisor)
             .OrderBy(u => u.FullName)

@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -256,7 +257,7 @@ class FirebaseMessagingService {
       notification.title,
       notification.body,
       details,
-      payload: message.data.toString(),
+      payload: jsonEncode(message.data),
     );
   }
 
@@ -264,6 +265,25 @@ class FirebaseMessagingService {
     if (kDebugMode) {
       debugPrint('Local notification tapped: ${response.payload}');
     }
+
+    // try to navigate to the related task or issue
+    if (response.payload != null && response.payload!.isNotEmpty) {
+      try {
+        final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+        final taskId = int.tryParse(data['taskId']?.toString() ?? '');
+        final issueId = int.tryParse(data['issueId']?.toString() ?? '');
+
+        if (taskId != null) {
+          _navigateToScreen(Routes.taskDetails, taskId);
+          return;
+        }
+        if (issueId != null) {
+          _navigateToScreen(Routes.issueDetails, issueId);
+          return;
+        }
+      } catch (_) {}
+    }
+
     _navigateToScreen(Routes.notifications, null);
   }
 
@@ -299,11 +319,19 @@ class FirebaseMessagingService {
         _navigateToScreen(Routes.tasksList, null);
         break;
 
-      // Issue-related notifications - go to notifications to see details
+      // Issue-related notifications
       case 'issuereported':
       case 'issue_reported':
       case 'issue_reviewed':
+      case 'issue_forwarded':
       case 'issue':
+        if (issueId != null) {
+          final id = int.tryParse(issueId);
+          if (id != null) {
+            _navigateToScreen(Routes.issueDetails, id);
+            return;
+          }
+        }
         _navigateToScreen(Routes.notifications, null);
         break;
 

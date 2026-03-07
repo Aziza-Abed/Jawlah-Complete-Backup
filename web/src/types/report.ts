@@ -1,4 +1,4 @@
-// Report types matching backend DTOs
+// report types
 
 export type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly" | "custom";
 

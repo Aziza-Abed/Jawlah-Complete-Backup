@@ -52,3 +52,17 @@ supervisorWebNextWorkForteamamte.txt
 ملاحظات مراد.md
 chapters/
 .claude/
+
+# Binary/generated files
+*.pdf
+*.drawio
+backend/api_pid.txt
+
+# API testing collections
+FollowUp-API.postman_collection.json
+
+# Duplicate setup guide (content already in README.md)
+Run It.md
+
+# Project report PDF
+ReportON 1 final 26-1.pdf

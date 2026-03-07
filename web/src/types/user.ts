@@ -1,4 +1,4 @@
-// User types matching backend DTOs
+// user types
 
 export type UserRole = "Admin" | "Supervisor" | "Worker";
 export type UserStatus = "Active" | "Inactive" | "Suspended";
@@ -29,6 +29,7 @@ export type UserResponse = {
   warningCount?: number;
   // Employee ID alias for username (used in UI)
   employeeId?: string;
+  profilePhotoUrl?: string;
 };
 
 // Alias for backward compatibility

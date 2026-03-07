@@ -14,13 +14,16 @@ public interface INotificationService
     Task SendSystemAlertAsync(int userId, string message);
     Task SendBatteryLowNotificationAsync(int workerId, string workerName, int batteryLevel, int? municipalityId = null);
 
-    // Task rejection notifications
+    // Task rejection notifications (supervisor manual rejection)
+    Task SendTaskRejectedToWorkerAsync(int workerId, int taskId, string taskTitle, string reason);
+
+    // Task auto-rejection notifications (GPS distance)
     Task SendTaskAutoRejectedToWorkerAsync(int workerId, int taskId, string taskTitle, string reason, int distanceMeters);
     Task SendTaskAutoRejectedToSupervisorsAsync(int taskId, string taskTitle, string workerName, string reason, int distanceMeters, int? municipalityId = null);
 
     // Warning system notifications
-    Task SendWarningIssuedToWorkerAsync(int workerId, string reason, int totalWarnings);
-    Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings, int? municipalityId = null);
+    Task SendWarningIssuedToWorkerAsync(int workerId, string reason, int totalWarnings, int? taskId = null);
+    Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings, int? municipalityId = null, int? taskId = null);
 
     // Task extension request notification
     Task SendTaskExtensionRequestAsync(int supervisorId, int taskId, string taskTitle, DateTime originalDeadline, DateTime requestedDeadline);
@@ -34,4 +37,7 @@ public interface INotificationService
 
     // Appeal notification
     Task SendAppealSubmittedToSupervisorsAsync(int taskId, string taskTitle, string workerName, int? municipalityId = null);
+
+    // Issue forwarded notification
+    Task SendIssueForwardedNotificationAsync(int issueId, string issueTitle, string departmentName, int? municipalityId = null);
 }

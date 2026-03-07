@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/config/api_config.dart';
 import 'api_service.dart';
 
@@ -122,6 +123,21 @@ class BatteryService {
     } catch (e) {
       if (kDebugMode) debugPrint('Error getting battery state: $e');
       return BatteryState.unknown;
+    }
+  }
+
+  // Request battery optimization exemption so background tracking isn't killed
+  Future<bool> requestBatteryOptimizationExemption() async {
+    try {
+      final status = await Permission.ignoreBatteryOptimizations.status;
+      if (status.isGranted) return true;
+
+      final result = await Permission.ignoreBatteryOptimizations.request();
+      if (kDebugMode) debugPrint('Battery optimization exemption: $result');
+      return result.isGranted;
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error requesting battery optimization exemption: $e');
+      return false;
     }
   }
 

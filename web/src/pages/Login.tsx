@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { Eye, EyeOff } from "lucide-react";
 import { login, verifyOtp, resendOtp } from "../api/auth";
-import { useMunicipality } from "../contexts/MunicipalityContext";
 import AuthLayout from "../components/auth/AuthLayout";
 import { STORAGE_KEYS } from "../constants/storageKeys";
 
 export default function Login() {
+  usePageTitle("تسجيل الدخول");
   const navigate = useNavigate();
-  const { municipalityName: _ } = useMunicipality();
 
   // Login form state
   const [username, setUsername] = useState("");
@@ -16,6 +16,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Load saved username on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.REMEMBERED_USERNAME);
+    if (saved) {
+      setUsername(saved);
+      setRememberMe(true);
+    }
+  }, []);
 
   // OTP state
   const [showOtp, setShowOtp] = useState(false);
@@ -26,13 +36,15 @@ export default function Login() {
   const [otpError, setOtpError] = useState("");
   const [resendCooldown, setResendCooldown] = useState(60);
   const [resending, setResending] = useState(false);
+  const [demoOtpCode, setDemoOtpCode] = useState("");
 
   // OTP input refs
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Cooldown timer
+  const cooldownActive = resendCooldown > 0;
   useEffect(() => {
-    if (!showOtp || resendCooldown <= 0) return;
+    if (!showOtp || !cooldownActive) return;
 
     const timer = setInterval(() => {
       setResendCooldown(prev => {
@@ -45,11 +57,31 @@ export default function Login() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [showOtp]);
+  }, [showOtp, cooldownActive]);
+
+  // Field-level validation errors
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
+
+  const validateForm = (): boolean => {
+    const errors: typeof fieldErrors = {};
+    if (!username.trim()) {
+      errors.username = "اسم المستخدم مطلوب";
+    } else if (username.trim().length < 3) {
+      errors.username = "اسم المستخدم يجب أن يكون 3 أحرف على الأقل";
+    }
+    if (!password) {
+      errors.password = "كلمة المرور مطلوبة";
+    } else if (password.length < 6) {
+      errors.password = "كلمة المرور يجب أن تكون 6 أحرف على الأقل";
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!validateForm()) return;
     setLoading(true);
 
     try {
@@ -60,6 +92,7 @@ export default function Login() {
         if (response.requiresOtp && response.sessionToken) {
           setSessionToken(response.sessionToken);
           setMaskedPhone(response.maskedPhone || "****");
+          setDemoOtpCode(response.demoOtpCode || "");
           setShowOtp(true);
           setResendCooldown(60);
           setLoading(false);
@@ -76,6 +109,11 @@ export default function Login() {
           }
           if (response.user) {
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
+          }
+          if (rememberMe) {
+            localStorage.setItem(STORAGE_KEYS.REMEMBERED_USERNAME, username);
+          } else {
+            localStorage.removeItem(STORAGE_KEYS.REMEMBERED_USERNAME);
           }
           navigate("/dashboard");
         }
@@ -145,6 +183,11 @@ export default function Login() {
         if (response.user) {
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
         }
+        if (rememberMe) {
+          localStorage.setItem(STORAGE_KEYS.REMEMBERED_USERNAME, username);
+        } else {
+          localStorage.removeItem(STORAGE_KEYS.REMEMBERED_USERNAME);
+        }
         navigate("/dashboard");
       } else {
         setOtpError(response.error || "رمز التحقق غير صحيح");
@@ -168,7 +211,9 @@ export default function Login() {
       const response = await resendOtp({ sessionToken });
 
       if (response.success) {
+        if (response.sessionToken) setSessionToken(response.sessionToken);
         setResendCooldown(response.resendCooldownSeconds || 60);
+        if (response.demoOtpCode) setDemoOtpCode(response.demoOtpCode);
       } else {
         setOtpError(response.message || "فشل إعادة إرسال الرمز");
       }
@@ -191,6 +236,12 @@ export default function Login() {
   if (showOtp) {
     return (
       <AuthLayout title="التحقق بخطوتين" subtitle={`تم إرسال رمز التحقق إلى ${maskedPhone}`}>
+        {demoOtpCode && (
+          <div className="mb-5 p-3 rounded-[12px] bg-blue-50 border border-blue-200 text-right font-sans">
+            <p className="text-blue-700 text-[13px] font-semibold">وضع التجربة — رمز التحقق: <span dir="ltr" className="text-[18px] tracking-widest font-black">{demoOtpCode}</span></p>
+          </div>
+        )}
+
         {otpError && (
           <div className="mb-5 p-3 rounded-[12px] bg-red-100 text-red-700 text-right font-sans font-semibold">
             {otpError}
@@ -259,27 +310,35 @@ export default function Login() {
       )}
 
       <form onSubmit={onSubmit} className="space-y-5">
-        <Field label="اسم المستخدم">
+        <Field label="اسم المستخدم" error={fieldErrors.username}>
           <input
+            dir="ltr"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => { setUsername(e.target.value); setFieldErrors(prev => ({ ...prev, username: undefined })); }}
             placeholder="مثال: supervisor01"
-            required
             disabled={loading}
-            className="w-full h-[46px] rounded-[12px] bg-white border border-black/10 px-4 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
+            required
+            minLength={3}
+            maxLength={50}
+            autoComplete="username"
+            className={`w-full h-[46px] rounded-[12px] bg-white border ${fieldErrors.username ? "border-red-400" : "border-black/10"} px-4 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50`}
           />
         </Field>
 
-        <Field label="كلمة المرور">
+        <Field label="كلمة المرور" error={fieldErrors.password}>
           <div className="relative">
             <input
+              dir="ltr"
               type={showPassword ? "text" : "password"}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setFieldErrors(prev => ({ ...prev, password: undefined })); }}
               placeholder="••••••••"
-              required
               disabled={loading}
-              className="w-full h-[46px] rounded-[12px] bg-white border border-black/10 px-4 pl-11 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
+              required
+              minLength={6}
+              maxLength={100}
+              autoComplete="current-password"
+              className={`w-full h-[46px] rounded-[12px] bg-white border ${fieldErrors.password ? "border-red-400" : "border-black/10"} px-4 pl-11 text-right outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50`}
             />
             <button
               type="button"
@@ -287,14 +346,19 @@ export default function Login() {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#2F2F2F] transition-colors"
               tabIndex={-1}
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
             </button>
           </div>
         </Field>
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <label className="flex items-center gap-2 text-[13px] text-[#2F2F2F]">
-            <input type="checkbox" className="accent-[#7895B2]" />
+          <label className="flex items-center gap-2 text-[13px] text-[#2F2F2F] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="accent-[#7895B2]"
+            />
             تذكرني
           </label>
 
@@ -318,13 +382,14 @@ export default function Login() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
       <div className="text-right font-sans font-semibold text-[#2F2F2F] text-[14px] mb-2">
         {label}
       </div>
       {children}
+      {error && <p className="text-right text-red-500 text-[12px] mt-1 font-semibold">{error}</p>}
     </div>
   );
 }

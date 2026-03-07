@@ -3,11 +3,11 @@ import 'package:provider/provider.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../presentation/widgets/base_screen.dart';
+import '../../presentation/widgets/authenticated_image.dart';
 import '../../providers/auth_manager.dart';
 import '../../providers/task_manager.dart';
 import '../../providers/sync_manager.dart';
-import '../../data/services/attendance_service.dart';
-import '../../data/models/attendance_model.dart';
+import '../../providers/attendance_manager.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -157,18 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final syncManager = context.read<SyncManager>();
     final pendingCount = syncManager.waitingItems;
 
-    // Fetch today's work summary
+    // Use AttendanceManager (already loaded) instead of creating a new service
     final taskManager = context.read<TaskManager>();
-    AttendanceModel? todayAttendance;
-
-    try {
-      final attendanceService = AttendanceService();
-      todayAttendance = await attendanceService.getTodayAttendance();
-    } catch (e) {
-      // Ignore errors - we'll show summary without attendance info
-    }
-
-    if (!context.mounted) return;
+    final todayAttendance = context.read<AttendanceManager>().todayRecord;
 
     // Calculate work stats
     final now = DateTime.now();
@@ -306,7 +297,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          if (pendingCount > 0)
+          if (pendingCount > 0) ...[
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await context.read<AuthManager>().doLogout();
+                if (!context.mounted) return;
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil(Routes.login, (route) => false);
+              },
+              child: const Text(
+                'خروج بدون مزامنة',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  color: AppColors.error,
+                  fontSize: 12,
+                ),
+              ),
+            ),
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(ctx);
@@ -318,24 +326,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 );
-                await context.read<SyncManager>().startSync();
+                final result =
+                    await context.read<SyncManager>().startSync();
+                if (!context.mounted) return;
+                if (result.totalFailed == 0) {
+                  // Sync succeeded — proceed to logout
+                  await context.read<AuthManager>().doLogout();
+                  if (!context.mounted) return;
+                  Navigator.of(context)
+                      .pushNamedAndRemoveUntil(Routes.login, (route) => false);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'فشلت بعض عمليات المزامنة. حاول مرة أخرى أو اخرج بدون مزامنة.',
+                        style: TextStyle(fontFamily: 'Cairo'),
+                      ),
+                      backgroundColor: AppColors.warning,
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
               ),
               child: const Text(
-                'مزامنة أولاً',
+                'مزامنة والخروج',
                 style: TextStyle(fontFamily: 'Cairo', color: Colors.white),
               ),
-            )
-          else
+            ),
+          ] else
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
-                context.read<AuthManager>().doLogout();
-                Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil(Routes.login, (route) => false);
+                await context.read<AuthManager>().doLogout();
+                if (!context.mounted) return;
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil(Routes.login, (route) => false);
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
               child: const Text(
@@ -381,6 +408,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildProfileCard(String userName, String? workerType) {
     final displayName = userName.isNotEmpty ? userName : 'الملف الشخصي';
     final displayRole = workerType ?? 'عامل ميداني';
+    final photoUrl = context.read<AuthManager>().user?.profilePhotoUrl;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -404,10 +433,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Hero(
-              tag: 'profile-avatar',
-              child: Icon(Icons.person, size: 36, color: AppColors.primary),
-            ),
+            child: hasPhoto
+                ? ClipOval(
+                    child: AuthenticatedImage(
+                      imageUrl: photoUrl,
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : const Icon(Icons.person, size: 36, color: AppColors.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -708,7 +743,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'فولو أب',
+                'FollowUp',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontSize: 22,

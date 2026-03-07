@@ -14,5 +14,6 @@ public enum NotificationType
     ManualAttendanceRejected = 10,
     IssueReported = 11,
     IssueResolved = 12,
-    AppealSubmitted = 13
+    AppealSubmitted = 13,
+    IssueForwarded = 14
 }

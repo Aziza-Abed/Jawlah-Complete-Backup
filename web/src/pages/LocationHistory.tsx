@@ -5,11 +5,12 @@ import L from "leaflet";
 import { getWorkerLocationHistory } from "../api/tracking";
 import { getMyWorkers } from "../api/users";
 import { getTasks, reassignTask } from "../api/tasks";
-import type { WorkerLocation } from "../types/tracking";
+import type { LocationHistoryPoint } from "../types/tracking";
 import type { UserResponse } from "../types/user";
 import type { TaskResponse } from "../types/task";
 import { ArrowRight, RefreshCw, AlertCircle, Phone, Users, X } from "lucide-react";
 import { useConfirm } from "../components/common/ConfirmDialog";
+import MiniStat from "../components/common/MiniStat";
 import "leaflet/dist/leaflet.css";
 
 // Fix Leaflet marker icon issue
@@ -66,7 +67,7 @@ export default function LocationHistory() {
   const [worker, setWorker] = useState<UserResponse | null>(null);
   const [allWorkers, setAllWorkers] = useState<UserResponse[]>([]);
   const [workerTasks, setWorkerTasks] = useState<TaskResponse[]>([]);
-  const [history, setHistory] = useState<WorkerLocation[]>([]);
+  const [history, setHistory] = useState<LocationHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -94,7 +95,7 @@ export default function LocationHistory() {
       
       const [workersData, historyData, tasksData] = await Promise.all([
         getMyWorkers(),
-        getWorkerLocationHistory(Number(workerId)),
+        getWorkerLocationHistory(Number(workerId), selectedDate),
         getTasks({ workerId: Number(workerId) }),
       ]);
 
@@ -103,15 +104,9 @@ export default function LocationHistory() {
       setAllWorkers(workersData);
       setWorkerTasks(tasksData);
 
-      // Filter history by selected date
-      const filteredHistory = historyData.filter((loc) => {
-        const d = new Date(loc.timestamp);
-        const locDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        return locDate === selectedDate;
-      });
-
-      filteredHistory.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-      setHistory(filteredHistory);
+      // Sort history chronologically
+      const sortedHistory = [...historyData].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      setHistory(sortedHistory);
 
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -155,15 +150,20 @@ export default function LocationHistory() {
     if (!reassignModal.taskId) return;
     const target = allWorkers.find(w => w.userId === targetWorkerId);
     if (!target) return;
-    if (!await confirm(`هل أنت متأكد من إعادة تعيين المهمة "${reassignModal.taskTitle}" إلى ${target.fullName}؟`)) return;
+    const taskId = reassignModal.taskId;
+    const taskTitle = reassignModal.taskTitle;
+
+    // Close reassign modal first so confirm dialog is not overlapped
+    setReassignModal({ open: false, taskId: null, taskTitle: "" });
+
+    if (!await confirm(`هل أنت متأكد من إعادة تعيين المهمة "${taskTitle}" إلى ${target.fullName}؟`)) return;
 
     try {
       setReassigning(true);
-      await reassignTask(reassignModal.taskId, {
+      await reassignTask(taskId, {
         newAssignedToUserId: targetWorkerId,
         reassignmentReason: "تم إعادة التعيين بواسطة المشرف من سجل العامل",
       });
-      setReassignModal({ open: false, taskId: null, taskTitle: "" });
       fetchAllData();
     } catch (err) {
       console.error("Failed to reassign task:", err);
@@ -217,7 +217,7 @@ export default function LocationHistory() {
                 <div className="text-[14px] font-black text-[#6B7280] uppercase tracking-wider mb-1">
                   سجل العامل:
                 </div>
-                <h1 className="font-sans font-black text-[32px] text-[#2F2F2F] tracking-tight leading-tight">
+                <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight leading-tight">
                   {worker?.fullName}
                 </h1>
                 <div className="flex items-center justify-end gap-2.5 mt-1.5 text-[#6B7280]">
@@ -267,8 +267,8 @@ export default function LocationHistory() {
           {/* Active Tasks Section */}
           <div className="bg-[#F3F1ED] rounded-[16px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.06)] overflow-hidden">
             <div className="p-4 border-b border-black/5 flex items-center justify-between">
-              <div className="text-[12px] font-bold text-[#6B7280]">{stats.activeTasks} مهام</div>
               <h3 className="text-[16px] font-black text-[#2F2F2F]">المهام الجاري العمل عليها</h3>
+              <div className="text-[12px] font-bold text-[#6B7280]">{stats.activeTasks} مهام</div>
             </div>
             <div className="p-4 space-y-3">
               {workerTasks.filter(t => t.status === "Pending" || t.status === "InProgress").length === 0 ? (
@@ -305,7 +305,7 @@ export default function LocationHistory() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Map Section */}
             <div className="md:col-span-2 space-y-4">
-              <div className="bg-white rounded-[16px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.06)] overflow-hidden h-[450px] relative">
+              <div className="bg-white rounded-[16px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.06)] overflow-hidden h-[450px] relative z-0">
                 {history.length === 0 ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-[#F9F8F6]">
                     <AlertCircle size={48} className="text-[#AFAFAF] mb-4" />
@@ -353,7 +353,7 @@ export default function LocationHistory() {
                       <div key={idx} className="flex items-center justify-between py-2 border-b border-black/5 last:border-0 hover:bg-black/5 px-2 transition rounded-lg">
                         <div className="text-[11px] font-bold text-[#6B7280]">{formatTime(loc.timestamp)}</div>
                         <div className="flex items-center gap-2">
-                           <span className="text-[12px] font-bold text-[#2F2F2F]">{loc.zoneName || "غير محدد"}</span>
+                           <span className="text-[12px] font-bold text-[#2F2F2F]">{loc.zoneName || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`}</span>
                            <div className={`w-2 h-2 rounded-full ${idx === 0 ? "bg-[#8FA36A]" : idx === history.length - 1 ? "bg-[#C86E5D]" : "bg-[#7895B2]"}`} />
                         </div>
                       </div>
@@ -401,15 +401,6 @@ export default function LocationHistory() {
 /* ---------- UI Components ---------- */
 
 
-
-function MiniStat({ title, value, color }: { title: string; value: string; color: string }) {
-  return (
-    <div className="bg-[#F3F1ED] rounded-[16px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.06)] p-4 flex flex-col items-end gap-1">
-      <div className="text-[10px] font-black text-[#AFAFAF] uppercase tracking-widest">{title}</div>
-      <div className="text-[18px] font-black" style={{ color }}>{value}</div>
-    </div>
-  );
-}
 
 function CenterModal({ children, onClose }: { children: React.ReactNode, onClose: () => void }) {
   return (

@@ -1,3 +1,4 @@
+using FollowUp.Core.Constants;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Enums;
 using Task = System.Threading.Tasks.Task;
@@ -48,8 +49,8 @@ public class TaskGenerationBackgroundService : BackgroundService
                 _logger.LogError(ex, "Error occurred executing Attendance Auto-Close.");
             }
 
-            // Check every 15 minutes
-            await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
+            // Check every N minutes (configured in AppConstants)
+            await Task.Delay(TimeSpan.FromMinutes(AppConstants.BackgroundServiceCheckIntervalMinutes), stoppingToken);
         }
     }
 
@@ -70,44 +71,93 @@ public class TaskGenerationBackgroundService : BackgroundService
             return;
         }
 
-        // Get first Worker in this municipality as default assignee (supervisor can reassign)
-        var defaultAssignee = await dbContext.Users
-            .Where(u => u.MunicipalityId == templates[0].MunicipalityId && u.Role == UserRole.Worker)
-            .OrderBy(u => u.UserId)
-            .FirstOrDefaultAsync(stoppingToken);
-
-        if (defaultAssignee == null)
-        {
-            _logger.LogWarning("No users found for task generation — skipping");
-            return;
-        }
-
         foreach (var template in templates)
         {
-            if (ShouldGenerateTask(template, now))
+            if (!ShouldGenerateTask(template, now))
+                continue;
+
+            // Determine assignment from the template itself
+            int assignedToUserId;
+            int? teamId = null;
+
+            if (template.IsTeamTask && template.DefaultTeamId.HasValue)
             {
-                var task = new FollowUp.Core.Entities.Task
+                // Team task: pick the first active member of the team to satisfy the NOT NULL FK.
+                // The real "owner" is expressed via TeamId; the FK user is just a required placeholder.
+                var teamMember = await dbContext.Users
+                    .Where(u => u.TeamId == template.DefaultTeamId.Value
+                             && u.Status == FollowUp.Core.Enums.UserStatus.Active)
+                    .OrderBy(u => u.UserId)
+                    .FirstOrDefaultAsync(stoppingToken);
+
+                if (teamMember == null)
                 {
-                    Title = template.Title,
-                    Description = template.Description,
-                    MunicipalityId = template.MunicipalityId,
-                    ZoneId = template.ZoneId,
-                    AssignedToUserId = defaultAssignee.UserId, // Required FK — assign to first user, supervisor can reassign
-                    Priority = TaskPriority.Medium,
-                    Status = TaskStatus.Pending,
-                    CreatedAt = DateTime.UtcNow,
-                    EventTime = DateTime.UtcNow,
-                    DueDate = DateTime.UtcNow.Date.AddDays(1).Add(template.Time),
-                };
+                    _logger.LogWarning(
+                        "Template {TemplateId} is a team task but team {TeamId} has no active members — skipping",
+                        template.Id, template.DefaultTeamId.Value);
+                    continue;
+                }
 
-                dbContext.Tasks.Add(task);
-                template.LastGeneratedAt = now;
+                assignedToUserId = teamMember.UserId;
+                teamId = template.DefaultTeamId.Value;
+            }
+            else if (!template.IsTeamTask && template.DefaultAssignedToUserId.HasValue)
+            {
+                // Individual task: use the designated worker
+                assignedToUserId = template.DefaultAssignedToUserId.Value;
+            }
+            else
+            {
+                // No default assignee configured — skip rather than produce an invalid FK value.
+                // Supervisor must set DefaultAssignedToUserId or DefaultTeamId on the template.
+                _logger.LogWarning(
+                    "Template {TemplateId} has no default assignee — skipping. Update the template to add a worker or team.",
+                    template.Id);
+                continue;
+            }
 
-                _logger.LogInformation("Generated task from template {TemplateId} assigned to user {UserId}", template.Id, defaultAssignee.UserId);
+            var task = new FollowUp.Core.Entities.Task
+            {
+                Title = template.Title,
+                Description = template.Description,
+                MunicipalityId = template.MunicipalityId,
+                ZoneId = template.ZoneId,
+                AssignedToUserId = assignedToUserId,
+                AssignedByUserId = null, // system-generated
+                TeamId = teamId,
+                IsTeamTask = template.IsTeamTask,
+                Priority = template.Priority,
+                Status = TaskStatus.Pending,
+                TaskType = template.TaskType,
+                RequiresPhotoProof = template.RequiresPhotoProof,
+                EstimatedDurationMinutes = template.EstimatedDurationMinutes,
+                LocationDescription = template.LocationDescription,
+                CreatedAt = DateTime.UtcNow,
+                EventTime = DateTime.UtcNow,
+                DueDate = DateTime.UtcNow.Date.AddDays(1).Add(template.Time),
+                SyncTime = DateTime.UtcNow,
+                IsSynced = true,
+                SyncVersion = 1,
+            };
+
+            dbContext.Tasks.Add(task);
+            template.LastGeneratedAt = now;
+
+            // Save per template to prevent duplicates if a later save fails
+            try
+            {
+                await dbContext.SaveChangesAsync(stoppingToken);
+                _logger.LogInformation(
+                    "Generated task from template {TemplateId} — {AssignType} {AssignId}",
+                    template.Id,
+                    template.IsTeamTask ? "team" : "user",
+                    template.IsTeamTask ? (object?)teamId : assignedToUserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save generated task for template {TemplateId}", template.Id);
             }
         }
-
-        await dbContext.SaveChangesAsync(stoppingToken);
     }
 
     private bool ShouldGenerateTask(TaskTemplate template, DateTime now)
@@ -132,7 +182,7 @@ public class TaskGenerationBackgroundService : BackgroundService
         return template.LastGeneratedAt.Value.Date < now.Date;
     }
 
-    // auto-close attendance records that have been open (CheckedIn) for more than 14 hours
+    // auto-close attendance records that have been open (CheckedIn) for more than AttendanceAutoCloseHours
     // handles the case where a worker forgets to check out at end of day
     // sets status to AutoClosed (3) so supervisors can distinguish from normal checkouts
     // uses per-user ExpectedEndTime for the auto-close checkout time
@@ -142,7 +192,7 @@ public class TaskGenerationBackgroundService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
 
-        var cutoff = DateTime.UtcNow.AddHours(-14);
+        var cutoff = DateTime.UtcNow.AddHours(-AppConstants.AttendanceAutoCloseHours);
         var now = DateTime.UtcNow;
 
         // Raw SQL with CTE: computes per-user checkout time, then updates in one atomic operation.
@@ -169,7 +219,7 @@ public class TaskGenerationBackgroundService : BackgroundService
                 a.AttendanceType = CASE WHEN s.AttendanceType = N'Late' THEN N'Late' ELSE N'AutoClosed' END,
                 a.WorkDuration = CASE
                     WHEN s.ComputedCheckout <= a.CheckInEventTime THEN CAST('00:00:00' AS TIME)
-                    WHEN DATEDIFF(HOUR, a.CheckInEventTime, s.ComputedCheckout) >= 23 THEN CAST('23:00:00' AS TIME)
+                    WHEN DATEDIFF(HOUR, a.CheckInEventTime, s.ComputedCheckout) >= {AppConstants.MaxWorkDurationHours} THEN CAST(CONCAT({AppConstants.MaxWorkDurationHours}, ':00:00') AS TIME)
                     ELSE CAST(DATEADD(SECOND, DATEDIFF(SECOND, a.CheckInEventTime, s.ComputedCheckout), CAST('00:00:00' AS DATETIME)) AS TIME)
                 END
             FROM Attendances a

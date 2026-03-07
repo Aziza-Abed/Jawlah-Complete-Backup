@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_manager.dart';
+import '../../providers/sync_manager.dart';
 import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -400,6 +401,16 @@ class _LoginScreenState extends State<LoginScreen> {
       final password = _passwordController.text.trim();
       final authProvider = context.read<AuthManager>();
 
+      // Sync pending data from previous session before login clears local storage
+      final syncManager = context.read<SyncManager>();
+      if (syncManager.waitingItems > 0 && syncManager.isOnline) {
+        try {
+          await syncManager.startSync();
+        } catch (e) {
+          if (kDebugMode) debugPrint('Pre-login sync failed (continuing): $e');
+        }
+      }
+
       final success = await authProvider.doLogin(
         username,
         password: password,
@@ -419,6 +430,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   maskedPhone: authProvider.otpMaskedPhone ?? '****',
                   username: username,
                   rememberMe: _rememberMe,
+                  demoOtpCode: authProvider.otpDemoCode,
                 ),
               ),
             );

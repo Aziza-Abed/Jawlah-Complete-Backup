@@ -2,10 +2,21 @@ import { useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import { Menu, Bell, User, Settings } from "lucide-react";
 import { useNotifications } from "../../contexts/NotificationContext";
+import { STORAGE_KEYS } from "../../constants/storageKeys";
 
 export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+
+  // Read on every render so photo updates without reload
+  let profilePhotoUrl: string | null = null;
+  try {
+    const userStr = localStorage.getItem(STORAGE_KEYS.USER);
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user.profilePhotoUrl) profilePhotoUrl = user.profilePhotoUrl;
+    }
+  } catch { /* ignore */ }
 
   return (
     <header className="w-full bg-[#7895B2] px-6 sm:px-8 md:px-10 h-[85px] sm:h-[105px] shadow-lg relative z-30">
@@ -30,7 +41,7 @@ export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         {/* Left Side: Premium Icon Pill (The End in RTL) */}
         <div className="flex items-center gap-4">
           {/* Desktop Icon Pill */}
-          <div className="hidden md:flex items-center bg-white/95 backdrop-blur-md rounded-xl px-2 py-1.5 shadow-xl border border-white/50">
+          <div className="flex items-center bg-white/95 backdrop-blur-md rounded-xl px-2 py-1.5 shadow-xl border border-white/50">
             {/* Notifications */}
             <button
               type="button"
@@ -50,10 +61,14 @@ export default function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             <button
               type="button"
               onClick={() => navigate("/profile")}
-              className="w-[36px] h-[36px] rounded-lg grid place-items-center hover:bg-gray-100 transition-all text-[#6B7280] hover:scale-105 active:scale-95"
+              className="w-[36px] h-[36px] rounded-lg grid place-items-center hover:bg-gray-100 transition-all text-[#6B7280] hover:scale-105 active:scale-95 overflow-hidden"
               title="الملف الشخصي"
             >
-              <User size={18} />
+              {profilePhotoUrl ? (
+                <img src={profilePhotoUrl} alt="Profile" className="w-full h-full object-cover rounded-lg" />
+              ) : (
+                <User size={18} />
+              )}
             </button>
 
             {/* Settings */}

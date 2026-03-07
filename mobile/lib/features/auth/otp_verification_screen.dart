@@ -13,6 +13,7 @@ class OtpVerificationScreen extends StatefulWidget {
   final String maskedPhone;
   final String? username;
   final bool rememberMe;
+  final String? demoOtpCode;
 
   const OtpVerificationScreen({
     super.key,
@@ -20,6 +21,7 @@ class OtpVerificationScreen extends StatefulWidget {
     required this.maskedPhone,
     this.username,
     this.rememberMe = false,
+    this.demoOtpCode,
   });
 
   @override
@@ -38,10 +40,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   int _resendCooldown = 0;
   Timer? _cooldownTimer;
   String? _errorMessage;
+  String? _demoOtpCode;
+  late String _sessionToken;
 
   @override
   void initState() {
     super.initState();
+    _sessionToken = widget.sessionToken;
+    _demoOtpCode = widget.demoOtpCode;
     _startResendCooldown(60); // Initial 60 second cooldown
   }
 
@@ -112,7 +118,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     try {
       final authManager = context.read<AuthManager>();
       final success = await authManager.verifyOtp(
-        sessionToken: widget.sessionToken,
+        sessionToken: _sessionToken,
         otpCode: _otpCode,
       );
 
@@ -168,12 +174,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
     try {
       final authManager = context.read<AuthManager>();
-      final result = await authManager.resendOtp(sessionToken: widget.sessionToken);
+      final result = await authManager.resendOtp(sessionToken: _sessionToken);
 
       if (!mounted) return;
 
       if (result != null) {
         _startResendCooldown(result.cooldownSeconds);
+        setState(() {
+          if (result.sessionToken != null) {
+            _sessionToken = result.sessionToken!;
+          }
+          if (result.demoOtpCode != null) {
+            _demoOtpCode = result.demoOtpCode;
+          }
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -273,6 +287,42 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     letterSpacing: 2,
                   ),
                 ),
+                if (_demoOtpCode != null && _demoOtpCode!.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.info_outline, color: Color(0xFF1D4ED8), size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'وضع التجربة — رمز التحقق: ',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1D4ED8),
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                        Text(
+                          _demoOtpCode!,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF1D4ED8),
+                            letterSpacing: 4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 40),
                 // OTP Input Fields
                 Container(

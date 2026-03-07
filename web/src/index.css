@@ -90,10 +90,23 @@ input:focus {
   background: rgba(255, 255, 255, 0.6);
 }
 
+/* Sidebar scrollbar on the left (opposite side in RTL) */
+.sidebar-nav {
+  direction: ltr;
+}
+.sidebar-nav > * {
+  direction: rtl;
+}
+
 /* Leaflet Overrides for Light Theme */
 .leaflet-container {
   background: #f3f1ed !important;
   font-family: inherit !important;
+}
+/* Fix Tailwind v4 preflight breaking Leaflet tile images */
+.leaflet-container img {
+  max-width: none !important;
+  height: auto;
 }
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {

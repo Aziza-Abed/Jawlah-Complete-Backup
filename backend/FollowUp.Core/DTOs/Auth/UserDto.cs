@@ -17,4 +17,5 @@ public class UserDto
     public string MunicipalityCode { get; set; } = string.Empty;
     public string MunicipalityName { get; set; } = string.Empty;
     public string? MunicipalityNameEnglish { get; set; }
+    public string? ProfilePhotoUrl { get; set; }
 }

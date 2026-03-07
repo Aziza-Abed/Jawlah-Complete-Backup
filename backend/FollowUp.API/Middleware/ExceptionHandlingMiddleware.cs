@@ -1,5 +1,7 @@
 using System.Net;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.Exceptions;
 
@@ -12,7 +14,8 @@ public class ExceptionHandlingMiddleware
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
     };
 
     public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)

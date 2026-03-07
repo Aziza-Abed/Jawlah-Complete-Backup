@@ -94,7 +94,7 @@ public class ZoneItem
     public DateTime? LastUpdate { get; set; }
 }
 
-// ========== INDIVIDUAL WORKER REPORT ==========
+// individual worker report
 
 public class IndividualWorkerReportData
 {
@@ -175,7 +175,7 @@ public class SupervisorStatsDetail
     public int AttendanceRate { get; set; }
 }
 
-// ========== ADMIN SUPERVISOR MONITORING ==========
+// admin supervisor monitoring
 
 // supervisor monitoring data for Admin dashboard
 public class AdminSupervisorMonitoringData

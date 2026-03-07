@@ -12,6 +12,10 @@ public interface IIssueRepository : IRepository<Issue>
     Task<IEnumerable<Issue>> GetCriticalIssuesAsync();
     Task<IEnumerable<Issue>> GetIssuesModifiedAfterAsync(int userId, DateTime lastSyncTime);
     Task<Issue?> GetByClientIdAsync(int userId, string clientId);
+    Task<IEnumerable<Issue>> GetIssuesByWorkerIdsAsync(IEnumerable<int> workerIds);
+
+    // Lightweight count — no entity loading, no Include()
+    Task<int> CountUnresolvedAsync(IEnumerable<int>? workerIds = null);
 
     // Dashboard optimized methods - use database-level aggregation
     Task<IssueStatsDto> GetIssueStatsAsync(IEnumerable<int> workerIds, DateTime today);

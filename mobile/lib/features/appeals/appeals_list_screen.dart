@@ -21,7 +21,9 @@ class _AppealsListScreenState extends State<AppealsListScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadAppeals();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAppeals();
+    });
   }
 
   @override
@@ -50,6 +52,9 @@ class _AppealsListScreenState extends State<AppealsListScreen>
           centerTitle: true,
           bottom: TabBar(
             controller: _tabController,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
             tabs: [
               Tab(
                 child: Consumer<AppealManager>(
@@ -136,20 +141,7 @@ class _AppealsListScreenState extends State<AppealsListScreen>
   }
 
   Widget _buildAppealCard(AppealModel appeal) {
-    Color statusColor;
-    switch (appeal.statusColor) {
-      case 'green':
-        statusColor = Colors.green;
-        break;
-      case 'red':
-        statusColor = Colors.red;
-        break;
-      case 'orange':
-        statusColor = Colors.orange;
-        break;
-      default:
-        statusColor = Colors.grey;
-    }
+    final statusColor = appeal.statusColorValue;
 
     return Card(
       elevation: 2,
@@ -270,6 +262,20 @@ class _AppealsListScreenState extends State<AppealsListScreen>
                     ),
                   ],
                 ),
+                if (!appeal.isApproved &&
+                    appeal.reviewNotes != null &&
+                    appeal.reviewNotes!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'سبب الرفض: ${appeal.reviewNotes}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.red[700],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ],
           ),

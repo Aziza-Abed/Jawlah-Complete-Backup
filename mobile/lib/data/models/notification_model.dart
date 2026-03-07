@@ -29,13 +29,15 @@ class NotificationModel {
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
     return NotificationModel(
-      notificationId: json['notificationId'] as int,
-      title: json['title'] as String,
-      message: json['message'] as String,
-      type: json['type'] as String,
+      notificationId: json['notificationId'] as int? ?? 0,
+      title: json['title'] as String? ?? '',
+      message: json['message'] as String? ?? '',
+      type: json['type'] as String? ?? '',
       isRead: json['isRead'] as bool? ?? false,
       isSent: json['isSent'] as bool? ?? false,
-      createdAt: DateFormatter.parseUtc(json['createdAt'] as String),
+      createdAt: json['createdAt'] != null
+          ? DateFormatter.parseUtc(json['createdAt'] as String)
+          : DateTime.now(),
       sentAt: json['sentAt'] != null
           ? DateFormatter.parseUtc(json['sentAt'] as String)
           : null,

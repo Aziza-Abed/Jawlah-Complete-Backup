@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../providers/auth_manager.dart';
+import '../../../../presentation/widgets/authenticated_image.dart';
 import 'battery_widget.dart';
 
 class GreetingCard extends StatelessWidget {
@@ -18,6 +19,8 @@ class GreetingCard extends StatelessWidget {
     return Consumer<AuthManager>(
       builder: (context, authProvider, child) {
         final userName = authProvider.userName;
+        final photoUrl = authProvider.user?.profilePhotoUrl;
+        final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
         return GestureDetector(
           onTap: () {
@@ -47,13 +50,22 @@ class GreetingCard extends StatelessWidget {
                     color: AppColors.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Hero(
+                  child: Hero(
                     tag: 'profile-avatar',
-                    child: Icon(
-                      Icons.person,
-                      size: 34,
-                      color: AppColors.primary,
-                    ),
+                    child: hasPhoto
+                        ? ClipOval(
+                            child: AuthenticatedImage(
+                              imageUrl: photoUrl,
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            size: 34,
+                            color: AppColors.primary,
+                          ),
                   ),
                 ),
                 const SizedBox(width: 16),

@@ -21,7 +21,9 @@ import {
   X,
   User as UserIcon,
   Briefcase,
-  Edit2
+  Edit2,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { useConfirm } from "../components/common/ConfirmDialog";
 
@@ -60,6 +62,9 @@ export default function AdminAccounts() {
     zoneIds: [] as number[],
   });
 
+  // Password visibility
+  const [showPassword, setShowPassword] = useState(false);
+
   // Device Management State
   const [deviceModalUser, setDeviceModalUser] = useState<UserResponse | null>(null);
 
@@ -91,14 +96,15 @@ export default function AdminAccounts() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [usersData, munisData, zonesData, deptsData] = await Promise.all([
-        getUsers(1, 1000),
+      const [usersData, supervisorsData, munisData, zonesData, deptsData] = await Promise.all([
+        getUsers(1, 500),
+        getUsers(1, 500, "Supervisor"),
         getMunicipalities(),
         getZones(),
         getDepartments(true)
       ]);
       setUsers(usersData.items);
-      setSupervisors(usersData.items.filter(u => u.role === "Supervisor"));
+      setSupervisors(supervisorsData.items);
       setMunicipalities(munisData);
       setZones(zonesData);
       setDepartments(deptsData);
@@ -164,6 +170,8 @@ export default function AdminAccounts() {
   const openAddModal = () => {
       setIsEditMode(false);
       setEditUserId(null);
+      setFormErrors({});
+      setShowPassword(false);
       setFormData({
         username: "",
         fullName: "",
@@ -183,6 +191,8 @@ export default function AdminAccounts() {
   const openEditModal = async (user: UserResponse) => {
       setIsEditMode(true);
       setEditUserId(user.userId);
+      setFormErrors({});
+      setShowPassword(false);
 
       let assignedZones: number[] = [];
       try {
@@ -207,13 +217,42 @@ export default function AdminAccounts() {
       setShowUserModal(true);
   };
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const validateUserForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    if (!formData.fullName.trim()) errors.fullName = "الاسم الكامل مطلوب";
+    else if (formData.fullName.trim().length < 3) errors.fullName = "الاسم يجب أن يكون 3 أحرف على الأقل";
+
+    if (!isEditMode) {
+      if (!formData.username.trim()) errors.username = "اسم المستخدم مطلوب";
+      else if (formData.username.trim().length < 3) errors.username = "اسم المستخدم يجب أن يكون 3 أحرف على الأقل";
+      else if (!/^[a-z0-9_]+$/.test(formData.username)) errors.username = "اسم المستخدم: أحرف إنجليزية صغيرة وأرقام فقط";
+    }
+
+    if (!formData.phoneNumber.trim()) errors.phoneNumber = "رقم الهاتف مطلوب";
+    else if (!/^\+?[0-9]{9,15}$/.test(formData.phoneNumber.replace(/\s/g, ''))) errors.phoneNumber = "رقم الهاتف غير صالح";
+
+    if (!isEditMode && !formData.password) errors.password = "كلمة المرور مطلوبة";
+    if (formData.password && !isStrongPassword(formData.password)) errors.password = "8 أحرف على الأقل + حرف + رقم + رمز خاص";
+
+    if (formData.role !== 'Worker' && !formData.email.trim()) errors.email = "البريد الإلكتروني مطلوب للمشرفين والمدراء";
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "بريد إلكتروني غير صالح";
+
+    if (formData.role === 'Worker' && !formData.supervisorId) errors.supervisorId = "يرجى اختيار مشرف مسؤول";
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const clearFormError = (field: string) => {
+    setFormErrors(prev => { const n = {...prev}; delete n[field]; return n; });
+  };
+
   const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if ((!isEditMode || formData.password) && formData.password && !isStrongPassword(formData.password)) {
-      setMessage({ type: "error", text: "كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على حرف ورقم ورمز خاص (@$!%*#?&)" });
-      return;
-    }
+    if (!validateUserForm()) return;
 
     setActionLoading("user-form");
     try {
@@ -247,9 +286,15 @@ export default function AdminAccounts() {
 
       setShowUserModal(false);
       fetchInitialData().catch(console.error);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "حدث خطأ أثناء حفظ البيانات";
-      setMessage({ type: "error", text: message });
+    } catch (err: unknown) {
+      let msg = "حدث خطأ أثناء حفظ البيانات";
+      if (err && typeof err === "object" && "response" in err) {
+        const res = (err as { response?: { data?: { message?: string; errors?: string[] } } }).response;
+        msg = res?.data?.errors?.join(", ") || res?.data?.message || msg;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      setMessage({ type: "error", text: msg });
     } finally {
       setActionLoading(null);
     }
@@ -292,7 +337,7 @@ export default function AdminAccounts() {
                 <Users size={32} />
               </div>
               <div className="text-right">
-                <h1 className="text-4xl font-black text-[#2F2F2F] tracking-tight">إدارة الحسابات</h1>
+                <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">إدارة الحسابات</h1>
                 <p className="text-[#6B7280] text-[15px] mt-1 font-bold">إدارة وصلاحيات المستخدمين والمشرفين والعمال في الميدان</p>
               </div>
             </div>
@@ -337,12 +382,12 @@ export default function AdminAccounts() {
              <div className="lg:col-span-4 bg-white rounded-[22px] px-8 py-2 shadow-sm border border-black/5 flex items-center justify-between">
                 <div className="text-center">
                    <p className="text-[10px] text-[#AFAFAF] font-black uppercase">إجمالي الحسابات</p>
-                   <p className="text-2xl font-black text-[#2F2F2F]">{users.length}</p>
+                   <p className="text-2xl font-black text-[#2F2F2F]">{filteredUsers.length}</p>
                 </div>
                 <div className="w-[1px] h-8 bg-black/5"></div>
                 <div className="text-center">
                    <p className="text-[10px] text-[#AFAFAF] font-black uppercase">نشطين الآن</p>
-                   <p className="text-2xl font-black text-[#8FA36A]">{users.filter(u => u.status === 'Active').length}</p>
+                   <p className="text-2xl font-black text-[#8FA36A]">{filteredUsers.filter(u => u.status === 'Active').length}</p>
                 </div>
              </div>
           </div>
@@ -354,11 +399,11 @@ export default function AdminAccounts() {
                 ? "bg-[#8FA36A]/10 text-[#5a6b41] border border-[#8FA36A]/20"
                 : "bg-[#C86E5D]/10 text-[#9b5143] border border-[#C86E5D]/20"
             }`}>
-              <button onClick={() => setMessage(null)} className="opacity-40 hover:opacity-100 transition-opacity"><X size={18} /></button>
               <div className="flex items-center gap-3">
-                 <span className="font-black text-[15px]">{message.text}</span>
                  {message.type === "success" ? <CheckCircle size={22} /> : <AlertCircle size={22} />}
+                 <span className="font-black text-[15px]">{message.text}</span>
               </div>
+              <button onClick={() => setMessage(null)} className="opacity-40 hover:opacity-100 transition-opacity"><X size={18} /></button>
             </div>
           )}
 
@@ -491,10 +536,10 @@ export default function AdminAccounts() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[16px] w-full max-w-md p-6 shadow-xl text-right">
             <div className="flex items-center justify-between mb-6">
+              <h3 className="text-[18px] font-black text-[#2F2F2F]">إعادة تعيين كلمة المرور</h3>
               <button onClick={() => setResetModalUser(null)} className="p-2 hover:bg-[#F3F1ED] rounded-full transition-colors text-[#6B7280]">
                 <X size={20} />
               </button>
-              <h3 className="text-[18px] font-black text-[#2F2F2F]">إعادة تعيين كلمة المرور</h3>
             </div>
 
             <p className="text-right text-[#6B7280] mb-6 text-[14px]">
@@ -542,77 +587,105 @@ export default function AdminAccounts() {
         <div className="fixed inset-0 bg-black/40 flex justify-center items-start pt-10 pb-20 p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-[16px] w-full max-w-3xl p-6 shadow-xl my-8 text-right">
             <div className="flex items-center justify-between mb-6">
-              <button onClick={() => setShowUserModal(false)} className="p-2 hover:bg-[#F3F1ED] rounded-full transition-colors text-[#6B7280]">
-                <X size={20} />
-              </button>
               <div className="flex items-center gap-3">
                 <h3 className="text-[18px] font-black text-[#2F2F2F]">{isEditMode ? "تعديل بيانات المستخدم" : "إضافة مستخدم جديد"}</h3>
                 <div className="p-2 bg-[#7895B2]/10 rounded-[10px] text-[#7895B2]">
                   {isEditMode ? <Edit2 size={20} /> : <Plus size={20} />}
                 </div>
               </div>
+              <button onClick={() => setShowUserModal(false)} className="p-2 hover:bg-[#F3F1ED] rounded-full transition-colors text-[#6B7280]">
+                <X size={20} />
+              </button>
             </div>
 
             <form onSubmit={handleUserSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   <label className="block text-right text-[12px] font-semibold text-[#6B7280]">الاسم الكامل</label>
                   <input
                     required
                     type="text"
                     value={formData.fullName}
-                    onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                    className="w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30"
+                    onChange={(e) => { setFormData({...formData, fullName: e.target.value}); clearFormError("fullName"); }}
+                    className={`w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 ${formErrors.fullName ? "ring-2 ring-red-400" : "focus:ring-[#7895B2]/30"}`}
                     placeholder="مثال: أحمد محمد علي"
+                    minLength={3}
+                    maxLength={100}
                   />
+                  {formErrors.fullName && <p className="text-right text-red-500 text-[11px] font-semibold">{formErrors.fullName}</p>}
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   <label className="block text-right text-[12px] font-semibold text-[#6B7280]">اسم المستخدم</label>
                   <input
                     required
                     disabled={isEditMode}
                     type="text"
                     value={formData.username}
-                    onChange={(e) => setFormData({...formData, username: e.target.value.toLowerCase().replace(/\s/g, '')})}
-                    className="w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30 disabled:opacity-50 font-sans"
+                    onChange={(e) => { setFormData({...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')}); clearFormError("username"); }}
+                    className={`w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 ${formErrors.username ? "ring-2 ring-red-400" : "focus:ring-[#7895B2]/30"} disabled:opacity-50 font-sans`}
                     placeholder="username"
+                    minLength={3}
+                    maxLength={50}
+                    pattern="[a-z0-9_]+"
                   />
+                  {formErrors.username && <p className="text-right text-red-500 text-[11px] font-semibold">{formErrors.username}</p>}
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   <label className="block text-right text-[12px] font-semibold text-[#6B7280]">رقم الهاتف</label>
                   <input
                     required
                     type="tel"
                     value={formData.phoneNumber}
-                    onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
-                    className="w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30"
-                    placeholder="05xxxxxxx"
+                    onChange={(e) => { setFormData({...formData, phoneNumber: e.target.value}); clearFormError("phoneNumber"); }}
+                    className={`w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 ${formErrors.phoneNumber ? "ring-2 ring-red-400" : "focus:ring-[#7895B2]/30"}`}
+                    placeholder="+970599000000"
+                    minLength={9}
+                    maxLength={15}
                   />
+                  {formErrors.phoneNumber && <p className="text-right text-red-500 text-[11px] font-semibold">{formErrors.phoneNumber}</p>}
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   <label className="block text-right text-[12px] font-semibold text-[#6B7280]">
                     {isEditMode ? "كلمة المرور (اتركها فارغة للتجاهل)" : "كلمة المرور"}
                   </label>
-                  <input
-                    required={!isEditMode}
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    className="w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30"
-                    placeholder={isEditMode ? "********" : "مثال: Pass@123"}
-                    minLength={8}
-                  />
+                  <div className="relative">
+                    <input
+                      required={!isEditMode}
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => { setFormData({...formData, password: e.target.value}); clearFormError("password"); }}
+                      className={`w-full h-[46px] px-4 pl-12 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 ${formErrors.password ? "ring-2 ring-red-400" : "focus:ring-[#7895B2]/30"}`}
+                      placeholder={isEditMode ? "********" : "مثال: Pass@123"}
+                      minLength={8}
+                      maxLength={100}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#2F2F2F] transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+                    </button>
+                  </div>
+                  {formErrors.password ? (
+                    <p className="text-right text-red-500 text-[11px] font-semibold">{formErrors.password}</p>
+                  ) : (
+                    <p className="text-[11px] text-[#6B7280] text-right">8 أحرف على الأقل + حرف + رقم + رمز خاص</p>
+                  )}
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   <label className="block text-right text-[12px] font-semibold text-[#6B7280]">البريد الإلكتروني</label>
                   <input
                     required={formData.role !== 'Worker'}
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30"
+                    onChange={(e) => { setFormData({...formData, email: e.target.value}); clearFormError("email"); }}
+                    className={`w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 ${formErrors.email ? "ring-2 ring-red-400" : "focus:ring-[#7895B2]/30"}`}
                     placeholder="example@municipality.ps"
+                    maxLength={100}
                   />
+                  {formErrors.email && <p className="text-right text-red-500 text-[11px] font-semibold">{formErrors.email}</p>}
                 </div>
                 <div className="space-y-3">
                   <label className="block text-right text-[12px] font-semibold text-[#6B7280]">القسم / الدائرة</label>
@@ -644,18 +717,20 @@ export default function AdminAccounts() {
                 </div>
 
                 {formData.role === "Worker" && (
-                  <div className="space-y-3">
+                  <div className="space-y-1.5">
                     <label className="block text-right text-[12px] font-semibold text-[#6B7280]">المشرف المسؤول</label>
                     <select
                       value={formData.supervisorId}
-                      onChange={(e) => setFormData({...formData, supervisorId: e.target.value})}
-                      className="w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30"
+                      onChange={(e) => { setFormData({...formData, supervisorId: e.target.value}); clearFormError("supervisorId"); }}
+                      className={`w-full h-[46px] px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 ${formErrors.supervisorId ? "ring-2 ring-red-400" : "focus:ring-[#7895B2]/30"}`}
+                      required
                     >
-                      <option value="">بدون مشرف</option>
+                      <option value="">-- اختر المشرف --</option>
                       {supervisors.map(s => (
                         <option key={s.userId} value={s.userId}>{s.fullName}</option>
                       ))}
                     </select>
+                    {formErrors.supervisorId && <p className="text-right text-red-500 text-[11px] font-semibold">{formErrors.supervisorId}</p>}
                   </div>
                 )}
               </div>
@@ -713,10 +788,10 @@ export default function AdminAccounts() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-[16px] w-full max-w-md p-6 shadow-xl text-right">
             <div className="flex items-center justify-between mb-6">
+              <h3 className="text-[18px] font-black text-[#2F2F2F]">إدارة جهاز المستخدم</h3>
               <button onClick={() => setDeviceModalUser(null)} className="p-2 hover:bg-[#F3F1ED] rounded-full transition-colors text-[#6B7280]">
                 <X size={20} />
               </button>
-              <h3 className="text-[18px] font-black text-[#2F2F2F]">إدارة جهاز المستخدم</h3>
             </div>
             
             <div className="space-y-6">

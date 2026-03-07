@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { getTasks } from "../api/tasks";
 import type { TaskResponse } from "../types/task";
 import { Plus, RefreshCw, ChevronLeft } from "lucide-react";
+import MiniStat from "../components/common/MiniStat";
+import FilterChip from "../components/common/FilterChip";
 
-type TaskStatus = "Pending" | "InProgress" | "UnderReview" | "Completed" | "Rejected";
-type TaskPriority = "Low" | "Medium" | "High";
+type TaskStatus = "Pending" | "InProgress" | "UnderReview" | "Completed" | "Rejected" | "Cancelled";
+type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
 type TaskRow = {
   id: string;
@@ -25,17 +28,29 @@ type FilterKey = "all" | "pending" | "inprogress" | "underreview" | "completed" 
 
 const mapStatus = (backendStatus: string): TaskStatus => {
   switch (backendStatus) {
-    case "Pending": return "Pending";
-    case "InProgress": return "InProgress";
-    case "UnderReview": return "UnderReview";
-    case "Completed": return "Completed";
-    case "Rejected": return "Rejected";
-    default: return "Pending";
+    case "Pending":
+    case "Created":
+    case "Assigned":
+      return "Pending";
+    case "InProgress":
+    case "Accepted":
+      return "InProgress";
+    case "UnderReview":
+    case "Submitted":
+      return "UnderReview";
+    case "Completed":
+    case "Synced":
+      return "Completed";
+    case "Rejected":
+      return "Rejected";
+    case "Cancelled":
+      return "Cancelled";
+    default:
+      return "Pending";
   }
 };
 
 const mapPriority = (backendPriority: string): TaskPriority => {
-  if (backendPriority === "Urgent") return "High";
   return backendPriority as TaskPriority;
 };
 
@@ -68,6 +83,7 @@ const mapTaskToRow = (task: TaskResponse): TaskRow => {
 };
 
 export default function TasksList() {
+  usePageTitle("المهام");
   const navigate = useNavigate();
 
   const [items, setItems] = useState<TaskRow[]>([]);
@@ -132,7 +148,7 @@ export default function TasksList() {
         <div className="max-w-[1100px] mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F]">
+            <h1 className="text-right font-black text-[28px] text-[#2F2F2F] tracking-tight">
               المهام الميدانية
             </h1>
             <div className="flex items-center gap-2">
@@ -207,33 +223,6 @@ export default function TasksList() {
   );
 }
 
-function MiniStat({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="bg-[#F3F1ED] rounded-[14px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.06)] p-4">
-      <div className="text-right text-[12px] text-[#6B7280] font-sans font-semibold">{title}</div>
-      <div className="mt-2 text-right text-[18px] text-[#2F2F2F] font-sans font-bold">{value}</div>
-    </div>
-  );
-}
-
-function FilterChip({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count: number }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "h-[34px] px-3 rounded-[10px] font-sans font-semibold text-[13px] border flex items-center gap-2 transition-all",
-        active ? "bg-[#7895B2] text-white border-black/10" : "bg-white text-[#2F2F2F] border-black/10 hover:opacity-95",
-      ].join(" ")}
-    >
-      <span>{label}</span>
-      <span className={["min-w-[20px] h-[20px] px-1 rounded-full text-[11px] font-bold grid place-items-center", active ? "bg-white/20" : "bg-black/5"].join(" ")}>
-        {count}
-      </span>
-    </button>
-  );
-}
-
 function TaskCard({ task, onClick }: { task: TaskRow; onClick: () => void }) {
   return (
     <button
@@ -281,6 +270,7 @@ function formatStatusLabel(s: TaskStatus) {
     UnderReview: "بانتظار اعتماد",
     Completed: "مكتملة",
     Rejected: "مرفوضة",
+    Cancelled: "ملغاة",
   };
   return map[s];
 }
@@ -292,6 +282,7 @@ function getStatusColor(s: TaskStatus) {
     UnderReview: "#C86E5D",
     Completed: "#8FA36A",
     Rejected: "#C86E5D",
+    Cancelled: "#6B7280",
   };
   return map[s];
 }

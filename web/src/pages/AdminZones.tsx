@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { useMunicipality } from "../contexts/MunicipalityContext";
 import { useConfirm } from "../components/common/ConfirmDialog";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { useToast } from "../contexts/ToastContext";
 
 // Helper to center map
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
@@ -39,10 +41,13 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
 }
 
 export default function AdminZones() {
+  usePageTitle("إدارة المناطق");
+  const { showToast } = useToast();
   const [confirm, ConfirmDialog] = useConfirm();
   const [zones, setZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [actionLoading, setActionLoading] = useState<number | string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -87,16 +92,13 @@ export default function AdminZones() {
 
   const handleGisUpload = async (file: File, fileType: GisFileType) => {
     setUploadingType(fileType);
-    setMessage({ type: "success", text: `جاري رفع ملف ${fileType === "Quarters" ? "الأحياء" : fileType === "Borders" ? "الحدود" : "البلوكات"}...` });
+    showToast(`جاري رفع ملف ${fileType === "Quarters" ? "الأحياء" : fileType === "Borders" ? "الحدود" : "البلوكات"}...`, "info");
 
     try {
       const result = await uploadGisFile(file, fileType, { autoImport: true });
 
       if (result.success) {
-        setMessage({
-          type: "success",
-          text: result.warning ? `${result.message} (تحذير: ${result.warning})` : result.message
-        });
+        showToast(result.warning ? `${result.message} (تحذير: ${result.warning})` : result.message);
         // Refresh data
         await Promise.all([fetchInitialData(), fetchGisData()]);
       } else {
@@ -146,9 +148,8 @@ export default function AdminZones() {
     setActionLoading(id);
     try {
       await deleteZone(id);
-      setMessage({ type: "success", text: "تم حذف المنطقة بنجاح" });
+      showToast("تم حذف المنطقة بنجاح");
       fetchInitialData();
-      setTimeout(() => setMessage(null), 3000);
     } catch (err) {
       setMessage({ type: "error", text: "فشل حذف المنطقة" });
     } finally {
@@ -162,16 +163,15 @@ export default function AdminZones() {
     try {
       if (editingZone) {
         await updateZone(editingZone.zoneId, formData);
-        setMessage({ type: "success", text: "تم تحديث المنطقة بنجاح" });
+        showToast("تم تحديث المنطقة بنجاح");
       } else {
         await createZone(formData);
-        setMessage({ type: "success", text: "تم إضافة المنطقة بنجاح" });
+        showToast("تم إضافة المنطقة بنجاح");
       }
       setShowModal(false);
       fetchInitialData();
-      setTimeout(() => setMessage(null), 3000);
     } catch (err) {
-      setMessage({ type: "error", text: "فشل حفظ بيانات المنطقة" });
+      showToast("فشل حفظ بيانات المنطقة", "error");
     } finally {
       setActionLoading(null);
     }
@@ -181,7 +181,9 @@ export default function AdminZones() {
     const name = z.zoneName?.toLowerCase() || "";
     const code = z.zoneCode?.toLowerCase() || "";
     const search = searchTerm.toLowerCase();
-    return name.includes(search) || code.includes(search);
+    const matchesSearch = name.includes(search) || code.includes(search);
+    const matchesType = typeFilter === "all" || z.zoneType === typeFilter || (typeFilter === "none" && !z.zoneType);
+    return matchesSearch && matchesType;
   });
 
   // Parse GeoJSON to Leaflet polygon coordinates
@@ -251,7 +253,7 @@ export default function AdminZones() {
           {/* Header (Corrected RTL Layout) */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="text-right">
-              <h1 className="font-sans font-black text-[28px] text-[#2F2F2F] tracking-tight">إدارة المناطق</h1>
+              <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">إدارة المناطق</h1>
               <p className="text-[14px] font-bold text-[#AFAFAF] mt-1">تقسيم البلدية لمناطق جغرافية لتعيين العمال وتتبعهم</p>
             </div>
             <button
@@ -426,27 +428,43 @@ export default function AdminZones() {
             )}
           </div>
 
-          {/* Search */}
+          {/* Search + Filter */}
           <div className="bg-white rounded-[24px] p-5 shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-black/5">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="بحث عن منطقة بالاسم أو الكود..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-[52px] pr-12 pl-6 bg-[#F9F8F6] rounded-[18px] text-right text-[15px] font-black text-[#2F2F2F] placeholder:text-[#AFAFAF] border-0 outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all"
-              />
-              <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
+            <div className="flex gap-3 items-center">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="h-[52px] px-4 bg-[#F9F8F6] rounded-[18px] text-right text-[14px] font-bold text-[#2F2F2F] border-0 outline-none focus:ring-4 focus:ring-[#7895B2]/10 cursor-pointer"
+              >
+                <option value="all">جميع الأنواع</option>
+                <option value="Quarters">الأحياء</option>
+                <option value="Borders">الحدود</option>
+                <option value="Blocks">البلوكات</option>
+                <option value="none">بدون نوع</option>
+              </select>
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="بحث عن منطقة بالاسم أو الكود..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full h-[52px] pr-12 pl-6 bg-[#F9F8F6] rounded-[18px] text-right text-[15px] font-black text-[#2F2F2F] placeholder:text-[#AFAFAF] border-0 outline-none focus:ring-4 focus:ring-[#7895B2]/10 transition-all"
+                />
+                <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
+              </div>
             </div>
           </div>
 
           {/* Message */}
           {message && (
-            <div className={`p-4 rounded-[12px] flex items-center justify-end gap-3 text-right ${
+            <div className={`p-4 rounded-[12px] flex items-center justify-between gap-3 text-right ${
               message.type === "success" ? "bg-[#8FA36A]/10 text-[#8FA36A] border border-[#8FA36A]/20" : "bg-[#C86E5D]/10 text-[#C86E5D] border border-[#C86E5D]/20"
             }`}>
-              <span className="font-semibold">{message.text}</span>
-              {message.type === "success" ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+              <button onClick={() => setMessage(null)} className="opacity-40 hover:opacity-100 transition-opacity"><X size={18} /></button>
+              <div className="flex items-center gap-3">
+                <span className="font-semibold">{message.text}</span>
+                {message.type === "success" ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+              </div>
             </div>
           )}
 
@@ -465,7 +483,7 @@ export default function AdminZones() {
                           <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                           <Polygon
                             positions={geometry}
-                            pathOptions={{ color: '#7895B2', fillColor: '#7895B2', fillOpacity: 0.3, weight: 2 }}
+                            pathOptions={{ color: zone.zoneType === 'Borders' ? '#EF4444' : zone.zoneType === 'Blocks' ? '#22C55E' : '#7895B2', fillColor: zone.zoneType === 'Borders' ? '#EF4444' : zone.zoneType === 'Blocks' ? '#22C55E' : '#7895B2', fillOpacity: 0.3, weight: 2 }}
                           />
                         </MapContainer>
                       );
@@ -479,6 +497,15 @@ export default function AdminZones() {
                   <div className="absolute top-3 right-3 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-[8px] text-[#2F2F2F] text-xs font-sans font-bold tracking-wider border border-[#E5E7EB] shadow-sm">
                     {zone.zoneCode}
                   </div>
+                  {zone.zoneType && (
+                    <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-[8px] text-[10px] font-bold border backdrop-blur-sm ${
+                      zone.zoneType === 'Borders' ? 'bg-red-50/90 text-red-600 border-red-200' :
+                      zone.zoneType === 'Blocks' ? 'bg-green-50/90 text-green-600 border-green-200' :
+                      'bg-blue-50/90 text-blue-600 border-blue-200'
+                    }`}>
+                      {zone.zoneType === 'Quarters' ? 'حي' : zone.zoneType === 'Borders' ? 'حدود' : 'بلوك'}
+                    </div>
+                  )}
                 </div>
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-4">
@@ -530,9 +557,6 @@ export default function AdminZones() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-[16px] w-full max-w-4xl my-8 shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-[#E5E7EB] flex items-center justify-between">
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-[#F3F1ED] rounded-full transition-colors text-[#2F2F2F]">
-                <X size={20} />
-              </button>
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <h3 className="text-xl font-bold text-[#2F2F2F]">{editingZone ? 'تعديل بيانات المنطقة' : 'إضافة منطقة جديدة'}</h3>
@@ -542,6 +566,9 @@ export default function AdminZones() {
                   <Layers size={24} />
                 </div>
               </div>
+              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-[#F3F1ED] rounded-full transition-colors text-[#2F2F2F]">
+                <X size={20} />
+              </button>
             </div>
 
             <div className="p-6 max-h-[80vh] overflow-y-auto">
@@ -585,9 +612,16 @@ export default function AdminZones() {
                       <textarea
                         value={formData.boundaryGeoJson || ""}
                         onChange={e => setFormData({...formData, boundaryGeoJson: e.target.value})}
-                        className="w-full h-32 p-4 bg-[#F3F1ED] rounded-[12px] text-left text-[12px] text-[#2F2F2F] font-sans leading-relaxed border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30"
+                        dir="ltr"
+                        className={`w-full h-32 p-4 bg-[#F3F1ED] rounded-[12px] text-left text-[12px] text-[#2F2F2F] font-sans leading-relaxed outline-none focus:ring-2 focus:ring-[#7895B2]/30 border ${formData.boundaryGeoJson && !getPreviewGeometry(formData.boundaryGeoJson) ? "border-[#C86E5D]" : "border-transparent"}`}
                         placeholder='{"type": "Polygon", "coordinates": [[...]]}'
                       />
+                      {formData.boundaryGeoJson && !getPreviewGeometry(formData.boundaryGeoJson) && (
+                        <p className="text-[#C86E5D] text-xs flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          صيغة GeoJSON غير صالحة — تحقق من البنية ثم حاول مجدداً
+                        </p>
+                      )}
                     </div>
                   </div>
 

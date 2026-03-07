@@ -1,8 +1,7 @@
 ﻿import 'dart:io';
-
-import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 
+import 'package:dio/dio.dart';
 import '../../core/config/api_config.dart';
 import '../../core/errors/app_exception.dart';
 
@@ -91,6 +90,7 @@ class TasksService {
     double? latitude,
     double? longitude,
     DateTime? eventTime,
+    bool gpsUnavailable = false,
   }) async {
     final formData = FormData();
 
@@ -107,6 +107,11 @@ class TasksService {
     // include device time so backend stores when the worker actually completed it
     if (eventTime != null) {
       formData.fields.add(MapEntry('eventTime', eventTime.toIso8601String()));
+    }
+
+    // flag GPS failure so supervisor is aware
+    if (gpsUnavailable) {
+      formData.fields.add(const MapEntry('gpsUnavailable', 'true'));
     }
 
     if (proofPhoto != null) {

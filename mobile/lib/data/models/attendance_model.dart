@@ -53,8 +53,8 @@ class AttendanceModel {
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json) {
     return AttendanceModel(
-      attendanceId: json['attendanceId'] as int,
-      userId: json['userId'] as int,
+      attendanceId: (json['attendanceId'] as num?)?.toInt() ?? 0,
+      userId: (json['userId'] as num?)?.toInt() ?? 0,
       // backend uses 'userName'
       employeeName:
           json['userName'] as String? ?? json['employeeName'] as String?,
@@ -71,14 +71,10 @@ class AttendanceModel {
           : (json['checkOutTime'] != null
               ? DateFormatter.parseUtc(json['checkOutTime'] as String)
               : null),
-      checkInLatitude: (json['checkInLatitude'] as num).toDouble(),
-      checkInLongitude: (json['checkInLongitude'] as num).toDouble(),
-      checkOutLatitude: json['checkOutLatitude'] != null
-          ? (json['checkOutLatitude'] as num).toDouble()
-          : null,
-      checkOutLongitude: json['checkOutLongitude'] != null
-          ? (json['checkOutLongitude'] as num).toDouble()
-          : null,
+      checkInLatitude: (json['checkInLatitude'] as num?)?.toDouble() ?? 0.0,
+      checkInLongitude: (json['checkInLongitude'] as num?)?.toDouble() ?? 0.0,
+      checkOutLatitude: (json['checkOutLatitude'] as num?)?.toDouble(),
+      checkOutLongitude: (json['checkOutLongitude'] as num?)?.toDouble(),
       // backend uses 'zoneName'
       checkInZoneName:
           json['zoneName'] as String? ?? json['checkInZoneName'] as String?,
@@ -127,54 +123,6 @@ class AttendanceModel {
       'manualReason': manualReason,
       'approvalStatus': approvalStatus,
     };
-  }
-
-  AttendanceModel copyWith({
-    int? attendanceId,
-    int? userId,
-    String? employeeName,
-    DateTime? checkInTime,
-    DateTime? checkOutTime,
-    double? checkInLatitude,
-    double? checkInLongitude,
-    double? checkOutLatitude,
-    double? checkOutLongitude,
-    String? checkInZoneName,
-    String? checkOutZoneName,
-    bool? isValid,
-    String? notes,
-    DateTime? createdAt,
-    int? lateMinutes,
-    int? earlyLeaveMinutes,
-    int? overtimeMinutes,
-    String? attendanceType,
-    bool? isManual,
-    String? manualReason,
-    String? approvalStatus,
-  }) {
-    return AttendanceModel(
-      attendanceId: attendanceId ?? this.attendanceId,
-      userId: userId ?? this.userId,
-      employeeName: employeeName ?? this.employeeName,
-      checkInTime: checkInTime ?? this.checkInTime,
-      checkOutTime: checkOutTime ?? this.checkOutTime,
-      checkInLatitude: checkInLatitude ?? this.checkInLatitude,
-      checkInLongitude: checkInLongitude ?? this.checkInLongitude,
-      checkOutLatitude: checkOutLatitude ?? this.checkOutLatitude,
-      checkOutLongitude: checkOutLongitude ?? this.checkOutLongitude,
-      checkInZoneName: checkInZoneName ?? this.checkInZoneName,
-      checkOutZoneName: checkOutZoneName ?? this.checkOutZoneName,
-      isValid: isValid ?? this.isValid,
-      notes: notes ?? this.notes,
-      createdAt: createdAt ?? this.createdAt,
-      lateMinutes: lateMinutes ?? this.lateMinutes,
-      earlyLeaveMinutes: earlyLeaveMinutes ?? this.earlyLeaveMinutes,
-      overtimeMinutes: overtimeMinutes ?? this.overtimeMinutes,
-      attendanceType: attendanceType ?? this.attendanceType,
-      isManual: isManual ?? this.isManual,
-      manualReason: manualReason ?? this.manualReason,
-      approvalStatus: approvalStatus ?? this.approvalStatus,
-    );
   }
 
   bool get isActive => checkOutTime == null;

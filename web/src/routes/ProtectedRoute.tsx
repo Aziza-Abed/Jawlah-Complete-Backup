@@ -1,39 +1,42 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { STORAGE_KEYS } from "../constants/storageKeys";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [isValidating, setIsValidating] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+  const hasToken = !!token;
+
+  // If token exists, assume authenticated until proven otherwise (no flash redirect)
+  const [isValidating, setIsValidating] = useState(hasToken);
+  const [isAuthenticated, setIsAuthenticated] = useState(hasToken);
+  const didValidate = useRef(false);
 
   useEffect(() => {
-    const validateToken = async () => {
-      // No token = not authenticated
-      if (!token) {
-        setIsAuthenticated(false);
-        setIsValidating(false);
-        return;
-      }
+    // No token = not authenticated, no need to validate
+    if (!token) {
+      setIsAuthenticated(false);
+      setIsValidating(false);
+      return;
+    }
 
+    // Only validate once per mount
+    if (didValidate.current) return;
+    didValidate.current = true;
+
+    const validateToken = async () => {
       try {
-        // SECURITY FIX: Validate token with server
-        // This prevents fake tokens from localStorage bypass
         const response = await apiClient.get('/auth/me');
 
         if (response.data.success) {
           setIsAuthenticated(true);
-          // Update user data in localStorage from server
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.data));
         } else {
-          // Token invalid
           localStorage.removeItem(STORAGE_KEYS.TOKEN);
           localStorage.removeItem(STORAGE_KEYS.USER);
           setIsAuthenticated(false);
         }
-      } catch (error) {
-        // Token validation failed
+      } catch {
         localStorage.removeItem(STORAGE_KEYS.TOKEN);
         localStorage.removeItem(STORAGE_KEYS.USER);
         setIsAuthenticated(false);
@@ -45,16 +48,21 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     validateToken();
   }, [token]);
 
-  // Show loading while validating
+  // No token at all → redirect immediately
+  if (!hasToken) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Token exists, validating in background → show loading
   if (isValidating) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800">
-        <div className="text-white text-lg">جاري التحقق من الجلسة...</div>
+      <div className="h-screen w-screen flex items-center justify-center bg-[#F3F1ED]">
+        <div className="text-[#2F2F2F] text-lg font-semibold">جاري التحقق من الجلسة...</div>
       </div>
     );
   }
 
-  // Redirect to login if not authenticated
+  // Validation done, not authenticated → redirect
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

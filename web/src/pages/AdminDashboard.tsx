@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { STORAGE_KEYS } from "../constants/storageKeys";
+import { TOP_PERFORMERS_COUNT } from "../constants/appConstants";
 import {
   Users, ClipboardList, AlertTriangle, Activity, Shield,
   MapPin, FileText, BarChart3, History, UserCog, Building,
@@ -12,6 +14,7 @@ import type { DashboardOverview, WorkerStatus } from "../types/dashboard";
 import type { AdminSupervisorMonitoringData } from "../api/reports";
 
 export default function AdminDashboard() {
+  usePageTitle("لوحة التحكم");
   const navigate = useNavigate();
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [workerStatuses, setWorkerStatuses] = useState<WorkerStatus[]>([]);
@@ -89,7 +92,7 @@ export default function AdminDashboard() {
           {/* Header with Title (Title Left, Date Right) */}
           <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
               <div className="w-full lg:w-auto text-right">
-                <h1 className="text-4xl font-black text-[#2F2F2F] tracking-tight">نظرة عامة</h1>
+                <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">نظرة عامة</h1>
                 <p className="text-[#6B7280] text-[15px] mt-1.5 font-medium">مرحباً بك، {userName}. إليك ملخص أداء البلدية اليوم.</p>
               </div>
 
@@ -249,7 +252,7 @@ export default function AdminDashboard() {
                     {workerStatuses
                       .filter(w => w.completedTasksCount > 0)
                       .sort((a, b) => b.completedTasksCount - a.completedTasksCount)
-                      .slice(0, 6)
+                      .slice(0, TOP_PERFORMERS_COUNT)
                       .map((worker) => (
                         <div key={worker.userId} className="flex items-center justify-between p-4 rounded-2xl bg-[#F3F1ED]/50 border border-black/5 hover:bg-[#F3F1ED] transition-colors group">
                           <div className="text-right">
@@ -262,7 +265,7 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       ))}
-                    {workerStatuses.length === 0 && (
+                    {workerStatuses.filter(w => w.completedTasksCount > 0).length === 0 && (
                       <div className="text-center py-10 opacity-40">
                          <Clock size={32} className="mx-auto mb-2" />
                          <p className="text-sm font-bold">لا توجد بيانات حالياً</p>
@@ -313,7 +316,7 @@ function DetailRow({ label, value, color }: { label: string; value: number | str
 }
 
 function TaskProgressRow({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
-  const percent = Math.min(100, Math.round((value / total) * 100));
+  const percent = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
   return (
     <div className="space-y-3">
        <div className="flex justify-between items-end">

@@ -1,4 +1,4 @@
-// Dashboard types matching backend response
+// dashboard types
 
 export type DashboardOverview = {
   workers: {

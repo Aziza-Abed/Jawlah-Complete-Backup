@@ -7,8 +7,10 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/attendance/attendance_screen.dart';
 import '../../features/tasks/tasks_list_screen.dart';
 import '../../features/tasks/task_details_screen.dart';
-import '../../features/issues/report_problem_screen.dart';
 import '../../features/tasks/submit_evidence_screen.dart';
+import '../../features/issues/issue_details_screen.dart';
+import '../../features/issues/report_problem_screen.dart';
+
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/settings/notification_settings_screen.dart';
@@ -26,9 +28,9 @@ class Routes {
 
   static const String tasksList = '/tasks';
   static const String taskDetails = '/tasks/details';
-  static const String taskProof = '/tasks/proof';
-
+  static const String submitEvidence = '/tasks/evidence';
   static const String reportIssue = '/field/report';
+  static const String issueDetails = '/issues/details';
 
   static const String notifications = '/notifications';
 
@@ -80,15 +82,22 @@ class AppRouter {
           settings,
         );
 
-      case Routes.taskProof:
+      case Routes.submitEvidence:
+        final taskId = settings.arguments as int?;
         return _buildRoute(
-          const SubmitEvidenceScreen(),
+          SubmitEvidenceScreen(taskId: taskId),
           settings,
         );
 
       case Routes.reportIssue:
         return _buildRoute(
           const ReportProblemScreen(),
+          settings,
+        );
+
+      case Routes.issueDetails:
+        return _buildRoute(
+          const IssueDetailsScreen(),
           settings,
         );
 

@@ -1,7 +1,10 @@
-﻿import 'package:hive_flutter/hive_flutter.dart';
+﻿import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:logging/logging.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 import '../../core/config/api_config.dart';
+import '../../core/config/app_constants.dart';
 import '../../core/utils/secure_storage_helper.dart';
 import '../models/local/location_point.dart';
 
@@ -9,6 +12,9 @@ class TrackingService {
   HubConnection? _hubConnection;
   final Logger _logger = Logger('TrackingService');
   bool _isConnecting = false;
+
+  // true while GPS points are queued for upload (offline buffering)
+  static final ValueNotifier<bool> isBuffering = ValueNotifier(false);
 
   static final TrackingService _instance = TrackingService._internal();
   factory TrackingService() => _instance;
@@ -36,7 +42,7 @@ class TrackingService {
           .withUrl(
             hubUrl,
             options: HttpConnectionOptions(
-              accessTokenFactory: () async => token,
+              accessTokenFactory: () async => await SecureStorageHelper.getToken() ?? '',
             ),
           )
           .configureLogging(Logger("SignalR"))
@@ -88,16 +94,68 @@ class TrackingService {
 
     if (_hubConnection?.state == HubConnectionState.Connected) {
       try {
-        await _hubConnection?.invoke('SendLocationUpdate', args: [lat, lng]);
-        _logger.fine('Location sent: $lat, $lng');
+        // build args list: always send lat/lng; append accuracy/speed/heading when available
+        final args = <Object>[lat, lng];
+        if (accuracy != null) {
+          args.add(accuracy);
+          args.add(speed ?? 0.0);
+          args.add(heading ?? 0.0);
+        }
+        await _hubConnection?.invoke('SendLocationUpdate', args: args);
+        _logger.fine('Location sent: $lat, $lng (acc: $accuracy, spd: $speed)');
       } catch (e) {
         _logger.warning('Failed to send location via SignalR, buffering...', e);
         await _bufferLocation(point);
       }
     } else {
-      _logger.info('SignalR not connected, buffering location...');
-      connect();
-      await _bufferLocation(point);
+      // SignalR not connected — send via REST API as fallback
+      _logger.info('SignalR not connected, sending via REST fallback...');
+      connect(); // attempt reconnect in background
+      final sent = await _sendLocationViaRest(lat, lng,
+          speed: speed, accuracy: accuracy, heading: heading);
+      if (!sent) {
+        await _bufferLocation(point);
+      }
+    }
+  }
+
+  // REST API fallback for when SignalR is unavailable
+  Future<bool> _sendLocationViaRest(double lat, double lng,
+      {double? speed, double? accuracy, double? heading}) async {
+    try {
+      final token = await SecureStorageHelper.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        connectTimeout: const Duration(seconds: AppConstants.backgroundHttpTimeoutSeconds),
+        receiveTimeout: const Duration(seconds: AppConstants.backgroundHttpTimeoutSeconds),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ));
+
+      final response = await dio.post(
+        'tracking/location',
+        data: {
+          'latitude': lat,
+          'longitude': lng,
+          if (speed != null) 'speed': speed,
+          if (accuracy != null) 'accuracy': accuracy,
+          if (heading != null) 'heading': heading,
+          'timestamp': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        _logger.fine('Location sent via REST fallback');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _logger.warning('REST fallback also failed, buffering...', e);
+      return false;
     }
   }
 
@@ -109,12 +167,13 @@ class TrackingService {
       }
       final box = Hive.box<LocationPoint>('location_buffer');
 
-      if (box.length > 1000) {
-        final keysToDelete = box.keys.take(box.length - 1000).toList();
+      if (box.length > AppConstants.locationBufferMaxEntries) {
+        final keysToDelete = box.keys.take(box.length - AppConstants.locationBufferMaxEntries).toList();
         await box.deleteAll(keysToDelete);
       }
 
       await box.add(point);
+      isBuffering.value = true;
     } catch (e) {
       _logger.severe('Failed to buffer location', e);
     }
@@ -133,8 +192,13 @@ class TrackingService {
 
       for (var point in points) {
         try {
-          await _hubConnection?.invoke('SendLocationUpdate',
-              args: [point.latitude, point.longitude]);
+          final args = <Object>[point.latitude, point.longitude];
+          if (point.accuracy != null) {
+            args.add(point.accuracy!);
+            args.add(point.speed ?? 0.0);
+            args.add(point.heading ?? 0.0);
+          }
+          await _hubConnection?.invoke('SendLocationUpdate', args: args);
           keysToDelete.add(point.key);
         } catch (e) {
           break;
@@ -142,6 +206,7 @@ class TrackingService {
       }
 
       await box.deleteAll(keysToDelete);
+      if (box.isEmpty) isBuffering.value = false;
     }
   }
 

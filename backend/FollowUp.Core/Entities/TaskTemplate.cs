@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using FollowUp.Core.Enums;
 
 namespace FollowUp.Core.Entities;
 
@@ -23,9 +24,6 @@ public class TaskTemplate
     [MaxLength(50)]
     public string Frequency { get; set; } = "Daily"; // Daily, Weekly, Monthly
 
-    // Stored as string "HH:mm" for simplicity in JSON/UI, or TimeSpan
-    // Plan said TimeSpan, let's stick to TimeSpan but ensure it serializes nicely or use string "HH:mm" if easier for frontend. 
-    // The frontend sends "HH:mm". TimeSpan in C# works fine with EF.
     public TimeSpan Time { get; set; }
 
     public bool IsActive { get; set; } = true;
@@ -33,11 +31,34 @@ public class TaskTemplate
     public DateTime? LastGeneratedAt { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    
+
+    // --- Task fields (mirrors CreateTaskRequest so generated tasks are identical) ---
+
+    public TaskPriority Priority { get; set; } = TaskPriority.Medium;
+
+    public TaskType? TaskType { get; set; }
+
+    public bool RequiresPhotoProof { get; set; } = true;
+
+    public int? EstimatedDurationMinutes { get; set; }
+
+    [MaxLength(500)]
+    public string? LocationDescription { get; set; }
+
+    // Assignment: either a specific worker OR a team (same rule as CreateTaskRequest)
+    public int? DefaultAssignedToUserId { get; set; }
+
+    public int? DefaultTeamId { get; set; }
+
+    public bool IsTeamTask { get; set; } = false;
+
     // Navigation properties
     [ForeignKey("MunicipalityId")]
     public virtual Municipality? Municipality { get; set; }
-    
+
     [ForeignKey("ZoneId")]
     public virtual Zone? Zone { get; set; }
+
+    [ForeignKey("DefaultAssignedToUserId")]
+    public virtual User? DefaultAssignedTo { get; set; }
 }

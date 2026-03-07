@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -20,11 +21,12 @@ class _TasksListScreenState extends State<TasksListScreen>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    // make the tabs we have 4 filters
+    // 4 tabs matching the design: All, New, InProgress, Completed
     _tabController = TabController(length: 4, vsync: this);
 
     // get tasks when screen opens
@@ -35,6 +37,7 @@ class _TasksListScreenState extends State<TasksListScreen>
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -70,7 +73,12 @@ class _TasksListScreenState extends State<TasksListScreen>
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: TextField(
         controller: _searchController,
-        onChanged: (value) => setState(() => _searchQuery = value),
+        onChanged: (value) {
+          _debounce?.cancel();
+          _debounce = Timer(const Duration(milliseconds: 300), () {
+            if (mounted) setState(() => _searchQuery = value);
+          });
+        },
         textDirection: TextDirection.rtl,
         decoration: InputDecoration(
           hintText: 'ابحث عن مهمة...',
@@ -174,9 +182,12 @@ class _TasksListScreenState extends State<TasksListScreen>
             filteredTasks = provider.inProgressTasks;
             break;
           case 'completed':
-            filteredTasks = provider.completedTasks;
+            filteredTasks = [
+              ...provider.underReviewTasks,
+              ...provider.completedTasks,
+            ];
             break;
-          default:
+          default: // 'all'
             filteredTasks = provider.myTasks;
         }
 
@@ -201,7 +212,7 @@ class _TasksListScreenState extends State<TasksListScreen>
             itemCount: filteredTasks.length,
             itemBuilder: (context, index) {
               return FadeInAnimation(
-                delay: Duration(milliseconds: 50 * index),
+                delay: Duration(milliseconds: index < 10 ? 50 * index : 500),
                 child: TaskCard(task: filteredTasks[index]),
               );
             },
@@ -221,7 +232,7 @@ class _TasksListScreenState extends State<TasksListScreen>
         break;
       case 'inprogress':
         message = 'لا توجد مهام قيد التنفيذ';
-        icon = Icons.hourglass_empty_rounded;
+        icon = Icons.pending_actions;
         break;
       case 'completed':
         message = 'لم تكتمل أي مهام بعد';

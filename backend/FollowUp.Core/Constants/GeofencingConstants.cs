@@ -1,7 +1,7 @@
 namespace FollowUp.Core.Constants;
 
 // geofencing constants for location validation
-// NOTE: Municipality-specific bounds are now stored in the Municipalities table
+// municipality bounds are in the Municipalities table
 // These are fallback/default values for backward compatibility
 public static class GeofencingConstants
 {

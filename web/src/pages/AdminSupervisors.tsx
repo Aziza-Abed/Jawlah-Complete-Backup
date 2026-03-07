@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { getAdminSupervisorsMonitoring } from "../api/reports";
 import type { AdminSupervisorMonitoringData, SupervisorMonitoringItem } from "../api/reports";
-import { getWorkers, updateUser } from "../api/users";
+import { getWorkers, transferWorkers } from "../api/users";
 import type { UserResponse } from "../types/user";
 import {
   Users,
@@ -19,11 +20,14 @@ import {
   Activity,
   Bell
 } from "lucide-react";
+import { useToast } from "../contexts/ToastContext";
 
 type StatusFilter = "all" | "Active" | "Inactive";
 type PerformanceFilter = "all" | "Good" | "Warning" | "Critical";
 
 export default function AdminSupervisors() {
+  usePageTitle("إدارة المشرفين");
+  const { showToast } = useToast();
   const [monitoringData, setMonitoringData] = useState<AdminSupervisorMonitoringData | null>(null);
   const [allWorkers, setAllWorkers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +43,7 @@ export default function AdminSupervisors() {
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<number[]>([]);
   const [targetSupervisorId, setTargetSupervisorId] = useState<number | "">("");
   const [transferring, setTransferring] = useState(false);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchData();
@@ -55,6 +60,7 @@ export default function AdminSupervisors() {
       setAllWorkers(workerData);
     } catch (err) {
       console.error("Failed to fetch data", err);
+      showToast("فشل تحميل بيانات المشرفين", "error");
     } finally {
       setLoading(false);
     }
@@ -94,23 +100,17 @@ export default function AdminSupervisors() {
 
     setTransferring(true);
     try {
-      await Promise.all(
-        selectedWorkerIds.map(workerId =>
-          updateUser(workerId, { supervisorId: Number(targetSupervisorId) })
-        )
-      );
+      await transferWorkers(selectedWorkerIds, Number(targetSupervisorId));
 
       await fetchData();
       setShowTransferModal(false);
       setSelectedWorkerIds([]);
       setTargetSupervisorId("");
-
-      if (selectedSupervisor) {
-        const workers = getWorkersForSupervisor(selectedSupervisor.userId);
-        setSupervisorWorkers(workers);
-      }
+      setSelectedSupervisor(null);
+      setSupervisorWorkers([]);
     } catch (err) {
       console.error("Failed to transfer workers", err);
+      showToast("فشل نقل العمال. يرجى المحاولة مرة أخرى", "error");
     } finally {
       setTransferring(false);
     }
@@ -149,8 +149,8 @@ export default function AdminSupervisors() {
               <Users size={22} className="text-[#7895B2]" />
             </div>
             <div>
-              <h1 className="font-sans font-bold text-[22px] sm:text-[24px] text-[#2F2F2F]">
-                مراقبة المشرفين
+              <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">
+                إدارة المشرفين
               </h1>
               <p className="text-[13px] text-[#6B7280]">
                 متابعة أداء المشرفين والعمال • {summary?.totalSupervisors || 0} مشرف
@@ -169,9 +169,9 @@ export default function AdminSupervisors() {
 
 
           {/* Alerts Section */}
-          {monitoringData?.alerts && monitoringData.alerts.length > 0 && (
+          {monitoringData?.alerts && monitoringData.alerts.filter(a => !dismissedAlerts.has(a.id)).length > 0 && (
             <div className="space-y-3">
-              {monitoringData.alerts.map((alert) => (
+              {monitoringData.alerts.filter(a => !dismissedAlerts.has(a.id)).map((alert) => (
                 <div
                   key={alert.id}
                   className={`flex items-center gap-4 flex-row-reverse p-4 rounded-[16px] border ${
@@ -212,6 +212,12 @@ export default function AdminSupervisors() {
                   }`}>
                     {alert.severity === 'Critical' ? 'حرج' : alert.severity === 'Warning' ? 'تحذير' : 'معلومة'}
                   </span>
+                  <button
+                    onClick={() => setDismissedAlerts(prev => new Set(prev).add(alert.id))}
+                    className="shrink-0 p-1 rounded-full opacity-30 hover:opacity-100 transition-opacity"
+                  >
+                    <X size={16} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -321,7 +327,7 @@ export default function AdminSupervisors() {
             onClick={closeSupervisorDetail}
           />
 
-          <div className="absolute left-0 top-0 h-full w-full max-w-xl bg-white border-r border-[#E5E7EB] shadow-2xl overflow-y-auto animate-slide-in-left">
+          <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-white border-l border-[#E5E7EB] shadow-2xl overflow-y-auto animate-slide-in-from-right">
             <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-black/5 p-6 flex items-center justify-between z-10">
               <h2 className="text-[18px] font-black text-[#2F2F2F]">تفاصيل المشرف الميداني</h2>
               <button
@@ -410,10 +416,10 @@ export default function AdminSupervisors() {
 
               {/* Workers Management Section */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between flex-row-reverse pb-2 border-b border-black/5">
+                <div className="flex items-center justify-between pb-2 border-b border-black/5">
                   <h4 className="text-[16px] font-black text-[#2F2F2F] flex items-center gap-2">
-                    العمال المسندين للمشرف ({supervisorWorkers.length})
                     <Users size={18} className="text-[#7895B2]" />
+                    العمال المسندين للمشرف ({supervisorWorkers.length})
                   </h4>
                   {selectedWorkerIds.length > 0 && (
                     <button

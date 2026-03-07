@@ -177,8 +177,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Routes.taskDetails,
             arguments: notification.taskId,
           );
+        } else if (notification.issueId != null) {
+          Navigator.of(context).pushNamed(
+            Routes.issueDetails,
+            arguments: notification.issueId,
+          );
         }
-        // issue notifications: mark as read only — no issue details screen on mobile
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

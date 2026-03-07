@@ -27,8 +27,8 @@ class ApiService {
         sendTimeout: const Duration(seconds: ApiConfig.timeoutSeconds),
         receiveTimeout: const Duration(seconds: ApiConfig.timeoutSeconds),
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
         },
       ),
     );
@@ -234,9 +234,13 @@ class ApiService {
     // server errors
     if (error.type == DioExceptionType.badResponse) {
       final statusCode = error.response?.statusCode;
-      final message = error.response?.data?['message'] ??
-          error.response?.data?['error'] ??
-          'Server Error';
+      final data = error.response?.data;
+      String message = 'Server Error';
+      if (data is Map) {
+        message = data['message'] ?? data['error'] ?? 'Server Error';
+      } else if (data is String && data.isNotEmpty) {
+        message = data;
+      }
 
       if (statusCode == 401 || statusCode == 403) {
         return UnauthorizedException('غير مصرح. يرجى تسجيل الدخول مرة أخرى.');

@@ -1,4 +1,4 @@
-// Notification types matching backend DTOs
+// notification types
 
 export type NotificationType =
   | "TaskAssigned"
@@ -13,7 +13,8 @@ export type NotificationType =
   | "ManualAttendanceRejected"
   | "IssueReported"
   | "IssueResolved"
-  | "AppealSubmitted";
+  | "AppealSubmitted"
+  | "IssueForwarded";
 
 export type NotificationResponse = {
   notificationId: number;

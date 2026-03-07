@@ -19,4 +19,7 @@ public class UpdateZoneRequest
 
     [StringLength(100)]
     public string? District { get; set; }
+
+    // optional: Quarters, Borders, or Blocks
+    public string? ZoneType { get; set; }
 }

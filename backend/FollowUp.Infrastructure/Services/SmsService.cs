@@ -37,20 +37,7 @@ public class SmsService : ISmsService
             return true;
         }
 
-        // Production implementation would go here
-        // Example with Twilio:
-        // var accountSid = _config["Twilio:AccountSid"];
-        // var authToken = _config["Twilio:AuthToken"];
-        // var fromNumber = _config["Twilio:FromNumber"];
-        // TwilioClient.Init(accountSid, authToken);
-        // var sms = await MessageResource.CreateAsync(
-        //     body: message,
-        //     from: new Twilio.Types.PhoneNumber(fromNumber),
-        //     to: new Twilio.Types.PhoneNumber(phoneNumber)
-        // );
-        // return sms.Status != MessageResource.StatusEnum.Failed;
-
-        _logger.LogWarning("SMS sending is not configured for production. Enable MockSms or configure Twilio.");
+        _logger.LogWarning("SMS sending is not configured for production. Enable MockSms or configure a provider.");
         return false;
     }
 

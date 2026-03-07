@@ -1,4 +1,6 @@
+using FollowUp.Core.Constants;
 using FollowUp.Core.Entities;
+using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using Microsoft.Extensions.Logging;
@@ -123,7 +125,7 @@ public class GisService : IGisService
         return zone.Boundary.Contains(point);
     }
 
-    public async Task ImportShapefileAsync(string filePath, int municipalityId)
+    public async Task ImportShapefileAsync(string filePath, int municipalityId, GisFileType? fileType = null)
     {
         // Verify municipality exists
         var municipality = await _municipalityRepository.GetByIdAsync(municipalityId);
@@ -191,8 +193,9 @@ public class GisService : IGisService
                         BoundaryGeoJson = WriteGeoJson(normalizedGeometry),
                         CenterLatitude = centroid.Y,
                         CenterLongitude = centroid.X,
-                        AreaSquareMeters = normalizedGeometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180),
+                        AreaSquareMeters = normalizedGeometry.Area * AppConstants.MetersPerDegree * AppConstants.MetersPerDegree * Math.Cos(centroid.Y * Math.PI / 180),
                         District = district,
+                        ZoneType = fileType,
                         Version = 1,
                         VersionDate = DateTime.UtcNow,
                         VersionNotes = "Imported from shapefile",
@@ -212,16 +215,22 @@ public class GisService : IGisService
         }
     }
 
-    public async Task ImportGeoJsonAsync(string filePath, int municipalityId)
+    public async Task ImportGeoJsonAsync(string filePath, int municipalityId, GisFileType? fileType = null)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"GeoJSON file not found at: {filePath}", filePath);
 
-        var geoJson = await File.ReadAllTextAsync(filePath);
-        await ImportGeoJsonStringAsync(geoJson, municipalityId);
+        // Use FileShare.ReadWrite so this doesn't block concurrent uploads
+        string geoJson;
+        using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var reader = new StreamReader(fs, System.Text.Encoding.UTF8))
+        {
+            geoJson = await reader.ReadToEndAsync();
+        }
+        await ImportGeoJsonStringAsync(geoJson, municipalityId, fileType);
     }
 
-    public async Task ImportGeoJsonStringAsync(string geoJson, int municipalityId)
+    public async Task ImportGeoJsonStringAsync(string geoJson, int municipalityId, GisFileType? fileType = null)
     {
         // Verify municipality exists
         var municipality = await _municipalityRepository.GetByIdAsync(municipalityId);
@@ -285,8 +294,9 @@ public class GisService : IGisService
                     BoundaryGeoJson = WriteGeoJson(normalizedGeometry),
                     CenterLatitude = centroid.Y,
                     CenterLongitude = centroid.X,
-                    AreaSquareMeters = normalizedGeometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180),
+                    AreaSquareMeters = normalizedGeometry.Area * AppConstants.MetersPerDegree * AppConstants.MetersPerDegree * Math.Cos(centroid.Y * Math.PI / 180),
                     District = district,
+                    ZoneType = fileType,
                     Version = 1,
                     VersionDate = DateTime.UtcNow,
                     VersionNotes = "Imported from GeoJSON",
@@ -310,7 +320,13 @@ public class GisService : IGisService
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"GeoJSON file not found at: {filePath}", filePath);
 
-        var geoJson = await File.ReadAllTextAsync(filePath);
+        // Use FileShare.ReadWrite so this doesn't block concurrent uploads
+        string geoJson;
+        using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var reader = new StreamReader(fs, System.Text.Encoding.UTF8))
+        {
+            geoJson = await reader.ReadToEndAsync();
+        }
         await ImportBlocksFromGeoJsonStringAsync(geoJson, municipalityId);
     }
 
@@ -393,8 +409,9 @@ public class GisService : IGisService
                     BoundaryGeoJson = WriteGeoJson(normalizedGeometry),
                     CenterLatitude = centroid.Y,
                     CenterLongitude = centroid.X,
-                    AreaSquareMeters = normalizedGeometry.Area * 111319.9 * 111319.9 * Math.Cos(centroid.Y * Math.PI / 180),
+                    AreaSquareMeters = normalizedGeometry.Area * AppConstants.MetersPerDegree * AppConstants.MetersPerDegree * Math.Cos(centroid.Y * Math.PI / 180),
                     District = district,
+                    ZoneType = GisFileType.Blocks,
                     Version = 1,
                     VersionDate = DateTime.UtcNow,
                     VersionNotes = "Imported from Blocks GeoJSON",
@@ -428,6 +445,7 @@ public class GisService : IGisService
                 existing.CenterLatitude = zone.CenterLatitude;
                 existing.CenterLongitude = zone.CenterLongitude;
                 existing.AreaSquareMeters = zone.AreaSquareMeters;
+                existing.ZoneType = zone.ZoneType;
                 existing.Version++;
                 existing.VersionDate = DateTime.UtcNow;
                 existing.VersionNotes = $"Updated from {source}";

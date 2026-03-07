@@ -9,6 +9,7 @@ class UserModel {
   final String? workerType;
   final String? email;
   final DateTime createdAt;
+  String? profilePhotoUrl;
 
   UserModel({
     required this.userId,
@@ -19,24 +20,25 @@ class UserModel {
     this.workerType,
     this.email,
     required this.createdAt,
+    this.profilePhotoUrl,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      userId: json['userId'] as int,
+      userId: json['userId'] as int? ?? 0,
       // try employeeId, pin, or username
       employeeId: (json['employeeId'] ?? json['pin'] ?? json['username'] ?? '')
           as String,
-      fullName: json['fullName'] as String,
+      fullName: json['fullName'] as String? ?? '',
       // use empty string if phone number is missing
       phoneNumber: (json['phoneNumber'] ?? '') as String,
-      role: json['role'] as String,
+      role: json['role'] as String? ?? 'Worker',
       workerType: json['workerType'] as String?,
       email: json['email'] as String?,
       // use current date if createdAt is missing or malformed
-      createdAt: json['createdAt'] != null
-          ? DateFormatter.parseUtc(json['createdAt'] as String)
-          : DateTime.now().toUtc(),
+      createdAt: DateFormatter.tryParseUtc(json['createdAt']) ??
+          DateTime.now().toUtc(),
+      profilePhotoUrl: json['profilePhotoUrl'] as String?,
     );
   }
 
@@ -50,6 +52,7 @@ class UserModel {
       'workerType': workerType,
       'email': email,
       'createdAt': createdAt.toIso8601String(),
+      'profilePhotoUrl': profilePhotoUrl,
     };
   }
 
@@ -62,6 +65,7 @@ class UserModel {
     String? workerType,
     String? email,
     DateTime? createdAt,
+    String? profilePhotoUrl,
   }) {
     return UserModel(
       userId: userId ?? this.userId,
@@ -72,6 +76,7 @@ class UserModel {
       workerType: workerType ?? this.workerType,
       email: email ?? this.email,
       createdAt: createdAt ?? this.createdAt,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
     );
   }
 

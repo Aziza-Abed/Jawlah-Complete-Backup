@@ -19,6 +19,11 @@ public class NotificationService : INotificationService
     private readonly ILogger<NotificationService> _logger;
     private readonly bool _fcmEnabled;
 
+    // Firebase init is expensive (reads credentials from disk) — do it once across all instances
+    private static bool _firebaseInitialized;
+    private static bool _firebaseAvailable;
+    private static readonly object _firebaseLock = new();
+
     public NotificationService(
         INotificationRepository notifications,
         IUserRepository users,
@@ -30,44 +35,63 @@ public class NotificationService : INotificationService
         _users = users;
         _logger = logger;
 
-        // setup firebase if we have the credentials file
-        var credentialsPath = configuration["Firebase:CredentialsPath"];
-        if (!string.IsNullOrEmpty(credentialsPath))
+        _fcmEnabled = EnsureFirebaseInitialized(configuration, environment);
+    }
+
+    private bool EnsureFirebaseInitialized(IConfiguration configuration, IHostEnvironment environment)
+    {
+        // Fast path: already initialized
+        if (_firebaseInitialized)
+            return _firebaseAvailable;
+
+        lock (_firebaseLock)
         {
+            // Double-check inside lock
+            if (_firebaseInitialized)
+                return _firebaseAvailable;
+
+            var credentialsPath = configuration["Firebase:CredentialsPath"];
+            if (string.IsNullOrEmpty(credentialsPath))
+            {
+                _logger.LogWarning("Firebase credentials path not configured");
+                _firebaseInitialized = true;
+                _firebaseAvailable = false;
+                return false;
+            }
+
             var fullPath = Path.IsPathRooted(credentialsPath)
                 ? credentialsPath
                 : Path.Combine(environment.ContentRootPath, credentialsPath);
 
-            if (File.Exists(fullPath))
-            {
-                try
-                {
-                    if (FirebaseApp.DefaultInstance == null)
-                    {
-                        FirebaseApp.Create(new AppOptions
-                        {
-                            Credential = GoogleCredential.FromFile(fullPath)
-                        });
-                    }
-                    _fcmEnabled = true;
-                    _logger.LogInformation("Firebase Cloud Messaging initialized successfully from {Path}", fullPath);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to initialize Firebase. Push notifications will be disabled");
-                    _fcmEnabled = false;
-                }
-            }
-            else
+            if (!File.Exists(fullPath))
             {
                 _logger.LogWarning("Firebase credentials file not found at: {Path}", fullPath);
-                _fcmEnabled = false;
+                _firebaseInitialized = true;
+                _firebaseAvailable = false;
+                return false;
             }
-        }
-        else
-        {
-            _logger.LogWarning("Firebase credentials path not configured");
-            _fcmEnabled = false;
+
+            try
+            {
+                if (FirebaseApp.DefaultInstance == null)
+                {
+                    FirebaseApp.Create(new AppOptions
+                    {
+                        Credential = GoogleCredential.FromFile(fullPath)
+                    });
+                }
+                _logger.LogInformation("Firebase Cloud Messaging initialized successfully from {Path}", fullPath);
+                _firebaseInitialized = true;
+                _firebaseAvailable = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to initialize Firebase. Push notifications will be disabled");
+                _firebaseInitialized = true;
+                _firebaseAvailable = false;
+                return false;
+            }
         }
     }
 
@@ -229,6 +253,16 @@ public class NotificationService : INotificationService
         _logger.LogInformation("Battery low notification sent for worker {WorkerId} ({BatteryLevel}%)", workerId, batteryLevel);
     }
 
+    public async Task SendTaskRejectedToWorkerAsync(int workerId, int taskId, string taskTitle, string reason)
+    {
+        var body = $"تم رفض إثبات المهمة \"{taskTitle}\".\nالسبب: {reason}\nيرجى إعادة المحاولة.";
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, reason });
+        var data = new Dictionary<string, string> { { "taskId", taskId.ToString() }, { "type", "task_rejected" } };
+
+        if (await SendToUserAsync(workerId, "تم رفض إثبات المهمة", body, NotificationType.TaskStatusChanged, payload, data))
+            _logger.LogInformation("Task rejected notification sent to worker {WorkerId} for task {TaskId}", workerId, taskId);
+    }
+
     public async Task SendTaskAutoRejectedToWorkerAsync(int workerId, int taskId, string taskTitle, string reason, int distanceMeters)
     {
         var body = $"تم رفض إثبات المهمة \"{taskTitle}\" تلقائياً.\n{reason}\nالمسافة من موقع المهمة: {distanceMeters} متر";
@@ -250,21 +284,23 @@ public class NotificationService : INotificationService
         _logger.LogInformation("Task auto-rejected notification sent to supervisors for task {TaskId}", taskId);
     }
 
-    public async Task SendWarningIssuedToWorkerAsync(int workerId, string reason, int totalWarnings)
+    public async Task SendWarningIssuedToWorkerAsync(int workerId, string reason, int totalWarnings, int? taskId = null)
     {
-        var payload = System.Text.Json.JsonSerializer.Serialize(new { reason, totalWarnings });
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, reason, totalWarnings });
         var data = new Dictionary<string, string> { { "type", "warning_issued" }, { "totalWarnings", totalWarnings.ToString() } };
+        if (taskId.HasValue) data["taskId"] = taskId.Value.ToString();
 
         if (await SendToUserAsync(workerId, "تحذير", $"تم إصدار تحذير: {reason}\nإجمالي التحذيرات: {totalWarnings}",
                 NotificationType.SystemAlert, payload, data))
             _logger.LogInformation("Warning notification sent to worker {WorkerId}, total warnings: {TotalWarnings}", workerId, totalWarnings);
     }
 
-    public async Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings, int? municipalityId = null)
+    public async Task SendWarningAlertToSupervisorsAsync(int workerId, string workerName, string reason, int totalWarnings, int? municipalityId = null, int? taskId = null)
     {
         var title = totalWarnings >= 3 ? "عامل وصل للحد الأقصى من التحذيرات" : "تحذير لعامل";
-        var payload = System.Text.Json.JsonSerializer.Serialize(new { workerId, workerName, reason, totalWarnings });
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { taskId, workerId, workerName, reason, totalWarnings });
         var data = new Dictionary<string, string> { { "workerId", workerId.ToString() }, { "type", "worker_warning_alert" }, { "totalWarnings", totalWarnings.ToString() } };
+        if (taskId.HasValue) data["taskId"] = taskId.Value.ToString();
 
         await SendToAllSupervisorsAsync(title, $"تم إصدار تحذير للعامل {workerName}.\nالسبب: {reason}\nإجمالي التحذيرات: {totalWarnings}",
             NotificationType.SystemAlert, payload, data, municipalityId);
@@ -322,6 +358,17 @@ public class NotificationService : INotificationService
             $"قدّم العامل {workerName} طعناً على المهمة \"{taskTitle}\"",
             NotificationType.AppealSubmitted, payload, data, municipalityId);
         _logger.LogInformation("Appeal submitted notification sent to supervisors for task {TaskId}", taskId);
+    }
+
+    public async Task SendIssueForwardedNotificationAsync(int issueId, string issueTitle, string departmentName, int? municipalityId = null)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { issueId, departmentName });
+        var data = new Dictionary<string, string> { { "issueId", issueId.ToString() }, { "type", "issue_forwarded" } };
+
+        await SendToAllSupervisorsAsync("تم تحويل بلاغ",
+            $"تم تحويل البلاغ \"{issueTitle}\" إلى قسم {departmentName}",
+            NotificationType.IssueForwarded, payload, data, municipalityId);
+        _logger.LogInformation("Issue forwarded notification sent to supervisors/admins for issue {IssueId} to department {Department}", issueId, departmentName);
     }
 
     // ─── Push notification via Firebase ───────────────────────────────────────

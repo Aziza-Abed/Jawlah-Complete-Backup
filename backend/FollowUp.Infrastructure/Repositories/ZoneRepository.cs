@@ -33,13 +33,12 @@ public class ZoneRepository : Repository<Zone>, IZoneRepository
         var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         var point = geometryFactory.CreatePoint(new Coordinate(longitude, latitude));
 
-        var zones = await _dbSet
+        // push spatial Contains to SQL Server (STContains) via NetTopologySuite
+        return await _dbSet
             .AsNoTracking()
-            .Where(z => z.IsActive && z.Boundary != null)
-            .ToListAsync();
-
-        var zone = zones.FirstOrDefault(z => z.Boundary!.Contains(point));
-        return zone;
+            .Where(z => z.IsActive && z.Boundary != null && z.Boundary.Contains(point))
+            .OrderBy(z => z.ZoneId)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<Zone>> GetUserZonesAsync(int userId)
@@ -89,13 +88,12 @@ public class ZoneRepository : Repository<Zone>, IZoneRepository
         var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         var point = geometryFactory.CreatePoint(new Coordinate(longitude, latitude));
 
-        var zones = await _dbSet
+        // push spatial Contains to SQL Server (STContains) via NetTopologySuite
+        return await _dbSet
             .AsNoTracking()
-            .Where(z => z.IsActive && z.MunicipalityId == municipalityId && z.Boundary != null)
-            .ToListAsync();
-
-        var zone = zones.FirstOrDefault(z => z.Boundary!.Contains(point));
-        return zone;
+            .Where(z => z.IsActive && z.MunicipalityId == municipalityId && z.Boundary != null && z.Boundary.Contains(point))
+            .OrderBy(z => z.ZoneId)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<Zone?> GetByCodeAndMunicipalityAsync(string zoneCode, int municipalityId)

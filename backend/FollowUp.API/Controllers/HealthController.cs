@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using FollowUp.Infrastructure.Data;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// this controller check if api and database are working
 [Route("api/[controller]")]
+[Tags("Health")]
 public class HealthController : BaseApiController
 {
     private readonly FollowUpDbContext _db;
@@ -17,9 +18,9 @@ public class HealthController : BaseApiController
         _logger = logger;
     }
 
-    // main health check endpoint
     [HttpGet]
     [AllowAnonymous]
+    [SwaggerOperation(Summary = "check api and database health")]
     public async Task<IActionResult> Get()
     {
         try
@@ -57,9 +58,9 @@ public class HealthController : BaseApiController
         }
     }
 
-    // simple ping endpoint - public for load balancer health checks
     [HttpGet("ping")]
     [AllowAnonymous]
+    [SwaggerOperation(Summary = "simple ping for load balancer")]
     public IActionResult Ping()
     {
         return Ok(new

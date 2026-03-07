@@ -7,7 +7,15 @@
     <UserSecretsId>34b9fe55-5b5f-4930-be0f-5b3aac4a0a9a</UserSecretsId>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
+
+  <!-- Exclude Storage folder from dotnet watch to prevent restart on file uploads -->
+  <ItemGroup>
+    <Watch Remove="Storage\**" />
+    <Content Remove="Storage\**" />
+    <None Remove="Storage\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="wwwroot\**" />

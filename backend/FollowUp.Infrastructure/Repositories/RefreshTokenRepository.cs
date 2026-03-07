@@ -37,7 +37,7 @@ public class RefreshTokenRepository : IRefreshTokenRepository
             query = query.Where(rt => rt.DeviceId == deviceId);
         }
 
-        return await query.FirstOrDefaultAsync();
+        return await query.OrderByDescending(rt => rt.CreatedAt).FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<RefreshToken>> GetByUserIdAsync(int userId)

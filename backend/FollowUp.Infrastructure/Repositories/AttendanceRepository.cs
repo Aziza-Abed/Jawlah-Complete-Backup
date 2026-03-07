@@ -20,7 +20,7 @@ public class AttendanceRepository : Repository<Attendance>, IAttendanceRepositor
         var tomorrow = today.AddDays(1);
 
         // find the first attendance record for this user today
-        // NOTE: No AsNoTracking because callers may update this entity
+        // no AsNoTracking since callers may update this
         return await _dbSet
             .Include(a => a.User)
             .Include(a => a.Zone)

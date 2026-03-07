@@ -13,6 +13,8 @@ public class TaskResponse
     public string? AssignedByUserName { get; set; }
     public int? ZoneId { get; set; }
     public string? ZoneName { get; set; }
+    public double? ZoneCenterLatitude { get; set; }
+    public double? ZoneCenterLongitude { get; set; }
 
     // Team task support
     public int? TeamId { get; set; }

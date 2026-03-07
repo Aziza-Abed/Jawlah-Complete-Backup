@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/storage_helper.dart';
+import '../../data/services/api_service.dart';
 import 'package:dio/dio.dart';
 
 // widget for displaying images that require authentication
@@ -71,19 +71,10 @@ class _AuthenticatedImageState extends State<AuthenticatedImage> {
         }
       }
 
-      // load network image with authentication
-      final token = await StorageHelper.getToken();
-      if (token == null) {
-        throw Exception('Authentication token not found');
-      }
-
-      final dio = Dio();
-      final response = await dio.get(
+      // load network image with authentication (shared dio has refresh interceptor)
+      final response = await ApiService.instance.dio.get(
         imageUrl,
         options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
           responseType: ResponseType.bytes,
         ),
       );

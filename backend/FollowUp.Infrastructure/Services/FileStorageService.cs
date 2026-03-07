@@ -1,3 +1,4 @@
+using FollowUp.Core.Constants;
 using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +14,6 @@ public class FileStorageService : IFileStorageService
     private readonly ILogger<FileStorageService> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
-    private const long MaxFileSize = 5 * 1024 * 1024; // 5MB max
     private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".gif" };
     private const string SecureStorageFolder = "Storage";
 
@@ -135,7 +135,7 @@ public class FileStorageService : IFileStorageService
             var storageRoot = Path.GetFullPath(Path.Combine(_environment.ContentRootPath, SecureStorageFolder, "uploads"));
             var filePath = Path.GetFullPath(Path.Combine(storageRoot, relativePath));
 
-            // SECURITY: Verify final path is within storage directory
+            // make sure path stays inside storage dir
             if (!filePath.StartsWith(storageRoot, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Blocked path traversal attempt in delete: {FileUrl}", fileUrl);
@@ -169,13 +169,6 @@ public class FileStorageService : IFileStorageService
             return false;
         }
 
-        // file too big
-        if (file.Length > MaxFileSize)
-        {
-            _logger.LogWarning("File size {Size} exceeds maximum {MaxSize}", file.Length, MaxFileSize);
-            return false;
-        }
-
         // wrong extension
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(extension))
@@ -191,7 +184,7 @@ public class FileStorageService : IFileStorageService
             return false;
         }
 
-        // SECURITY: Validate actual file content via magic bytes
+        // check file content with magic bytes
         if (!ValidateImageMagicBytes(file))
         {
             _logger.LogWarning("File failed magic bytes validation - potential malicious file");

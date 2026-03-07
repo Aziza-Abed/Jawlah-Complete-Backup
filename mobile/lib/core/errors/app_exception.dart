@@ -40,21 +40,3 @@ class NotFoundException extends AppException {
 class ValidationException extends AppException {
   ValidationException(super.message) : super(code: 'VALIDATION_ERROR');
 }
-
-// helper to create exception from HTTP status code
-extension AppExceptionFactory on AppException {
-  static AppException fromStatusCode(int statusCode, String message) {
-    switch (statusCode) {
-      case 401:
-        return UnauthorizedException(message);
-      case 404:
-        return NotFoundException(message);
-      case 400:
-        return ValidationException(message);
-      case >= 500:
-        return ServerException(message, statusCode: statusCode);
-      default:
-        return ServerException(message, statusCode: statusCode);
-    }
-  }
-}

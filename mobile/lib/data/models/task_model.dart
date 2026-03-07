@@ -44,6 +44,9 @@ class TaskModel {
   final DateTime? rejectedAt;
   final int? rejectionDistanceMeters;
 
+  // Sync status — true when data matches server, false when local changes pending
+  final bool isSynced;
+
   TaskModel({
     required this.taskId,
     this.sourceIssueId,
@@ -80,6 +83,7 @@ class TaskModel {
     this.rejectionReason,
     this.rejectedAt,
     this.rejectionDistanceMeters,
+    this.isSynced = true,
   }) : photos = photos ?? (photoUrl != null ? [photoUrl] : []);
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
@@ -215,6 +219,7 @@ class TaskModel {
       syncVersion: local.syncVersion,
       progressPercentage: local.progressPercentage,
       progressNotes: local.progressNotes,
+      isSynced: local.isSynced,
     );
   }
 
@@ -284,6 +289,7 @@ class TaskModel {
     String? rejectionReason,
     DateTime? rejectedAt,
     int? rejectionDistanceMeters,
+    bool? isSynced,
   }) {
     return TaskModel(
       taskId: taskId ?? this.taskId,
@@ -323,34 +329,17 @@ class TaskModel {
       rejectedAt: rejectedAt ?? this.rejectedAt,
       rejectionDistanceMeters:
           rejectionDistanceMeters ?? this.rejectionDistanceMeters,
+      isSynced: isSynced ?? this.isSynced,
     );
   }
 
   bool get isPending => status.toLowerCase() == 'pending';
-  bool get isCreated => status.toLowerCase() == 'created';
-  bool get isAssigned => status.toLowerCase() == 'assigned';
-  bool get isAccepted => status.toLowerCase() == 'accepted';
-
   bool get isInProgress => status.toLowerCase() == 'inprogress';
-  bool get isSubmitted => status.toLowerCase() == 'submitted';
-
   bool get isUnderReview => status.toLowerCase() == 'underreview';
-
   bool get isCompleted => status.toLowerCase() == 'completed';
-  bool get isSynced => status.toLowerCase() == 'synced';
   bool get isRejected => status.toLowerCase() == 'rejected';
-  bool get isCancelled => status.toLowerCase() == 'cancelled';
-  bool get isFailedSync => status.toLowerCase() == 'failedsync';
-
-  bool get isOverdue {
-    if (dueDate == null || isUnderReview || isCompleted) return false;
-    return DateTime.now().toUtc().isAfter(dueDate!);
-  }
 
   bool get hasLocation => latitude != null && longitude != null;
-
-  bool get hasPhoto =>
-      photos.isNotEmpty || (photoUrl != null && photoUrl!.isNotEmpty);
 
   String get statusArabic {
     switch (status.toLowerCase()) {
@@ -414,19 +403,6 @@ class TaskModel {
         return 'أخرى';
       default:
         return taskType!;
-    }
-  }
-
-  String get estimatedDurationFormatted {
-    if (estimatedDurationMinutes == null) return '';
-    final hours = estimatedDurationMinutes! ~/ 60;
-    final minutes = estimatedDurationMinutes! % 60;
-    if (hours > 0 && minutes > 0) {
-      return '$hours ساعة و $minutes دقيقة';
-    } else if (hours > 0) {
-      return '$hours ساعة';
-    } else {
-      return '$minutes دقيقة';
     }
   }
 

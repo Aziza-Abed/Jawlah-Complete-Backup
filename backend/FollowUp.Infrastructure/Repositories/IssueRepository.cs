@@ -20,7 +20,6 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
             .Include(i => i.ResolvedByUser)
-            .Include(i => i.Photos)
             .Include(i => i.ForwardedToDepartment)
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
@@ -44,7 +43,6 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
             .Include(i => i.ResolvedByUser)
-            .Include(i => i.Photos)
             .Include(i => i.ForwardedToDepartment)
             .Where(i => i.ReportedByUserId == userId)
             .OrderByDescending(i => i.ReportedAt)
@@ -57,7 +55,6 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .AsNoTracking()
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
-            .Include(i => i.Photos)
             .Include(i => i.ForwardedToDepartment)
             .Where(i => i.Status == status)
             .OrderByDescending(i => i.Severity)
@@ -71,7 +68,6 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .AsNoTracking()
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
-            .Include(i => i.Photos)
             .Include(i => i.ForwardedToDepartment)
             .Where(i => i.Type == type)
             .OrderByDescending(i => i.ReportedAt)
@@ -84,10 +80,23 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .AsNoTracking()
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
-            .Include(i => i.Photos)
             .Include(i => i.ForwardedToDepartment)
             .Where(i => i.Severity == IssueSeverity.Critical &&
                        i.Status != IssueStatus.Resolved)
+            .OrderByDescending(i => i.ReportedAt)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<Issue>> GetIssuesByWorkerIdsAsync(IEnumerable<int> workerIds)
+    {
+        var workerIdSet = workerIds.ToList();
+        return await _dbSet
+            .AsNoTracking()
+            .Include(i => i.ReportedByUser)
+            .Include(i => i.Zone)
+            .Include(i => i.ResolvedByUser)
+            .Include(i => i.ForwardedToDepartment)
+            .Where(i => workerIdSet.Contains(i.ReportedByUserId))
             .OrderByDescending(i => i.ReportedAt)
             .ToListAsync();
     }
@@ -105,10 +114,24 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
             .AsNoTracking()
             .Include(i => i.ReportedByUser)
             .Include(i => i.Zone)
-            .Include(i => i.Photos)
+            .Include(i => i.Photos)  // sync needs photos for offline display
             .Include(i => i.ForwardedToDepartment)
             .Where(i => i.ReportedByUserId == userId && i.SyncTime > lastSyncTime)
             .ToListAsync();
+    }
+
+    public async Task<int> CountUnresolvedAsync(IEnumerable<int>? workerIds = null)
+    {
+        var query = _dbSet.AsNoTracking()
+            .Where(i => i.Status == IssueStatus.New || i.Status == IssueStatus.Forwarded || i.Status == IssueStatus.InProgress);
+
+        if (workerIds != null)
+        {
+            var ids = workerIds.ToList();
+            query = query.Where(i => ids.Contains(i.ReportedByUserId));
+        }
+
+        return await query.CountAsync();
     }
 
     // Dashboard optimized: Get stats using database-level COUNT instead of loading entities
@@ -127,6 +150,7 @@ public class IssueRepository : Repository<Issue>, IIssueRepository
                 ReportedToday = g.Count(i => i.ReportedAt >= today && i.ReportedAt < tomorrow),
                 Unresolved = g.Count(i => i.Status != IssueStatus.Resolved)
             })
+            .OrderBy(s => s.ReportedToday)
             .FirstOrDefaultAsync();
 
         return stats ?? new IssueStatsDto();

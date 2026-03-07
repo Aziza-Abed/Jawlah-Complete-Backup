@@ -13,6 +13,7 @@ interface LocationState {
   sessionToken?: string;
   maskedPhone?: string;
   username?: string;
+  demoOtpCode?: string;
 }
 
 export default function VerifyOtp() {
@@ -23,6 +24,7 @@ export default function VerifyOtp() {
   const username = state?.username;
 
   const [sessionToken, setSessionToken] = useState(state?.sessionToken);
+  const [demoOtpCode, setDemoOtpCode] = useState(state?.demoOtpCode);
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,6 +71,7 @@ export default function VerifyOtp() {
       const result = await forgotPassword({ username });
       if (result.success) {
         if (result.sessionToken) setSessionToken(result.sessionToken);
+        if (result.demoOtpCode) setDemoOtpCode(result.demoOtpCode);
         setInfo("تمت إعادة إرسال رمز التحقق.");
       } else {
         setError(result.message || "فشل إعادة إرسال الرمز.");
@@ -82,6 +85,11 @@ export default function VerifyOtp() {
 
   return (
     <AuthLayout title="التحقق من الرمز" subtitle="أدخل رمز OTP المرسل إلى هاتفك">
+      {demoOtpCode && (
+        <div className="mb-4 p-3 rounded-[12px] bg-blue-50 border border-blue-200 text-right font-sans">
+          <p className="text-blue-700 text-[13px] font-semibold">وضع التجربة — رمز التحقق: <span dir="ltr" className="text-[18px] tracking-widest font-black">{demoOtpCode}</span></p>
+        </div>
+      )}
       {error && (
         <div className="mb-4 p-3 rounded-[12px] bg-red-100 text-red-700 text-right font-sans font-semibold">
           {error}

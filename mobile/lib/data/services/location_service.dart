@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
 
+import '../../core/config/app_constants.dart';
 import '../../core/errors/app_exception.dart';
 
 class LocationService {
@@ -11,14 +12,14 @@ class LocationService {
   static const LocationAccuracy highAccuracy = LocationAccuracy.high;
   static const LocationAccuracy batteryOptimizedAccuracy = LocationAccuracy.low;
 
-  static const Duration stationaryInterval = Duration(minutes: 5);
-  static const Duration movingSlowInterval = Duration(minutes: 2);
-  static const Duration movingFastInterval = Duration(seconds: 30);
+  static const Duration stationaryInterval = AppConstants.stationaryPollingInterval;
+  static const Duration movingSlowInterval = AppConstants.slowMovementPollingInterval;
+  static const Duration movingFastInterval = AppConstants.fastMovementPollingInterval;
 
-  static const double stationaryThreshold = 20.0;
-  static const double slowMovementThreshold = 100.0;
+  static const double stationaryThreshold = AppConstants.stationaryThresholdMeters;
+  static const double slowMovementThreshold = AppConstants.slowMovementThresholdMeters;
 
-  static const int gpsTimeoutSeconds = 30;
+  static const int gpsTimeoutSeconds = AppConstants.gpsGeneralTimeoutSeconds;
 
   static Future<bool> checkPermissions() async {
     try {
@@ -32,7 +33,17 @@ class LocationService {
 
   static Future<bool> requestPermissions() async {
     try {
-      final permission = await Geolocator.requestPermission();
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      // For background GPS tracking, we need "Always" permission.
+      // Android requires requesting whileInUse first, then upgrading to always.
+      if (permission == LocationPermission.whileInUse) {
+        permission = await Geolocator.requestPermission();
+      }
+
       return permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always;
     } catch (e) {
@@ -60,7 +71,7 @@ class LocationService {
   static Future<Position?> getCurrentLocation({
     LocationAccuracy accuracy = defaultAccuracy,
     bool validateAccuracy = true,
-    double maxAccuracyMeters = 100.0,
+    double maxAccuracyMeters = AppConstants.maxGpsAccuracyMeters,
   }) async {
     final serviceEnabled = await isLocationServiceEnabled();
     if (!serviceEnabled) {

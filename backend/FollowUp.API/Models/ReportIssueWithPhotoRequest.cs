@@ -4,6 +4,7 @@ namespace FollowUp.API.Models;
 // title and Severity are optional - defaults will be provided if not specified
 public class ReportIssueWithPhotoRequest
 {
+    public string? ClientId { get; set; }  // UUID for idempotent sync (prevents duplicates on retry)
     public string? Title { get; set; }  // Optional - will be generated from Type if not provided
     public string? Description { get; set; }  // Optional - notes are optional
     public string Type { get; set; } = string.Empty;

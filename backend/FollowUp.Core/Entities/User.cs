@@ -35,6 +35,7 @@ public class User
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public string? FcmToken { get; set; }
+    public string? ProfilePhotoUrl { get; set; }
 
     // login attempt tracking
     public int FailedLoginAttempts { get; set; } = 0;

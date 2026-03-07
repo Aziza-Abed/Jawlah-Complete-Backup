@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/sync_toast_helper.dart';
 import '../../../../providers/sync_manager.dart';
 
 class SyncStatusCard extends StatelessWidget {
@@ -95,28 +96,7 @@ class SyncStatusCard extends StatelessWidget {
                   onPressed: () async {
                     final result = await connectivity.startSync();
                     if (context.mounted) {
-                      String message;
-                      Color bgColor;
-
-                      if (result.totalFailed > 0) {
-                        message = 'تم رفع ${result.totalSynced} عنصر، فشل ${result.totalFailed} عنصر';
-                        bgColor = AppColors.warning;
-                      } else if (result.success) {
-                        message = result.totalSynced > 0
-                            ? 'تمت المزامنة بنجاح (${result.totalSynced} عنصر)'
-                            : 'لا توجد عناصر للمزامنة';
-                        bgColor = AppColors.success;
-                      } else {
-                        message = 'فشلت المزامنة: ${result.errorMessage ?? "خطأ غير معروف"}';
-                        bgColor = AppColors.error;
-                      }
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(message, style: const TextStyle(fontFamily: 'Cairo')),
-                          backgroundColor: bgColor,
-                        ),
-                      );
+                      showSyncResultToast(context, result);
                     }
                   },
                   icon: const Icon(

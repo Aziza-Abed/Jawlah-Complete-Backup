@@ -1,23 +1,26 @@
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.Interfaces.Repositories;
-using FollowUp.Infrastructure.Services;
+using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// audit log viewer for administrators
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin,Supervisor")]
+[Tags("Audit")]
 public class AuditController : BaseApiController
 {
-    private readonly AuditLogService _auditService;
+    private readonly IAuditLogService _auditService;
     private readonly IUserRepository _users;
+    private readonly ILogger<AuditController> _logger;
 
-    public AuditController(AuditLogService auditService, IUserRepository users)
+    public AuditController(IAuditLogService auditService, IUserRepository users, ILogger<AuditController> logger)
     {
         _auditService = auditService;
         _users = users;
+        _logger = logger;
     }
 
     // filter logs by supervisor's workers if needed, then project to response
@@ -43,25 +46,27 @@ public class AuditController : BaseApiController
             l.Action,
             l.Details,
             l.IpAddress,
+            l.UserAgent,
             l.CreatedAt
         });
 
         return Ok(ApiResponse<object>.SuccessResponse(response));
     }
 
-    // get recent audit logs
     [HttpGet]
+    [SwaggerOperation(Summary = "get recent audit logs")]
     public async Task<IActionResult> GetLogs(
         [FromQuery] int count = 100,
         [FromQuery] int? userId = null,
         [FromQuery] string? action = null)
     {
+        count = Math.Clamp(count, 1, 500);
         var logs = await _auditService.GetRecentLogsAsync(count, userId, action);
         return await FilterAndRespond(logs);
     }
 
-    // get logs by date range
     [HttpGet("range")]
+    [SwaggerOperation(Summary = "get audit logs by date range")]
     public async Task<IActionResult> GetLogsByRange(
         [FromQuery] DateTime from,
         [FromQuery] DateTime to)
@@ -70,8 +75,8 @@ public class AuditController : BaseApiController
         return await FilterAndRespond(logs);
     }
 
-    // Get action types for filtering
     [HttpGet("actions")]
+    [SwaggerOperation(Summary = "get available action types for filtering")]
     public IActionResult GetActionTypes()
     {
         var actions = new[]

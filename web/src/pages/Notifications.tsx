@@ -136,14 +136,14 @@ export default function Notifications() {
     // Mark as read first
     if (n.status === "unread") markOneRead(n.id);
 
-    // Navigate based on type
-    if (n.type === "issue_report" && n.issueId) {
-      navigate(`/issues/${n.issueId}`);
+    // Navigate to task or issue if ID is available
+    if (n.taskId) {
+      navigate(`/tasks/${n.taskId}`);
       return;
     }
 
-    if (n.type === "task_update" && n.taskId) {
-      navigate(`/tasks/${n.taskId}`);
+    if (n.issueId) {
+      navigate(`/issues/${n.issueId}`);
       return;
     }
   };
@@ -154,7 +154,7 @@ export default function Notifications() {
         <div className="max-w-[1100px] mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F]">
+            <h1 className="text-right font-black text-[28px] text-[#2F2F2F] tracking-tight">
               الإشعارات
             </h1>
 

@@ -35,12 +35,6 @@ export async function getGisFilesStatus(): Promise<GisFilesStatus> {
   return response.data.data;
 }
 
-// Get all uploaded GIS files (history)
-export async function getAllGisFiles(): Promise<GisFileDto[]> {
-  const response = await apiClient.get<{ data: GisFileDto[] }>("/gis/files");
-  return response.data.data;
-}
-
 // Upload a new GIS file
 export async function uploadGisFile(
   file: File,
@@ -82,19 +76,6 @@ export async function importGisFile(fileId: number): Promise<{ success: boolean;
     `/gis/import/${fileId}`
   );
   return response.data;
-}
-
-// Delete a GIS file
-export async function deleteGisFile(fileId: number): Promise<{ success: boolean; message: string }> {
-  const response = await apiClient.delete<{ success: boolean; message: string }>(
-    `/gis/files/${fileId}`
-  );
-  return response.data;
-}
-
-// Get download URL for a GIS file
-export function getGisFileDownloadUrl(fileId: number): string {
-  return `/api/gis/files/${fileId}/download`;
 }
 
 // Get zones summary

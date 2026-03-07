@@ -1,4 +1,4 @@
-// Issue types matching backend DTOs
+// issue types
 
 export type IssueType = "Infrastructure" | "Safety" | "Cleanliness" | "Equipment" | "Other";
 export type IssueSeverity = "Low" | "Medium" | "High" | "Critical";
@@ -36,17 +36,6 @@ export type IssueResponse = {
 export type ForwardIssueRequest = {
   departmentId: number;
   notes?: string;
-};
-
-export type CreateIssueRequest = {
-  title: string;
-  description: string;
-  type: IssueType;
-  severity: IssueSeverity;
-  latitude: number;
-  longitude: number;
-  locationDescription?: string;
-  zoneId?: number;
 };
 
 export type UpdateIssueStatusRequest = {

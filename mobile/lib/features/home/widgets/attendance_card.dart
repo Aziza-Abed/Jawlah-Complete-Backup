@@ -308,7 +308,7 @@ class AttendanceCard extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   const Text(
-                    'سيتم تسجيل الانصراف تلقائياً',
+                    'اضغط لإنهاء العمل',
                     style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
@@ -317,11 +317,6 @@ class AttendanceCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-            const Icon(
-              Icons.arrow_back_ios,
-              color: AppColors.success,
-              size: 20,
             ),
           ],
         ),

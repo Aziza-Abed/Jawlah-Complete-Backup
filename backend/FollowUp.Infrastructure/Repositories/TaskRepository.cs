@@ -19,7 +19,6 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
             .Include(t => t.Zone)
-            .Include(t => t.Photos)
             .Include(t => t.Team)
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
@@ -43,6 +42,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
         var userTeamId = await _context.Users
             .Where(u => u.UserId == userId)
             .Select(u => u.TeamId)
+            .OrderBy(x => x)
             .FirstOrDefaultAsync();
 
         var query = _dbSet
@@ -50,7 +50,6 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .Include(t => t.AssignedToUser)
             .Include(t => t.Zone)
             .Include(t => t.AssignedByUser)
-            .Include(t => t.Photos)
             .Include(t => t.Team)
             .Where(t =>
                 // Individual task assigned to this user
@@ -81,7 +80,6 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .AsNoTracking()
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
-            .Include(t => t.Photos)
             .Include(t => t.Team)
             .Where(t => t.ZoneId == zoneId);
 
@@ -104,7 +102,6 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .AsNoTracking()
             .Include(t => t.AssignedToUser)
             .Include(t => t.Zone)
-            .Include(t => t.Photos)
             .Include(t => t.Team)
             .Where(t => t.DueDate < now &&
                        (t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress));
@@ -128,7 +125,6 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .AsNoTracking()
             .Include(t => t.AssignedToUser)
             .Include(t => t.Zone)
-            .Include(t => t.Photos)
             .Include(t => t.Team)
             .Where(t => t.DueDate >= now &&
                        t.DueDate <= threshold &&
@@ -144,7 +140,6 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
             .Include(t => t.Zone)
-            .Include(t => t.Photos)
             .Include(t => t.Team)
             .AsQueryable();
 
@@ -174,6 +169,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
         var userTeamId = await _context.Users
             .Where(u => u.UserId == userId)
             .Select(u => u.TeamId)
+            .OrderBy(x => x)
             .FirstOrDefaultAsync();
 
         return await _dbSet
@@ -181,7 +177,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
             .Include(t => t.Zone)
-            .Include(t => t.Photos)
+            .Include(t => t.Photos)  // sync needs photos for offline display
             .Include(t => t.Team)
             .Where(t => t.SyncTime > lastSyncTime &&
                 (t.AssignedToUserId == userId ||
@@ -207,6 +203,7 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
                 InProgress = g.Count(t => t.Status == TaskStatus.InProgress),
                 CompletedToday = g.Count(t => t.Status == TaskStatus.Completed && t.CompletedAt >= today)
             })
+            .OrderBy(s => s.CreatedToday)
             .FirstOrDefaultAsync();
 
         return stats ?? new TaskStatsDto();
@@ -230,7 +227,6 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
             .Include(t => t.Zone)
-            .Include(t => t.Photos)
             .Include(t => t.Team)
             .Where(t =>
                 // Individual tasks assigned to workers in the list

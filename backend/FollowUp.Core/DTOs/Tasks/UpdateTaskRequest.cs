@@ -28,4 +28,11 @@ public class UpdateTaskRequest
 
     [StringLength(500)]
     public string? LocationDescription { get; set; }
+
+    public TaskType? TaskType { get; set; }
+
+    public bool? RequiresPhotoProof { get; set; }
+
+    [Range(1, 1440)]
+    public int? EstimatedDurationMinutes { get; set; }
 }

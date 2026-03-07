@@ -7,9 +7,9 @@ using FollowUp.Core.DTOs.Tasks;
 using FollowUp.Core.Entities;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
-using FollowUp.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 using TaskEntity = FollowUp.Core.Entities.Task;
 using TaskStatus = FollowUp.Core.Enums.TaskStatus;
 using UserRole = FollowUp.Core.Enums.UserRole;
@@ -18,6 +18,7 @@ namespace FollowUp.API.Controllers;
 
 // this controller handle all task operations
 [Route("api/[controller]")]
+[Tags("Tasks")]
 public class TasksController : BaseApiController
 {
     private readonly ITaskRepository _tasks;
@@ -29,12 +30,12 @@ public class TasksController : BaseApiController
     private readonly INotificationService _notifications;
     private readonly IMapper _mapper;
     private readonly IConfiguration _config;
-    private readonly AuditLogService _audit;
+    private readonly IAuditLogService _audit;
 
     // max number of active tasks per worker (fair distribution)
-    private const int MaxActiveTasksPerWorker = 5;
+    private const int MaxActiveTasksPerWorker = AppConstants.MaxActiveTasksPerWorker;
 
-    // Auto-rejection thresholds for location verification (see AppConstants)
+    // distance thresholds for location check
     private static readonly int HardRejectDistanceMeters = AppConstants.HardRejectDistanceMeters;
     private static readonly int WarningDistanceMeters = AppConstants.WarningDistanceMeters;
 
@@ -48,7 +49,7 @@ public class TasksController : BaseApiController
         INotificationService notifications,
         IMapper mapper,
         IConfiguration config,
-        AuditLogService audit)
+        IAuditLogService audit)
     {
         _tasks = tasks;
         _photos = photos;
@@ -64,9 +65,10 @@ public class TasksController : BaseApiController
 
     // get tasks for current worker
     [HttpGet("my-tasks")]
+    [SwaggerOperation(Summary = "get tasks assigned to current user")]
     public async Task<IActionResult> GetMyTasks(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
+        [FromQuery] int pageSize = AppConstants.DefaultPageSize,
         [FromQuery] string? status = null,
         [FromQuery] string? priority = null)
     {
@@ -104,6 +106,7 @@ public class TasksController : BaseApiController
 
     // get single task by id
     [HttpGet("{id}")]
+    [SwaggerOperation(Summary = "get a single task by id")]
     public async Task<IActionResult> GetTaskById(int id)
     {
         var userId = GetCurrentUserId();
@@ -126,6 +129,7 @@ public class TasksController : BaseApiController
     // create new task by supervisor or admin
     [HttpPost]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "create a new task")]
     public async Task<IActionResult> CreateTask([FromBody] CreateTaskRequest request)
     {
         var userId = GetCurrentUserId();
@@ -138,9 +142,9 @@ public class TasksController : BaseApiController
             return Unauthorized();
 
         // clean inputs to prevent xss
-        var sanitizedTitle = InputSanitizer.SanitizeString(request.Title, 200);
-        var sanitizedDescription = InputSanitizer.SanitizeString(request.Description, 2000);
-        var sanitizedLocation = InputSanitizer.SanitizeString(request.LocationDescription, 500);
+        var sanitizedTitle = InputSanitizer.SanitizeString(request.Title, AppConstants.TitleMaxLength);
+        var sanitizedDescription = InputSanitizer.SanitizeString(request.Description, AppConstants.DescriptionMaxLength);
+        var sanitizedLocation = InputSanitizer.SanitizeString(request.LocationDescription, AppConstants.LocationMaxLength);
 
         // Validate assignment: Must provide either AssignedToUserId OR TeamId, not both or neither
         bool isTeamTask = request.TeamId.HasValue;
@@ -210,7 +214,7 @@ public class TasksController : BaseApiController
                 return BadRequest(ApiResponse<object>.ErrorResponse("الفريق المحدد غير موجود أو لا يحتوي على أعضاء"));
             }
 
-            // SECURITY: Supervisors can only assign tasks to teams containing their supervised workers
+            // supervisors can only assign to their own teams
             if (currentUser.Role == Core.Enums.UserRole.Supervisor)
             {
                 var supervisesAnyWorker = teamWorkers.Any(w => w.SupervisorId == userId.Value);
@@ -326,6 +330,7 @@ public class TasksController : BaseApiController
     // get all tasks for supervisors (filtered to their workers only)
     [HttpGet("all")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get all tasks for supervisors")]
     public async Task<IActionResult> GetAllTasks(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
@@ -382,6 +387,7 @@ public class TasksController : BaseApiController
     // update task details
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "update task details")]
     public async Task<IActionResult> UpdateTask(int id, [FromBody] UpdateTaskRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -390,10 +396,10 @@ public class TasksController : BaseApiController
 
         // update only fields that were sent
         if (!string.IsNullOrEmpty(request.Title))
-            task.Title = InputSanitizer.SanitizeString(request.Title, 200);
+            task.Title = InputSanitizer.SanitizeString(request.Title, AppConstants.TitleMaxLength);
 
         if (!string.IsNullOrEmpty(request.Description))
-            task.Description = InputSanitizer.SanitizeString(request.Description, 2000);
+            task.Description = InputSanitizer.SanitizeString(request.Description, AppConstants.DescriptionMaxLength);
 
         // check if assigned user exist and is worker
         if (request.AssignedToUserId.HasValue)
@@ -446,7 +452,16 @@ public class TasksController : BaseApiController
             task.Longitude = request.Longitude.Value;
 
         if (!string.IsNullOrEmpty(request.LocationDescription))
-            task.LocationDescription = InputSanitizer.SanitizeString(request.LocationDescription, 500);
+            task.LocationDescription = InputSanitizer.SanitizeString(request.LocationDescription, AppConstants.LocationMaxLength);
+
+        if (request.TaskType.HasValue)
+            task.TaskType = request.TaskType.Value;
+
+        if (request.RequiresPhotoProof.HasValue)
+            task.RequiresPhotoProof = request.RequiresPhotoProof.Value;
+
+        if (request.EstimatedDurationMinutes.HasValue)
+            task.EstimatedDurationMinutes = request.EstimatedDurationMinutes.Value;
 
         task.SyncTime = DateTime.UtcNow;
         task.SyncVersion++;
@@ -461,6 +476,7 @@ public class TasksController : BaseApiController
 
     // update task status
     [HttpPut("{id}/status")]
+    [SwaggerOperation(Summary = "update task status")]
     public async Task<IActionResult> UpdateTaskStatus(int id, [FromBody] UpdateTaskStatusRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -474,13 +490,19 @@ public class TasksController : BaseApiController
         if (userRole == "Worker" && userId.HasValue && !await CanAccessTaskAsync(task, userId.Value))
             return Forbid();
 
-        // workers have limited status changes
-        if (userRole == "Worker" &&
-            request.Status != TaskStatus.InProgress &&
-            request.Status != TaskStatus.UnderReview &&
-            request.Status != TaskStatus.Pending)
+        // workers can only move tasks forward: Pending → InProgress → UnderReview
+        if (userRole == "Worker")
         {
-            return Forbid();
+            if (request.Status != TaskStatus.InProgress && request.Status != TaskStatus.UnderReview)
+                return Forbid();
+
+            // prevent regression: only allow InProgress from valid prior states
+            if (request.Status == TaskStatus.InProgress &&
+                task.Status != TaskStatus.Pending &&
+                task.Status != TaskStatus.Assigned &&
+                task.Status != TaskStatus.Accepted &&
+                task.Status != TaskStatus.Rejected) // allow re-attempting rejected tasks
+                return BadRequest(ApiResponse<object>.ErrorResponse("لا يمكن إرجاع المهمة إلى حالة قيد التنفيذ"));
         }
 
         // update the status
@@ -537,6 +559,7 @@ public class TasksController : BaseApiController
     // complete task with photo upload
     [HttpPost("{id}/complete")]
     [Consumes("multipart/form-data")]
+    [SwaggerOperation(Summary = "complete task with photo proof")]
     public async Task<IActionResult> CompleteTaskWithPhoto(
         int id,
         [FromForm] CompleteTaskWithPhotoRequest request)
@@ -548,59 +571,20 @@ public class TasksController : BaseApiController
         var userId = GetCurrentUserId();
         var userRole = GetCurrentUserRole();
 
-        // workers can only complete their own tasks or team tasks they belong to
-        if (userRole == "Worker" && userId.HasValue && !await CanAccessTaskAsync(task, userId.Value))
-            return Forbid();
+        // Step 1: Validate task access, status, and photo requirement
+        var accessError = await ValidateTaskAccess(task, userId, userRole, request.Photo);
+        if (accessError != null)
+            return accessError;
 
-        // STATUS LOCK: Prevent double-submission for team tasks
-        // If task is already UnderReview or Completed, another team member already submitted
-        if (task.Status == TaskStatus.UnderReview || task.Status == TaskStatus.Completed)
-        {
-            return BadRequest(ApiResponse<object>.ErrorResponse(
-                "تم إرسال هذه المهمة بالفعل من قبل عضو آخر في الفريق. المهمة قيد المراجعة."));
-        }
-
-        // check if photo is required
-        if (task.RequiresPhotoProof && request.Photo == null)
-        {
-            return BadRequest(ApiResponse<object>.ErrorResponse("الصورة مطلوبة لهذه المهمة"));
-        }
-
-        // validate gps coords
+        // Step 2: Validate GPS coordinates and zone boundary
         if (request.Latitude.HasValue && request.Longitude.HasValue)
         {
-            var gpsValidation = ValidateGpsCoordinates(request.Latitude.Value, request.Longitude.Value);
-            if (gpsValidation != null)
-                return gpsValidation;
-
-            // verify proof GPS location is within task's assigned zone (skip if geofencing disabled)
-            var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
-            if (!disableGeofencing && task.ZoneId.HasValue)
-            {
-                var zone = await _zones.GetByIdAsync(task.ZoneId.Value);
-                if (zone?.Boundary != null)
-                {
-                    var proofPoint = NetTopologySuite.Geometries.GeometryFactory.Default.CreatePoint(
-                        new NetTopologySuite.Geometries.Coordinate(request.Longitude.Value, request.Latitude.Value));
-
-                    // allow some tolerance (worker may be near the zone boundary)
-                    var isInsideOrNear = zone.Boundary.Contains(proofPoint) ||
-                                         zone.Boundary.Distance(proofPoint) <= Core.Constants.GeofencingConstants.ProofLocationToleranceDegrees;
-
-                    if (!isInsideOrNear)
-                    {
-                        _logger.LogWarning("Task {TaskId} completion rejected - proof location outside task zone. " +
-                            "Proof location: ({Lat}, {Lon}), Zone: {ZoneName}",
-                            id, request.Latitude.Value, request.Longitude.Value, zone.ZoneName);
-
-                        return BadRequest(ApiResponse<object>.ErrorResponse(
-                            "موقع الإثبات خارج منطقة المهمة. يرجى إرسال الإثبات من موقع المهمة."));
-                    }
-                }
-            }
+            var locationError = await ValidateCompletionLocation(task, id, request.Latitude.Value, request.Longitude.Value);
+            if (locationError != null)
+                return locationError;
         }
 
-        // Upload photo FIRST (before validation) so supervisor has evidence even if rejected
+        // Step 3: Upload photo FIRST (before distance validation) so supervisor has evidence even if rejected
         string? photoUrl = null;
         if (request.Photo != null)
         {
@@ -610,7 +594,7 @@ public class TasksController : BaseApiController
             photoUrl = await _files.UploadImageAsync(request.Photo, "tasks");
         }
 
-        // Calculate distance from task location if task has specific coordinates
+        // Step 4: Calculate distance and handle two-strike auto-rejection system
         int? completionDistanceMeters = null;
         bool isDistanceWarning = false;
 
@@ -620,182 +604,21 @@ public class TasksController : BaseApiController
                 task.Latitude.Value, task.Longitude.Value,
                 request.Latitude.Value, request.Longitude.Value);
 
-            // TWO-STRIKE SYSTEM: Give worker a chance to retry before rejection
             if (completionDistanceMeters > HardRejectDistanceMeters)
             {
-                // Increment failed attempts
                 task.FailedCompletionAttempts++;
 
-                // FIRST ATTEMPT: Issue warning and keep task InProgress for retry
                 if (task.FailedCompletionAttempts == 1)
                 {
-                    var warningMessage = $"تحذير: الموقع غير مطابق لموقع المهمة. المسافة: {completionDistanceMeters} متر (الحد الأقصى: {HardRejectDistanceMeters} متر)";
-
-                    // Keep task as InProgress so worker can retry
-                    task.Status = TaskStatus.InProgress;
-                    task.RejectionLatitude = request.Latitude;
-                    task.RejectionLongitude = request.Longitude;
-                    task.RejectionDistanceMeters = completionDistanceMeters;
-                    task.PhotoUrl = photoUrl; // Save photo for supervisor review
-                    task.SyncTime = DateTime.UtcNow;
-                    task.SyncVersion++;
-
-                    await _tasks.UpdateAsync(task);
-
-                    // Save photo to Photos table if provided
-                    if (photoUrl != null)
-                    {
-                        var photo = new Photo
-                        {
-                            PhotoUrl = photoUrl,
-                            EntityType = "Task",
-                            EntityId = task.TaskId,
-                            OrderIndex = 0,
-                            UploadedAt = DateTime.UtcNow,
-                            UploadedByUserId = userId,
-                            CreatedAt = DateTime.UtcNow,
-                            Latitude = request.Latitude,
-                            Longitude = request.Longitude,
-                            EventTime = request.EventTime
-                        };
-                        await _photos.AddAsync(photo);
-                    }
-
-                    await _tasks.SaveChangesAsync();
-
-                    // Issue warning to worker
-                    var worker = await _users.GetByIdAsync(userId!.Value);
-                    if (worker != null)
-                    {
-                        worker.WarningCount++;
-                        worker.LastWarningAt = DateTime.UtcNow;
-                        worker.LastWarningReason = $"إرسال إثبات مهمة من موقع خاطئ (المسافة: {completionDistanceMeters}م)";
-                        await _users.UpdateAsync(worker);
-                        await _users.SaveChangesAsync();
-
-                        // Notify worker about warning
-                        try
-                        {
-                            await _notifications.SendWarningIssuedToWorkerAsync(
-                                worker.UserId, worker.LastWarningReason, worker.WarningCount);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to send warning notification for task {TaskId}", task.TaskId);
-                        }
-
-                        // Alert supervisors
-                        try
-                        {
-                            await _notifications.SendWarningAlertToSupervisorsAsync(
-                                worker.UserId, worker.FullName, worker.LastWarningReason, worker.WarningCount, worker.MunicipalityId);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to send supervisor warning alert for task {TaskId}", task.TaskId);
-                        }
-                    }
-
-                    _logger.LogWarning("Task {TaskId} - FIRST ATTEMPT FAILED - worker {UserId} submitted from {Distance}m away (max: {MaxDistance}m). Keeping task InProgress for retry.",
-                        id, userId, completionDistanceMeters, HardRejectDistanceMeters);
-
-                    return BadRequest(ApiResponse<object>.ErrorResponse(
-                        $"{warningMessage}\n\n" +
-                        $"هذه المحاولة الأولى. لديك فرصة أخرى لإعادة المحاولة من الموقع الصحيح.\n" +
-                        $"تم حفظ الصورة التي أرسلتها.\n\n" +
-                        $"يرجى التأكد من موقعك والمحاولة مرة أخرى."));
+                    return await HandleFirstFailedAttempt(task, id, userId, request, photoUrl, completionDistanceMeters.Value);
                 }
-
-                // SECOND ATTEMPT: Reject task and require supervisor intervention
                 else
                 {
-                    var rejectionReason = $"الموقع غير مطابق لموقع المهمة (محاولتان فاشلتان). المسافة: {completionDistanceMeters} متر (الحد الأقصى: {HardRejectDistanceMeters} متر)";
-
-                    // Reject task
-                    task.Status = TaskStatus.Rejected;
-                    task.IsAutoRejected = true;
-                    task.RejectionReason = rejectionReason;
-                    task.RejectedAt = DateTime.UtcNow;
-                    task.RejectionLatitude = request.Latitude;
-                    task.RejectionLongitude = request.Longitude;
-                    task.RejectionDistanceMeters = completionDistanceMeters;
-                    task.PhotoUrl = photoUrl; // Save photo for supervisor review
-                    task.SyncTime = DateTime.UtcNow;
-                    task.SyncVersion++;
-
-                    await _tasks.UpdateAsync(task);
-
-                    // Save photo to Photos table if provided (supervisor needs evidence)
-                    if (photoUrl != null)
-                    {
-                        var photo = new Photo
-                        {
-                            PhotoUrl = photoUrl,
-                            EntityType = "Task",
-                            EntityId = task.TaskId,
-                            OrderIndex = 0,
-                            UploadedAt = DateTime.UtcNow,
-                            UploadedByUserId = userId,
-                            CreatedAt = DateTime.UtcNow,
-                            Latitude = request.Latitude,
-                            Longitude = request.Longitude,
-                            EventTime = request.EventTime
-                        };
-                        await _photos.AddAsync(photo);
-                    }
-
-                    await _tasks.SaveChangesAsync();
-
-                    // Issue second warning to worker
-                    var worker = await _users.GetByIdAsync(userId!.Value);
-                    if (worker != null)
-                    {
-                        worker.WarningCount++;
-                        worker.LastWarningAt = DateTime.UtcNow;
-                        worker.LastWarningReason = $"إرسال إثبات مهمة من موقع خاطئ مرتين (المسافة: {completionDistanceMeters}م)";
-                        await _users.UpdateAsync(worker);
-                        await _users.SaveChangesAsync();
-
-                        // Notify worker about rejection and warning
-                        try
-                        {
-                            await _notifications.SendTaskAutoRejectedToWorkerAsync(
-                                worker.UserId, task.TaskId, task.Title, rejectionReason, completionDistanceMeters.Value);
-                            await _notifications.SendWarningIssuedToWorkerAsync(
-                                worker.UserId, worker.LastWarningReason, worker.WarningCount);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to send auto-rejection notifications for task {TaskId}", task.TaskId);
-                        }
-
-                        // Alert supervisors
-                        try
-                        {
-                            await _notifications.SendTaskAutoRejectedToSupervisorsAsync(
-                                task.TaskId, task.Title, worker.FullName, rejectionReason, completionDistanceMeters.Value, task.MunicipalityId);
-                            await _notifications.SendWarningAlertToSupervisorsAsync(
-                                worker.UserId, worker.FullName, worker.LastWarningReason, worker.WarningCount, worker.MunicipalityId);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to send supervisor alert for task {TaskId}", task.TaskId);
-                        }
-                    }
-
-                    _logger.LogWarning("Task {TaskId} AUTO-REJECTED - worker {UserId} submitted from {Distance}m away twice (max: {MaxDistance}m)",
-                        id, userId, completionDistanceMeters, HardRejectDistanceMeters);
-
-                    return BadRequest(ApiResponse<object>.ErrorResponse(
-                        $"تم رفض الإثبات تلقائياً\n{rejectionReason}\n\n" +
-                        $"هذا الرفض تقني وليس عقوبة.\n" +
-                        $"إذا كنت قد أنجزت المهمة فعلاً، سيقوم المشرف بمراجعة الصورة واتخاذ القرار المناسب.\n\n" +
-                        $"تم حفظ الصورة التي أرسلتها للمراجعة.\n" +
-                        $"يرجى الاتصال بالمشرف للمتابعة."));
+                    return await HandleAutoRejection(task, id, userId, request, photoUrl, completionDistanceMeters.Value);
                 }
             }
 
-            // WARNING: If worker is between warning and hard reject thresholds
+            // worker is between warning and hard reject distance
             if (completionDistanceMeters > WarningDistanceMeters)
             {
                 isDistanceWarning = true;
@@ -804,92 +627,13 @@ public class TasksController : BaseApiController
             }
         }
 
-        // Photo was already uploaded earlier (before distance check) so supervisor has evidence
-
+        // Step 5: Process the actual task completion
         try
         {
-            // clean completion notes
-            var sanitizedNotes = InputSanitizer.SanitizeString(request.CompletionNotes, 1000);
+            await ProcessTaskCompletion(task, id, userId, request, photoUrl, completionDistanceMeters, isDistanceWarning);
 
-            // Add distance warning to notes if applicable
-            if (isDistanceWarning && completionDistanceMeters.HasValue)
-            {
-                var warningNote = $"تنبيه: تم الإنجاز على بعد {completionDistanceMeters}م من موقع المهمة";
-                sanitizedNotes = string.IsNullOrEmpty(sanitizedNotes)
-                    ? warningNote
-                    : $"{warningNote}\n{sanitizedNotes}";
-            }
-
-            // update task with completion data - moves to UnderReview for supervisor approval
-            task.Status = TaskStatus.UnderReview;
-            task.CompletedAt = DateTime.UtcNow;                                    // server time (tamper-proof)
-            task.EventTime = request.EventTime ?? DateTime.UtcNow;                 // device time when worker actually completed it
-            task.CompletionNotes = sanitizedNotes;
-            task.Latitude = request.Latitude;
-            task.Longitude = request.Longitude;
-            task.PhotoUrl = photoUrl;
-            task.CompletionDistanceMeters = completionDistanceMeters;
-            task.IsDistanceWarning = isDistanceWarning;
-            task.FailedCompletionAttempts = 0; // Reset failed attempts on successful completion
-            task.SyncTime = DateTime.UtcNow;
-            task.SyncVersion++;
-
-            await _tasks.UpdateAsync(task);
-
-            // save photo to photos table with GPS and device timestamp for full audit trail
-            if (photoUrl != null)
-            {
-                var photo = new Photo
-                {
-                    PhotoUrl = photoUrl,
-                    EntityType = "Task",
-                    EntityId = task.TaskId,
-                    OrderIndex = 0,
-                    UploadedAt = DateTime.UtcNow,
-                    UploadedByUserId = userId,
-                    CreatedAt = DateTime.UtcNow,
-                    Latitude = request.Latitude,
-                    Longitude = request.Longitude,
-                    EventTime = request.EventTime ?? DateTime.UtcNow
-                };
-                await _photos.AddAsync(photo);
-
-                // add to task's Photos collection so mapper includes it in response
-                task.Photos.Add(photo);
-            }
-
-            // save task and photo together
-            await _tasks.SaveChangesAsync();
-
-            // notify supervisors that task was completed
-            try
-            {
-                var worker = await _users.GetByIdAsync(userId!.Value);
-                var workerName = worker?.FullName ?? "عامل";
-                await _notifications.SendTaskCompletedToSupervisorsAsync(
-                    task.TaskId,
-                    task.Title,
-                    workerName,
-                    task.MunicipalityId);
-
-                // team task: notify other team members that a teammate completed the task
-                if (task.IsTeamTask && task.TeamId.HasValue)
-                {
-                    var allWorkers = await _users.GetByRoleAsync(UserRole.Worker);
-                    var teammates = allWorkers.Where(w => w.TeamId == task.TeamId.Value && w.UserId != userId.Value);
-                    foreach (var mate in teammates)
-                    {
-                        await _notifications.SendTaskUpdatedNotificationAsync(
-                            mate.UserId,
-                            task.TaskId,
-                            $"{task.Title} - أكملها {workerName} نيابة عن الفريق");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send task completion notification for task {TaskId}", task.TaskId);
-            }
+            // Step 6: Notify supervisors and team members
+            await NotifyTaskCompletion(task, userId!.Value);
         }
         catch
         {
@@ -904,7 +648,7 @@ public class TasksController : BaseApiController
         _logger.LogInformation("Task {TaskId} completed by user {UserId} with photo {PhotoUrl}",
             id, userId, photoUrl);
 
-        // audit log for task completion
+        // Step 7: Audit log for task completion
         var completer = await _users.GetByIdAsync(userId!.Value);
         await _audit.LogAsync(userId, completer?.Username, "TaskCompleted",
             $"إكمال مهمة: {task.Title} (#{task.TaskId})",
@@ -916,6 +660,7 @@ public class TasksController : BaseApiController
 
     // get count of pending tasks for current user
     [HttpGet("pending-count")]
+    [SwaggerOperation(Summary = "get pending task count for current user")]
     public async Task<IActionResult> GetPendingCount()
     {
         var userId = GetCurrentUserId();
@@ -930,6 +675,7 @@ public class TasksController : BaseApiController
 
     // get overdue tasks
     [HttpGet("overdue")]
+    [SwaggerOperation(Summary = "get overdue tasks")]
     public async Task<IActionResult> GetOverdueTasks(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
@@ -971,6 +717,7 @@ public class TasksController : BaseApiController
     // assign task to worker
     [HttpPost("{id}/assign")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "assign task to a worker")]
     public async Task<IActionResult> AssignTask(int id, [FromBody] AssignTaskRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -1049,6 +796,7 @@ public class TasksController : BaseApiController
     // supervisor approve completed task
     [HttpPut("{id}/approve")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "approve a completed task")]
     public async Task<IActionResult> ApproveTask(int id, [FromBody] ApproveTaskRequest? request)
     {
         // find task in db
@@ -1058,7 +806,7 @@ public class TasksController : BaseApiController
             return NotFound(ApiResponse<object>.ErrorResponse("المهمة غير موجودة"));
         }
 
-        // SECURITY: Supervisors can only approve tasks from their own workers
+        // supervisors can only approve their workers' tasks
         var currentRole = GetCurrentUserRole();
         var currentUserId = GetCurrentUserId();
         if (currentRole == "Supervisor" && currentUserId.HasValue)
@@ -1133,6 +881,7 @@ public class TasksController : BaseApiController
     // supervisor reject completed task
     [HttpPut("{id}/reject")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "reject a completed task")]
     public async Task<IActionResult> RejectTask(int id, [FromBody] RejectTaskRequest request)
     {
         // find task
@@ -1142,7 +891,7 @@ public class TasksController : BaseApiController
             return NotFound(ApiResponse<object>.ErrorResponse("المهمة غير موجودة"));
         }
 
-        // SECURITY: Supervisors can only reject tasks from their own workers
+        // supervisors can only reject their workers' tasks
         var currentRole = GetCurrentUserRole();
         var currentUserId = GetCurrentUserId();
         if (currentRole == "Supervisor" && currentUserId.HasValue)
@@ -1168,8 +917,9 @@ public class TasksController : BaseApiController
             return BadRequest(ApiResponse<object>.ErrorResponse("يمكن رفض المهام قيد المراجعة فقط"));
         }
 
-        // update status with rejection reason
-        task.Status = TaskStatus.Rejected;
+        // update status — rejected task goes back to InProgress so worker can retry
+        task.Status = TaskStatus.InProgress;
+        task.ProgressPercentage = 75; // reset progress to allow re-submission
         if (!string.IsNullOrWhiteSpace(request.Reason))
         {
             var sanitizedReason = InputSanitizer.SanitizeString(request.Reason, 500);
@@ -1181,27 +931,30 @@ public class TasksController : BaseApiController
         await _tasks.UpdateAsync(task);
         await _tasks.SaveChangesAsync();
 
-        // notify worker(s) that task was rejected
+        // notify worker(s) that task was rejected and sent back to InProgress
         try
         {
+            var rejectionMessage = $"تم رفض إثبات المهمة: {task.Title}\nالسبب: {request.Reason}\nيرجى إعادة المحاولة.";
             if (task.IsTeamTask && task.TeamId.HasValue)
             {
                 // Notify all team members
                 var teamMembers = await _users.GetByRoleAsync(UserRole.Worker);
                 foreach (var member in teamMembers.Where(m => m.TeamId == task.TeamId))
                 {
-                    await _notifications.SendTaskUpdatedNotificationAsync(
+                    await _notifications.SendTaskRejectedToWorkerAsync(
                         member.UserId,
                         task.TaskId,
-                        $"تم رفض: {task.Title}");
+                        task.Title,
+                        request.Reason);
                 }
             }
             else
             {
-                await _notifications.SendTaskUpdatedNotificationAsync(
+                await _notifications.SendTaskRejectedToWorkerAsync(
                     task.AssignedToUserId,
                     task.TaskId,
-                    task.Title);
+                    task.Title,
+                    request.Reason);
             }
         }
         catch (Exception ex)
@@ -1209,34 +962,39 @@ public class TasksController : BaseApiController
             _logger.LogWarning(ex, "Failed to send task rejection notification for task {TaskId}", task.TaskId);
         }
 
-        _logger.LogInformation("Task {TaskId} rejected. Reason: {Reason}", id, request.Reason);
+        _logger.LogInformation("Task {TaskId} rejected and sent back to InProgress. Reason: {Reason}", id, request.Reason);
 
-        return Ok(ApiResponse<object?>.SuccessResponse(null, "تم رفض المهمة"));
+        return Ok(ApiResponse<object?>.SuccessResponse(null, "تم رفض المهمة وإعادتها للعامل"));
     }
 
     // delete task
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "delete a task")]
     public async Task<IActionResult> DeleteTask(int id)
     {
         var task = await _tasks.GetByIdAsync(id);
         if (task == null)
             return NotFound(ApiResponse<object>.ErrorResponse("المهمة غير موجودة"));
 
-        // delete photos from disk and db
+        // collect photo URLs before deleting from DB
         var photos = await _photos.GetPhotosByEntityAsync("Task", id);
         var photoUrls = photos.Select(p => p.PhotoUrl).Where(u => !string.IsNullOrEmpty(u)).ToList();
-        if (photoUrls.Any())
-        {
-            await _files.DeleteImagesAsync(photoUrls!);
-        }
+
+        // delete from DB first (if this fails, photos on disk remain intact)
         foreach (var photo in photos)
         {
             await _photos.DeleteAsync(photo);
         }
-
         await _tasks.DeleteAsync(task);
         await _tasks.SaveChangesAsync();
+
+        // only delete files from disk after DB commit succeeds
+        if (photoUrls.Any())
+        {
+            try { await _files.DeleteImagesAsync(photoUrls!); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete photo files for task {TaskId}", id); }
+        }
 
         _logger.LogInformation("Task {TaskId} deleted with {PhotoCount} photos", id, photoUrls.Count);
         return NoContent();
@@ -1244,6 +1002,7 @@ public class TasksController : BaseApiController
 
     // update task progress (for multi-day tasks)
     [HttpPut("{id}/progress")]
+    [SwaggerOperation(Summary = "update task progress percentage")]
     public async Task<IActionResult> UpdateTaskProgress(int id, [FromBody] UpdateTaskProgressRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -1371,6 +1130,7 @@ public class TasksController : BaseApiController
     // reassign task to different worker (supervisor/admin only)
     [HttpPut("{id}/reassign")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "reassign task to another worker")]
     public async Task<IActionResult> ReassignTask(int id, [FromBody] ReassignTaskRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -1417,7 +1177,7 @@ public class TasksController : BaseApiController
         task.SyncVersion++;
 
         // if task was in progress, reset to pending since new worker hasn't started
-        if (task.Status == TaskStatus.InProgress && !string.IsNullOrEmpty(request.ReassignmentReason))
+        if (task.Status == TaskStatus.InProgress || task.Status == TaskStatus.Rejected)
         {
             task.Status = TaskStatus.Pending;
             task.StartedAt = null;
@@ -1465,6 +1225,7 @@ public class TasksController : BaseApiController
     // extend task deadline (supervisor only)
     [HttpPut("{id}/extend")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "extend task deadline")]
     public async Task<IActionResult> ExtendTaskDeadline(int id, [FromBody] ExtendTaskDeadlineRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -1524,6 +1285,7 @@ public class TasksController : BaseApiController
     // get tasks with location warnings (supervisor view)
     [HttpGet("location-warnings")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get tasks with location warnings")]
     public async Task<IActionResult> GetTasksWithLocationWarnings(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
@@ -1556,6 +1318,7 @@ public class TasksController : BaseApiController
     // reset rejected task (allow worker to retry)
     [HttpPut("{id}/reset")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "reset a rejected task for retry")]
     public async Task<IActionResult> ResetRejectedTask(int id)
     {
         var task = await _tasks.GetByIdAsync(id);
@@ -1602,6 +1365,7 @@ public class TasksController : BaseApiController
     // approve rejected task (supervisor override - worker did the work but GPS was wrong)
     [HttpPut("{id}/approve-override")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "override and approve a rejected task")]
     public async Task<IActionResult> ApproveRejectedTask(int id, [FromBody] ApproveOverrideRequest? request)
     {
         var supervisorId = GetCurrentUserId();
@@ -1689,6 +1453,339 @@ public class TasksController : BaseApiController
             "تمت الموافقة على المهمة. تم تقليل عدد التحذيرات للعامل."));
     }
 
+    // ──────────────────────────────────────────────────────────────────────
+    // CompleteTaskWithPhoto helper methods
+    // ──────────────────────────────────────────────────────────────────────
+
+    // helper: validate task access, status lock, and photo requirement
+    private async Task<IActionResult?> ValidateTaskAccess(TaskEntity task, int? userId, string? userRole, IFormFile? photo)
+    {
+        // workers can only complete their own tasks or team tasks they belong to
+        if (userRole == "Worker" && userId.HasValue && !await CanAccessTaskAsync(task, userId.Value))
+            return Forbid();
+
+        // STATUS LOCK: Prevent double-submission for team tasks
+        // If task is already UnderReview or Completed, another team member already submitted
+        if (task.Status == TaskStatus.UnderReview || task.Status == TaskStatus.Completed)
+        {
+            return BadRequest(ApiResponse<object>.ErrorResponse(
+                "تم إرسال هذه المهمة بالفعل من قبل عضو آخر في الفريق. المهمة قيد المراجعة."));
+        }
+
+        // check if photo is required
+        if (task.RequiresPhotoProof && photo == null)
+        {
+            return BadRequest(ApiResponse<object>.ErrorResponse("الصورة مطلوبة لهذه المهمة"));
+        }
+
+        return null;
+    }
+
+    // helper: validate GPS coordinates and zone boundary for completion proof
+    private async Task<IActionResult?> ValidateCompletionLocation(TaskEntity task, int taskId, double latitude, double longitude)
+    {
+        var gpsValidation = ValidateGpsCoordinates(latitude, longitude);
+        if (gpsValidation != null)
+            return gpsValidation;
+
+        // verify proof GPS location is within task's assigned zone (skip if geofencing disabled)
+        var disableGeofencing = _config.GetValue<bool>("DeveloperMode:DisableGeofencing");
+        if (!disableGeofencing && task.ZoneId.HasValue)
+        {
+            var zone = await _zones.GetByIdAsync(task.ZoneId.Value);
+            if (zone?.Boundary != null)
+            {
+                var proofPoint = NetTopologySuite.Geometries.GeometryFactory.Default.CreatePoint(
+                    new NetTopologySuite.Geometries.Coordinate(longitude, latitude));
+
+                // allow some tolerance (worker may be near the zone boundary)
+                var isInsideOrNear = zone.Boundary.Contains(proofPoint) ||
+                                     zone.Boundary.Distance(proofPoint) <= Core.Constants.GeofencingConstants.ProofLocationToleranceDegrees;
+
+                if (!isInsideOrNear)
+                {
+                    _logger.LogWarning("Task {TaskId} completion rejected - proof location outside task zone. " +
+                        "Proof location: ({Lat}, {Lon}), Zone: {ZoneName}",
+                        taskId, latitude, longitude, zone.ZoneName);
+
+                    return BadRequest(ApiResponse<object>.ErrorResponse(
+                        "موقع الإثبات خارج منطقة المهمة. يرجى إرسال الإثبات من موقع المهمة."));
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // helper: handle first failed completion attempt - issue warning and keep task InProgress for retry
+    private async Task<IActionResult> HandleFirstFailedAttempt(
+        TaskEntity task, int taskId, int? userId,
+        CompleteTaskWithPhotoRequest request, string? photoUrl, int completionDistanceMeters)
+    {
+        var warningMessage = $"تحذير: الموقع غير مطابق لموقع المهمة. المسافة: {completionDistanceMeters} متر (الحد الأقصى: {HardRejectDistanceMeters} متر)";
+
+        // Keep task as InProgress so worker can retry
+        task.Status = TaskStatus.InProgress;
+        task.RejectionLatitude = request.Latitude;
+        task.RejectionLongitude = request.Longitude;
+        task.RejectionDistanceMeters = completionDistanceMeters;
+        task.PhotoUrl = photoUrl; // Save photo for supervisor review
+        task.SyncTime = DateTime.UtcNow;
+        task.SyncVersion++;
+
+        await _tasks.UpdateAsync(task);
+
+        // Save photo to Photos table if provided
+        await SaveCompletionPhoto(task.TaskId, userId, request, photoUrl);
+
+        await _tasks.SaveChangesAsync();
+
+        // Issue warning to worker
+        var worker = await _users.GetByIdAsync(userId!.Value);
+        if (worker != null)
+        {
+            worker.WarningCount++;
+            worker.LastWarningAt = DateTime.UtcNow;
+            worker.LastWarningReason = $"إرسال إثبات مهمة من موقع خاطئ (المسافة: {completionDistanceMeters}م)";
+            await _users.UpdateAsync(worker);
+            await _users.SaveChangesAsync();
+
+            // Notify worker about warning
+            try
+            {
+                await _notifications.SendWarningIssuedToWorkerAsync(
+                    worker.UserId, worker.LastWarningReason, worker.WarningCount, task.TaskId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send warning notification for task {TaskId}", task.TaskId);
+            }
+
+            // Alert supervisors
+            try
+            {
+                await _notifications.SendWarningAlertToSupervisorsAsync(
+                    worker.UserId, worker.FullName, worker.LastWarningReason, worker.WarningCount, worker.MunicipalityId, task.TaskId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send supervisor warning alert for task {TaskId}", task.TaskId);
+            }
+        }
+
+        _logger.LogWarning("Task {TaskId} - FIRST ATTEMPT FAILED - worker {UserId} submitted from {Distance}m away (max: {MaxDistance}m). Keeping task InProgress for retry.",
+            taskId, userId, completionDistanceMeters, HardRejectDistanceMeters);
+
+        return BadRequest(ApiResponse<object>.ErrorResponse(
+            $"{warningMessage}\n\n" +
+            $"هذه المحاولة الأولى. لديك فرصة أخرى لإعادة المحاولة من الموقع الصحيح.\n" +
+            $"تم حفظ الصورة التي أرسلتها.\n\n" +
+            $"يرجى التأكد من موقعك والمحاولة مرة أخرى."));
+    }
+
+    // helper: handle second failed completion attempt - auto-reject and allow worker to appeal
+    private async Task<IActionResult> HandleAutoRejection(
+        TaskEntity task, int taskId, int? userId,
+        CompleteTaskWithPhotoRequest request, string? photoUrl, int completionDistanceMeters)
+    {
+        var rejectionReason = $"الموقع غير مطابق لموقع المهمة (محاولتان فاشلتان). المسافة: {completionDistanceMeters} متر (الحد الأقصى: {HardRejectDistanceMeters} متر)";
+
+        // Auto-reject task — worker can appeal through the appeals system
+        task.Status = TaskStatus.Rejected;
+        task.IsAutoRejected = true;
+        task.RejectionReason = rejectionReason;
+        task.RejectedAt = DateTime.UtcNow;
+        task.RejectionLatitude = request.Latitude;
+        task.RejectionLongitude = request.Longitude;
+        task.RejectionDistanceMeters = completionDistanceMeters;
+        task.PhotoUrl = photoUrl; // Save photo for supervisor review via appeals
+        task.SyncTime = DateTime.UtcNow;
+        task.SyncVersion++;
+
+        await _tasks.UpdateAsync(task);
+
+        // Save photo to Photos table if provided (supervisor needs evidence)
+        await SaveCompletionPhoto(task.TaskId, userId, request, photoUrl);
+
+        await _tasks.SaveChangesAsync();
+
+        // Issue second warning to worker
+        var worker = await _users.GetByIdAsync(userId!.Value);
+        if (worker != null)
+        {
+            worker.WarningCount++;
+            worker.LastWarningAt = DateTime.UtcNow;
+            worker.LastWarningReason = $"إرسال إثبات مهمة من موقع خاطئ مرتين (المسافة: {completionDistanceMeters}م)";
+            await _users.UpdateAsync(worker);
+            await _users.SaveChangesAsync();
+
+            // Notify worker about rejection and warning
+            try
+            {
+                await _notifications.SendTaskAutoRejectedToWorkerAsync(
+                    worker.UserId, task.TaskId, task.Title, rejectionReason, completionDistanceMeters);
+                await _notifications.SendWarningIssuedToWorkerAsync(
+                    worker.UserId, worker.LastWarningReason, worker.WarningCount, task.TaskId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send auto-rejection notifications for task {TaskId}", task.TaskId);
+            }
+
+            // Alert supervisors
+            try
+            {
+                await _notifications.SendTaskAutoRejectedToSupervisorsAsync(
+                    task.TaskId, task.Title, worker.FullName, rejectionReason, completionDistanceMeters, task.MunicipalityId);
+                await _notifications.SendWarningAlertToSupervisorsAsync(
+                    worker.UserId, worker.FullName, worker.LastWarningReason, worker.WarningCount, worker.MunicipalityId, task.TaskId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send supervisor alert for task {TaskId}", task.TaskId);
+            }
+        }
+
+        _logger.LogWarning("Task {TaskId} AUTO-REJECTED - worker {UserId} submitted from {Distance}m away twice (max: {MaxDistance}m)",
+            taskId, userId, completionDistanceMeters, HardRejectDistanceMeters);
+
+        return BadRequest(ApiResponse<object>.ErrorResponse(
+            $"تم رفض الإثبات تلقائياً بسبب بُعد الموقع.\n{rejectionReason}\n\n" +
+            $"يمكنك تقديم طعن من خلال شاشة الطعون إذا كنت قد أنجزت المهمة فعلاً.\n" +
+            $"تم حفظ الصورة للمراجعة."));
+    }
+
+    // helper: save completion photo to Photos table with GPS and device timestamp
+    private async System.Threading.Tasks.Task SaveCompletionPhoto(
+        int taskId, int? userId, CompleteTaskWithPhotoRequest request, string? photoUrl)
+    {
+        if (photoUrl == null)
+            return;
+
+        var photo = new Photo
+        {
+            PhotoUrl = photoUrl,
+            EntityType = "Task",
+            EntityId = taskId,
+            OrderIndex = 0,
+            UploadedAt = DateTime.UtcNow,
+            UploadedByUserId = userId,
+            CreatedAt = DateTime.UtcNow,
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+            EventTime = request.EventTime
+        };
+        await _photos.AddAsync(photo);
+    }
+
+    // helper: process the actual task completion - update task state and save photo record
+    private async System.Threading.Tasks.Task ProcessTaskCompletion(
+        TaskEntity task, int taskId, int? userId,
+        CompleteTaskWithPhotoRequest request, string? photoUrl,
+        int? completionDistanceMeters, bool isDistanceWarning)
+    {
+        // clean completion notes
+        var sanitizedNotes = InputSanitizer.SanitizeString(request.CompletionNotes, 1000);
+
+        // Flag GPS unavailability only for tasks that have a location requirement
+        var taskHasLocationRequirement = task.ZoneId.HasValue || (task.Latitude.HasValue && task.Longitude.HasValue);
+        if (taskHasLocationRequirement && (request.GpsUnavailable || (!request.Latitude.HasValue && !request.Longitude.HasValue)))
+        {
+            var gpsNote = "⚠ لم يتوفر GPS عند الإنجاز";
+            sanitizedNotes = string.IsNullOrEmpty(sanitizedNotes)
+                ? gpsNote
+                : $"{gpsNote}\n{sanitizedNotes}";
+            _logger.LogInformation("Task {TaskId} completed without GPS by user {UserId}", taskId, userId);
+        }
+
+        // Add distance warning to notes if applicable
+        if (isDistanceWarning && completionDistanceMeters.HasValue)
+        {
+            var warningNote = $"تنبيه: تم الإنجاز على بعد {completionDistanceMeters}م من موقع المهمة";
+            sanitizedNotes = string.IsNullOrEmpty(sanitizedNotes)
+                ? warningNote
+                : $"{warningNote}\n{sanitizedNotes}";
+        }
+
+        // update task with completion data - moves to UnderReview for supervisor approval
+        task.Status = TaskStatus.UnderReview;
+        task.CompletedAt = DateTime.UtcNow;                                    // server time (tamper-proof)
+        task.EventTime = request.EventTime ?? DateTime.UtcNow;                 // device time when worker actually completed it
+        task.CompletionNotes = sanitizedNotes;
+        task.Latitude = request.Latitude;
+        task.Longitude = request.Longitude;
+        task.PhotoUrl = photoUrl;
+        task.CompletionDistanceMeters = completionDistanceMeters;
+        task.IsDistanceWarning = isDistanceWarning;
+        task.FailedCompletionAttempts = 0; // Reset failed attempts on successful completion
+        task.SyncTime = DateTime.UtcNow;
+        task.SyncVersion++;
+
+        await _tasks.UpdateAsync(task);
+
+        // save photo to photos table with GPS and device timestamp for full audit trail
+        if (photoUrl != null)
+        {
+            var photo = new Photo
+            {
+                PhotoUrl = photoUrl,
+                EntityType = "Task",
+                EntityId = task.TaskId,
+                OrderIndex = 0,
+                UploadedAt = DateTime.UtcNow,
+                UploadedByUserId = userId,
+                CreatedAt = DateTime.UtcNow,
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+                EventTime = request.EventTime ?? DateTime.UtcNow
+            };
+            await _photos.AddAsync(photo);
+
+            // add to task's Photos collection so mapper includes it in response
+            task.Photos.Add(photo);
+        }
+
+        // save task and photo together
+        await _tasks.SaveChangesAsync();
+    }
+
+    // helper: notify supervisors and team members about task completion
+    private async System.Threading.Tasks.Task NotifyTaskCompletion(TaskEntity task, int userId)
+    {
+        try
+        {
+            var worker = await _users.GetByIdAsync(userId);
+            var workerName = worker?.FullName ?? "عامل";
+            await _notifications.SendTaskCompletedToSupervisorsAsync(
+                task.TaskId,
+                task.Title,
+                workerName,
+                task.MunicipalityId);
+
+            // team task: notify other team members that a teammate completed the task
+            if (task.IsTeamTask && task.TeamId.HasValue)
+            {
+                var allWorkers = await _users.GetByRoleAsync(UserRole.Worker);
+                var teammates = allWorkers.Where(w => w.TeamId == task.TeamId.Value && w.UserId != userId);
+                foreach (var mate in teammates)
+                {
+                    await _notifications.SendTaskUpdatedNotificationAsync(
+                        mate.UserId,
+                        task.TaskId,
+                        $"{task.Title} - أكملها {workerName} نيابة عن الفريق");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send task completion notification for task {TaskId}", task.TaskId);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // General helper methods
+    // ──────────────────────────────────────────────────────────────────────
+
     // helper: count active tasks for a worker
     private async Task<int> GetActiveTaskCount(int workerId)
     {
@@ -1696,15 +1793,17 @@ public class TasksController : BaseApiController
         return workerTasks.Count(t => t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress);
     }
 
-    // helper: check if worker has another task on the same day
+    // helper: check if worker has too many tasks on the same day (allows up to 5 per day)
     private async Task<bool> HasTaskConflict(int workerId, DateTime dueDate, int? excludeTaskId)
     {
+        const int maxTasksPerDay = 5;
         var workerTasks = await _tasks.GetUserTasksAsync(workerId);
-        return workerTasks.Any(t =>
+        var sameDayCount = workerTasks.Count(t =>
             t.DueDate.HasValue &&
             t.DueDate.Value.Date == dueDate.Date &&
             (t.Status == TaskStatus.Pending || t.Status == TaskStatus.InProgress) &&
             (!excludeTaskId.HasValue || t.TaskId != excludeTaskId.Value));
+        return sameDayCount >= maxTasksPerDay;
     }
 
     // helper: calculate distance between two GPS coordinates in meters using Haversine formula

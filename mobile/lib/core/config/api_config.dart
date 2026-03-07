@@ -1,3 +1,5 @@
+import 'app_constants.dart';
+
 class ApiConfig {
   ApiConfig._();
 
@@ -58,13 +60,15 @@ class ApiConfig {
   static const String appeals = 'appeals';
   static const String myAppeals = 'appeals/my-appeals';
 
+  // profile endpoints
+  static const String updateProfilePhoto = 'users/profile-photo';
+
   // battery endpoints
   static const String batteryStatus = 'users/battery-status';
 
   // sync endpoints
   static const String syncAttendanceBatch = 'sync/attendance/batch';
   static const String syncTasksBatch = 'sync/tasks/batch';
-  static const String syncChanges = 'sync/changes';
 
   // zones endpoints
   static const String activeZones = 'zones';
@@ -82,13 +86,13 @@ class ApiConfig {
   static const bool enableLogging =
       bool.fromEnvironment('API_LOGGING', defaultValue: false);
 
-  static const int maxImageSize = 5 * 1024 * 1024;
+  static const int maxImageSize = AppConstants.maxImageSizeBytes;
 
   // Task location verification thresholds (must match backend AppConstants)
   // Used to warn workers before submitting task completion
-  static const int warningDistanceMeters = 100;      // Show warning if > 100m
-  static const int hardRejectDistanceMeters = 500;   // Auto-reject if > 500m
-  static const int onlineThresholdMinutes = 15;      // Consider worker online
+  static const int warningDistanceMeters = AppConstants.warningDistanceMeters;
+  static const int hardRejectDistanceMeters = AppConstants.hardRejectDistanceMeters;
+  static const int onlineThresholdMinutes = AppConstants.onlineThresholdMinutes;
 
   static String getHubUrl(String endpoint) {
     // hubs are mapped at root level, not under /api - strip /api/ suffix

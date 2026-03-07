@@ -4,6 +4,13 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Search, MapPin, Crosshair } from "lucide-react";
 import { useMunicipality } from "../../contexts/MunicipalityContext";
+import {
+  GEOLOCATION_TIMEOUT_MS,
+  GEOLOCATION_MAX_AGE_MS,
+  LOCATION_SEARCH_RESULT_LIMIT,
+  LOCATION_SELECTED_ZOOM,
+  MAP_MIN_ZOOM,
+} from "../../constants/appConstants";
 
 // Nominatim search result type
 type NominatimResult = {
@@ -62,7 +69,7 @@ function RecenterMap({ center, zoomLevel }: { center: [number, number]; zoomLeve
   const map = useMap();
   useEffect(() => {
     // If zoomLevel is provided, use it; otherwise keep current zoom but ensure at least 16
-    const targetZoom = zoomLevel ?? Math.max(map.getZoom(), 16);
+    const targetZoom = zoomLevel ?? Math.max(map.getZoom(), MAP_MIN_ZOOM);
     map.flyTo(center, targetZoom, { duration: 0.5 });
   }, [center, map, zoomLevel]);
   return null;
@@ -76,7 +83,7 @@ export default function LocationPicker({
   disabled = false,
 }: LocationPickerProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [targetZoom, setTargetZoom] = useState<number | undefined>(undefined);
@@ -97,14 +104,14 @@ export default function LocationPicker({
         : `${searchQuery}, ${municipalityName}، فلسطين`;
 
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchWithContext)}&limit=8&accept-language=ar`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchWithContext)}&limit=${LOCATION_SEARCH_RESULT_LIMIT}&accept-language=ar`
       );
       const data = await response.json();
 
       // If no results, try without the context
       if (data.length === 0) {
         const fallbackResponse = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=8&accept-language=ar`
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=${LOCATION_SEARCH_RESULT_LIMIT}&accept-language=ar`
         );
         const fallbackData = await fallbackResponse.json();
         setSearchResults(fallbackData);
@@ -117,7 +124,7 @@ export default function LocationPicker({
     } finally {
       setSearching(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, municipalityName]);
 
   // Handle search on Enter key
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -131,7 +138,7 @@ export default function LocationPicker({
   const selectResult = (result: NominatimResult) => {
     const lat = parseFloat(result.lat);
     const lng = parseFloat(result.lon);
-    setTargetZoom(18); // Zoom in close when selecting from search
+    setTargetZoom(LOCATION_SELECTED_ZOOM); // Zoom in close when selecting from search
     onLocationChange(lat, lng);
 
     // Get a clean location name for the description
@@ -145,6 +152,7 @@ export default function LocationPicker({
 
   // Get current location from browser
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -152,22 +160,22 @@ export default function LocationPicker({
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setGettingLocation(false);
-          setTargetZoom(18); // Zoom in close when using current location
+          setTargetZoom(LOCATION_SELECTED_ZOOM); // Zoom in close when using current location
           onLocationChange(position.coords.latitude, position.coords.longitude);
         },
         (error) => {
           setGettingLocation(false);
           console.error("Geolocation error:", error);
-          alert("لم نتمكن من تحديد موقعك الحالي");
+          setLocationError("لم نتمكن من تحديد موقعك الحالي");
         },
         {
-          timeout: 10000, // 10 second timeout to prevent UI freeze
-          enableHighAccuracy: false, // Faster response
-          maximumAge: 60000 // Accept cached position up to 1 minute old
+          timeout: GEOLOCATION_TIMEOUT_MS,
+          enableHighAccuracy: true,
+          maximumAge: GEOLOCATION_MAX_AGE_MS
         }
       );
     } else {
-      alert("المتصفح لا يدعم تحديد الموقع");
+      setLocationError("المتصفح لا يدعم تحديد الموقع");
     }
   };
 
@@ -230,6 +238,14 @@ export default function LocationPicker({
           </div>
         )}
       </div>
+
+      {/* Location Error */}
+      {locationError && (
+        <div className="flex items-center justify-between bg-[#C86E5D]/10 border border-[#C86E5D]/30 rounded-[10px] px-4 py-2 text-[13px] text-[#C86E5D] font-medium">
+          <button onClick={() => setLocationError("")} className="text-[#C86E5D] hover:opacity-70">✕</button>
+          <span>{locationError}</span>
+        </div>
+      )}
 
       {/* Map */}
       <div className="relative rounded-[10px] overflow-hidden border border-black/10" style={{ height: "300px" }}>

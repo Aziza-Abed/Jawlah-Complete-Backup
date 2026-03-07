@@ -38,9 +38,11 @@ public class MappingProfile : Profile
 
         // task → taskResponse (only map navigation properties and transformations)
         CreateMap<TaskEntity, TaskResponse>()
-            .ForMember(dest => dest.AssignedToUserName, opt => opt.MapFrom(src => src.AssignedToUser != null ? src.AssignedToUser.FullName : "غير متوفر"))
+            .ForMember(dest => dest.AssignedToUserName, opt => opt.MapFrom(src => src.AssignedToUser != null ? src.AssignedToUser.FullName : "غير مسند"))
             .ForMember(dest => dest.AssignedByUserName, opt => opt.MapFrom(src => src.AssignedByUser != null ? src.AssignedByUser.FullName : null))
             .ForMember(dest => dest.ZoneName, opt => opt.MapFrom(src => src.Zone != null ? src.Zone.ZoneName : null))
+            .ForMember(dest => dest.ZoneCenterLatitude, opt => opt.MapFrom(src => src.Zone != null ? src.Zone.CenterLatitude : (double?)null))
+            .ForMember(dest => dest.ZoneCenterLongitude, opt => opt.MapFrom(src => src.Zone != null ? src.Zone.CenterLongitude : (double?)null))
             .ForMember(dest => dest.TeamName, opt => opt.MapFrom(src => src.Team != null ? src.Team.Name : null))
             .ForMember(dest => dest.Photos, opt => opt.MapFrom(src => src.Photos.OrderBy(p => p.OrderIndex).Select(p => p.PhotoUrl).ToList()));
 
@@ -53,7 +55,7 @@ public class MappingProfile : Profile
 
         // attendance → attendanceResponse (map navigation properties and renamed field)
         CreateMap<Attendance, AttendanceResponse>()
-            .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.FullName))
+            .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User != null ? src.User.FullName : null))
             .ForMember(dest => dest.ZoneName, opt => opt.MapFrom(src => src.Zone != null ? src.Zone.ZoneName : null))
             .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CheckInSyncTime))
             .ForMember(dest => dest.ApprovedByUserName, opt => opt.MapFrom(src => src.ApprovedByUser != null ? src.ApprovedByUser.FullName : null));
@@ -64,12 +66,14 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.TaskId, opt => opt.MapFrom(src => ExtractIntFromPayload(src.PayloadJson, "taskId")))
             .ForMember(dest => dest.IssueId, opt => opt.MapFrom(src => ExtractIntFromPayload(src.PayloadJson, "issueId")));
 
-        // zone → zoneResponse (all properties match)
-        CreateMap<Zone, ZoneResponse>();
+        // zone → zoneResponse (map ZoneType enum to string)
+        CreateMap<Zone, ZoneResponse>()
+            .ForMember(dest => dest.ZoneType, opt => opt.MapFrom(src =>
+                src.ZoneType.HasValue ? src.ZoneType.Value.ToString() : null));
 
         // appeal → appealResponse (map navigation properties and enum conversions)
         CreateMap<Appeal, AppealResponse>()
-            .ForMember(dest => dest.WorkerName, opt => opt.MapFrom(src => src.User.FullName))
+            .ForMember(dest => dest.WorkerName, opt => opt.MapFrom(src => src.User != null ? src.User.FullName : null))
             .ForMember(dest => dest.ReviewedByName, opt => opt.MapFrom(src => src.ReviewedByUser != null ? src.ReviewedByUser.FullName : null))
             .ForMember(dest => dest.AppealTypeName, opt => opt.MapFrom(src => GetAppealTypeName(src.AppealType)))
             .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => GetAppealStatusName(src.Status)))
@@ -112,7 +116,7 @@ public class MappingProfile : Profile
             if (doc.RootElement.TryGetProperty(key, out var prop) && prop.TryGetInt32(out var value))
                 return value;
         }
-        catch { /* ignore malformed JSON */ }
+        catch { } // ignore malformed JSON
         return null;
     }
 }

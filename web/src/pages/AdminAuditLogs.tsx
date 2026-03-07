@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { getAuditLogs } from "../api/audit";
 import type { AuditLog } from "../api/audit";
+import { AUDIT_LOGS_PAGE_SIZE } from "../constants/appConstants";
 import {
   History,
   Search,
@@ -8,8 +10,6 @@ import {
   Activity,
   Calendar,
   Info,
-  Globe,
-  Monitor,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 export default function AdminAuditLogs() {
+  usePageTitle("سجلات النشاط");
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -26,32 +27,33 @@ export default function AdminAuditLogs() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  useEffect(() => {
-    fetchLogs();
-  }, [page, actionFilter]);
+  const [fetchTrigger, setFetchTrigger] = useState(0);
 
-  const fetchLogs = async () => {
-    try {
-      setLoading(true);
-      const data = await getAuditLogs(page, 20, {
-          action: actionFilter === "all" ? undefined : actionFilter,
-          username: searchTerm || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined
-      });
-      setLogs(data.items || []);
-      setTotalCount(data.totalCount || 0);
-    } catch (err) {
-      console.error("Failed to fetch audit logs", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const doFetch = async () => {
+      try {
+        setLoading(true);
+        const data = await getAuditLogs(page, AUDIT_LOGS_PAGE_SIZE, {
+            action: actionFilter === "all" ? undefined : actionFilter,
+            username: searchTerm || undefined,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined
+        });
+        setLogs(data.items || []);
+        setTotalCount(data.totalCount || 0);
+      } catch (err) {
+        console.error("Failed to fetch audit logs", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    doFetch();
+  }, [page, actionFilter, searchTerm, startDate, endDate, fetchTrigger]);
 
   const handleSearch = (e: React.FormEvent) => {
       e.preventDefault();
       setPage(1);
-      fetchLogs();
+      setFetchTrigger(t => t + 1);
   };
 
   const clearFilters = () => {
@@ -60,6 +62,7 @@ export default function AdminAuditLogs() {
     setStartDate("");
     setEndDate("");
     setPage(1);
+    setFetchTrigger(t => t + 1);
   };
 
   const activities = [
@@ -100,7 +103,7 @@ export default function AdminAuditLogs() {
                 <History size={22} className="text-[#7895B2]" />
               </div>
               <div>
-                <h1 className="font-sans font-bold text-[22px] sm:text-[24px] text-[#2F2F2F]">
+                <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">
                   سجلات النشاط
                 </h1>
                 <p className="text-[13px] text-[#6B7280]">تتبع جميع التغييرات والعمليات على النظام</p>
@@ -156,7 +159,6 @@ export default function AdminAuditLogs() {
                 <div className="flex flex-row-reverse gap-3 items-center flex-1">
                   <div className="flex items-center gap-2 text-[#6B7280]">
                     <CalendarDays size={18} />
-                    <span className="text-[13px] font-medium">الفترة:</span>
                   </div>
                   <div className="flex flex-row-reverse gap-2 flex-1">
                     <div className="relative flex-1">
@@ -164,29 +166,23 @@ export default function AdminAuditLogs() {
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        className="h-[46px] w-full px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30 cursor-pointer [color-scheme:light]"
+                        className="h-[46px] w-full pr-9 pl-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30 cursor-pointer [color-scheme:light]"
                       />
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[#6B7280] pointer-events-none">من</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#6B7280] pointer-events-none">من</span>
                     </div>
                     <div className="relative flex-1">
                       <input
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="h-[46px] w-full px-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30 cursor-pointer [color-scheme:light]"
+                        className="h-[46px] w-full pr-9 pl-4 bg-[#F3F1ED] rounded-[12px] text-right text-[14px] text-[#2F2F2F] border-0 outline-none focus:ring-2 focus:ring-[#7895B2]/30 cursor-pointer [color-scheme:light]"
                       />
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[#6B7280] pointer-events-none">إلى</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#6B7280] pointer-events-none">إلى</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="bg-[#7895B2] hover:bg-[#6B87A3] text-white px-6 h-[46px] rounded-[12px] transition-all font-semibold text-[14px]"
-                  >
-                    تصفية
-                  </button>
                   {(searchTerm || actionFilter !== "all" || startDate || endDate) && (
                     <button
                       type="button"
@@ -211,7 +207,6 @@ export default function AdminAuditLogs() {
                     <th className="px-5 py-4 font-bold">العملية</th>
                     <th className="px-5 py-4 font-bold">التفاصيل</th>
                     <th className="px-5 py-4 font-bold">الوقت والتاريخ</th>
-                    <th className="px-5 py-4 font-bold text-center">معلومات تقنية</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F3F1ED]">
@@ -251,18 +246,6 @@ export default function AdminAuditLogs() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="flex items-center gap-1 text-[10px] text-[#6B7280] bg-[#F3F1ED] px-2 py-1 rounded-[8px]" title={log.ipAddress}>
-                            <Globe size={10} className="text-[#7895B2]" />
-                            <span className="font-sans">{log.ipAddress?.split(',')[0]}</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[10px] text-[#6B7280] bg-[#F3F1ED] px-2 py-1 rounded-[8px]" title={log.userAgent}>
-                            <Monitor size={10} className="text-[#8FA36A]" />
-                            <span className="max-w-[50px] truncate font-sans">{log.userAgent?.split(' ')[0]}</span>
-                          </div>
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -277,7 +260,7 @@ export default function AdminAuditLogs() {
             )}
 
             {/* Pagination */}
-            {totalCount > 20 && (
+            {totalCount > AUDIT_LOGS_PAGE_SIZE && (
               <div className="bg-[#F3F1ED] px-5 py-4 border-t border-[#E5E7EB] flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button
@@ -287,10 +270,10 @@ export default function AdminAuditLogs() {
                   >
                     <ChevronRight size={18} />
                   </button>
-                  <span className="text-[12px] font-semibold text-[#6B7280] mx-2">صفحة {page} من {Math.ceil(totalCount / 20)}</span>
+                  <span className="text-[12px] font-semibold text-[#6B7280] mx-2">صفحة {page} من {Math.ceil(totalCount / AUDIT_LOGS_PAGE_SIZE)}</span>
                   <button
                     onClick={() => setPage(p => p + 1)}
-                    disabled={page >= Math.ceil(totalCount / 20)}
+                    disabled={page >= Math.ceil(totalCount / AUDIT_LOGS_PAGE_SIZE)}
                     className="p-2 rounded-[10px] border border-[#E5E7EB] bg-white text-[#2F2F2F] hover:bg-[#F3F1ED] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                   >
                     <ChevronLeft size={18} />

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import '../core/errors/app_exception.dart';
 import '../core/utils/hive_init.dart';
 import '../core/utils/background_service_utils.dart';
 import '../data/models/user_model.dart';
@@ -11,6 +13,7 @@ import '../data/services/api_service.dart';
 import '../data/services/firebase_messaging_service.dart';
 import '../data/services/battery_service.dart';
 import '../core/utils/secure_storage_helper.dart';
+import '../core/utils/storage_helper.dart';
 
 import 'base_controller.dart';
 
@@ -18,13 +21,22 @@ class AuthManager extends BaseController {
   final AuthService _authService;
   final StorageService _storageService;
 
+  /// Callbacks to clear sibling providers on logout
+  final List<VoidCallback> _logoutCallbacks = [];
+  void addLogoutCallback(VoidCallback cb) => _logoutCallbacks.add(cb);
+
   UserModel? currentUser;
   String? jwtToken;
+
+  // completer to signal when session restore is done
+  final Completer<void> _sessionRestored = Completer<void>();
+  Future<void> get sessionRestored => _sessionRestored.future;
 
   // OTP (Two-Factor Authentication) state
   bool _requiresOtp = false;
   String? _otpSessionToken;
   String? _otpMaskedPhone;
+  String? _otpDemoCode;
 
   UserModel? get user => currentUser;
   String? get token => jwtToken;
@@ -35,6 +47,13 @@ class AuthManager extends BaseController {
   bool get requiresOtp => _requiresOtp;
   String? get otpSessionToken => _otpSessionToken;
   String? get otpMaskedPhone => _otpMaskedPhone;
+  String? get otpDemoCode => _otpDemoCode;
+
+  // update profile photo URL and notify listeners
+  void updateProfilePhoto(String url) {
+    currentUser?.profilePhotoUrl = url;
+    notifyListeners();
+  }
 
   AuthManager(this._authService, this._storageService) {
     _loadSavedSession();
@@ -76,6 +95,8 @@ class AuthManager extends BaseController {
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Error loading session: $e');
+    } finally {
+      if (!_sessionRestored.isCompleted) _sessionRestored.complete();
     }
   }
 
@@ -120,8 +141,12 @@ class AuthManager extends BaseController {
     _requiresOtp = false;
     _otpSessionToken = null;
     _otpMaskedPhone = null;
+    _otpDemoCode = null;
 
-    final result = await executeWithErrorHandling(() async {
+    try {
+      setLoading(true);
+      clearError();
+
       final loginResult = await _authService.loginWithGPS(
         username: username,
         password: password,
@@ -129,15 +154,26 @@ class AuthManager extends BaseController {
 
       // Check if OTP is required (Two-Factor Authentication)
       if (loginResult.requiresOtp) {
+        // Save hashed password now so offline login works after OTP verification
+        await _storageService.saveHashedPin(_hashPasswordWithSalt(password));
         _requiresOtp = true;
         _otpSessionToken = loginResult.sessionToken;
         _otpMaskedPhone = loginResult.maskedPhone;
+        _otpDemoCode = loginResult.demoOtpCode;
         notifyListeners();
-        return loginResult;
+        return true;
       }
 
       currentUser = loginResult.user;
       jwtToken = loginResult.token;
+
+      // Mobile app is for Workers only — block non-Worker roles
+      if (currentUser != null && !currentUser!.isWorker) {
+        currentUser = null;
+        jwtToken = null;
+        setError('هذا التطبيق مخصص للعمال الميدانيين فقط. يرجى استخدام لوحة التحكم عبر المتصفح');
+        return false;
+      }
 
       // Clear old local data on fresh login (server is source of truth)
       try {
@@ -156,6 +192,8 @@ class AuthManager extends BaseController {
 
       await _storageService.saveHashedPin(_hashPasswordWithSalt(password));
       await _storageService.saveUserProfile(jsonEncode(loginResult.user!.toJson()));
+      // also save to SharedPreferences so IssueManager can read it offline
+      await StorageHelper.keepUser(loginResult.user!);
 
       // update api token
       ApiService().updateToken(loginResult.token);
@@ -173,15 +211,20 @@ class AuthManager extends BaseController {
         // ignore if fcm fails
       }
 
-      return loginResult;
-    });
-
-    if (result == null) {
-      // login failed maybe we are offline so try offline login
+      return true;
+    } on NetworkException {
+      // Only fall back to offline login on network errors (no internet)
       return await _attemptOfflineLogin(password);
+    } on AppException catch (e) {
+      // Auth failures (wrong password, inactive user, etc.) — do NOT try offline
+      setError(e.message);
+      return false;
+    } catch (e) {
+      setError(e.toString().replaceAll('Exception: ', ''));
+      return false;
+    } finally {
+      setLoading(false);
     }
-
-    return true;
   }
 
   Future<bool> _attemptOfflineLogin(String password) async {
@@ -283,9 +326,15 @@ class AuthManager extends BaseController {
     _requiresOtp = false;
     _otpSessionToken = null;
     _otpMaskedPhone = null;
+    _otpDemoCode = null;
     clearError();
 
     ApiService().updateToken(null);
+
+    // Clear sibling provider caches (TaskManager, IssueManager, etc.)
+    for (final cb in _logoutCallbacks) {
+      try { cb(); } catch (_) {}
+    }
 
     notifyListeners();
   }
@@ -305,10 +354,18 @@ class AuthManager extends BaseController {
       currentUser = verifyResult.user;
       jwtToken = verifyResult.token;
 
+      // Mobile app is for Workers only — block non-Worker roles
+      if (currentUser != null && !currentUser!.isWorker) {
+        currentUser = null;
+        jwtToken = null;
+        throw Exception('هذا التطبيق مخصص للعمال الميدانيين فقط. يرجى استخدام لوحة التحكم عبر المتصفح');
+      }
+
       // Reset OTP state
       _requiresOtp = false;
       _otpSessionToken = null;
       _otpMaskedPhone = null;
+      _otpDemoCode = null;
 
       // save user data
       await _storageService.saveToken(verifyResult.token!);
@@ -317,6 +374,7 @@ class AuthManager extends BaseController {
       }
       await _storageService.saveUserId(verifyResult.user!.userId);
       await _storageService.saveUserProfile(jsonEncode(verifyResult.user!.toJson()));
+      await StorageHelper.keepUser(verifyResult.user!);
 
       // update api token
       ApiService().updateToken(verifyResult.token);

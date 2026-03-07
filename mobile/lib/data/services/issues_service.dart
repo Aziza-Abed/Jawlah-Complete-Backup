@@ -1,7 +1,7 @@
 import 'dart:io';
+import 'package:path/path.dart' as path;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as path;
 import '../../core/errors/app_exception.dart';
 
 import '../models/issue_model.dart';
@@ -24,6 +24,7 @@ class IssuesService {
     File? photo3,
     double? latitude,
     double? longitude,
+    String? clientId,
   }) async {
     try {
       double lat;
@@ -58,6 +59,10 @@ class IssuesService {
         MapEntry('latitude', lat.toString()),
         MapEntry('longitude', lng.toString()),
       ]);
+
+      if (clientId != null && clientId.isNotEmpty) {
+        formData.fields.add(MapEntry('clientId', clientId));
+      }
 
       if (locationDescription != null && locationDescription.isNotEmpty) {
         formData.fields.add(MapEntry('locationDescription', locationDescription));

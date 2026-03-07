@@ -3,12 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { logout } from "../../api/auth";
-import {
-  X,
-  User,
-  Settings as SettingsIcon,
-  LogOut,
-} from "lucide-react";
+import { X, LogOut } from "lucide-react";
 import { STORAGE_KEYS } from "../../constants/storageKeys";
 import { type UserRole, getNavItems } from "./navItems";
 
@@ -24,12 +19,13 @@ export default function AppLayout() {
         const user = JSON.parse(userStr);
         const backendRole = user.role?.toLowerCase();
         if (backendRole === "admin") return "admin";
-        if (backendRole === "manager") return "manager";
         if (backendRole === "supervisor") return "supervisor";
       }
     } catch (err) {
       console.error("Failed to parse user role:", err);
     }
+    // Default to supervisor — web app is for admin/supervisor only;
+    // ProtectedRoute validates the token server-side before this renders
     return "supervisor";
   };
 
@@ -46,6 +42,11 @@ export default function AppLayout() {
     localStorage.removeItem(STORAGE_KEYS.TOKEN);
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(STORAGE_KEYS.HAS_SEEN_WELCOME);
+    // Clear notification preferences (user-specific)
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("notification_")) localStorage.removeItem(key);
+    }
     navigate("/login");
   };
 
@@ -70,11 +71,16 @@ export default function AppLayout() {
 
         <div className="flex-1 min-h-0 flex overflow-hidden" dir="rtl">
           <div className="w-[280px] shrink-0 h-full hidden md:block">
-            <Sidebar role={role} />
+            <Sidebar role={role} onLogout={handleLogout} />
           </div>
 
-          <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
-            <Outlet />
+          <main className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden" dir="ltr">
+            <div dir="rtl">
+              <Outlet />
+            </div>
+            <footer dir="rtl" className="py-4 px-6 text-center border-t border-black/5 bg-[#F3F1ED]">
+              <p className="text-[11px] text-[#AFAFAF] font-bold">© {new Date().getFullYear()} FollowUp — نظام متابعة العمل الميداني</p>
+            </footer>
           </main>
         </div>
       </div>
@@ -135,42 +141,6 @@ export default function AppLayout() {
           <div className="my-4 mx-4 h-[1px] bg-white/25" />
 
           <div className="px-3 flex flex-col gap-2">
-            <NavLink
-              to="/profile"
-              className={({ isActive }) =>
-                [
-                  "w-full rounded-[12px] px-4 py-2.5",
-                  "font-sans font-semibold text-[14px]",
-                  "flex items-center gap-3",
-                  isActive
-                    ? "bg-[#E2E8F0] text-[#2F2F2F]"
-                    : "bg-white/15 text-white hover:bg-white/20",
-                ].join(" ")
-              }
-              onClick={() => setDrawerOpen(false)}
-            >
-              <User size={18} className="shrink-0" />
-              <span className="flex-1 text-right">الملف الشخصي</span>
-            </NavLink>
-
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                [
-                  "w-full rounded-[12px] px-4 py-2.5",
-                  "font-sans font-semibold text-[14px]",
-                  "flex items-center gap-3",
-                  isActive
-                    ? "bg-[#E2E8F0] text-[#2F2F2F]"
-                    : "bg-white/15 text-white hover:bg-white/20",
-                ].join(" ")
-              }
-              onClick={() => setDrawerOpen(false)}
-            >
-              <SettingsIcon size={18} className="shrink-0" />
-              <span className="flex-1 text-right">الإعدادات</span>
-            </NavLink>
-
             <button
               type="button"
               onClick={() => {

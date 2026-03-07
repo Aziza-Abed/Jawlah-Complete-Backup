@@ -16,7 +16,8 @@ class AppColors {
   static const Color statusNew = primaryBlue;
   static const Color statusInProgress = accentOrange;
   static const Color statusCompleted = oliveGreen;
-  static const Color statusRejected = accentOrange;
+  static const Color statusRejected = Color(0xFFB74C3B); // distinct red — not same as inProgress
+  static const Color statusUnderReview = primaryBlue;
 
   // Priority colors using the palette
   static const Color priorityLow = primaryBlue;
@@ -25,7 +26,7 @@ class AppColors {
 
   // Semantic colors
   static const Color success = oliveGreen;
-  static const Color error = accentOrange;
+  static const Color error = Color(0xFFB74C3B); // distinct red — not same as warning
   static const Color warning = accentOrange;
   static const Color info = primaryBlue;
 
@@ -39,62 +40,4 @@ class AppColors {
   static const Color textPrimary = mainText;
   static const Color textSecondary = secondaryText;
 
-  // Get color for status
-  static Color getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-      case 'new':
-      case 'جديد':
-        return statusNew;
-      case 'inprogress':
-      case 'قيد التنفيذ':
-        return statusInProgress;
-      case 'underreview':
-      case 'قيد المراجعة':
-        return statusInProgress;
-      case 'completed':
-      case 'مكتملة':
-        return statusCompleted;
-      case 'rejected':
-      case 'مرفوضة':
-        return statusRejected;
-      default:
-        return mainText;
-    }
-  }
-
-  // Get label for status
-  static String getStatusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return 'جديد';
-      case 'inprogress':
-        return 'قيد التنفيذ';
-      case 'underreview':
-        return 'قيد المراجعة';
-      case 'completed':
-        return 'مكتملة';
-      case 'rejected':
-        return 'مرفوضة';
-      default:
-        return status;
-    }
-  }
-
-  // Get color for priority
-  static Color getPriorityColor(String priority) {
-    switch (priority.toLowerCase()) {
-      case 'low':
-      case 'منخفضة':
-        return priorityLow;
-      case 'medium':
-      case 'متوسطة':
-        return priorityMedium;
-      case 'high':
-      case 'عالية':
-        return priorityHigh;
-      default:
-        return secondaryText;
-    }
-  }
 }

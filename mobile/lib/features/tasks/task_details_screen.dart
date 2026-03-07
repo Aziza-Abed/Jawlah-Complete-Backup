@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../core/config/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 
-import '../../core/routing/app_router.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/authenticated_image.dart';
 import '../../presentation/widgets/offline_banner.dart';
@@ -15,6 +15,7 @@ import '../../providers/appeal_manager.dart';
 import '../../data/models/task_model.dart';
 import '../appeals/submit_appeal_screen.dart';
 import 'widgets/task_details_card.dart';
+import '../../core/routing/app_router.dart';
 
 // screen to see task details and change status
 class TaskDetailsScreen extends StatefulWidget {
@@ -25,6 +26,9 @@ class TaskDetailsScreen extends StatefulWidget {
 }
 
 class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
+  Future<double?>? _distanceFuture;
+  int? _distanceTaskId;
+
   @override
   void initState() {
     super.initState();
@@ -105,7 +109,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         const SizedBox(height: 16),
                       ],
 
-                      // show diferent buttons based on status
+                      // show different buttons based on status
                       if (statusLower == 'pending') ...[
                         _buildPrimaryActionButton(
                           icon: Icons.play_arrow_rounded,
@@ -116,7 +120,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       ],
 
                       if (statusLower == 'inprogress') ...[
-                        _buildProgressSlider(task),
+                        _buildProgressSteps(task),
                         const SizedBox(height: 16),
                         if (task.hasLocation) ...[
                           _buildDistanceInfo(task),
@@ -124,43 +128,177 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         ],
                         _buildPrimaryActionButton(
                           icon: Icons.check_circle_rounded,
-                          label: 'إكمال وإرسال الإثبات',
+                          label: 'إرسال الإثبات',
                           color: AppColors.success,
                           onPressed: () => Navigator.of(context).pushNamed(
-                              Routes.taskProof,
-                              arguments: task.taskId),
+                            Routes.submitEvidence,
+                            arguments: task.taskId,
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        _buildSecondaryActionButton(
-                          icon: Icons.pause_rounded,
-                          label: 'توقف مؤقتاً (إعادة إلى جديد)',
-                          onPressed: () =>
-                              _handleStatusUpdate(task.taskId, 'pending'),
+                        // Visible pause button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                _handleStatusUpdate(task.taskId, 'pending'),
+                            icon: const Icon(Icons.pause_rounded, size: 22),
+                            label: const Text(
+                              'إيقاف مؤقت',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.warning,
+                              side: const BorderSide(
+                                  color: AppColors.warning, width: 1.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
 
                       if (statusLower == 'underreview') ...[
                         _buildCompletedSection(task),
+                        const SizedBox(height: 16),
+                        // Status explanation card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.info.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: AppColors.info.withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.hourglass_top_rounded,
+                                  color: AppColors.info, size: 24),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'المهمة بانتظار مراجعة المشرف. ستتلقى إشعاراً عند القبول أو الرفض.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontFamily: 'Cairo',
+                                    color: AppColors.info,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
 
                       if (statusLower == 'completed') ...[
                         _buildApprovalStatus(true),
+                        const SizedBox(height: 16),
+                        _buildCompletedSection(task),
                       ],
 
                       if (statusLower == 'rejected') ...[
                         _buildApprovalStatus(false),
                         const SizedBox(height: 16),
 
+                        // Show rejection reason for ALL rejections
+                        if (task.rejectionReason != null &&
+                            task.rejectionReason!.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: AppColors.error.withOpacity(0.3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      task.isAutoRejected
+                                          ? Icons.gps_off_rounded
+                                          : Icons.feedback_rounded,
+                                      color: Colors.red[700],
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        task.isAutoRejected
+                                            ? 'رُفض تلقائياً (موقع غير مطابق)'
+                                            : 'سبب الرفض',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red[900],
+                                          fontFamily: 'Cairo',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(height: 24),
+                                Text(
+                                  task.rejectionReason!,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontFamily: 'Cairo',
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        // Guidance text
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.lightbulb_outline,
+                                  color: AppColors.warning, size: 22),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'يرجى معالجة الملاحظات أعلاه ثم إعادة المحاولة.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontFamily: 'Cairo',
+                                    color: AppColors.textSecondary,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // Show appeal button for auto-rejected tasks
                         if (task.isAutoRejected) ...[
-                          _buildAutoRejectionInfo(task),
-                          const SizedBox(height: 16),
                           Consumer<AppealManager>(
                             builder: (context, appealManager, _) {
-                              final hasAppeal = appealManager.hasAppealForTask(task.taskId);
+                              final hasAppeal =
+                                  appealManager.hasAppealForTask(task.taskId);
 
                               if (hasAppeal) {
-                                final appeal = appealManager.getAppealForTask(task.taskId);
+                                final appeal =
+                                    appealManager.getAppealForTask(task.taskId);
                                 return _buildAppealStatusCard(appeal);
                               }
 
@@ -280,32 +418,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           elevation: 0,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSecondaryActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: TextButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 20, color: AppColors.textSecondary),
-        label: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 15,
-            color: AppColors.textSecondary,
-            fontFamily: 'Cairo',
-            decoration: TextDecoration.underline,
-          ),
-        ),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12),
         ),
       ),
     );
@@ -439,11 +551,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
+              const Icon(Icons.verified, color: Color(0xFFA3B18A), size: 20),
+              const SizedBox(width: 8),
               const Text(
                 'إثبات الإنجاز',
                 style: TextStyle(
@@ -453,8 +567,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   fontFamily: 'Cairo',
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.verified, color: Color(0xFFA3B18A), size: 20),
             ],
           ),
           const SizedBox(height: 16),
@@ -473,10 +585,12 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           if (task.completionNotes != null &&
               task.completionNotes!.isNotEmpty) ...[
             const Divider(height: 32),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                Text(
+                const Icon(Icons.notes, size: 16, color: Color(0xFF6C757D)),
+                const SizedBox(width: 8),
+                const Text(
                   'ملاحظات الإنجاز',
                   style: TextStyle(
                     fontSize: 14,
@@ -485,13 +599,12 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     fontFamily: 'Cairo',
                   ),
                 ),
-                SizedBox(width: 8),
-                Icon(Icons.notes, size: 16, color: Color(0xFF6C757D)),
               ],
             ),
             const SizedBox(height: 8),
             Text(
               task.completionNotes!,
+              textAlign: TextAlign.right,
               style: const TextStyle(
                 fontSize: 16,
                 color: Color(0xFF2F2F2F),
@@ -548,48 +661,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     }
   }
 
-  Widget _buildAutoRejectionInfo(TaskModel task) {
-    return Card(
-      color: Colors.red[50],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'رفض تلقائي - موقع غير مطابق',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red[900],
-                      fontFamily: 'Cairo',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (task.rejectionReason != null) ...[
-              const Divider(height: 24),
-              Text(
-                task.rejectionReason!,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontFamily: 'Cairo',
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildAppealStatusCard(dynamic appeal) {
     if (appeal == null) return const SizedBox.shrink();
 
@@ -623,21 +694,40 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       color: statusColor.withOpacity(0.1),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(statusIcon, color: statusColor, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                statusText,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: statusColor,
+            Row(
+              children: [
+                Icon(statusIcon, color: statusColor, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                      fontFamily: 'Cairo',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (appeal.status == 'Rejected' &&
+                appeal.reviewNotes != null &&
+                appeal.reviewNotes!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'سبب الرفض: ${appeal.reviewNotes}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.secondaryText,
                   fontFamily: 'Cairo',
                 ),
+                textAlign: TextAlign.right,
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -667,7 +757,15 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     }
   }
 
-  Widget _buildProgressSlider(TaskModel task) {
+  // ── Phase 2: Progress Steps ──────────────────────────────────────────
+
+  Widget _buildProgressSteps(TaskModel task) {
+    final taskManager = context.read<TaskManager>();
+    final canUpdate = taskManager.canUpdateProgress(task.taskId);
+    final cooldown = taskManager.progressCooldownMinutes(task.taskId);
+
+    const steps = [0, 25, 50, 75, 100];
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -702,19 +800,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Slider(
-            value: task.progressPercentage.toDouble(),
-            min: 0,
-            max: 100,
-            divisions: 20,
-            label: '${task.progressPercentage}%',
-            activeColor: _getProgressColor(task.progressPercentage),
-            inactiveColor: AppColors.primary.withOpacity(0.2),
-            onChanged: (value) {
-              _handleProgressUpdate(task.taskId, value.toInt());
-            },
-          ),
-          const SizedBox(height: 8),
           LinearProgressIndicator(
             value: task.progressPercentage / 100,
             backgroundColor: AppColors.primary.withOpacity(0.1),
@@ -724,29 +809,135 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             minHeight: 8,
             borderRadius: BorderRadius.circular(4),
           ),
-          const SizedBox(height: 12),
-          Text(
-            task.progressPercentage == 0
-                ? 'لم يتم البدء بعد'
-                : task.progressPercentage == 100
-                    ? 'مكتمل! يمكنك الآن إرسال الإثبات'
-                    : 'جاري العمل... استمر!',
-            style: TextStyle(
-              fontSize: 14,
-              fontFamily: 'Cairo',
-              color: AppColors.textSecondary,
-              fontStyle: FontStyle.italic,
-            ),
-            textAlign: TextAlign.center,
+          const SizedBox(height: 16),
+          Row(
+            children: steps.map((step) {
+              final isActive = task.progressPercentage >= step;
+              final isCurrent = task.progressPercentage == step;
+              final isForward = step > task.progressPercentage;
+              // Allow tapping any forward step; 100% always enabled (goes to evidence screen)
+              final canTap = (isForward && (canUpdate || step == 100)) || (step == 0 && !isCurrent);
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: _buildStepButton(
+                    step: step,
+                    isActive: isActive,
+                    isCurrent: isCurrent,
+                    enabled: canTap,
+                    taskId: task.taskId,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
+          if (!canUpdate && task.progressPercentage < 100) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                'يمكنك التحديث بعد $cooldown دقائق',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontFamily: 'Cairo',
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
+  Widget _buildStepButton({
+    required int step,
+    required bool isActive,
+    required bool isCurrent,
+    required bool enabled,
+    required int taskId,
+  }) {
+    return Material(
+      color: isCurrent
+          ? _getProgressColor(step)
+          : isActive
+              ? _getProgressColor(step).withOpacity(0.15)
+              : Colors.grey.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: enabled
+            ? () => _confirmProgressUpdate(taskId, step)
+            : null,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          child: Text(
+            '$step%',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+              fontFamily: 'Cairo',
+              color: isCurrent
+                  ? Colors.white
+                  : isActive
+                      ? _getProgressColor(step)
+                      : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmProgressUpdate(int taskId, int step) async {
+    // When progress reaches 100%, navigate to evidence screen instead
+    if (step == 100) {
+      Navigator.of(context).pushNamed(
+        Routes.submitEvidence,
+        arguments: taskId,
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title:
+            const Text('تحديث التقدم', style: TextStyle(fontFamily: 'Cairo')),
+        content: Text(
+          'هل تريد تحديث نسبة الإنجاز إلى $step%؟',
+          style: const TextStyle(fontFamily: 'Cairo'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('تحديث',
+                style:
+                    TextStyle(color: AppColors.primary, fontFamily: 'Cairo')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await _handleProgressUpdate(taskId, step);
+  }
+
+  // ── Distance info ────────────────────────────────────────────────────
+
   Widget _buildDistanceInfo(TaskModel task) {
+    // Cache the future so GPS doesn't fire on every setState/rebuild
+    if (_distanceTaskId != task.taskId) {
+      _distanceTaskId = task.taskId;
+      _distanceFuture = _calculateDistance(task.latitude!, task.longitude!);
+    }
     return FutureBuilder<double?>(
-      future: _calculateDistance(task.latitude!, task.longitude!),
+      future: _distanceFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return Container(
@@ -782,12 +973,20 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             ? '${distanceMeters.toStringAsFixed(0)} متر'
             : '${distanceKm.toStringAsFixed(2)} كم';
 
-        final isNearby = distanceMeters <= 500;
-        final icon = isNearby ? Icons.check_circle : Icons.warning;
-        final color = isNearby ? AppColors.success : AppColors.warning;
+        final isNearby = distanceMeters <= AppConstants.nearbyDistanceMeters;
+        final willReject =
+            distanceMeters > AppConstants.hardRejectDistanceMeters;
+        final icon = isNearby
+            ? Icons.check_circle
+            : (willReject ? Icons.error : Icons.warning);
+        final color = isNearby
+            ? AppColors.success
+            : (willReject ? AppColors.error : AppColors.warning);
         final message = isNearby
-            ? 'أنت قريب من موقع المهمة'
-            : 'أنت بعيد عن موقع المهمة';
+            ? 'أنت في نطاق موقع المهمة'
+            : willReject
+                ? 'أنت بعيد جداً — قد يتم رفض الإثبات تلقائياً'
+                : 'أنت بعيد عن موقع المهمة';
 
         return Container(
           padding: const EdgeInsets.all(16),
@@ -834,14 +1033,12 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   Future<double?> _calculateDistance(double taskLat, double taskLon) async {
     try {
-      // FIX 6: GPS TIMEOUT - Maximum 15 seconds to get location
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 15),
+        timeLimit: const Duration(seconds: AppConstants.gpsTimeoutSeconds),
       );
 
-      // FIX 5: GPS ACCURACY VALIDATION - Reject if accuracy > 100m
-      if (position.accuracy > 100) {
+      if (position.accuracy > AppConstants.maxGpsAccuracyMeters) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -867,7 +1064,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
       return distanceMeters;
     } on TimeoutException catch (e) {
-      // FIX 6: HANDLE GPS TIMEOUT
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -914,7 +1110,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     if (milestoneMsg != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(milestoneMsg, style: const TextStyle(fontFamily: 'Cairo')),
+          content:
+              Text(milestoneMsg, style: const TextStyle(fontFamily: 'Cairo')),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
@@ -932,4 +1129,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       );
     }
   }
+
 }
+
+

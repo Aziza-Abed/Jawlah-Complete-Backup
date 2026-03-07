@@ -2,59 +2,59 @@ using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Departments;
 using FollowUp.Core.Entities;
-using FollowUp.Infrastructure.Data;
+using FollowUp.Core.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
 [Route("api/[controller]")]
+[Tags("Departments")]
 public class DepartmentsController : BaseApiController
 {
-    private readonly FollowUpDbContext _context;
+    private readonly IDepartmentRepository _departments;
+    private readonly IMunicipalityRepository _municipalities;
     private readonly ILogger<DepartmentsController> _logger;
 
-    public DepartmentsController(FollowUpDbContext context, ILogger<DepartmentsController> logger)
+    public DepartmentsController(
+        IDepartmentRepository departments,
+        IMunicipalityRepository municipalities,
+        ILogger<DepartmentsController> logger)
     {
-        _context = context;
+        _departments = departments;
+        _municipalities = municipalities;
         _logger = logger;
     }
 
-    // get all departments
     [HttpGet]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get all departments")]
     public async Task<IActionResult> GetAll([FromQuery] bool? activeOnly = null)
     {
-        var query = _context.Departments.AsQueryable();
+        var results = await _departments.GetAllWithUserCountAsync(activeOnly);
 
-        if (activeOnly == true)
-        {
-            query = query.Where(d => d.IsActive);
-        }
-
-        var departments = await ProjectToDto(query.OrderBy(d => d.Name)).ToListAsync();
+        var departments = results.Select(r => MapToDto(r.Department, r.UserCount)).ToList();
 
         return Ok(ApiResponse<List<DepartmentDto>>.SuccessResponse(departments));
     }
 
-    // get department by ID
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get department by id")]
     public async Task<IActionResult> GetById(int id)
     {
-        var department = await ProjectToDto(_context.Departments.Where(d => d.DepartmentId == id))
-            .FirstOrDefaultAsync();
+        var (department, userCount) = await _departments.GetByIdWithUserCountAsync(id);
 
         if (department == null)
             return NotFound(ApiResponse<object>.ErrorResponse("القسم غير موجود"));
 
-        return Ok(ApiResponse<DepartmentDto>.SuccessResponse(department));
+        return Ok(ApiResponse<DepartmentDto>.SuccessResponse(MapToDto(department, userCount)));
     }
 
-    // create a new department (admin only)
     [HttpPost]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "create a new department")]
     public async Task<IActionResult> Create([FromBody] CreateDepartmentRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -64,12 +64,12 @@ public class DepartmentsController : BaseApiController
             return BadRequest(ApiResponse<object>.ErrorResponse("رمز القسم مطلوب"));
 
         // Check if code already exists
-        var existingCode = await _context.Departments.AnyAsync(d => d.Code == request.Code);
-        if (existingCode)
+        if (await _departments.CodeExistsAsync(request.Code))
             return BadRequest(ApiResponse<object>.ErrorResponse("رمز القسم موجود مسبقاً"));
 
         // Get municipality ID (assuming single tenant for now)
-        var municipality = await _context.Municipalities.FirstOrDefaultAsync();
+        var allMunicipalities = await _municipalities.GetAllAsync();
+        var municipality = allMunicipalities.FirstOrDefault();
         if (municipality == null)
             return BadRequest(ApiResponse<object>.ErrorResponse("لم يتم تكوين البلدية بعد"));
 
@@ -84,8 +84,8 @@ public class DepartmentsController : BaseApiController
             CreatedAt = DateTime.UtcNow
         };
 
-        _context.Departments.Add(department);
-        await _context.SaveChangesAsync();
+        await _departments.AddAsync(department);
+        await _departments.SaveChangesAsync();
 
         _logger.LogInformation("Department created: {Name} ({Code}) by user {UserId}",
             department.Name, department.Code, GetCurrentUserId());
@@ -93,20 +93,19 @@ public class DepartmentsController : BaseApiController
         return Ok(ApiResponse<DepartmentDto>.SuccessResponse(MapToDto(department, 0), "تم إنشاء القسم بنجاح"));
     }
 
-    // update department (admin only)
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "update a department")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateDepartmentRequest request)
     {
-        var department = await _context.Departments.FindAsync(id);
+        var department = await _departments.GetByIdAsync(id);
         if (department == null)
             return NotFound(ApiResponse<object>.ErrorResponse("القسم غير موجود"));
 
         // Check if new code already exists (if changing code)
         if (!string.IsNullOrWhiteSpace(request.Code) && request.Code != department.Code)
         {
-            var existingCode = await _context.Departments.AnyAsync(d => d.Code == request.Code && d.DepartmentId != id);
-            if (existingCode)
+            if (await _departments.CodeExistsAsync(request.Code, excludeId: id))
                 return BadRequest(ApiResponse<object>.ErrorResponse("رمز القسم موجود مسبقاً"));
             department.Code = request.Code.Trim().ToUpper();
         }
@@ -125,53 +124,38 @@ public class DepartmentsController : BaseApiController
 
         department.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _departments.UpdateAsync(department);
+        await _departments.SaveChangesAsync();
 
         _logger.LogInformation("Department updated: {Name} ({Code}) by user {UserId}",
             department.Name, department.Code, GetCurrentUserId());
 
-        var usersCount = await _context.Users.CountAsync(u => u.DepartmentId == id);
+        var usersCount = await _departments.GetUserCountAsync(id);
 
         return Ok(ApiResponse<DepartmentDto>.SuccessResponse(MapToDto(department, usersCount), "تم تحديث القسم بنجاح"));
     }
 
-    // delete department (admin only)
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "delete a department")]
     public async Task<IActionResult> Delete(int id)
     {
-        var department = await _context.Departments.FindAsync(id);
+        var department = await _departments.GetByIdAsync(id);
         if (department == null)
             return NotFound(ApiResponse<object>.ErrorResponse("القسم غير موجود"));
 
         // Check if department has users
-        var usersCount = await _context.Users.CountAsync(u => u.DepartmentId == id);
+        var usersCount = await _departments.GetUserCountAsync(id);
         if (usersCount > 0)
             return BadRequest(ApiResponse<object>.ErrorResponse($"لا يمكن حذف القسم لأنه يحتوي على {usersCount} مستخدم. قم بنقلهم أولاً."));
 
-        _context.Departments.Remove(department);
-        await _context.SaveChangesAsync();
+        await _departments.DeleteAsync(department);
+        await _departments.SaveChangesAsync();
 
         _logger.LogInformation("Department deleted: {Name} ({Code}) by user {UserId}",
             department.Name, department.Code, GetCurrentUserId());
 
         return Ok(ApiResponse<object>.SuccessResponse(new { }, "تم حذف القسم بنجاح"));
-    }
-
-    // project department query to DTO with user count
-    private IQueryable<DepartmentDto> ProjectToDto(IQueryable<Department> query)
-    {
-        return query.Select(d => new DepartmentDto
-        {
-            DepartmentId = d.DepartmentId,
-            Name = d.Name,
-            NameEnglish = d.NameEnglish,
-            Code = d.Code,
-            Description = d.Description,
-            IsActive = d.IsActive,
-            UsersCount = _context.Users.Count(u => u.DepartmentId == d.DepartmentId),
-            CreatedAt = d.CreatedAt
-        });
     }
 
     // map a department entity to DTO

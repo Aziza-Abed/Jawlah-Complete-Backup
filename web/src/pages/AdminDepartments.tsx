@@ -178,7 +178,7 @@ export default function AdminDepartments() {
           {/* Header (Corrected Layout) */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div className="text-right">
-              <h1 className="font-sans font-black text-[28px] text-[#2F2F2F]">
+              <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">
                 إدارة الأقسام الميدانية
               </h1>
               <p className="text-[14px] font-bold text-[#AFAFAF] mt-1">
@@ -199,14 +199,17 @@ export default function AdminDepartments() {
           {/* Message */}
           {message && (
             <div
-              className={`mb-4 p-4 rounded-[12px] flex items-center justify-end gap-3 ${
+              className={`mb-4 p-4 rounded-[12px] flex items-center justify-between gap-3 ${
                 message.type === "success"
                   ? "bg-[#8FA36A]/10 text-[#8FA36A]"
                   : "bg-[#C86E5D]/10 text-[#C86E5D]"
               }`}
             >
-              <span className="font-semibold">{message.text}</span>
-              {message.type === "success" ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+              <button onClick={() => setMessage(null)} className="opacity-40 hover:opacity-100 transition-opacity"><X size={18} /></button>
+              <div className="flex items-center gap-3">
+                <span className="font-semibold">{message.text}</span>
+                {message.type === "success" ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+              </div>
             </div>
           )}
 

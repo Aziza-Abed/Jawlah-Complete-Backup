@@ -10,11 +10,11 @@ import {
   Building,
   ShieldCheck,
   Scale,
-  Bell,
   FileText,
+  History,
 } from "lucide-react";
 
-export type UserRole = "admin" | "manager" | "supervisor";
+export type UserRole = "admin" | "supervisor";
 
 export type NavItem = {
   to: string;
@@ -25,7 +25,7 @@ export type NavItem = {
 
 export const supervisorItems: NavItem[] = [
   { to: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, end: true },
-  { to: "/my-workers", label: "العمال التابعين لي", icon: Users },
+  { to: "/my-workers", label: "إدارة العمال", icon: Users },
   { to: "/tasks", label: "المهام", icon: ClipboardList, end: true },
   { to: "/issues", label: "البلاغات", icon: AlertCircle },
   { to: "/tasks/new", label: "تعيين مهمة جديدة", icon: PlusCircle },
@@ -33,7 +33,6 @@ export const supervisorItems: NavItem[] = [
   { to: "/task-templates", label: "قوالب المهام", icon: FileText },
   { to: "/appeals", label: "مركز المراجعة", icon: Scale },
   { to: "/reports", label: "التقارير", icon: BarChart3 },
-  { to: "/notifications", label: "الإشعارات", icon: Bell },
 ];
 
 export const adminItems: NavItem[] = [
@@ -45,10 +44,10 @@ export const adminItems: NavItem[] = [
   { to: "/zones-admin", label: "إدارة المناطق", icon: Map },
   { to: "/task-oversight", label: "الرقابة على المهام", icon: ShieldCheck },
   { to: "/task-templates", label: "قوالب المهام", icon: FileText },
-  { to: "/appeals", label: "مركز المراجعة", icon: Scale },
   { to: "/reports", label: "التقارير", icon: BarChart3 },
+  { to: "/audit-logs", label: "سجل النشاط", icon: History },
 ];
 
 export function getNavItems(role: UserRole): NavItem[] {
-  return (role === "admin" || role === "manager") ? adminItems : supervisorItems;
+  return role === "admin" ? adminItems : supervisorItems;
 }

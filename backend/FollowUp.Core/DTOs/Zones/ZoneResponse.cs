@@ -16,4 +16,7 @@ public class ZoneResponse
 
     // GeoJSON boundary for map display
     public string? BoundaryGeoJson { get; set; }
+
+    // GIS source type: "Quarters", "Borders", "Blocks", or null for manual zones
+    public string? ZoneType { get; set; }
 }

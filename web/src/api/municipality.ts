@@ -1,7 +1,6 @@
 import { apiClient } from "./client";
 
-// ============== Municipality Settings (for app configuration) ==============
-// Types for municipality data
+// municipality settings and types
 
 export interface MunicipalitySettings {
   municipalityId: number;
@@ -44,9 +43,7 @@ export const DEFAULT_MUNICIPALITY_SETTINGS: MunicipalityBasic = {
   defaultZoom: 10,
 };
 
-/**
- * Get current user's municipality settings (requires authentication)
- */
+// Get current user's municipality settings (requires authentication)
 export async function getCurrentMunicipalitySettings(): Promise<MunicipalitySettings | null> {
   try {
     const response = await apiClient.get<{ success: boolean; data: MunicipalitySettings }>("/municipality/current");
@@ -57,9 +54,7 @@ export async function getCurrentMunicipalitySettings(): Promise<MunicipalitySett
   }
 }
 
-/**
- * Get default municipality settings (for login screen, no auth required)
- */
+// Get default municipality settings (for login screen, no auth required)
 export async function getDefaultMunicipalitySettings(): Promise<MunicipalityBasic> {
   try {
     const response = await apiClient.get<{ success: boolean; data: MunicipalityBasic }>("/municipality/default");
@@ -70,7 +65,7 @@ export async function getDefaultMunicipalitySettings(): Promise<MunicipalityBasi
   }
 }
 
-// ============== Municipality Admin Management ==============
+// admin municipality management
 
 export interface Municipality {
   municipalityId: number;

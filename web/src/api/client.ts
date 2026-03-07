@@ -1,15 +1,14 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { STORAGE_KEYS } from "../constants/storageKeys";
+import { HTTP_REQUEST_TIMEOUT_MS } from "../constants/appConstants";
 
-// 1) Read base URL from environment variables
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// Generate or retrieve a unique device ID for this browser
+// get or create a unique device ID for this browser
 function getDeviceId(): string {
   let deviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
 
   if (!deviceId) {
-    // Generate a UUID v4
     deviceId = crypto.randomUUID();
     localStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
   }
@@ -23,31 +22,27 @@ if (!BASE_URL) {
   );
 }
 
-// 2) Create a single axios instance for the whole app
+// shared axios instance
 export const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000, // 10 second timeout to prevent hanging
+  timeout: HTTP_REQUEST_TIMEOUT_MS,
   headers: {
     'Accept': 'application/json; charset=utf-8',
-    'Content-Type': 'application/json; charset=utf-8',
   },
   responseType: 'json',
   responseEncoding: 'utf8',
 });
 
-// 3) Request interceptor: inject JWT token and device ID automatically
+// attach token and device ID to every request
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
-
-    // Ensure headers object exists
     config.headers = config.headers ?? {};
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Always include device ID for OTP device binding
     config.headers["X-Device-Id"] = getDeviceId();
 
     return config;
@@ -57,7 +52,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-// 4) Response interceptor: handle 401 with token refresh
+// handle 401 by trying to refresh the token
 apiClient.interceptors.response.use(
   undefined,
   async (error: AxiosError) => {
@@ -67,7 +62,7 @@ apiClient.interceptors.response.use(
       const status = error.response.status;
       console.error("API Error:", status, error.response.data);
 
-      // Try refresh token on 401 (but not for auth endpoints themselves)
+      // try refresh (skip auth endpoints to avoid loops)
       if (status === 401 && originalRequest && !originalRequest._retry) {
         const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
         const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
@@ -93,16 +88,16 @@ apiClient.interceptors.response.use(
                 localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
               }
 
-              // Retry the original request with new token
+              // retry with new token
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               return apiClient(originalRequest);
             }
           } catch {
-            // Refresh failed - fall through to redirect
+            // refresh failed
           }
         }
 
-        // Refresh failed or no refresh token - redirect to login
+        // no valid token, go to login
         localStorage.removeItem(STORAGE_KEYS.TOKEN);
         localStorage.removeItem(STORAGE_KEYS.USER);
         localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);

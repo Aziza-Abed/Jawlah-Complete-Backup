@@ -6,6 +6,7 @@ using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Services;
 using FollowUp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 // Resolve Task ambiguity (Entity vs Threading)
@@ -13,42 +14,37 @@ using Task = System.Threading.Tasks.Task;
 
 namespace FollowUp.Infrastructure.Services;
 
-// sms-based OTP service for two-factor authentication
-// all roles: OTP only on first login or new device (device binding)
-// once device is registered, no OTP needed for that device
+// OTP service - sends SMS codes for login verification
+// OTP is only needed on first login or when switching devices
 public class OtpService : IOtpService
 {
     private readonly FollowUpDbContext _db;
     private readonly ISmsService _sms;
     private readonly ILogger<OtpService> _logger;
+    private readonly bool _isMockSms;
 
     private const int OTP_LENGTH = 6;
     private const int OTP_EXPIRY_MINUTES = 5;
     private const int MAX_ATTEMPTS = 3;
 
-    // IP-based rate limiting to prevent brute force attacks
+    // rate limiting by IP
     private static readonly ConcurrentDictionary<string, (int FailedCount, DateTime LockoutUntil)> _ipRateLimits = new();
     private const int MAX_FAILED_ATTEMPTS_PER_IP = 10;
     private const int IP_LOCKOUT_MINUTES = 15;
     private static DateTime _lastCleanup = DateTime.UtcNow;
 
-    public OtpService(FollowUpDbContext db, ISmsService sms, ILogger<OtpService> logger)
+    public OtpService(FollowUpDbContext db, ISmsService sms, ILogger<OtpService> logger, IConfiguration config)
     {
         _db = db;
         _sms = sms;
         _logger = logger;
+        _isMockSms = config.GetValue<bool>("DeveloperMode:MockSms", true);
     }
 
-    // determine if user needs OTP verification based on device binding
-    // implements a "trust this device" security pattern
-    //
-    // policy (applies to all roles):
-    // - first login: OTP required to register device
-    // - same device: no OTP needed (device is trusted)
-    // - new device: OTP required to verify identity
+    // check if this user needs OTP (first login or new device)
     public bool RequiresOtp(User user, string? deviceId)
     {
-        // If no device registered yet, this is first login - require OTP to register device
+        // first login - no device registered yet
         if (string.IsNullOrEmpty(user.RegisteredDeviceId))
         {
             _logger.LogInformation("OTP required for {Role} user {UserId} - first device registration", user.Role, user.UserId);
@@ -69,7 +65,7 @@ public class OtpService : IOtpService
     }
 
     // generate OTP, store hash, and send via SMS
-    public async Task<string?> GenerateAndSendOtpAsync(User user, string purpose = "Login", string? deviceId = null)
+    public async Task<(string? SessionToken, string? OtpCode)> GenerateAndSendOtpAsync(User user, string purpose = "Login", string? deviceId = null)
     {
         try
         {
@@ -77,7 +73,7 @@ public class OtpService : IOtpService
             if (string.IsNullOrEmpty(user.PhoneNumber))
             {
                 _logger.LogWarning("Cannot send OTP - User {UserId} has no phone number", user.UserId);
-                return null;
+                return (null, null);
             }
 
             // Invalidate any existing unused OTPs for this user
@@ -122,16 +118,17 @@ public class OtpService : IOtpService
             if (!smsSent)
             {
                 _logger.LogError("Failed to send OTP SMS to user {UserId}", user.UserId);
-                return null;
+                return (null, null);
             }
 
             _logger.LogInformation("OTP sent to user {UserId} for {Purpose}", user.UserId, purpose);
-            return sessionToken;
+            // Return OTP code only in mock SMS mode (for demo/testing)
+            return (sessionToken, _isMockSms ? otpCode : null);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating OTP for user {UserId}", user.UserId);
-            return null;
+            return (null, null);
         }
     }
 
@@ -151,6 +148,7 @@ public class OtpService : IOtpService
             var twoFactorCode = await _db.TwoFactorCodes
                 .Include(c => c.User)
                 .Where(c => c.SessionToken == sessionToken && !c.IsUsed)
+                .OrderByDescending(c => c.CreatedAt)
                 .FirstOrDefaultAsync();
 
             if (twoFactorCode == null)
@@ -313,54 +311,15 @@ public class OtpService : IOtpService
         return Convert.ToBase64String(hash);
     }
 
-    // store pending JWT token for session (for load-balanced environments)
-    public async Task StorePendingTokenAsync(string sessionToken, string jwtToken)
+    // get user ID for an active session (for resend OTP)
+    public async Task<int?> GetSessionUserIdAsync(string sessionToken)
     {
         var record = await _db.TwoFactorCodes
             .Where(c => c.SessionToken == sessionToken && !c.IsUsed)
+            .OrderByDescending(c => c.CreatedAt)
+            .Select(c => (int?)c.UserId)
             .FirstOrDefaultAsync();
 
-        if (record != null)
-        {
-            record.PendingJwtToken = jwtToken;
-            await _db.SaveChangesAsync();
-            _logger.LogDebug("Stored pending JWT token for 2FA session");
-        }
-    }
-
-    // retrieve and clear pending JWT token for session
-    public async Task<string?> GetAndClearPendingTokenAsync(string sessionToken)
-    {
-        var record = await _db.TwoFactorCodes
-            .Where(c => c.SessionToken == sessionToken)
-            .FirstOrDefaultAsync();
-
-        if (record?.PendingJwtToken == null)
-        {
-            _logger.LogWarning("No pending JWT token found for 2FA session");
-            return null;
-        }
-
-        var token = record.PendingJwtToken;
-        record.PendingJwtToken = null; // Clear after retrieval
-        await _db.SaveChangesAsync();
-
-        _logger.LogDebug("Retrieved and cleared pending JWT token for 2FA session");
-        return token;
-    }
-
-    // get session info without clearing (for resend OTP)
-    public async Task<(int? UserId, string? JwtToken)> GetSessionInfoAsync(string sessionToken)
-    {
-        var record = await _db.TwoFactorCodes
-            .Where(c => c.SessionToken == sessionToken && !c.IsUsed)
-            .FirstOrDefaultAsync();
-
-        if (record == null)
-        {
-            return (null, null);
-        }
-
-        return (record.UserId, record.PendingJwtToken);
+        return record;
     }
 }

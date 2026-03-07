@@ -17,9 +17,11 @@ import {
   Settings as SettingsIcon,
   Eye,
   EyeOff,
+  Info,
+  Globe,
 } from "lucide-react";
 
-type SettingsTab = "notifications" | "password" | "municipality";
+type SettingsTab = "notifications" | "password" | "municipality" | "about";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("notifications");
@@ -53,7 +55,7 @@ export default function Settings() {
   };
 
   const user = getUserInfo();
-  const isAdmin = user?.role === "Admin" || user?.role === "Manager";
+  const isAdmin = user?.role === "Admin";
 
   // Fetch municipality data for admin
   useEffect(() => {
@@ -120,8 +122,8 @@ export default function Settings() {
     e.preventDefault();
     setMessage(null);
 
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setMessage({ type: "error", text: "كلمتا المرور الجديدتان غير متطابقتين" });
+    if (!passwordForm.oldPassword) {
+      setMessage({ type: "error", text: "كلمة المرور الحالية مطلوبة" });
       return;
     }
 
@@ -130,11 +132,22 @@ export default function Settings() {
       return;
     }
 
+    if (!/[A-Za-z]/.test(passwordForm.newPassword) || !/\d/.test(passwordForm.newPassword) || !/[^A-Za-z0-9]/.test(passwordForm.newPassword)) {
+      setMessage({ type: "error", text: "كلمة المرور يجب أن تحتوي على حرف ورقم ورمز خاص (@$!%*#?&)" });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setMessage({ type: "error", text: "كلمتا المرور الجديدتان غير متطابقتين" });
+      return;
+    }
+
     setSaving(true);
     try {
       await changePassword({
         oldPassword: passwordForm.oldPassword,
         newPassword: passwordForm.newPassword,
+        confirmPassword: passwordForm.confirmPassword,
       });
       setMessage({ type: "success", text: "تم تغيير كلمة المرور بنجاح" });
       setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
@@ -154,6 +167,7 @@ export default function Settings() {
     { id: "notifications", label: "الإشعارات", icon: <Bell size={18} /> },
     { id: "password", label: "كلمة المرور", icon: <KeyRound size={18} /> },
     { id: "municipality", label: "إعدادات البلدية", icon: <Building2 size={18} />, adminOnly: true },
+    { id: "about", label: "حول النظام", icon: <Info size={18} /> },
   ];
 
   // Filter tabs based on role
@@ -227,7 +241,7 @@ export default function Settings() {
                   />
                   <Lock className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
                   <button type="button" onClick={() => setShowPasswords(p => ({ ...p, old: !p.old }))} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AFAFAF] hover:text-[#2F2F2F] transition-colors" tabIndex={-1}>
-                    {showPasswords.old ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPasswords.old ? <Eye size={18} /> : <EyeOff size={18} />}
                   </button>
                 </div>
               </div>
@@ -245,10 +259,10 @@ export default function Settings() {
                   />
                   <ShieldCheck className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
                   <button type="button" onClick={() => setShowPasswords(p => ({ ...p, new: !p.new }))} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AFAFAF] hover:text-[#2F2F2F] transition-colors" tabIndex={-1}>
-                    {showPasswords.new ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPasswords.new ? <Eye size={18} /> : <EyeOff size={18} />}
                   </button>
                 </div>
-                <p className="text-[10px] text-[#6B7280] font-bold text-right mr-1">يجب أن تكون 8 أحرف على الأقل</p>
+                <p className="text-[10px] text-[#6B7280] font-bold text-right mr-1">8 أحرف على الأقل + حرف + رقم + رمز خاص (@$!%*#?&)</p>
               </div>
 
               <div className="space-y-3">
@@ -263,7 +277,7 @@ export default function Settings() {
                   />
                   <Lock className="absolute right-5 top-1/2 -translate-y-1/2 text-[#AFAFAF]" size={20} />
                   <button type="button" onClick={() => setShowPasswords(p => ({ ...p, confirm: !p.confirm }))} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AFAFAF] hover:text-[#2F2F2F] transition-colors" tabIndex={-1}>
-                    {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPasswords.confirm ? <Eye size={18} /> : <EyeOff size={18} />}
                   </button>
                 </div>
               </div>
@@ -425,6 +439,64 @@ export default function Settings() {
           </div>
         );
 
+      case "about":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 mb-8 pb-6 border-b border-black/5">
+              <div className="p-4 bg-[#7895B2]/10 rounded-[20px] text-[#7895B2] shadow-sm">
+                <Info size={28} />
+              </div>
+              <div className="text-right">
+                <h2 className="text-xl font-black text-[#2F2F2F]">حول النظام</h2>
+                <p className="text-[13px] font-bold text-[#AFAFAF]">معلومات عن نظام FollowUp لمتابعة العمل الميداني</p>
+              </div>
+            </div>
+
+            {/* System Name & Version */}
+            <div className="bg-[#7895B2]/5 rounded-[20px] p-8 border border-[#7895B2]/10 text-center">
+              <div className="w-16 h-16 bg-[#7895B2]/10 rounded-[20px] flex items-center justify-center mx-auto mb-4">
+                <Globe size={32} className="text-[#7895B2]" />
+              </div>
+              <h3 className="text-[24px] font-black text-[#2F2F2F] tracking-tight">FollowUp</h3>
+              <p className="text-[13px] font-bold text-[#AFAFAF] mt-1">نظام متابعة العمل الميداني</p>
+              <span className="inline-block mt-3 px-4 py-1.5 bg-[#7895B2]/10 text-[#7895B2] rounded-full text-[12px] font-black">الإصدار 1.0.0</span>
+            </div>
+
+            {/* Features */}
+            <div className="bg-[#F9F8F6] rounded-[20px] p-6 border border-black/5">
+              <h3 className="text-right text-[14px] font-black text-[#2F2F2F] mb-5">الميزات الرئيسية</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  "إدارة المهام الميدانية وتتبع الإنجاز",
+                  "تتبع المواقع والحضور عبر GPS",
+                  "نظام البلاغات الميدانية بالصور",
+                  "نظام الطعون ومراجعة القرارات",
+                  "التقارير والإحصائيات المتقدمة",
+                  "الإشعارات الفورية (Push & SignalR)",
+                  "خريطة حية لمراقبة العمال",
+                  "دعم العمل بدون إنترنت (Offline-First)",
+                  "إدارة المناطق والأحياء عبر GIS",
+                  "تعيين المهام تلقائياً من قوالب مجدولة",
+                  "تصدير التقارير بصيغة PDF و Excel",
+                  "نظام صلاحيات متعدد الأدوار",
+                ].map((feature) => (
+                  <div key={feature} className="flex items-center gap-2 text-right">
+                    <span className="text-[13px] font-bold text-[#2F2F2F]">{feature}</span>
+                    <CheckCircle size={14} className="text-[#8FA36A] shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="text-center pt-4 border-t border-black/5">
+              <p className="text-[12px] text-[#AFAFAF] font-bold">
+                © {new Date().getFullYear()} FollowUp — جميع الحقوق محفوظة
+              </p>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -441,7 +513,7 @@ export default function Settings() {
                     <SettingsIcon size={28} />
                 </div>
                 <div className="text-right">
-                    <h1 className="font-sans font-black text-[28px] text-[#2F2F2F] tracking-tight">
+                    <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">
                         الإعدادات العامة
                     </h1>
                     <p className="text-[14px] font-bold text-[#AFAFAF] mt-1">إدارة حسابك الشخصي وتفضيلات النظام وتنبيهاته</p>

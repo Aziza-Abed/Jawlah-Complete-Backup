@@ -68,7 +68,7 @@ class AttendanceLocal extends HiveObject {
     return {
       'clientId': clientId,
       'userId': userId,
-      // CRITICAL: Backend expects 'checkInEventTime' not 'checkInTime'
+      // backend expects 'checkInEventTime' not 'checkInTime'
       'checkInEventTime': checkInTime.toIso8601String(),
       'checkOutEventTime': checkOutTime?.toIso8601String(),
       'checkInLatitude': checkInLatitude,

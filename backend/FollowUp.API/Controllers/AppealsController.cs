@@ -7,15 +7,18 @@ using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
 // handles location validation appeals
 [Route("api/[controller]")]
+[Tags("Appeals")]
 public class AppealsController : BaseApiController
 {
     private readonly IAppealRepository _appeals;
     private readonly ITaskRepository _tasks;
+    private readonly IAttendanceRepository _attendance;
     private readonly IUserRepository _users;
     private readonly IFileStorageService _files;
     private readonly INotificationService _notifications;
@@ -25,6 +28,7 @@ public class AppealsController : BaseApiController
     public AppealsController(
         IAppealRepository appeals,
         ITaskRepository tasks,
+        IAttendanceRepository attendance,
         IUserRepository users,
         IFileStorageService files,
         INotificationService notifications,
@@ -33,6 +37,7 @@ public class AppealsController : BaseApiController
     {
         _appeals = appeals;
         _tasks = tasks;
+        _attendance = attendance;
         _users = users;
         _files = files;
         _notifications = notifications;
@@ -44,6 +49,7 @@ public class AppealsController : BaseApiController
     [HttpPost]
     [Authorize(Roles = "Worker")]
     [Consumes("multipart/form-data")]
+    [SwaggerOperation(Summary = "submit an appeal with evidence")]
     public async Task<IActionResult> SubmitAppeal([FromForm] SubmitAppealRequest request)
     {
         var userId = GetCurrentUserId();
@@ -96,8 +102,24 @@ public class AppealsController : BaseApiController
         else // AttendanceFailure
         {
             entityType = "Attendance";
-            // Future: handle attendance check-in failures
-            return BadRequest(ApiResponse<object>.ErrorResponse("طعون الحضور غير مدعومة حالياً"));
+            var attendance = await _attendance.GetByIdAsync(request.EntityId);
+            if (attendance == null)
+                return NotFound(ApiResponse<object>.ErrorResponse("سجل الحضور غير موجود"));
+
+            if (attendance.UserId != userId.Value)
+                return Forbid();
+
+            // Only allow appeals for rejected manual attendance
+            if (attendance.ApprovalStatus != "Rejected")
+                return BadRequest(ApiResponse<object>.ErrorResponse("سجل الحضور هذا لم يتم رفضه"));
+
+            // Check if appeal already exists
+            if (await _appeals.HasAppealForEntityAsync(entityType, request.EntityId))
+                return BadRequest(ApiResponse<object>.ErrorResponse("تم إرسال طعن لسجل الحضور هذا بالفعل"));
+
+            workerLat = attendance.CheckInLatitude;
+            workerLng = attendance.CheckInLongitude;
+            originalRejectionReason = attendance.ValidationMessage;
         }
 
         // Upload evidence photo if provided (optional)
@@ -144,9 +166,12 @@ public class AppealsController : BaseApiController
             // notify supervisors about the new appeal
             try
             {
+                var entityTitle = request.AppealType == AppealType.TaskRejection
+                    ? task?.Title ?? "مهمة"
+                    : "طعن حضور";
                 await _notifications.SendAppealSubmittedToSupervisorsAsync(
                     request.EntityId,
-                    task?.Title ?? "مهمة",
+                    entityTitle,
                     user.FullName,
                     user.MunicipalityId);
             }
@@ -178,6 +203,7 @@ public class AppealsController : BaseApiController
     // get all appeals for the current user
     [HttpGet("my-appeals")]
     [Authorize(Roles = "Worker")]
+    [SwaggerOperation(Summary = "get current user appeals")]
     public async Task<IActionResult> GetMyAppeals()
     {
         var userId = GetCurrentUserId();
@@ -187,6 +213,7 @@ public class AppealsController : BaseApiController
         var appeals = await _appeals.GetUserAppealsAsync(userId.Value);
         var responses = new List<AppealResponse>();
         var taskCache = new Dictionary<int, string?>(); // avoid duplicate task queries
+        var attendanceCache = new Dictionary<int, string?>(); // avoid duplicate attendance queries
 
         foreach (var appeal in appeals)
         {
@@ -202,6 +229,16 @@ public class AppealsController : BaseApiController
                 }
                 response.EntityTitle = title;
             }
+            else if (appeal.EntityType == "Attendance")
+            {
+                if (!attendanceCache.TryGetValue(appeal.EntityId, out var title))
+                {
+                    var att = await _attendance.GetByIdAsync(appeal.EntityId);
+                    title = att != null ? $"حضور {att.CheckInEventTime:yyyy-MM-dd}" : null;
+                    attendanceCache[appeal.EntityId] = title;
+                }
+                response.EntityTitle = title;
+            }
 
             responses.Add(response);
         }
@@ -211,6 +248,7 @@ public class AppealsController : BaseApiController
 
     // get appeal by ID
     [HttpGet("{id}")]
+    [SwaggerOperation(Summary = "get a single appeal by id")]
     public async Task<IActionResult> GetAppealById(int id)
     {
         var userId = GetCurrentUserId();
@@ -226,7 +264,7 @@ public class AppealsController : BaseApiController
         if (userRole == "Worker" && appeal.UserId != userId.Value)
             return Forbid();
 
-        // Supervisors can only see appeals from their own workers
+        // Supervisors can only see appeals from their own workers; Admin can see all
         if (userRole == "Supervisor")
         {
             var worker = await _users.GetByIdAsync(appeal.UserId);
@@ -242,34 +280,44 @@ public class AppealsController : BaseApiController
             var task = await _tasks.GetByIdAsync(appeal.EntityId);
             response.EntityTitle = task?.Title;
         }
+        else if (appeal.EntityType == "Attendance")
+        {
+            var att = await _attendance.GetByIdAsync(appeal.EntityId);
+            response.EntityTitle = att != null ? $"حضور {att.CheckInEventTime:yyyy-MM-dd}" : null;
+        }
 
         return Ok(ApiResponse<AppealResponse>.SuccessResponse(response));
     }
 
-    // get all pending appeals (supervisors only see their workers' appeals)
+    // get all pending appeals (supervisor sees their workers' appeals only)
     [HttpGet("pending")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "get all pending appeals")]
     public async Task<IActionResult> GetPendingAppeals()
     {
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+            return Unauthorized(ApiResponse<object>.ErrorResponse("رمز غير صالح"));
+
         var appeals = await _appeals.GetPendingAppealsAsync();
         var responses = new List<AppealResponse>();
 
-        // SECURITY: Supervisors can only see appeals from their own workers
-        var currentRole = GetCurrentUserRole();
-        var currentUserId = GetCurrentUserId();
-        HashSet<int>? supervisorWorkerIds = null;
+        var userRole = GetCurrentUserRole();
 
-        if (currentRole == "Supervisor" && currentUserId.HasValue)
+        // Supervisors only see appeals from their own workers; Admin sees all
+        HashSet<int>? supervisorWorkerIds = null;
+        if (userRole == "Supervisor")
         {
             var supervisorWorkers = await _users.GetWorkersBySupervisorAsync(currentUserId.Value);
             supervisorWorkerIds = supervisorWorkers.Select(w => w.UserId).ToHashSet();
         }
 
         var taskCache = new Dictionary<int, string?>(); // avoid duplicate task queries
+        var attendanceCache = new Dictionary<int, string?>(); // avoid duplicate attendance queries
 
         foreach (var appeal in appeals)
         {
-            // Filter: Skip appeals from workers not under this supervisor
+            // Skip appeals from workers not under this supervisor (Admin sees all)
             if (supervisorWorkerIds != null && !supervisorWorkerIds.Contains(appeal.UserId))
             {
                 continue;
@@ -287,6 +335,16 @@ public class AppealsController : BaseApiController
                 }
                 response.EntityTitle = title;
             }
+            else if (appeal.EntityType == "Attendance")
+            {
+                if (!attendanceCache.TryGetValue(appeal.EntityId, out var title))
+                {
+                    var att = await _attendance.GetByIdAsync(appeal.EntityId);
+                    title = att != null ? $"حضور {att.CheckInEventTime:yyyy-MM-dd}" : null;
+                    attendanceCache[appeal.EntityId] = title;
+                }
+                response.EntityTitle = title;
+            }
 
             responses.Add(response);
         }
@@ -294,9 +352,10 @@ public class AppealsController : BaseApiController
         return Ok(ApiResponse<List<AppealResponse>>.SuccessResponse(responses));
     }
 
-    // review an appeal (approve or reject) - supervisors only
+    // review an appeal (approve or reject) - supervisors and admins
     [HttpPost("{id}/review")]
     [Authorize(Roles = "Admin,Supervisor")]
+    [SwaggerOperation(Summary = "approve or reject an appeal")]
     public async Task<IActionResult> ReviewAppeal(int id, [FromBody] ReviewAppealRequest request)
     {
         var supervisorId = GetCurrentUserId();
@@ -307,15 +366,13 @@ public class AppealsController : BaseApiController
         if (appeal == null)
             return NotFound(ApiResponse<object>.ErrorResponse("الطعن غير موجود"));
 
-        // SECURITY: Supervisors can only review appeals from their own workers
-        var currentRole = GetCurrentUserRole();
-        if (currentRole == "Supervisor")
+        // Supervisors can only review appeals from their own workers; Admin can review all
+        var userRole = GetCurrentUserRole();
+        if (userRole == "Supervisor")
         {
             var worker = await _users.GetByIdAsync(appeal.UserId);
             if (worker?.SupervisorId != supervisorId.Value)
-            {
                 return Forbid();
-            }
         }
 
         if (appeal.Status != AppealStatus.Pending)
@@ -349,12 +406,45 @@ public class AppealsController : BaseApiController
                     task.TaskId, appeal.AppealId, supervisorId.Value);
             }
         }
+        else if (request.Approved && appeal.EntityType == "Attendance")
+        {
+            var attendance = await _attendance.GetByIdAsync(appeal.EntityId);
+            if (attendance != null)
+            {
+                // Reinstate the attendance record
+                attendance.IsValidated = true;
+                attendance.ApprovalStatus = "Approved";
+                attendance.ApprovedByUserId = supervisorId.Value;
+                attendance.ApprovedAt = DateTime.UtcNow;
+                attendance.ValidationMessage = "تمت الموافقة بعد الطعن";
+                attendance.SyncVersion++;
+
+                await _attendance.UpdateAsync(attendance);
+
+                _logger.LogInformation("Attendance {AttendanceId} reinstated after appeal {AppealId} approval by supervisor {SupervisorId}",
+                    attendance.AttendanceId, appeal.AppealId, supervisorId.Value);
+            }
+        }
 
         await _appeals.UpdateAsync(appeal);
         await _appeals.SaveChangesAsync();
 
         _logger.LogInformation("Appeal {AppealId} {Action} by supervisor {SupervisorId}",
             id, request.Approved ? "approved" : "rejected", supervisorId.Value);
+
+        // Notify the worker about the appeal outcome
+        try
+        {
+            var statusText = request.Approved ? "تمت الموافقة على طعنك" : "تم رفض طعنك";
+            var details = request.Approved
+                ? "تمت الموافقة على طعنك وإعادة المهمة/الحضور إلى حالتها الصحيحة"
+                : $"تم رفض طعنك. {(string.IsNullOrEmpty(appeal.ReviewNotes) ? "" : $"السبب: {appeal.ReviewNotes}")}";
+            await _notifications.SendSystemAlertAsync(appeal.UserId, $"{statusText}: {details}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send appeal review notification to worker for appeal {AppealId}", appeal.AppealId);
+        }
 
         return Ok(ApiResponse<object?>.SuccessResponse(null,
             request.Approved ? "تمت الموافقة على الطعن" : "تم رفض الطعن"));

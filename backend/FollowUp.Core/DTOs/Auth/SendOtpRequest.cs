@@ -32,4 +32,7 @@ public class SendOtpResponse
 
     // seconds until user can request another OTP
     public int ResendCooldownSeconds { get; set; } = 60;
+
+    // OTP code for demo/testing (only set when MockSms is enabled, null in production)
+    public string? DemoOtpCode { get; set; }
 }

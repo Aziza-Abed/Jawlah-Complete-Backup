@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { getMyWorkers, assignUserZones, getUserZones } from "../api/users";
 import { getZones } from "../api/zones";
-import { getTasks, reassignTask } from "../api/tasks";
+import { getTasks } from "../api/tasks";
 import type { UserResponse } from "../types/user";
 import type { ZoneResponse } from "../types/zone";
 import { Users, MapPin, Phone, RefreshCw, X, MapPinned, Check } from "lucide-react";
 import { useConfirm } from "../components/common/ConfirmDialog";
+import MiniStat from "../components/common/MiniStat";
+import FilterChip from "../components/common/FilterChip";
 
 type WorkerWithStats = UserResponse & {
   activeTasks: number;
@@ -17,7 +20,8 @@ type WorkerWithStats = UserResponse & {
 };
 
 export default function MyWorkers() {
-  const [confirm, ConfirmDialog] = useConfirm();
+  usePageTitle("العمال");
+  const [, ConfirmDialog] = useConfirm();
   const navigate = useNavigate();
 
   const [workers, setWorkers] = useState<WorkerWithStats[]>([]);
@@ -25,14 +29,6 @@ export default function MyWorkers() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
-
-  const [reassignModal, setReassignModal] = useState<{
-    open: boolean;
-    taskId: number | null;
-    taskTitle: string;
-    currentWorkerId: number | null;
-  }>({ open: false, taskId: null, taskTitle: "", currentWorkerId: null });
-  const [reassigning, setReassigning] = useState(false);
 
   // Zone assignment state
   const [zones, setZones] = useState<ZoneResponse[]>([]);
@@ -107,9 +103,9 @@ export default function MyWorkers() {
     if (q) {
       result = result.filter(
         (w) =>
-          w.fullName.toLowerCase().includes(q) ||
-          w.username.toLowerCase().includes(q) ||
-          w.phoneNumber.includes(q)
+          (w.fullName || "").toLowerCase().includes(q) ||
+          (w.username || "").toLowerCase().includes(q) ||
+          (w.phoneNumber || "").includes(q)
       );
     }
     return result;
@@ -122,27 +118,6 @@ export default function MyWorkers() {
     const totalActive = workers.reduce((sum, w) => sum + w.activeTasks, 0);
     return { total, online, offline, totalActive };
   }, [workers]);
-
-  const handleReassign = async (targetWorkerId: number) => {
-    if (!reassignModal.taskId) return;
-    const targetWorker = workers.find(w => w.userId === targetWorkerId);
-    if (!targetWorker) return;
-    if (!await confirm(`هل أنت متأكد من إعادة تعيين المهمة "${reassignModal.taskTitle}" إلى ${targetWorker.fullName}؟`)) return;
-
-    try {
-      setReassigning(true);
-      await reassignTask(reassignModal.taskId, {
-        newAssignedToUserId: targetWorkerId,
-        reassignmentReason: "تم إعادة التعيين بواسطة المشرف",
-      });
-      setReassignModal({ open: false, taskId: null, taskTitle: "", currentWorkerId: null });
-      fetchData();
-    } catch (err) {
-      console.error("Failed to reassign task:", err);
-    } finally {
-      setReassigning(false);
-    }
-  };
 
   const openZoneModal = async (worker: WorkerWithStats) => {
     try {
@@ -200,8 +175,8 @@ export default function MyWorkers() {
         <div className="max-w-[1100px] mx-auto">
           {/* Unified Header */}
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-right font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F]">
-              العمال التابعين لي
+            <h1 className="text-right font-black text-[28px] text-[#2F2F2F] tracking-tight">
+              إدارة عمالي
             </h1>
             <button
               type="button"
@@ -282,56 +257,25 @@ export default function MyWorkers() {
         </div>
       </div>
 
-      {reassignModal.open && (
-        <CenterModal onClose={() => setReassignModal({ open: false, taskId: null, taskTitle: "", currentWorkerId: null })}>
-          <div className="text-right">
-            <div className="text-[16px] font-sans font-semibold text-[#2F2F2F]">
-              إعادة تعيين المهمة
-            </div>
-            <div className="mt-2 text-[12px] text-[#6B7280]">
-              اختر عامل آخر لتعيين المهمة: <span className="font-bold">{reassignModal.taskTitle}</span>
-            </div>
-            <div className="mt-4 space-y-2 max-h-[300px] overflow-auto">
-              {workers
-                .filter((w) => w.userId !== reassignModal.currentWorkerId)
-                .map((w) => (
-                  <button
-                    key={w.userId}
-                    onClick={() => handleReassign(w.userId)}
-                    disabled={reassigning}
-                    className="w-full p-3 rounded-[12px] bg-white border border-black/10 text-right hover:bg-[#7895B2]/5 transition flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2">
-                       <span className={`w-2 h-2 rounded-full ${w.isOnline ? "bg-green-500" : "bg-gray-400"}`} />
-                       <span className="text-[11px] text-[#6B7280]">{w.activeTasks} نشطة</span>
-                    </div>
-                    <div>
-                      <div className="text-[13px] font-semibold text-[#2F2F2F]">{w.fullName}</div>
-                      <div className="text-[11px] text-[#6B7280]">{w.phoneNumber}</div>
-                    </div>
-                  </button>
-                ))}
-            </div>
-          </div>
-        </CenterModal>
-      )}
-
       {/* Zone Assignment Modal */}
       {zoneModal.open && zoneModal.worker && (
         <CenterModal onClose={() => setZoneModal({ open: false, worker: null, selectedZones: [] })}>
           <div className="text-right">
-            <div className="flex items-center justify-end gap-3 mb-4">
-              <div>
-                <div className="text-[16px] font-sans font-bold text-[#2F2F2F]">
-                  تعيين المناطق
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#7895B2]/10 flex items-center justify-center">
+                  <MapPinned size={20} className="text-[#7895B2]" />
                 </div>
-                <div className="text-[12px] text-[#6B7280]">
-                  {zoneModal.worker.fullName}
+                <div>
+                  <div className="text-[16px] font-sans font-bold text-[#2F2F2F]">
+                    تعيين المناطق
+                  </div>
+                  <div className="text-[12px] text-[#6B7280]">
+                    {zoneModal.worker.fullName}
+                  </div>
                 </div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-[#7895B2]/10 flex items-center justify-center">
-                <MapPinned size={20} className="text-[#7895B2]" />
-              </div>
+              <div>{/* spacer for X button */}</div>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 max-h-[300px] overflow-auto p-1">
@@ -378,33 +322,6 @@ export default function MyWorkers() {
 
       {ConfirmDialog}
     </div>
-  );
-}
-
-function MiniStat({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="bg-[#F3F1ED] rounded-[14px] border border-black/10 shadow-[0_2px_0_rgba(0,0,0,0.06)] p-4">
-      <div className="text-right text-[12px] text-[#6B7280] font-sans font-semibold">{title}</div>
-      <div className="mt-2 text-right text-[18px] text-[#2F2F2F] font-sans font-bold">{value}</div>
-    </div>
-  );
-}
-
-function FilterChip({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count: number }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "h-[34px] px-3 rounded-[10px] font-sans font-semibold text-[13px] border flex items-center gap-2",
-        active ? "bg-[#7895B2] text-white border-black/10" : "bg-white text-[#2F2F2F] border-black/10 hover:opacity-95",
-      ].join(" ")}
-    >
-      <span>{label}</span>
-      <span className={["min-w-[20px] h-[20px] px-1 rounded-full text-[11px] font-bold grid place-items-center", active ? "bg-white/20" : "bg-black/5"].join(" ")}>
-        {count}
-      </span>
-    </button>
   );
 }
 

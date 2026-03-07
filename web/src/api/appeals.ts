@@ -7,12 +7,6 @@ export async function getPendingAppeals(): Promise<AppealResponse[]> {
   return response.data.data;
 }
 
-// Get appeal by ID
-export async function getAppeal(id: number): Promise<AppealResponse> {
-  const response = await apiClient.get<{ data: AppealResponse }>(`/appeals/${id}`);
-  return response.data.data;
-}
-
 // Review appeal (approve or reject)
 export async function reviewAppeal(id: number, request: ReviewAppealRequest): Promise<void> {
   await apiClient.post(`/appeals/${id}/review`, request);

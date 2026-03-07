@@ -1,5 +1,4 @@
-// Centralized localStorage key constants
-// All localStorage keys used across the app should be defined here
+// localStorage keys
 
 export const STORAGE_KEYS = {
   TOKEN: "followup_token",
@@ -7,4 +6,5 @@ export const STORAGE_KEYS = {
   USER: "followup_user",
   DEVICE_ID: "followup_device_id",
   HAS_SEEN_WELCOME: "hasSeenWelcome",
+  REMEMBERED_USERNAME: "followup_remembered_username",
 } as const;

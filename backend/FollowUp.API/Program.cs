@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Encodings.Web;
+using FollowUp.Core.Constants;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Unicode;
@@ -26,6 +27,22 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Catch unhandled exceptions that would crash the process (exit code -1)
+AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+{
+    var ex = args.ExceptionObject as Exception;
+    Console.Error.WriteLine($"FATAL UNHANDLED EXCEPTION: {ex?.Message}");
+    Console.Error.WriteLine(ex?.ToString());
+    Log.Fatal(ex, "Unhandled exception crashed the process");
+    Log.CloseAndFlush();
+};
+
+TaskScheduler.UnobservedTaskException += (sender, args) =>
+{
+    Log.Error(args.Exception, "Unobserved task exception");
+    args.SetObserved(); // Prevent process crash from unobserved task exceptions
+};
+
 // setup logging
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -48,6 +65,8 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        // Prevent StackOverflowException from circular entity references (e.g., User → Supervisor → SupervisedWorkers → ...)
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
         // Allow Arabic/Unicode characters without escaping, while still escaping HTML-dangerous chars (<, >, &)
         options.JsonSerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All);
     });
@@ -109,6 +128,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 
     options.OperationFilter<FileUploadOperationFilter>();
+    options.EnableAnnotations();
 });
 
 // setup the database connection
@@ -121,12 +141,15 @@ builder.Services.AddDbContext<FollowUpDbContext>(options =>
         sqlOptions =>
         {
             sqlOptions.UseNetTopologySuite();
+            // Use split queries globally to prevent cartesian explosion from multiple Include() calls
+            // (e.g., Task includes Photos + Team → rows multiply, causing OOM with large datasets)
+            sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
             // increase command timeout to 60 seconds (default is 30)
-            sqlOptions.CommandTimeout(60);
+            sqlOptions.CommandTimeout(AppConstants.DbCommandTimeoutSeconds);
             // enable connection resiliency with retry logic
             sqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 3,
-                maxRetryDelay: TimeSpan.FromSeconds(5),
+                maxRetryCount: AppConstants.DbMaxRetryCount,
+                maxRetryDelay: TimeSpan.FromSeconds(AppConstants.DbMaxRetryDelaySeconds),
                 errorNumbersToAdd: null
             );
         }
@@ -136,6 +159,14 @@ builder.Services.AddDbContext<FollowUpDbContext>(options =>
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"]
     ?? throw new InvalidOperationException("JWT SecretKey not configured");
+
+// reject dev placeholder keys in production
+if (!builder.Environment.IsDevelopment() &&
+    secretKey.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException(
+        "JWT SecretKey is a development placeholder! Set a unique secret via environment variable JwtSettings__SecretKey");
+}
 
 builder.Services.AddAuthentication(options =>
 {
@@ -158,6 +189,17 @@ builder.Services.AddAuthentication(options =>
 
     options.Events = new JwtBearerEvents
     {
+        // SignalR WebSocket: extract JWT from query string since WebSocket can't use Authorization header
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        },
         OnAuthenticationFailed = context =>
         {
             Log.Warning("Authentication failed: {Error}", context.Exception.Message);
@@ -172,7 +214,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // require authentication by default on all endpoints
+    // endpoints that should be public must be explicitly marked with [AllowAnonymous]
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 var productionOrigins = builder.Configuration.GetSection("Cors:ProductionOrigins").Get<string[]>()
     ?? new[] { "https://followup.ps", "https://www.followup.ps" };
@@ -200,7 +249,6 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 builder.Services.AddHttpContextAccessor();
 
-// Add password hasher for database seeding
 builder.Services.AddSingleton<IPasswordHasher<FollowUp.Core.Entities.User>, PasswordHasher<FollowUp.Core.Entities.User>>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -216,6 +264,8 @@ builder.Services.AddScoped<IAppealRepository, AppealRepository>();
 builder.Services.AddScoped<ITaskTemplateRepository, TaskTemplateRepository>();
 builder.Services.AddScoped<IGisFileRepository, GisFileRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 builder.Services.AddHostedService<TaskGenerationBackgroundService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -225,12 +275,18 @@ builder.Services.AddScoped<IOtpService, OtpService>();
 
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // request size limits
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB max
+    options.MultipartBodyLengthLimit = AppConstants.MaxUploadSizeBytes;
+});
+
+// Kestrel server limits for file uploads
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = AppConstants.MaxUploadSizeBytes;
 });
 
 // Rate limiting: protect against brute force and abuse
@@ -238,41 +294,59 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Auth endpoints: 10 requests/minute per IP (login, OTP, resend)
+    // Auth endpoints: N requests/minute per IP (login, OTP, resend)
     options.AddPolicy("auth", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                PermitLimit = AppConstants.AuthRateLimitRequestsPerMinute,
                 Window = TimeSpan.FromMinutes(1)
             }));
 
-    // Upload endpoints: 5 requests/minute per IP
+    // Upload endpoints: N requests/minute per IP
     options.AddPolicy("upload", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = AppConstants.UploadRateLimitRequestsPerMinute,
                 Window = TimeSpan.FromMinutes(1)
             }));
 });
 
 var app = builder.Build();
 
-var disableGeofencing = app.Configuration.GetValue<bool>("DeveloperMode:DisableGeofencing", false);
+// Set QuestPDF license once at startup (instead of per-request in IssuesController)
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
-if (disableGeofencing && !app.Environment.IsDevelopment())
+var disableGeofencing = app.Configuration.GetValue<bool>("DeveloperMode:DisableGeofencing", false);
+var mockSms = app.Configuration.GetValue<bool>("DeveloperMode:MockSms", false);
+
+// block dev-only settings in production
+if (!app.Environment.IsDevelopment())
 {
-    Log.Fatal("SECURITY WARNING: Geofencing is DISABLED in non-Development environment!");
-    throw new InvalidOperationException("Geofencing can only be disabled in Development environment");
+    if (disableGeofencing)
+    {
+        Log.Fatal("SECURITY: Geofencing is DISABLED in non-Development environment!");
+        throw new InvalidOperationException("Geofencing can only be disabled in Development environment");
+    }
+    if (mockSms)
+    {
+        Log.Fatal("SECURITY: MockSms is ENABLED in non-Development environment! OTPs will not be sent.");
+        throw new InvalidOperationException("MockSms can only be enabled in Development environment");
+    }
 }
 
 if (disableGeofencing)
 {
     Console.WriteLine("WARNING: Geofencing validation is DISABLED!");
     Console.WriteLine("Workers can login from any location. This is for development only.");
+}
+
+if (mockSms)
+{
+    Console.WriteLine("WARNING: SMS is in MOCK mode! OTPs are logged, not sent.");
 }
 
 if (app.Environment.IsDevelopment())
@@ -297,13 +371,16 @@ app.Use(async (context, next) =>
     }
 });
 
+// Enable response compression (reduces payload size by 70-90%) — must be before exception handling
+// so that error responses are also compressed
+app.UseResponseCompression();
+
 // global exception handling
 app.UseExceptionHandling();
 
-// Enable response compression (reduces payload size by 70-90%)
-app.UseResponseCompression();
-
-app.UseHttpsRedirection();
+// Only redirect to HTTPS in production (dev runs on HTTP only)
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 
 // basic security headers
 app.Use(async (context, next) =>
@@ -336,73 +413,9 @@ app.MapHub<TrackingHub>("/hubs/tracking");
 // Ensure database schema is up-to-date (applies any pending migrations)
 using (var scope = app.Services.CreateScope())
 {
-    try
-    {
-        var context = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
-        await context.Database.MigrateAsync();
-        Log.Information("Database migrations applied successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Warning(ex, "Failed to apply migrations - attempting to ensure RefreshTokens table exists");
-        // Fallback: create RefreshTokens table if missing (handles corrupted migration state)
-        try
-        {
-            var context = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
-            await context.Database.ExecuteSqlRawAsync(@"
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RefreshTokens')
-                BEGIN
-                    CREATE TABLE [RefreshTokens] (
-                        [RefreshTokenId] INT IDENTITY(1,1) NOT NULL,
-                        [UserId] INT NOT NULL,
-                        [Token] NVARCHAR(500) NOT NULL,
-                        [ExpiresAt] DATETIME2 NOT NULL,
-                        [CreatedAt] DATETIME2 NOT NULL,
-                        [RevokedAt] DATETIME2 NULL,
-                        [ReplacedByToken] NVARCHAR(500) NULL,
-                        [DeviceId] NVARCHAR(100) NULL,
-                        [IpAddress] NVARCHAR(50) NULL,
-                        CONSTRAINT [PK_RefreshTokens] PRIMARY KEY ([RefreshTokenId]),
-                        CONSTRAINT [FK_RefreshTokens_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [Users]([UserId]) ON DELETE CASCADE
-                    );
-                    CREATE UNIQUE INDEX [IX_RefreshToken_Token] ON [RefreshTokens]([Token]);
-                    CREATE INDEX [IX_RefreshToken_User_Active] ON [RefreshTokens]([UserId], [RevokedAt], [ExpiresAt]);
-                    CREATE INDEX [IX_RefreshToken_ExpiresAt] ON [RefreshTokens]([ExpiresAt]);
-                END");
-            Log.Information("RefreshTokens table ensured via fallback SQL");
-        }
-        catch (Exception ex2)
-        {
-            Log.Warning(ex2, "Could not ensure RefreshTokens table");
-        }
-    }
-}
-
-// DEV ONLY: Reset all passwords to "pass" and clear lockouts
-if (app.Environment.IsDevelopment())
-{
-    using var scope = app.Services.CreateScope();
-    try
-    {
-        var context = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
-        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<FollowUp.Core.Entities.User>>();
-        var users = await context.Users.ToListAsync();
-        if (users.Any())
-        {
-            foreach (var u in users)
-            {
-                u.PasswordHash = passwordHasher.HashPassword(u, "pass");
-                u.FailedLoginAttempts = 0;
-                u.LockoutEndTime = null;
-            }
-            await context.SaveChangesAsync();
-            Log.Information("DEV: Reset {Count} user passwords to 'pass'", users.Count);
-        }
-    }
-    catch (Exception ex)
-    {
-        Log.Warning(ex, "Failed to reset dev passwords.");
-    }
+    var context = scope.ServiceProvider.GetRequiredService<FollowUpDbContext>();
+    await context.Database.MigrateAsync();
+    Log.Information("Database migrations applied successfully");
 }
 
 // auto-import GIS zones if the table is empty
@@ -428,54 +441,27 @@ using (var scope = app.Services.CreateScope())
             {
                 int municipId = municipality.MunicipalityId;
 
-                // Priority 1: Check Storage/GIS folder (admin uploaded files)
                 string storagePath = Path.Combine(Directory.GetCurrentDirectory(), "Storage", "GIS");
+                Log.Information("Looking for GIS files in: {StoragePath}", storagePath);
 
-                // Priority 2: Fallback to repo GIS folder (legacy/initial setup)
-                string gisBasePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "GIS"));
+                string? FindGisFile(string name) =>
+                    File.Exists(Path.Combine(storagePath, name)) ? Path.Combine(storagePath, name) : null;
 
-                if (!Directory.Exists(gisBasePath))
-                {
-                    // Fallback to try finding it if we are in bin/Debug
-                    gisBasePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "GIS"));
-                }
-
-                // Helper to find file in Storage first, then fallback
-                string? FindGisFile(string storageName, string[] legacyNames)
-                {
-                    // Check Storage/GIS first
-                    var storagefile = Path.Combine(storagePath, storageName);
-                    if (File.Exists(storagefile)) return storagefile;
-
-                    // Fallback to legacy locations
-                    foreach (var name in legacyNames)
-                    {
-                        var legacyFile = Path.Combine(gisBasePath, name);
-                        if (File.Exists(legacyFile)) return legacyFile;
-                    }
-                    return null;
-                }
-
-                Log.Information("Looking for GIS files in Storage: {StoragePath} and Legacy: {LegacyPath}", storagePath, gisBasePath);
-
-                // 1. Urban Master Plan / Borders
-                var bordersFile = FindGisFile("borders.geojson", new[] { "Urban_Master_Plan_Borders_1_WGS84_CORRECT.geojson" });
+                var bordersFile = FindGisFile("borders.geojson");
                 if (bordersFile != null)
                 {
                     Log.Information("Importing Borders from: {Path}", bordersFile);
-                    await gisService.ImportGeoJsonAsync(bordersFile, municipId);
+                    await gisService.ImportGeoJsonAsync(bordersFile, municipId, FollowUp.Core.Enums.GisFileType.Borders);
                 }
 
-                // 2. Quarters (Neighborhoods)
-                var quartersFile = FindGisFile("quarters.geojson", new[] { "Quarters(Neighborhoods)_WGS84_CORRECT.geojson" });
+                var quartersFile = FindGisFile("quarters.geojson");
                 if (quartersFile != null)
                 {
                     Log.Information("Importing Quarters from: {Path}", quartersFile);
-                    await gisService.ImportGeoJsonAsync(quartersFile, municipId);
+                    await gisService.ImportGeoJsonAsync(quartersFile, municipId, FollowUp.Core.Enums.GisFileType.Quarters);
                 }
 
-                // 3. Blocks
-                var blocksFile = FindGisFile("blocks.geojson", new[] { "Blocks_WGS84.geojson" });
+                var blocksFile = FindGisFile("blocks.geojson");
                 if (blocksFile != null)
                 {
                     Log.Information("Importing Blocks from: {Path}", blocksFile);

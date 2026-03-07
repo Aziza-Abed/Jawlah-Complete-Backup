@@ -12,7 +12,6 @@ import '../../repositories/local/attendance_local_repository.dart';
 import '../../repositories/local/task_local_repository.dart';
 import '../../repositories/local/issue_local_repository.dart';
 import '../../repositories/local/zone_local_repository.dart';
-import '../../../core/utils/date_formatter.dart';
 import '../tasks_service.dart';
 import '../issues_service.dart';
 
@@ -178,6 +177,7 @@ class SyncService {
                 proofPhoto: file,
                 latitude: task.latitude,
                 longitude: task.longitude,
+                eventTime: task.eventTime ?? task.completedAt,
               );
 
               await _taskLocalRepo.markAsSynced(
@@ -219,12 +219,12 @@ class SyncService {
               await _taskLocalRepo.markAsSynced(taskId, serverVersion);
               result.success++;
             } else if (syncResult['conflictResolution'] == 'ServerWins') {
-              // Server has newer version - update local syncVersion so next
-              // upload sends correct version instead of retrying forever
+              // Server has newer version — accept server's state and stop retrying.
+              // The next syncFromServer pull will overwrite local with server data.
               final taskId = syncResult['serverId'] as int?;
               final serverVersion = syncResult['serverVersion'] as int? ?? 1;
               if (taskId != null) {
-                await _taskLocalRepo.updateSyncVersion(taskId, serverVersion);
+                await _taskLocalRepo.markAsSynced(taskId, serverVersion);
               }
               result.failed++;
             } else {
@@ -282,6 +282,7 @@ class SyncService {
             photo3: p3,
             latitude: issue.latitude,
             longitude: issue.longitude,
+            clientId: issue.clientId,
           );
 
           if (issue.clientId != null) {
@@ -300,103 +301,104 @@ class SyncService {
     return result;
   }
 
-  // download latest data from server
+  // download latest data from server using existing REST endpoints.
+  // Previously called GET /sync/changes which does not exist in the backend.
+  // Now uses the typed service methods that already exist.
   Future<void> syncFromServer() async {
     try {
-      // get last sync time
-      final lastSyncTime = await _getLastSyncTime();
-
-      final response = await _dio.get(
-        ApiConfig.syncChanges,
-        queryParameters: {
-          'lastSyncTime': lastSyncTime?.toIso8601String(),
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = response.data['data'];
-        if (data == null) return;
-
-        // update tasks from server using field-level merge
-        final tasks = data['tasks'] as List? ?? [];
-        for (var taskJson in tasks) {
-          final task = TaskLocal(
-            taskId: taskJson['taskId'],
-            title: taskJson['title'],
-            status: taskJson['status'],
-            completionNotes: taskJson['completionNotes'],
-            photoUrl: taskJson['photoUrl'],
-            completedAt: DateFormatter.tryParseUtc(taskJson['completedAt']),
-            eventTime: DateFormatter.tryParseUtc(taskJson['eventTime']),
-            syncVersion: taskJson['syncVersion'] ?? 1,
-            isSynced: true,
-            updatedAt: DateTime.now(),
-            syncedAt: DateTime.now(),
-            description: taskJson['description'],
-            priority: taskJson['priority'] ?? 'Medium',
-            dueDate: DateFormatter.tryParseUtc(taskJson['dueDate']),
-            zoneId: taskJson['zoneId'],
-            zoneName: taskJson['zoneName'],
-            latitude: (taskJson['latitude'] as num?)?.toDouble(),
-            longitude: (taskJson['longitude'] as num?)?.toDouble(),
-            locationDescription: taskJson['locationDescription'],
-            taskType: taskJson['taskType'],
-            requiresPhotoProof: taskJson['requiresPhotoProof'] ?? false,
-            estimatedDurationMinutes: taskJson['estimatedDurationMinutes'],
-            progressPercentage: taskJson['progressPercentage'] ?? 0,
-            progressNotes: taskJson['progressNotes'],
-            photos: (taskJson['photos'] as List?)?.map((e) => e.toString()).toList() ?? [],
-          );
-          // mergeFromServer handles conflict: if local has unsynced worker
-          // changes, it keeps them and only takes supervisor fields from server
-          await _taskLocalRepo.mergeFromServer(task);
-        }
-
-        // update issues from server using field-level merge
-        final issues = data['issues'] as List? ?? [];
-        for (var issueJson in issues) {
-          final issue = IssueLocal(
-            serverId: issueJson['issueId'],
-            title: issueJson['title'],
-            description: issueJson['description'],
-            type: issueJson['type'],
-            severity: issueJson['severity'],
-            status: issueJson['status'] as String?,
-            reportedByUserId: issueJson['reportedByUserId'],
-            latitude: (issueJson['latitude'] as num?)?.toDouble() ?? 0.0,
-            longitude: (issueJson['longitude'] as num?)?.toDouble() ?? 0.0,
-            locationDescription: issueJson['locationDescription'],
-            // Use photos array from server (joined with semicolons for IssueLocal compatibility)
-            photoUrl: (issueJson['photos'] as List?)?.isNotEmpty == true
-                ? (issueJson['photos'] as List).map((e) => e.toString()).join(';')
-                : issueJson['photoUrl'],
-            reportedAt: DateFormatter.tryParseUtc(issueJson['reportedAt']) ??
-                DateTime.now(),
-            isSynced: true,
-            createdAt: DateTime.now(),
-            syncedAt: DateTime.now(),
-            syncVersion: issueJson['syncVersion'] as int? ?? 1,
-            forwardedToDepartmentId: issueJson['forwardedToDepartmentId'] as int?,
-            forwardedToDepartmentName: issueJson['forwardedToDepartmentName'] as String?,
-            forwardedAt: DateFormatter.tryParseUtc(issueJson['forwardedAt']),
-            forwardingNotes: issueJson['forwardingNotes'] as String?,
-          );
-          // mergeFromServer handles conflict: if local has unsynced worker
-          // changes, it keeps them and only takes supervisor fields from server
-          await _issueLocalRepo.mergeFromServer(issue);
-        }
-
-        // save server time for accurate sync (avoids clock drift)
-        final serverTimeStr = data['currentServerTime'];
-        final serverTime = DateFormatter.tryParseUtc(serverTimeStr) ?? DateTime.now();
-        await _saveLastSyncTime(serverTime);
-      }
-
-      // sync zones for offline validation
+      await _pullTasksFromServer();
+      await _pullIssuesFromServer();
       await syncZones();
+      await _saveLastSyncTime(DateTime.now().toUtc());
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Sync failed: $e');
+        debugPrint('Sync from server failed: $e');
+      }
+    }
+  }
+
+  // pull tasks assigned to this worker and merge into local Hive store
+  Future<void> _pullTasksFromServer() async {
+    try {
+      final serverTasks = await _tasksService.getMyTasks();
+      for (final model in serverTasks) {
+        final local = TaskLocal(
+          taskId: model.taskId,
+          title: model.title,
+          status: model.status,
+          completionNotes: model.completionNotes,
+          photoUrl: model.photoUrl,
+          completedAt: model.completedAt,
+          eventTime: model.eventTime,
+          syncVersion: model.syncVersion,
+          isSynced: true,
+          updatedAt: DateTime.now(),
+          syncedAt: DateTime.now(),
+          description: model.description,
+          priority: model.priority,
+          dueDate: model.dueDate,
+          zoneId: model.zoneId,
+          zoneName: model.zoneName,
+          latitude: model.latitude,
+          longitude: model.longitude,
+          locationDescription: model.location,
+          taskType: model.taskType,
+          requiresPhotoProof: model.requiresPhotoProof,
+          estimatedDurationMinutes: model.estimatedDurationMinutes,
+          progressPercentage: model.progressPercentage,
+          progressNotes: model.progressNotes,
+          photos: model.photos,
+        );
+        await _taskLocalRepo.mergeFromServer(local);
+      }
+      if (kDebugMode) {
+        debugPrint('Sync: pulled ${serverTasks.length} tasks from server');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Task pull failed: $e');
+      }
+    }
+  }
+
+  // pull issues reported by this worker and merge into local Hive store
+  Future<void> _pullIssuesFromServer() async {
+    try {
+      final serverIssues = await _issuesService.getMyIssues();
+      for (final model in serverIssues) {
+        final combinedPhotoUrl = model.photos.isNotEmpty
+            ? model.photos.join(';')
+            : model.photoUrl;
+        final local = IssueLocal(
+          serverId: model.issueId,
+          title: model.title,
+          description: model.description,
+          type: model.type,
+          severity: model.severity,
+          status: model.status,
+          reportedByUserId: model.reportedByUserId,
+          latitude: model.latitude ?? 0.0,
+          longitude: model.longitude ?? 0.0,
+          locationDescription: model.location,
+          photoUrl: combinedPhotoUrl,
+          reportedAt: model.createdAt,
+          isSynced: true,
+          createdAt: DateTime.now(),
+          syncedAt: DateTime.now(),
+          syncVersion: 1,
+          forwardedToDepartmentId: model.forwardedToDepartmentId,
+          forwardedToDepartmentName: model.forwardedToDepartmentName,
+          forwardedAt: model.forwardedAt,
+          forwardingNotes: model.forwardingNotes,
+        );
+        await _issueLocalRepo.mergeFromServer(local);
+      }
+      if (kDebugMode) {
+        debugPrint('Sync: pulled ${serverIssues.length} issues from server');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Issue pull failed: $e');
       }
     }
   }
@@ -429,14 +431,6 @@ class SyncService {
   // use secure DeviceService for device ID (consistent with login)
   Future<String> _getDeviceId() async {
     return await DeviceService.getDeviceId();
-  }
-
-  Future<DateTime?> _getLastSyncTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    final timestamp = prefs.getInt('last_sync_time');
-    return timestamp != null
-        ? DateTime.fromMillisecondsSinceEpoch(timestamp)
-        : null;
   }
 
   Future<void> _saveLastSyncTime(DateTime time) async {

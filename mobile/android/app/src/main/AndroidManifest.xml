@@ -3,7 +3,14 @@
     <!-- GPS Location Permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Keep CPU awake during background GPS tracking -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Restart tracking service after device reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Camera Permission for photo capture -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -19,6 +26,9 @@
     <!-- FIX: Android 14+ requires foreground service type permission -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- Battery optimization exemption — keeps background GPS tracking alive -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:label="FollowUp"

@@ -1,5 +1,7 @@
 // src/pages/TaskDetails.tsx
 import React, { useEffect, useMemo, useState } from "react";
+import AuthImage from "../components/common/AuthImage";
+import ImageLightbox from "../components/common/ImageLightbox";
 import { useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -23,14 +25,15 @@ const TaskLocationIcon = L.divIcon({
   iconAnchor: [20, 20]
 });
 
-type Priority = "Low" | "Medium" | "High";
+type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 type TaskStatus =
   | "open"
   | "in_progress"
   | "under_review"
   | "completed"
-  | "rejected";
+  | "rejected"
+  | "cancelled";
 
 type TaskUpdate = {
   id: string;
@@ -60,6 +63,7 @@ type TaskDTO = {
 
   lastLocationText?: string;
   lastGps?: { lat: number; lng: number };
+  taskGps?: { lat: number; lng: number };
 
   updates: TaskUpdate[];
   lastRejectReason?: string;
@@ -75,6 +79,7 @@ export default function TaskDetails() {
   const [busyAction, setBusyAction] = useState<"approve" | "reject" | "">("");
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -134,6 +139,10 @@ export default function TaskDetails() {
       setErr("سبب الرفض مطلوب");
       return;
     }
+    if (rejectReason.trim().length < 10) {
+      setErr("سبب الرفض يجب أن يكون 10 أحرف على الأقل");
+      return;
+    }
     try {
       setBusyAction("reject");
       setErr("");
@@ -174,7 +183,7 @@ export default function TaskDetails() {
         <div className="max-w-[1100px] mx-auto">
           <div className="flex items-start justify-between gap-3">
             <div className="text-right">
-              <h1 className="font-sans font-semibold text-[20px] sm:text-[22px] text-[#2F2F2F]">
+              <h1 className="font-black text-[28px] text-[#2F2F2F] tracking-tight">
                 تفاصيل المهمة
               </h1>
               <div className="mt-1 text-[12px] text-[#6B7280]">
@@ -259,10 +268,10 @@ export default function TaskDetails() {
                 <div className="text-right text-[13px] text-[#6B7280] font-sans font-semibold mb-2">
                   موقع المهمة على الخريطة
                 </div>
-                {(latestUpdate?.gps || task.lastGps) ? (
-                  <div className="h-[180px] rounded-[10px] overflow-hidden border border-black/5">
+                {(task.taskGps || latestUpdate?.gps || task.lastGps) ? (
+                  <div className="h-[180px] rounded-[10px] overflow-hidden border border-black/5 relative z-0">
                     <MapContainer
-                      center={[(latestUpdate?.gps || task.lastGps)!.lat, (latestUpdate?.gps || task.lastGps)!.lng]}
+                      center={[(task.taskGps || latestUpdate?.gps || task.lastGps)!.lat, (task.taskGps || latestUpdate?.gps || task.lastGps)!.lng]}
                       zoom={15}
                       className="w-full h-full"
                       zoomControl={false}
@@ -272,22 +281,20 @@ export default function TaskDetails() {
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
                       <Marker
-                        position={[(latestUpdate?.gps || task.lastGps)!.lat, (latestUpdate?.gps || task.lastGps)!.lng]}
+                        position={[(task.taskGps || latestUpdate?.gps || task.lastGps)!.lat, (task.taskGps || latestUpdate?.gps || task.lastGps)!.lng]}
                         icon={TaskLocationIcon}
                       >
                         <Popup>
                           <div dir="rtl" className="text-right font-sans p-1">
                             <div className="font-bold text-[#2F2F2F] text-sm mb-1">
-                              آخر موقع للعامل
+                              {task.taskGps ? "موقع المهمة (المنطقة)" : "آخر موقع للعامل"}
                             </div>
                             <div className="text-[10px] text-[#6B7280]">
-                              {(latestUpdate?.gps || task.lastGps)!.lat.toFixed(5)}, {(latestUpdate?.gps || task.lastGps)!.lng.toFixed(5)}
+                              {(task.taskGps || latestUpdate?.gps || task.lastGps)!.lat.toFixed(5)}, {(task.taskGps || latestUpdate?.gps || task.lastGps)!.lng.toFixed(5)}
                             </div>
-                            {latestUpdate?.locationText || task.lastLocationText ? (
-                              <div className="text-[10px] text-[#6B7280] mt-1">
-                                {latestUpdate?.locationText || task.lastLocationText}
-                              </div>
-                            ) : null}
+                            {task.zoneName && (
+                              <div className="text-[10px] text-[#6B7280] mt-1">{task.zoneName}</div>
+                            )}
                           </div>
                         </Popup>
                       </Marker>
@@ -383,10 +390,10 @@ export default function TaskDetails() {
                                   key={src + i}
                                   type="button"
                                   className="rounded-[12px] border border-black/10 overflow-hidden hover:opacity-95 transition"
-                                  onClick={() => window.open(src, "_blank")}
+                                  onClick={() => setLightbox({ images: u.images, index: i })}
                                   aria-label={`Open image ${i + 1}`}
                                 >
-                                  <img
+                                  <AuthImage
                                     src={src}
                                     alt={`update-${u.id}-${i + 1}`}
                                     className="w-full h-[110px] object-cover"
@@ -467,6 +474,8 @@ export default function TaskDetails() {
                   ? "تم اعتماد المهمة."
                   : task.status === "rejected"
                   ? "تم رفض المهمة."
+                  : task.status === "cancelled"
+                  ? "تم إلغاء المهمة."
                   : "بانتظار تحديث من العامل."}
               </div>
             )}
@@ -516,6 +525,15 @@ export default function TaskDetails() {
           </div>
         </CenterModal>
       )}
+
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          currentIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onNavigate={(i) => setLightbox({ ...lightbox, index: i })}
+        />
+      )}
     </div>
   );
 }
@@ -550,6 +568,7 @@ function PriorityBadge({ priority }: { priority: Priority }) {
     Low: { label: "أولوية منخفضة", bg: "#E5E7EB", text: "#2F2F2F" },
     Medium: { label: "أولوية متوسطة", bg: "#F3E7C8", text: "#2F2F2F" },
     High: { label: "أولوية عالية", bg: "#F2D3CD", text: "#2F2F2F" },
+    Urgent: { label: "عاجلة", bg: "#C86E5D", text: "#FFFFFF" },
   };
   const p = map[priority];
   return (
@@ -569,6 +588,7 @@ function StatusBadge({ status }: { status: TaskStatus }) {
     under_review: { label: "بانتظار الاعتماد", bg: "#7895B2", text: "#FFFFFF" },
     completed: { label: "معتمدة", bg: "#8FA36A", text: "#FFFFFF" },
     rejected: { label: "مرفوضة", bg: "#C86E5D", text: "#FFFFFF" },
+    cancelled: { label: "ملغاة", bg: "#6B7280", text: "#FFFFFF" },
   };
   const s = map[status];
   return (
@@ -667,18 +687,30 @@ function formatDateTime(d: string) {
 // Map backend status to frontend status
 const mapBackendStatus = (status: string): TaskStatus => {
   switch (status) {
-    case "Pending": return "open";
-    case "InProgress": return "in_progress";
-    case "UnderReview": return "under_review";
-    case "Completed": return "completed";
-    case "Rejected": return "rejected";
-    default: return "open";
+    case "Pending":
+    case "Created":
+    case "Assigned":
+      return "open";
+    case "InProgress":
+    case "Accepted":
+      return "in_progress";
+    case "UnderReview":
+    case "Submitted":
+      return "under_review";
+    case "Completed":
+    case "Synced":
+      return "completed";
+    case "Rejected":
+      return "rejected";
+    case "Cancelled":
+      return "cancelled";
+    default:
+      return "open";
   }
 };
 
 // Map backend priority
 const mapBackendPriority = (priority: string): Priority => {
-  if (priority === "Urgent") return "High";
   return priority as Priority;
 };
 
@@ -713,6 +745,7 @@ const mapBackendTaskToDTO = (task: TaskResponse): TaskDTO => {
     teamName: task.teamName,
     lastLocationText: task.locationDescription,
     lastGps: task.latitude && task.longitude ? { lat: task.latitude, lng: task.longitude } : undefined,
+    taskGps: task.zoneCenterLatitude && task.zoneCenterLongitude ? { lat: task.zoneCenterLatitude, lng: task.zoneCenterLongitude } : undefined,
     updates: updates,
     lastRejectReason: task.rejectionReason || (task.status === "Rejected" ? "تم رفض المهمة" : undefined),
   };

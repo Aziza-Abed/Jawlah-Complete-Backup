@@ -3,15 +3,17 @@ using FollowUp.API.Utils;
 using FollowUp.Core.DTOs.Common;
 using FollowUp.Core.DTOs.Zones;
 using FollowUp.Core.Entities;
+using FollowUp.Core.Enums;
 using FollowUp.Core.Interfaces.Repositories;
 using FollowUp.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace FollowUp.API.Controllers;
 
-// this controller handle zones and geofencing
 [Route("api/[controller]")]
+[Tags("Zones")]
 public class ZonesController : BaseApiController
 {
     private readonly IZoneRepository _zones;
@@ -29,8 +31,8 @@ public class ZonesController : BaseApiController
         _mapper = mapper;
     }
 
-    // get zones assigned to current user
     [HttpGet("my")]
+    [SwaggerOperation(Summary = "get zones assigned to current user")]
     public async Task<IActionResult> GetMyZones()
     {
         // get user id
@@ -44,23 +46,27 @@ public class ZonesController : BaseApiController
             return NotFound(ApiResponse<object>.ErrorResponse("المستخدم غير موجود"));
 
         // extract active zones
-        var zones = user.AssignedZones.Select(uz => uz.Zone).Where(z => z.IsActive).ToList();
+        var zones = user.AssignedZones.Select(uz => uz.Zone).Where(z => z != null && z.IsActive).ToList();
 
         return Ok(ApiResponse<IEnumerable<ZoneResponse>>.SuccessResponse(
             zones.Select(z => _mapper.Map<ZoneResponse>(z))));
     }
 
-    // get all active zones
     [HttpGet]
-    public async Task<IActionResult> GetAllZones()
+    [SwaggerOperation(Summary = "get all active zones")]
+    public async Task<IActionResult> GetAllZones([FromQuery] string? type = null)
     {
         var zones = await _zones.GetActiveZonesAsync();
+
+        if (!string.IsNullOrEmpty(type) && Enum.TryParse<GisFileType>(type, true, out var zoneType))
+            zones = zones.Where(z => z.ZoneType == zoneType);
+
         return Ok(ApiResponse<IEnumerable<ZoneResponse>>.SuccessResponse(
             zones.Select(z => _mapper.Map<ZoneResponse>(z))));
     }
 
-    // get zone by id
     [HttpGet("{id}")]
+    [SwaggerOperation(Summary = "get zone by id")]
     public async Task<IActionResult> GetZoneById(int id)
     {
         var zone = await _zones.GetByIdAsync(id);
@@ -70,9 +76,9 @@ public class ZonesController : BaseApiController
         return Ok(ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone)));
     }
 
-    // create new zone
     [HttpPost]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "create a new zone")]
     public async Task<IActionResult> CreateZone([FromBody] CreateZoneRequest request)
     {
         if (!ModelState.IsValid)
@@ -103,6 +109,7 @@ public class ZonesController : BaseApiController
                 AreaSquareMeters = request.AreaSquareMeters,
                 BoundaryGeoJson = request.BoundaryGeoJson,
                 District = InputSanitizer.SanitizeString(request.District, 100),
+                ZoneType = !string.IsNullOrEmpty(request.ZoneType) && Enum.TryParse<GisFileType>(request.ZoneType, true, out var zt) ? zt : null,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 Version = 1,
@@ -128,9 +135,9 @@ public class ZonesController : BaseApiController
         }
     }
 
-    // update zone
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "update an existing zone")]
     public async Task<IActionResult> UpdateZone(int id, [FromBody] UpdateZoneRequest request)
     {
         if (!ModelState.IsValid)
@@ -163,6 +170,14 @@ public class ZonesController : BaseApiController
             if (request.AreaSquareMeters.HasValue)
                 zone.AreaSquareMeters = request.AreaSquareMeters.Value;
 
+            if (request.ZoneType != null)
+            {
+                if (Enum.TryParse<GisFileType>(request.ZoneType, true, out var zt))
+                    zone.ZoneType = zt;
+                else if (string.IsNullOrEmpty(request.ZoneType))
+                    zone.ZoneType = null;
+            }
+
             // Update GeoJSON and geometry
             if (!string.IsNullOrEmpty(request.BoundaryGeoJson))
             {
@@ -188,9 +203,9 @@ public class ZonesController : BaseApiController
         }
     }
 
-    // delete zone (soft delete)
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "soft delete a zone")]
     public async Task<IActionResult> DeleteZone(int id)
     {
         try
@@ -214,9 +229,9 @@ public class ZonesController : BaseApiController
         }
     }
 
-    // get zones as geojson for map (full boundaries - cached for 1 hour)
     [HttpGet("map-data")]
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
+    [SwaggerOperation(Summary = "get zones as geojson for map")]
     public async Task<IActionResult> GetMapData()
     {
         var zones = await _zones.GetActiveZonesAsync();
@@ -249,6 +264,7 @@ public class ZonesController : BaseApiController
                     zoneName = z.ZoneName,
                     zoneCode = z.ZoneCode,
                     district = z.District,
+                    zoneType = z.ZoneType?.ToString(),
                     areaSquareMeters = z.AreaSquareMeters,
                     centerLatitude = z.CenterLatitude,
                     centerLongitude = z.CenterLongitude
@@ -266,9 +282,9 @@ public class ZonesController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(featureCollection));
     }
 
-    // get zone markers only (lightweight for map initialization)
     [HttpGet("map-markers")]
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
+    [SwaggerOperation(Summary = "get zone markers for map")]
     public async Task<IActionResult> GetMapMarkers()
     {
         var zones = await _zones.GetActiveZonesAsync();
@@ -287,8 +303,8 @@ public class ZonesController : BaseApiController
         return Ok(ApiResponse<object>.SuccessResponse(new { markers }));
     }
 
-    // get zone by code
     [HttpGet("by-code/{code}")]
+    [SwaggerOperation(Summary = "get zone by code")]
     public async Task<IActionResult> GetZoneByCode(string code)
     {
         var zone = await _zones.GetByCodeAsync(code);
@@ -298,9 +314,9 @@ public class ZonesController : BaseApiController
         return Ok(ApiResponse<ZoneResponse>.SuccessResponse(_mapper.Map<ZoneResponse>(zone)));
     }
 
-    // validate if gps point is inside any zone
     [HttpPost("validate-location")]
     [HttpPost("validate")]
+    [SwaggerOperation(Summary = "validate if location is inside a zone")]
     public async Task<IActionResult> ValidateLocation([FromBody] ValidateLocationRequest request)
     {
         if (!ModelState.IsValid)
@@ -358,9 +374,9 @@ public class ZonesController : BaseApiController
         }
     }
 
-    // import zones from shapefile admin only
     [HttpPost("import-shapefile")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "import zones from shapefile")]
     public async Task<IActionResult> ImportShapefile([FromBody] ImportShapefileRequest request)
     {
         try
@@ -371,17 +387,26 @@ public class ZonesController : BaseApiController
                 return BadRequest(ApiResponse<object>.ErrorResponse("مسار الملف مطلوب"));
             }
 
-            // check file exists
-            if (!System.IO.File.Exists(request.FilePath))
+            // restrict access to Storage/GIS dir only
+            var allowedBasePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "Storage", "GIS"));
+            var resolvedPath = Path.GetFullPath(request.FilePath);
+            if (!resolvedPath.StartsWith(allowedBasePath, StringComparison.OrdinalIgnoreCase))
             {
-                return BadRequest(ApiResponse<object>.ErrorResponse($"ملف الشكل غير موجود في: {request.FilePath}"));
+                _logger.LogWarning("Shapefile import blocked - path outside Storage/GIS: {FilePath}", request.FilePath);
+                return BadRequest(ApiResponse<object>.ErrorResponse("مسار الملف غير مسموح به. يجب أن يكون داخل مجلد Storage/GIS"));
+            }
+
+            // check file exists
+            if (!System.IO.File.Exists(resolvedPath))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResponse("ملف الشكل غير موجود"));
             }
 
             _logger.LogInformation("Starting shapefile import from: {FilePath} for municipality {MunicipalityId}",
-                request.FilePath, request.MunicipalityId);
+                resolvedPath, request.MunicipalityId);
 
             // do the import
-            await _gis.ImportShapefileAsync(request.FilePath, request.MunicipalityId);
+            await _gis.ImportShapefileAsync(resolvedPath, request.MunicipalityId);
 
             // get count of zones
             var zones = await _zones.GetActiveZonesAsync();

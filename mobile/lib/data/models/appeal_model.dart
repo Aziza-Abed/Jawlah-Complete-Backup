@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import '../../core/utils/date_formatter.dart';
 
 class AppealModel {
@@ -53,28 +54,30 @@ class AppealModel {
 
   factory AppealModel.fromJson(Map<String, dynamic> json) {
     return AppealModel(
-      appealId: json['appealId'] as int,
-      appealType: json['appealType'] as String,
-      appealTypeName: json['appealTypeName'] as String,
-      entityType: json['entityType'] as String,
-      entityId: json['entityId'] as int,
-      userId: json['userId'] as int,
-      workerName: json['workerName'] as String,
-      workerExplanation: json['workerExplanation'] as String,
-      workerLatitude: json['workerLatitude'] as double?,
-      workerLongitude: json['workerLongitude'] as double?,
-      expectedLatitude: json['expectedLatitude'] as double?,
-      expectedLongitude: json['expectedLongitude'] as double?,
+      appealId: json['appealId'] as int? ?? 0,
+      appealType: json['appealType'] as String? ?? '',
+      appealTypeName: json['appealTypeName'] as String? ?? '',
+      entityType: json['entityType'] as String? ?? '',
+      entityId: json['entityId'] as int? ?? 0,
+      userId: json['userId'] as int? ?? 0,
+      workerName: json['workerName'] as String? ?? '',
+      workerExplanation: json['workerExplanation'] as String? ?? '',
+      workerLatitude: (json['workerLatitude'] as num?)?.toDouble(),
+      workerLongitude: (json['workerLongitude'] as num?)?.toDouble(),
+      expectedLatitude: (json['expectedLatitude'] as num?)?.toDouble(),
+      expectedLongitude: (json['expectedLongitude'] as num?)?.toDouble(),
       distanceMeters: json['distanceMeters'] as int?,
-      status: json['status'] as String,
-      statusName: json['statusName'] as String,
+      status: json['status'] as String? ?? 'Pending',
+      statusName: json['statusName'] as String? ?? '',
       reviewedByUserId: json['reviewedByUserId'] as int?,
       reviewedByName: json['reviewedByName'] as String?,
       reviewedAt: json['reviewedAt'] != null
           ? DateFormatter.parseUtc(json['reviewedAt'] as String)
           : null,
       reviewNotes: json['reviewNotes'] as String?,
-      submittedAt: DateFormatter.parseUtc(json['submittedAt'] as String),
+      submittedAt: json['submittedAt'] != null
+          ? DateFormatter.parseUtc(json['submittedAt'] as String)
+          : DateTime.now(),
       evidencePhotoUrl: json['evidencePhotoUrl'] as String?,
       originalRejectionReason: json['originalRejectionReason'] as String?,
       entityTitle: json['entityTitle'] as String?,
@@ -123,6 +126,19 @@ class AppealModel {
         return 'red';
       default:
         return 'grey';
+    }
+  }
+
+  Color get statusColorValue {
+    switch (status) {
+      case 'Approved':
+        return Colors.green;
+      case 'Rejected':
+        return Colors.red;
+      case 'Pending':
+        return Colors.orange;
+      default:
+        return Colors.grey;
     }
   }
 }
