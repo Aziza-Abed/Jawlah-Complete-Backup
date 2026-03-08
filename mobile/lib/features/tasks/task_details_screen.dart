@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/config/app_constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/photo_picker_helper.dart';
 
 import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/authenticated_image.dart';
@@ -900,32 +902,53 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    // For milestone steps (25%, 50%, 75%), offer photo proof option
+    final isMilestone = step == 25 || step == 50 || step == 75;
+
+    // result: null=cancelled, 'update'=without photo, 'photo'=with photo
+    final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title:
             const Text('تحديث التقدم', style: TextStyle(fontFamily: 'Cairo')),
         content: Text(
-          'هل تريد تحديث نسبة الإنجاز إلى $step%؟',
+          isMilestone
+              ? 'هل تريد تحديث نسبة الإنجاز إلى $step%؟\nيمكنك إرفاق صورة كدليل على التقدم.'
+              : 'هل تريد تحديث نسبة الإنجاز إلى $step%؟',
           style: const TextStyle(fontFamily: 'Cairo'),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context, null),
             child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo')),
           ),
+          if (isMilestone)
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'photo'),
+              child: const Text('تحديث مع صورة',
+                  style: TextStyle(
+                      color: AppColors.success, fontFamily: 'Cairo')),
+            ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('تحديث',
+            onPressed: () => Navigator.pop(context, 'update'),
+            child: Text(
+                isMilestone ? 'تحديث بدون صورة' : 'تحديث',
                 style:
-                    TextStyle(color: AppColors.primary, fontFamily: 'Cairo')),
+                    const TextStyle(color: AppColors.primary, fontFamily: 'Cairo')),
           ),
         ],
       ),
     );
 
-    if (confirmed != true || !mounted) return;
-    await _handleProgressUpdate(taskId, step);
+    if (result == null || !mounted) return;
+
+    if (result == 'photo') {
+      final photo = await PhotoPickerHelper.pickImageCameraOnly(context);
+      if (photo == null || !mounted) return;
+      await _handleProgressUpdate(taskId, step, photo: photo);
+    } else {
+      await _handleProgressUpdate(taskId, step);
+    }
   }
 
   // ── Distance info ────────────────────────────────────────────────────
@@ -1099,9 +1122,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     return AppColors.success;
   }
 
-  Future<void> _handleProgressUpdate(int taskId, int progress) async {
+  Future<void> _handleProgressUpdate(int taskId, int progress, {File? photo}) async {
     final taskManager = context.read<TaskManager>();
-    await taskManager.updateTaskProgress(taskId, progress);
+    await taskManager.updateTaskProgress(taskId, progress, photo: photo);
 
     if (!mounted) return;
 

@@ -1002,8 +1002,9 @@ public class TasksController : BaseApiController
 
     // update task progress (for multi-day tasks)
     [HttpPut("{id}/progress")]
-    [SwaggerOperation(Summary = "update task progress percentage")]
-    public async Task<IActionResult> UpdateTaskProgress(int id, [FromBody] UpdateTaskProgressRequest request)
+    [Consumes("multipart/form-data")]
+    [SwaggerOperation(Summary = "update task progress percentage with optional photo proof")]
+    public async Task<IActionResult> UpdateTaskProgress(int id, [FromForm] UpdateTaskProgressRequest request)
     {
         var task = await _tasks.GetByIdAsync(id);
         if (task == null)
@@ -1103,6 +1104,16 @@ public class TasksController : BaseApiController
             }
         }
 
+        // Upload progress photo proof if provided
+        string? photoUrl = null;
+        if (request.Photo != null)
+        {
+            if (!_files.ValidateImage(request.Photo))
+                return BadRequest(ApiResponse<object>.ErrorResponse("ملف الصورة غير صالح"));
+
+            photoUrl = await _files.UploadImageAsync(request.Photo, "tasks");
+        }
+
         // auto-set status based on progress - 100% moves to UnderReview for supervisor approval
         if (request.ProgressPercentage == 100)
         {
@@ -1117,10 +1128,28 @@ public class TasksController : BaseApiController
         }
 
         await _tasks.UpdateAsync(task);
+
+        // Save progress photo to Photos table
+        if (photoUrl != null)
+        {
+            var photo = new Photo
+            {
+                EntityType = "Task",
+                EntityId = task.TaskId,
+                TaskId = task.TaskId,
+                PhotoUrl = photoUrl,
+                UploadedByUserId = userId,
+                UploadedAt = DateTime.UtcNow,
+                EventTime = DateTime.UtcNow
+            };
+            await _photos.AddAsync(photo);
+            task.Photos.Add(photo);
+        }
+
         await _tasks.SaveChangesAsync();
 
-        _logger.LogInformation("Task {TaskId} progress updated to {Progress}% by user {UserId}",
-            id, request.ProgressPercentage, userId);
+        _logger.LogInformation("Task {TaskId} progress updated to {Progress}% by user {UserId}{Photo}",
+            id, request.ProgressPercentage, userId, photoUrl != null ? " with photo" : "");
 
         return Ok(ApiResponse<TaskResponse>.SuccessResponse(
             _mapper.Map<TaskResponse>(task),

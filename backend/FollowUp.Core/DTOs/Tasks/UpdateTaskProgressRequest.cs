@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace FollowUp.Core.DTOs.Tasks;
 
@@ -21,4 +22,7 @@ public class UpdateTaskProgressRequest
 
     [Range(-180, 180, ErrorMessage = "خط الطول غير صالح")]
     public double? Longitude { get; set; }
+
+    // Optional photo proof for progress milestone (25%, 50%, 75%)
+    public IFormFile? Photo { get; set; }
 }

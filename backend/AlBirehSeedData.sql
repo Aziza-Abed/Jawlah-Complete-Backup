@@ -1118,6 +1118,79 @@ END;
 
 PRINT 'Today attendance check-in for all active workers';
 
+-- 15.25 HISTORICAL attendance for ALL workers (past 7 work days)
+-- This makes the monthly reports chart show realistic data
+DECLARE @histDay INT = 7;
+DECLARE @histDate DATE;
+DECLARE @histDow INT;
+DECLARE @histWIdx INT;
+DECLARE @histUserId INT;
+DECLARE @histZoneId INT;
+DECLARE @histMinOff INT;
+DECLARE @histIn DATETIME;
+DECLARE @histOut DATETIME;
+DECLARE @histLat FLOAT;
+DECLARE @histLng FLOAT;
+DECLARE @histAbsentChance INT;
+
+WHILE @histDay >= 1
+BEGIN
+    SET @histDate = CAST(DATEADD(DAY, -@histDay, @Now) AS DATE);
+    SET @histDow = DATEPART(WEEKDAY, @histDate);
+
+    -- Skip Friday(6) and Saturday(7)
+    IF @histDow NOT IN (6, 7)
+    BEGIN
+        SET @histWIdx = 4; -- start from worker4 (worker1-3 already have history)
+        WHILE @histWIdx <= 148
+        BEGIN
+            SELECT @histUserId = UserId FROM [Users]
+                WHERE Username = 'worker' + CAST(@histWIdx AS VARCHAR(10)) AND Status = 0;
+
+            IF @histUserId IS NOT NULL
+            BEGIN
+                -- 90% attendance rate (random 10% absent)
+                SET @histAbsentChance = ABS(CHECKSUM(NEWID())) % 100;
+                IF @histAbsentChance >= 10  -- 90% show up
+                BEGIN
+                    SELECT TOP 1 @histZoneId = uz.ZoneId FROM [UserZones] uz
+                        WHERE uz.UserId = @histUserId AND uz.IsActive = 1;
+                    IF @histZoneId IS NULL SET @histZoneId = @Z1;
+
+                    SELECT @histLat = CenterLatitude, @histLng = CenterLongitude
+                        FROM [Zones] WHERE ZoneId = @histZoneId;
+                    IF @histLat IS NULL BEGIN SET @histLat = 31.900; SET @histLng = 35.212; END;
+
+                    -- Check-in 7:00-7:30, checkout after 8 hours
+                    SET @histMinOff = ABS(CHECKSUM(NEWID())) % 31;
+                    SET @histIn = DATEADD(MINUTE, @histMinOff, DATEADD(HOUR, 7, CAST(@histDate AS DATETIME)));
+                    SET @histOut = DATEADD(HOUR, 8, @histIn);
+
+                    INSERT INTO [Attendances] (MunicipalityId, UserId, ZoneId, CheckInEventTime, CheckInSyncTime,
+                        CheckOutEventTime, CheckOutSyncTime, CheckInLatitude, CheckInLongitude, CheckInAccuracyMeters,
+                        CheckOutLatitude, CheckOutLongitude, CheckOutAccuracyMeters, IsValidated, ValidationMessage,
+                        WorkDuration, Status, IsManual, ManualReason, ApprovalStatus, IsSynced, SyncVersion,
+                        LateMinutes, EarlyLeaveMinutes, OvertimeMinutes, AttendanceType)
+                    VALUES (@MunicipalityId, @histUserId, @histZoneId, @histIn, @histIn, @histOut, @histOut,
+                        @histLat + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001,
+                        @histLng + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001,
+                        CAST(5 + ABS(CHECKSUM(NEWID())) % 15 AS FLOAT),
+                        @histLat + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001,
+                        @histLng + (ABS(CHECKSUM(NEWID())) % 10) * 0.0001,
+                        CAST(5 + ABS(CHECKSUM(NEWID())) % 15 AS FLOAT),
+                        1, NULL, CAST('08:00:00' AS TIME), 2, 0, NULL, 'AutoApproved', 1, 1,
+                        CASE WHEN @histMinOff > 15 THEN @histMinOff - 15 ELSE 0 END, 0, 0,
+                        CASE WHEN @histMinOff > 15 THEN 'Late' ELSE 'OnTime' END);
+                END;
+            END;
+            SET @histWIdx = @histWIdx + 1;
+        END;
+    END;
+    SET @histDay = @histDay - 1;
+END;
+
+PRINT 'Historical attendance for all workers (past 7 work days, ~90% rate)';
+
 -- 15.3 Zone assignments for Works and Agriculture workers
 DECLARE @wzIdx INT = 101;
 DECLARE @wzUserId INT;

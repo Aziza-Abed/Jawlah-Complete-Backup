@@ -159,17 +159,31 @@ class TasksService {
     );
   }
 
-  // update task progress (for multi-day tasks)
+  // update task progress (for multi-day tasks) with optional photo proof
   Future<TaskModel?> updateTaskProgress(
     int taskId,
-    int progressPercentage,
-  ) async {
+    int progressPercentage, {
+    File? photo,
+  }) async {
     try {
+      final formData = FormData();
+      formData.fields.add(MapEntry('progressPercentage', progressPercentage.toString()));
+
+      if (photo != null) {
+        formData.files.add(
+          MapEntry(
+            'photo',
+            await MultipartFile.fromFile(
+              photo.path,
+              filename: path.basename(photo.path),
+            ),
+          ),
+        );
+      }
+
       final response = await _apiService.put(
         '${ApiConfig.updateTaskProgress}/$taskId/progress',
-        data: {
-          'progressPercentage': progressPercentage,
-        },
+        data: formData,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {

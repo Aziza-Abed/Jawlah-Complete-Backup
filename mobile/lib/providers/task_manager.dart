@@ -520,7 +520,7 @@ class TaskManager extends BaseController {
 
   // update task progress (for multi-day tasks)
   // Rate limited to once every 5 minutes per task
-  Future<bool> updateTaskProgress(int taskId, int progressPercentage) async {
+  Future<bool> updateTaskProgress(int taskId, int progressPercentage, {File? photo}) async {
     // Check rate limit
     final lastUpdate = _lastProgressUpdateTime[taskId];
     if (lastUpdate != null) {
@@ -540,6 +540,7 @@ class TaskManager extends BaseController {
       final updated = await _tasksService.updateTaskProgress(
         taskId,
         progressPercentage,
+        photo: photo,
       );
 
       if (updated != null) {

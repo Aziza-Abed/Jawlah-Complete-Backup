@@ -278,8 +278,10 @@ public class GisService : IGisService
                 // get zone info from feature properties
                 string zoneName = GetGeoJsonProperty(feature, new[] { "name", "NAME", "zoneName", "BlockName_Arabic", "QuarterNam" })
                     ?? $"Zone {featureIndex}";
-                string zoneCode = GetGeoJsonProperty(feature, new[] { "code", "CODE", "id", "ID", "zoneCode", "BlockNumber", "Quarter_Nu" })
-                    ?? $"ZONE-{featureIndex:D3}";
+                string rawCode = GetGeoJsonProperty(feature, new[] { "code", "CODE", "zoneCode", "BlockNumber", "Quarter_Nu", "id", "ID", "OBJECTID" })
+                    ?? $"{featureIndex:D3}";
+                // Prefix border codes to avoid collision with quarter/block codes
+                string zoneCode = fileType == GisFileType.Borders ? $"BDR-{rawCode}" : rawCode;
                 string description = GetGeoJsonProperty(feature, new[] { "description", "BlockName_English", "nameEn", "QuarterN_1" })
                     ?? zoneName;
                 string district = GetGeoJsonProperty(feature, new[] { "district", "governorate", "region" })
