@@ -29,10 +29,17 @@ public class SmsService : ISmsService
             _logger.LogInformation("[MOCK SMS] To: {Phone}, Message: {Message}", phoneNumber, message);
 
             // Also write to a file for easy testing
-            var logPath = Path.Combine(Directory.GetCurrentDirectory(), "logs", "sms_log.txt");
-            Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
-            await File.AppendAllTextAsync(logPath,
-                $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] To: {phoneNumber} | Message: {message}\n");
+            try
+            {
+                var logPath = Path.Combine(Directory.GetCurrentDirectory(), "logs", "sms_log.txt");
+                Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+                await File.AppendAllTextAsync(logPath,
+                    $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] To: {phoneNumber} | Message: {message}\n");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to write SMS log file — SMS was still sent successfully");
+            }
 
             return true;
         }

@@ -23,7 +23,6 @@ public class LocationHistoryRepository : Repository<LocationHistory>, ILocationH
 
     public async Task<IEnumerable<LocationHistory>> GetLatestLocationsAsync(DateTime date)
     {
-        // Step 1: Get the latest timestamp per user (subquery approach for EF Core compatibility)
         IQueryable<LocationHistory> baseQuery = _dbSet.AsNoTracking();
 
         // Apply date filter if not DateTime.MinValue
@@ -33,13 +32,14 @@ public class LocationHistoryRepository : Repository<LocationHistory>, ILocationH
             baseQuery = baseQuery.Where(x => x.Timestamp >= date && x.Timestamp < endOfDay);
         }
 
-        // Get latest location ID per user using a subquery
-        var latestPerUser = baseQuery
+        // Single query: get latest location ID per user, then fetch with includes in one round-trip
+        var latestIds = await baseQuery
             .GroupBy(x => x.UserId)
-            .Select(g => g.OrderByDescending(x => x.Timestamp).First().Id);
+            .Select(g => g.OrderByDescending(x => x.Timestamp).First().Id)
+            .ToListAsync();
 
-        // Step 2: Fetch full records with includes using the IDs
-        var latestIds = await latestPerUser.ToListAsync();
+        if (!latestIds.Any())
+            return Enumerable.Empty<LocationHistory>();
 
         return await _dbSet
             .AsNoTracking()

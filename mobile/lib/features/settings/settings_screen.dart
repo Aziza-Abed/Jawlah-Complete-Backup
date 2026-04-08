@@ -49,14 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Navigator.of(context).pushNamed(Routes.attendance);
                   },
                 ),
-                _SettingItem(
-                  icon: Icons.gavel,
-                  title: 'طعوني',
-                  subtitle: 'عرض حالة الطعون المقدمة',
-                  onTap: () {
-                    Navigator.of(context).pushNamed(Routes.appeals);
-                  },
-                ),
               ],
             ),
             const SizedBox(height: 16),

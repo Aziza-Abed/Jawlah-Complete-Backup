@@ -9,7 +9,6 @@ import {
   UserCog,
   Building,
   ShieldCheck,
-  Scale,
   FileText,
   History,
 } from "lucide-react";
@@ -31,7 +30,6 @@ export const supervisorItems: NavItem[] = [
   { to: "/tasks/new", label: "تعيين مهمة جديدة", icon: PlusCircle },
   { to: "/zones", label: "الخريطة الحية", icon: Map },
   { to: "/task-templates", label: "قوالب المهام", icon: FileText },
-  { to: "/appeals", label: "مركز المراجعة", icon: Scale },
   { to: "/reports", label: "التقارير", icon: BarChart3 },
 ];
 

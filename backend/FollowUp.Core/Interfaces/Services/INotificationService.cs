@@ -40,4 +40,7 @@ public interface INotificationService
 
     // Issue forwarded notification
     Task SendIssueForwardedNotificationAsync(int issueId, string issueTitle, string departmentName, int? municipalityId = null);
+
+    // Worker assigned to supervisor notification
+    Task SendWorkerAssignedToSupervisorAsync(int supervisorId, string workerName);
 }

@@ -66,26 +66,12 @@ public class AuthController : BaseApiController
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = Request.Headers.UserAgent.ToString();
 
-        var (success, token, error) = await _auth.LoginAsync(request.Username, request.Password);
-        if (!success)
+        var (success, token, user, error) = await _auth.LoginAsync(request.Username, request.Password);
+        if (!success || user == null)
         {
             // log failed login
             await _audit.LogAsync(null, request.Username, "LoginFailed", error, ipAddress, userAgent);
             return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse(error ?? "فشل تسجيل الدخول"));
-        }
-
-        var user = await _users.GetByUsernameAsync(request.Username);
-        if (user == null)
-        {
-            // don't reveal if username exists
-            return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse("اسم المستخدم أو كلمة المرور غير صحيحة"));
-        }
-
-        // check if active
-        if (user.Status != Core.Enums.UserStatus.Active)
-        {
-            _logger.LogWarning("Login failed - User {UserId} is not active (Status: {Status})", user.UserId, user.Status);
-            return Unauthorized(ApiResponse<LoginResponse>.ErrorResponse("حساب المستخدم غير نشط"));
         }
 
         // device ID from body (mobile) or header (web)
@@ -310,27 +296,12 @@ public class AuthController : BaseApiController
             }
 
             // authenticate user with username and password
-            var (authSuccess, token, authError) = await _auth.LoginAsync(request.Username, request.Password);
+            var (authSuccess, token, user, authError) = await _auth.LoginAsync(request.Username, request.Password);
 
-            if (!authSuccess)
+            if (!authSuccess || user == null)
             {
                 _logger.LogWarning("GPS login failed - Invalid credentials for user {Username}", request.Username);
                 return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse(authError ?? "اسم المستخدم أو كلمة المرور غير صحيحة"));
-            }
-
-            // get user details
-            var user = await _users.GetByUsernameAsync(request.Username);
-            if (user == null)
-            {
-                // don't reveal if username exists
-                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("اسم المستخدم أو كلمة المرور غير صحيحة"));
-            }
-
-            // check if user is active or not
-            if (user.Status != Core.Enums.UserStatus.Active)
-            {
-                _logger.LogWarning("GPS login failed - User {UserId} is not active", user.UserId);
-                return Unauthorized(ApiResponse<LoginWithGPSResponse>.ErrorResponse("حساب المستخدم غير نشط"));
             }
 
             // Validate device ID format

@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/photo_picker_helper.dart';
 import '../../data/services/api_service.dart';
 import '../../presentation/widgets/authenticated_image.dart';
+import '../../core/routing/app_router.dart';
 import '../../presentation/widgets/base_screen.dart';
 import '../../presentation/widgets/offline_banner.dart';
 import '../../providers/auth_manager.dart';
@@ -61,6 +62,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildStatisticsCard(tasksProvider),
                   const SizedBox(height: 16),
                   _buildWorkInfoCard(user),
+                  const SizedBox(height: 16),
+                  _buildAppealsButton(),
                 ],
               ),
             ),
@@ -387,6 +390,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAppealsButton() {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pushNamed(Routes.appeals),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.chevron_left, color: AppColors.textSecondary),
+            const Spacer(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'طعوني',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'عرض حالة الطعون المقدمة',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Icon(Icons.gavel, size: 28, color: AppColors.primary),
+          ],
+        ),
+      ),
     );
   }
 

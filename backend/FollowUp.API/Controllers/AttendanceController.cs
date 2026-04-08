@@ -78,7 +78,7 @@ public class AttendanceController : BaseApiController
             if (!disableGeofencing)
                 return BadRequest(ApiResponse<AttendanceResponse>.ErrorResponse("أنت خارج منطقة العمل المخصصة لك، لا يمكن تسجيل الحضور"));
 
-            // dev mode: fall back to user's first assigned zone
+            // fall back to user's first assigned zone
             var userWithZones = await _users.GetUserWithZonesAsync(userId.Value);
             zone = userWithZones?.AssignedZones?.FirstOrDefault()?.Zone;
             _logger.LogWarning("Dev mode: Geofencing bypassed for user {UserId}, using fallback zone", userId.Value);
@@ -90,8 +90,8 @@ public class AttendanceController : BaseApiController
 
         // calculate late arrival
         var now = DateTime.UtcNow;
-        var expectedStart = now.Date.Add(user.ExpectedStartTime); // e.g., 08:00
-        var graceEnd = expectedStart.AddMinutes(user.GraceMinutes); // e.g., 08:15
+        var expectedStart = now.Date.Add(user.ExpectedStartTime); //  08:00
+        var graceEnd = expectedStart.AddMinutes(user.GraceMinutes); // 08:15
 
         int lateMinutes = 0;
         string attendanceType = "OnTime";

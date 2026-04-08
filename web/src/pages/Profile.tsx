@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getProfile, updateProfile, uploadProfilePhoto } from "../api/users";
 import { STORAGE_KEYS } from "../constants/storageKeys";
 import type { UserResponse } from "../types/user";
-import { User, Phone, Mail, Shield, Save, CheckCircle, Camera, Calendar, Clock, Building, UserCog, KeyRound } from "lucide-react";
+import { User, Phone, Mail, Shield, Save, CheckCircle, Camera, Calendar, Clock, Building, UserCog, KeyRound, Scale } from "lucide-react";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -372,6 +372,23 @@ export default function Profile() {
               </form>
             </div>
           </div>
+
+          {/* Appeals Quick Link — Supervisor only */}
+          {profile?.role === "Supervisor" && (
+            <div className="bg-white rounded-[24px] shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-black/5 overflow-hidden mb-6">
+              <button
+                type="button"
+                onClick={() => navigate("/appeals")}
+                className="w-full p-6 flex items-center justify-between hover:bg-[#F9F8F6] transition-colors"
+              >
+                <span className="text-[14px] font-black text-[#7895B2]">مراجعة الطعون المقدمة من العمال</span>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-[18px] font-black text-[#2F2F2F]">مركز المراجعة</h3>
+                  <Scale size={20} className="text-[#AFAFAF]" />
+                </div>
+              </button>
+            </div>
+          )}
 
           {/* Security Quick Link */}
           <div className="bg-white rounded-[24px] shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-black/5 overflow-hidden">

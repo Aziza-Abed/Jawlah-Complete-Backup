@@ -40,21 +40,21 @@ public class AuthService : IAuthService
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 15;
 
-    public async Task<(bool Success, string? Token, string? Error)> LoginAsync(string username, string password)
+    public async Task<(bool Success, string? Token, User? User, string? Error)> LoginAsync(string username, string password)
     {
         var user = await _userRepository.GetByUsernameAsync(username);
 
         if (user == null)
         {
             _logger.LogWarning("Login failed: user '{Username}' not found", username);
-            return (false, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
+            return (false, null, null, "اسم المستخدم أو كلمة المرور غير صحيحة");
         }
 
         // check if account is locked
         if (user.LockoutEndTime.HasValue && user.LockoutEndTime > DateTime.UtcNow)
         {
             var remainingMinutes = (int)(user.LockoutEndTime.Value - DateTime.UtcNow).TotalMinutes + 1;
-            return (false, null, $"الحساب مقفل. يرجى المحاولة بعد {remainingMinutes} دقيقة");
+            return (false, null, null, $"الحساب مقفل. يرجى المحاولة بعد {remainingMinutes} دقيقة");
         }
 
         // Reset lockout if expired
@@ -67,7 +67,7 @@ public class AuthService : IAuthService
         // user must be active
         if (user.Status != UserStatus.Active)
         {
-            return (false, null, "حساب المستخدم غير نشط");
+            return (false, null, null, "حساب المستخدم غير نشط");
         }
 
         // check password using Identity PasswordHasher
@@ -82,16 +82,16 @@ public class AuthService : IAuthService
                 user.LockoutEndTime = DateTime.UtcNow.AddMinutes(LockoutMinutes);
                 await _userRepository.UpdateAsync(user);
                 await _userRepository.SaveChangesAsync();
-                return (false, null, $"تم قفل الحساب بسبب {MaxFailedAttempts} محاولات فاشلة. يرجى المحاولة بعد {LockoutMinutes} دقيقة");
+                return (false, null, null, $"تم قفل الحساب بسبب {MaxFailedAttempts} محاولات فاشلة. يرجى المحاولة بعد {LockoutMinutes} دقيقة");
             }
 
             await _userRepository.UpdateAsync(user);
             await _userRepository.SaveChangesAsync();
 
             var remainingAttempts = MaxFailedAttempts - user.FailedLoginAttempts;
-            return (false, null, $"اسم المستخدم أو كلمة المرور غير صحيحة. ({remainingAttempts} محاولات متبقية)");
+            return (false, null, null, $"اسم المستخدم أو كلمة المرور غير صحيحة. ({remainingAttempts} محاولات متبقية)");
         }
-        
+
         // Handle SuccessRehashNeeded if necessary (optional but good practice)
         if (verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
         {
@@ -108,7 +108,7 @@ public class AuthService : IAuthService
 
         var token = GenerateJwtToken(user);
 
-        return (true, token, null);
+        return (true, token, user, null);
     }
 
     public async Task<(bool Success, User? User, string? Error)> RegisterAsync(User user, string password)

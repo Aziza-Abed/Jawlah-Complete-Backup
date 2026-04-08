@@ -317,6 +317,10 @@ public class UsersController : BaseApiController
 
             user.SupervisorId = request.SupervisorId.Value > 0 ? request.SupervisorId.Value : null;
             _logger.LogInformation("Worker {WorkerId} transferred to supervisor {SupervisorId}", id, request.SupervisorId);
+
+            // Notify the new supervisor about the assigned worker
+            if (user.SupervisorId.HasValue)
+                await _notifications.SendWorkerAssignedToSupervisorAsync(user.SupervisorId.Value, user.FullName);
         }
 
         // Update departmentId if provided
@@ -950,6 +954,15 @@ public class UsersController : BaseApiController
             .ExecuteUpdateAsync(u => u.SetProperty(x => x.SupervisorId, request.NewSupervisorId));
 
         _logger.LogInformation("Bulk reassigned {Count} workers to supervisor {SupervisorId}", affected, request.NewSupervisorId);
+
+        // Notify the new supervisor about assigned workers
+        var workerNames = await _context.Users
+            .Where(u => request.WorkerIds.Contains(u.UserId) && u.Role == UserRole.Worker)
+            .Select(u => u.FullName)
+            .ToListAsync();
+        foreach (var name in workerNames)
+            await _notifications.SendWorkerAssignedToSupervisorAsync(request.NewSupervisorId, name);
+
         return Ok(ApiResponse<object>.SuccessResponse(new { affected }));
     }
 
@@ -1023,6 +1036,10 @@ public class UsersController : BaseApiController
         _logger.LogInformation("Transferred {TaskCount} pending tasks from old supervisor", pendingTasks.Count);
 
         await _context.SaveChangesAsync();
+
+        // Notify the new supervisor about each transferred worker
+        foreach (var worker in workers)
+            await _notifications.SendWorkerAssignedToSupervisorAsync(request.NewSupervisorId, worker.FullName);
 
         await AuditLogAsync("WorkerTransfer",
             $"نقل {workers.Count} عامل من {oldSupervisor.FullName} إلى {newSupervisor.FullName}");

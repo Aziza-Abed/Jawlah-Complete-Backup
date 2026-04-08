@@ -371,6 +371,16 @@ public class NotificationService : INotificationService
         _logger.LogInformation("Issue forwarded notification sent to supervisors/admins for issue {IssueId} to department {Department}", issueId, departmentName);
     }
 
+    public async Task SendWorkerAssignedToSupervisorAsync(int supervisorId, string workerName)
+    {
+        var data = new Dictionary<string, string> { { "type", "worker_assigned" } };
+
+        if (await SendToUserAsync(supervisorId, "عامل جديد",
+                $"تم تعيين العامل {workerName} تحت إشرافك",
+                NotificationType.WorkerAssigned, null, data))
+            _logger.LogInformation("Worker assigned notification sent to supervisor {SupervisorId} for worker {WorkerName}", supervisorId, workerName);
+    }
+
     // ─── Push notification via Firebase ───────────────────────────────────────
 
     private async Task SendPushNotificationAsync(int userId, string title, string body, Dictionary<string, string>? data = null, string? fcmToken = null)

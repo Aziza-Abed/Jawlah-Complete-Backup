@@ -12,13 +12,13 @@ public class LocationUpdateDto
     [Range(-180, 180, ErrorMessage = "longitude must be between -180 and 180")]
     public double Longitude { get; set; }
 
-    [Range(0, double.MaxValue, ErrorMessage = "speed must be non-negative")]
+    [Range(0, 1000, ErrorMessage = "speed must be between 0 and 1000 m/s")]
     public double? Speed { get; set; }
 
-    [Range(0, double.MaxValue, ErrorMessage = "accuracy must be non-negative")]
+    [Range(0, 5000, ErrorMessage = "accuracy must be between 0 and 5000 meters")]
     public double? Accuracy { get; set; }
 
-    [Range(0, 360, ErrorMessage = "heading must be between 0 and 360")]
+    [Range(0, 359.99, ErrorMessage = "heading must be between 0 and 359.99")]
     public double? Heading { get; set; }
 
     [Required(ErrorMessage = "timestamp is required")]

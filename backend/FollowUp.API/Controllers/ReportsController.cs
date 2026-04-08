@@ -61,9 +61,8 @@ public class ReportsController : BaseApiController
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, statusFilter)).ToList();
             var todayAttendance = await _attendance.GetFilteredAttendanceAsync(null, null, DateTime.UtcNow.Date, DateTime.UtcNow.Date.AddDays(1));
 
-            // data isolation: supervisors only see their workers
-            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
-            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            // data isolation: supervisors only see their workers (single query instead of two)
+            var (visibleWorkerIds, visibleTeamIds) = await GetVisibleWorkerAndTeamIdsAsync();
             List<User> workers;
             if (visibleWorkerIds != null)
             {
@@ -216,9 +215,8 @@ public class ReportsController : BaseApiController
             var zones = (await _zones.GetActiveZonesAsync()).ToList();
             var tasks = (await _tasks.GetFilteredTasksAsync(null, null, fromDate, toDate, null)).ToList();
 
-            // data isolation: supervisors only see their workers' tasks
-            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
-            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            // data isolation: supervisors only see their workers' tasks (single query)
+            var (visibleWorkerIds, visibleTeamIds) = await GetVisibleWorkerAndTeamIdsAsync();
             tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
             var tasksByZone = tasks.Where(t => t.ZoneId.HasValue)
@@ -480,26 +478,24 @@ public class ReportsController : BaseApiController
             var monthStart = new DateTime(today.Year, today.Month, 1);
             var tomorrow = today.AddDays(1);
 
-            // Get all supervisors
+            // Await sequentially — DbContext is not thread-safe, cannot run parallel queries
             var allSupervisors = (await _users.GetByRoleAsync(UserRole.Supervisor)).ToList();
             var activeSupervisors = allSupervisors.Where(s => s.Status == UserStatus.Active).ToList();
 
-            // Get all workers
             var allWorkers = (await _users.GetByRoleAsync(UserRole.Worker)).ToList();
             var workersBySuper = allWorkers
                 .Where(w => w.SupervisorId.HasValue)
                 .GroupBy(w => w.SupervisorId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            // Get today's attendance for all workers
             var todayAttendance = (await _attendance.GetFilteredAttendanceAsync(null, null, today, tomorrow)).ToList();
             var checkedInWorkerIds = todayAttendance.Select(a => a.UserId).Distinct().ToHashSet();
 
-            // Get all tasks this month
             var monthTasks = (await _tasks.GetFilteredTasksAsync(null, null, monthStart, tomorrow, null)).ToList();
 
-            // Get all issues
-            var allIssues = (await _issues.GetAllAsync()).ToList();
+            // Only load issues for workers that have supervisors (instead of loading ALL issues)
+            var allWorkerIds = allWorkers.Select(w => w.UserId).ToList();
+            var allIssues = (await _issues.GetIssuesByWorkerIdsAsync(allWorkerIds)).ToList();
 
             // Build supervisor monitoring items
             var supervisorItems = new List<SupervisorMonitoringItem>();
@@ -753,9 +749,8 @@ public class ReportsController : BaseApiController
         {
             var tasks = (await _tasks.GetFilteredTasksAsync(workerId, zoneId, startDate, endDate, status)).ToList();
 
-            // filter for supervisor data isolation
-            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
-            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            // filter for supervisor data isolation (single query)
+            var (visibleWorkerIds, visibleTeamIds) = await GetVisibleWorkerAndTeamIdsAsync();
             tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
             if (format.Equals("excel", StringComparison.OrdinalIgnoreCase))
@@ -817,32 +812,33 @@ public class ReportsController : BaseApiController
 
     // helpers
 
-    // get worker IDs visible to the current user (null = admin sees all)
-    private async Task<HashSet<int>?> GetVisibleWorkerIdsAsync()
+    // get worker IDs and team IDs visible to the current user (null = admin sees all)
+    private async Task<(HashSet<int>? WorkerIds, HashSet<int>? TeamIds)> GetVisibleWorkerAndTeamIdsAsync()
     {
         if (GetCurrentUserRole() == "Admin")
-            return null;
+            return (null, null);
 
         var userId = GetCurrentUserId();
         if (!userId.HasValue)
-            return new HashSet<int>();
+            return (new HashSet<int>(), new HashSet<int>());
 
-        var workers = await _users.GetWorkersBySupervisorAsync(userId.Value);
-        return workers.Select(w => w.UserId).ToHashSet();
+        var workers = (await _users.GetWorkersBySupervisorAsync(userId.Value)).ToList();
+        var workerIds = workers.Select(w => w.UserId).ToHashSet();
+        var teamIds = workers.Where(w => w.TeamId.HasValue).Select(w => w.TeamId!.Value).ToHashSet();
+        return (workerIds, teamIds);
     }
 
-    // Returns team IDs for the visible workers' teams (null = admin, sees all)
+    // Convenience wrappers for callers that only need one
+    private async Task<HashSet<int>?> GetVisibleWorkerIdsAsync()
+    {
+        var (workerIds, _) = await GetVisibleWorkerAndTeamIdsAsync();
+        return workerIds;
+    }
+
     private async Task<HashSet<int>?> GetVisibleTeamIdsAsync()
     {
-        if (GetCurrentUserRole() == "Admin")
-            return null;
-
-        var userId = GetCurrentUserId();
-        if (!userId.HasValue)
-            return new HashSet<int>();
-
-        var workers = await _users.GetWorkersBySupervisorAsync(userId.Value);
-        return workers.Where(w => w.TeamId.HasValue).Select(w => w.TeamId!.Value).ToHashSet();
+        var (_, teamIds) = await GetVisibleWorkerAndTeamIdsAsync();
+        return teamIds;
     }
 
     // Filter tasks to only those visible to the current user:
@@ -1118,9 +1114,8 @@ public class ReportsController : BaseApiController
             var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
             var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
 
-            // filter for supervisor data isolation
-            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
-            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            // filter for supervisor data isolation (single query)
+            var (visibleWorkerIds, visibleTeamIds) = await GetVisibleWorkerAndTeamIdsAsync();
             tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
             // Generate PDF
@@ -1335,9 +1330,8 @@ public class ReportsController : BaseApiController
             var currentUser = currentUserId.HasValue ? await _users.GetByIdAsync(currentUserId.Value) : null;
             var supervisorName = currentUser?.FullName ?? "مستخدم النظام";
 
-            // filter for supervisor data isolation
-            var visibleWorkerIds = await GetVisibleWorkerIdsAsync();
-            var visibleTeamIds = await GetVisibleTeamIdsAsync();
+            // filter for supervisor data isolation (single query)
+            var (visibleWorkerIds, visibleTeamIds) = await GetVisibleWorkerAndTeamIdsAsync();
             tasks = FilterTasksByVisibility(tasks, visibleWorkerIds, visibleTeamIds);
 
             using var workbook = new XLWorkbook();

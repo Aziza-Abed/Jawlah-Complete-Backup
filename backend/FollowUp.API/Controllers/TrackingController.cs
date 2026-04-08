@@ -45,6 +45,18 @@ public class TrackingController : BaseApiController
         if (gpsValidation != null)
             return gpsValidation;
 
+        // Reject (0,0) explicitly — indicates GPS not initialized
+        if (dto.Latitude == 0 && dto.Longitude == 0)
+            return BadRequest(ApiResponse<object>.ErrorResponse("إحداثيات GPS غير صالحة (0,0). يرجى تفعيل خدمات الموقع"));
+
+        // Reject future or too-old timestamps
+        var now = DateTime.UtcNow;
+        var effectiveTimestamp = dto.Timestamp == default ? now : dto.Timestamp;
+        if (effectiveTimestamp > now.AddMinutes(5))
+            return BadRequest(ApiResponse<object>.ErrorResponse("الطابع الزمني في المستقبل"));
+        if ((now - effectiveTimestamp).TotalHours > 24)
+            return BadRequest(ApiResponse<object>.ErrorResponse("الطابع الزمني قديم جداً (أكثر من 24 ساعة)"));
+
         // save location to history table
         var history = new LocationHistory
         {
@@ -54,7 +66,7 @@ public class TrackingController : BaseApiController
             Speed = dto.Speed,
             Accuracy = dto.Accuracy,
             Heading = dto.Heading,
-            Timestamp = dto.Timestamp == default ? DateTime.UtcNow : dto.Timestamp,
+            Timestamp = effectiveTimestamp,
             IsSync = true
         };
 

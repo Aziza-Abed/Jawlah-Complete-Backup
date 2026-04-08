@@ -128,8 +128,8 @@ public class GisController : BaseApiController
 
                 if (ext == ".zip")
                 {
-                    // Extract ZIP to temp directory
-                    var extractDir = Path.Combine(_storagePath, $"temp_{Guid.NewGuid():N}");
+                    // Extract ZIP to system temp directory (avoids polluting storage)
+                    var extractDir = Path.Combine(Path.GetTempPath(), $"gis_extract_{Guid.NewGuid():N}");
                     Directory.CreateDirectory(extractDir);
 
                     try
@@ -163,7 +163,10 @@ public class GisController : BaseApiController
                         // Find .shp file inside extracted directory
                         var shpFiles = Directory.GetFiles(extractDir, "*.shp", SearchOption.AllDirectories);
                         if (shpFiles.Length == 0)
+                        {
+                            if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
                             return BadRequest(ApiResponse<object>.ErrorResponse("ملف ZIP لا يحتوي على ملف Shapefile (.shp)"));
+                        }
 
                         shpBasePath = shpFiles[0][..^4]; // remove .shp extension
                     }
@@ -171,6 +174,12 @@ public class GisController : BaseApiController
                     {
                         if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
                         return BadRequest(ApiResponse<object>.ErrorResponse("ملف ZIP غير صالح"));
+                    }
+                    catch (Exception)
+                    {
+                        // Always clean up temp directory on any failure
+                        if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
+                        throw;
                     }
                 }
                 else
@@ -496,6 +505,9 @@ public class GisController : BaseApiController
                 await System.Threading.Tasks.Task.Delay(500 * (attempt + 1)); // 500ms, 1s, 1.5s
             }
         }
+
+        // All retries exhausted — throw so the caller knows the file was not written
+        throw new IOException($"Failed to write file after {maxRetries + 1} attempts: {Path.GetFileName(path)}");
     }
 
     private static GisFileDto MapToDto(GisFile gisFile)

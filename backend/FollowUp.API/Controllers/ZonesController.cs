@@ -230,7 +230,7 @@ public class ZonesController : BaseApiController
     }
 
     [HttpGet("map-data")]
-    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
+    [ResponseCache(NoStore = true)]
     [SwaggerOperation(Summary = "get zones as geojson for map")]
     public async Task<IActionResult> GetMapData()
     {

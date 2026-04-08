@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap, GeoJSON } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polygon, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getWorkerLocations } from "../api/tracking";
@@ -103,8 +103,8 @@ export default function Zones() {
     try {
       const [locations, zones, myWorkers] = await Promise.all([
         getWorkerLocations(),
-        getZonesMapData(),
-        getMyWorkers().catch(() => []) // Fallback if not supervisor
+        getZonesMapData().catch(() => null),
+        getMyWorkers().catch(() => [])
       ]);
 
       // Build user details map for battery info enrichment
@@ -319,26 +319,46 @@ export default function Zones() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {zonesData && (
-            <GeoJSON
-              key={JSON.stringify(zonesData).length}
-              data={zonesData}
-              style={(feature) => {
-                const zt = feature?.properties?.zoneType;
-                const color = zt === 'Borders' ? '#EF4444' : zt === 'Blocks' ? '#22C55E' : '#7895B2';
-                return { fillColor: color, weight: 2, opacity: 0.8, color, fillOpacity: 0.1 };
-              }}
-              onEachFeature={(feature, layer) => {
-                if (feature.properties && feature.properties.zoneName) {
-                  const typeLabel = feature.properties.zoneType === 'Quarters' ? 'حي' :
-                    feature.properties.zoneType === 'Borders' ? 'حدود' :
-                    feature.properties.zoneType === 'Blocks' ? 'بلوك' : '';
-                  const typeTag = typeLabel ? ` <span style="font-size:10px;opacity:0.6">(${typeLabel})</span>` : '';
-                  layer.bindPopup(`<div class="text-right font-sans p-2"><b>${feature.properties.zoneName}</b>${typeTag}</div>`);
-                }
-              }}
-            />
-          )}
+          {zonesData?.features?.map((feature: any, idx: number) => {
+            const geo = feature.geometry;
+            if (!geo?.coordinates) return null;
+            const zt = feature.properties?.zoneType;
+
+            // Convert GeoJSON [lng, lat] to Leaflet [lat, lng]
+            const toLatLng = (ring: number[][]) => ring.map((c: number[]) => [c[1], c[0]] as [number, number]);
+
+            // Extract all polygon rings from Polygon or MultiPolygon
+            let rings: [number, number][][] = [];
+            if (geo.type === 'Polygon') {
+              rings = geo.coordinates.map(toLatLng);
+            } else if (geo.type === 'MultiPolygon') {
+              geo.coordinates.forEach((poly: number[][][]) => {
+                poly.forEach((ring: number[][]) => rings.push(toLatLng(ring)));
+              });
+            }
+            if (rings.length === 0) return null;
+
+            const style = zt === 'Borders'
+              ? { color: '#EF4444', weight: 3, opacity: 0.9, fillColor: '#EF4444', fillOpacity: 0.05, dashArray: '10, 6' }
+              : zt === 'Blocks'
+              ? { color: '#22C55E', weight: 2, opacity: 0.7, fillColor: '#22C55E', fillOpacity: 0.08 }
+              : { color: '#7895B2', weight: 2, opacity: 0.8, fillColor: '#7895B2', fillOpacity: 0.1 };
+
+            const typeLabel = zt === 'Quarters' ? 'حي' : zt === 'Borders' ? 'حدود' : zt === 'Blocks' ? 'بلوك' : '';
+
+            return (
+              <Polygon key={`zone-${idx}`} positions={rings} pathOptions={style}>
+                {feature.properties?.zoneName && (
+                  <Tooltip direction="center" permanent={false}>
+                    <div className="text-right font-sans">
+                      <b>{feature.properties.zoneName}</b>
+                      {typeLabel && <span className="text-[10px] opacity-60 mr-1">({typeLabel})</span>}
+                    </div>
+                  </Tooltip>
+                )}
+              </Polygon>
+            );
+          })}
 
           <FlyAndOpenPopup worker={selectedWorker} selectedId={selectedId} markerRefs={markerRefs} />
 

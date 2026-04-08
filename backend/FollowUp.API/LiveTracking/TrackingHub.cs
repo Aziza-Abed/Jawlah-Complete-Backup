@@ -34,9 +34,28 @@ public class UserConnection
     public string Role { get; set; } = string.Empty;
     public string ConnectionId { get; set; } = string.Empty;
     public DateTime ConnectedAt { get; set; }
-    public DateTime? LastActivity { get; set; }
-    public double? LastLatitude { get; set; }
-    public double? LastLongitude { get; set; }
+    public DateTime LastActivity { get; set; }
+    public double LastLatitude { get; set; }
+    public double LastLongitude { get; set; }
+    private readonly object _lock = new();
+
+    public void UpdateLocation(double latitude, double longitude, DateTime timestamp)
+    {
+        lock (_lock)
+        {
+            LastLatitude = latitude;
+            LastLongitude = longitude;
+            LastActivity = timestamp;
+        }
+    }
+
+    public void TouchActivity()
+    {
+        lock (_lock)
+        {
+            LastActivity = DateTime.UtcNow;
+        }
+    }
 }
 
 // real-time tracking hub for location updates between workers and supervisors
@@ -48,6 +67,14 @@ public class TrackingHub : Hub<ITrackingClient>
 
     // thread-safe dictionary to track active connections (SignalR is concurrent)
     private static readonly ConcurrentDictionary<string, UserConnection> _connections = new();
+
+    // cleanup stale connections every 10 minutes
+    private static DateTime _lastCleanup = DateTime.UtcNow;
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan StaleConnectionTimeout = TimeSpan.FromMinutes(30);
+
+    // max age for batch location timestamps (24 hours)
+    private static readonly TimeSpan MaxTimestampAge = TimeSpan.FromHours(24);
 
     public TrackingHub(ILogger<TrackingHub> logger, ILocationHistoryRepository locationHistory)
     {
@@ -92,6 +119,9 @@ public class TrackingHub : Hub<ITrackingClient>
                 await Clients.Group("Supervisors").ReceiveUserStatus(
                     userId.Value, userName, "online");
             }
+
+            // periodically clean up stale connections
+            CleanupStaleConnections();
 
             await BroadcastConnectionStats();
             _logger.LogInformation("User connected: {UserName}", userName);
@@ -148,12 +178,10 @@ public class TrackingHub : Hub<ITrackingClient>
 
         var timestamp = DateTime.UtcNow;
 
-        // update the connection info in our memory
+        // update the connection info in our memory (thread-safe via lock inside UserConnection)
         if (_connections.TryGetValue(Context.ConnectionId, out var conn))
         {
-            conn.LastLatitude = latitude;
-            conn.LastLongitude = longitude;
-            conn.LastActivity = timestamp;
+            conn.UpdateLocation(latitude, longitude, timestamp);
         }
 
         // save to database so REST API can retrieve locations (including accuracy/speed/heading for quality analysis)
@@ -175,12 +203,20 @@ public class TrackingHub : Hub<ITrackingClient>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save location to database for user {UserId}", userId);
+            _logger.LogError(ex, "Failed to save location to database for user {UserId}. Location data may be lost.", userId);
+            // Continue to broadcast even if DB save fails — supervisor still sees real-time position
         }
 
         // send the new location to all supervisors so they can see it on the map
-        await Clients.Group("Supervisors").ReceiveLocationUpdate(
-            userId.Value, userName, latitude, longitude, timestamp);
+        try
+        {
+            await Clients.Group("Supervisors").ReceiveLocationUpdate(
+                userId.Value, userName, latitude, longitude, timestamp);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast location for {UserName} — supervisor may have disconnected", userName);
+        }
 
         _logger.LogDebug("Location updated for {UserName}", userName);
     }
@@ -197,16 +233,20 @@ public class TrackingHub : Hub<ITrackingClient>
         if (locations.Count > 500)
             locations = locations.Take(500).ToList();
 
-        // sort once, filter invalid coordinates
+        var now = DateTime.UtcNow;
+
+        // sort once, filter invalid coordinates and reject future/too-old timestamps
         var validLocations = locations
             .Where(l => IsValidGpsCoordinate(l.Latitude, l.Longitude))
+            .Where(l => l.Timestamp <= now && (now - l.Timestamp) <= MaxTimestampAge)
             .OrderBy(l => l.Timestamp)
             .ToList();
 
         if (!validLocations.Any())
             return;
 
-        _logger.LogInformation("Received {Count} batch location updates from {UserName}", validLocations.Count, userName);
+        _logger.LogInformation("Received {Count} batch location updates from {UserName} ({Rejected} rejected)",
+            validLocations.Count, userName, locations.Count - validLocations.Count);
 
         // save batch locations to database
         try
@@ -227,14 +267,20 @@ public class TrackingHub : Hub<ITrackingClient>
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save batch locations to database for user {UserId}", userId);
+            _logger.LogError(ex, "Failed to save batch locations to database for user {UserId}. {Count} locations may be lost.",
+                userId, validLocations.Count);
         }
 
-        // broadcast each location to supervisors
-        foreach (var location in validLocations)
+        // broadcast the latest location to supervisors (not all 500 — just the most recent)
+        try
         {
+            var latest = validLocations.Last();
             await Clients.Group("Supervisors").ReceiveLocationUpdate(
-                userId.Value, userName, location.Latitude, location.Longitude, location.Timestamp);
+                userId.Value, userName, latest.Latitude, latest.Longitude, latest.Timestamp);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast batch location for {UserName}", userName);
         }
     }
 
@@ -250,8 +296,15 @@ public class TrackingHub : Hub<ITrackingClient>
         if (!userId.HasValue)
             return;
 
-        await Clients.Group("Supervisors").ReceiveActivity(
-            userId.Value, userName, activityType, description);
+        try
+        {
+            await Clients.Group("Supervisors").ReceiveActivity(
+                userId.Value, userName, activityType, description);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast activity for {UserName}", userName);
+        }
 
         _logger.LogInformation("Activity reported: {ActivityType} by {UserName}", activityType, userName);
     }
@@ -264,13 +317,20 @@ public class TrackingHub : Hub<ITrackingClient>
         if (!userId.HasValue)
             return;
 
-        // broadcast to supervisors
-        await Clients.Group("Supervisors").ReceiveZoneEvent(
-            userId.Value, userName, zoneId, zoneName, eventType);
+        // broadcast to supervisors and zone workers
+        try
+        {
+            await Clients.Group("Supervisors").ReceiveZoneEvent(
+                userId.Value, userName, zoneId, zoneName, eventType);
 
-        // also broadcast to other workers in the same zone (for coordination)
-        await Clients.Group($"Zone_{zoneId}").ReceiveZoneEvent(
-            userId.Value, userName, zoneId, zoneName, eventType);
+            // also broadcast to other workers in the same zone (for coordination)
+            await Clients.Group($"Zone_{zoneId}").ReceiveZoneEvent(
+                userId.Value, userName, zoneId, zoneName, eventType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast zone event for {UserName}", userName);
+        }
 
         _logger.LogInformation("Zone event: {EventType} at {ZoneName}", eventType, zoneName);
     }
@@ -296,6 +356,9 @@ public class TrackingHub : Hub<ITrackingClient>
     {
         var (_, _, role) = GetCurrentHubUser();
 
+        if (zoneId <= 0)
+            return;
+
         if (role == "Worker")
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"Zone_{zoneId}");
@@ -306,8 +369,16 @@ public class TrackingHub : Hub<ITrackingClient>
     // worker leaves a zone-specific group
     public async Task LeaveZoneGroup(int zoneId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Zone_{zoneId}");
-        _logger.LogInformation("Worker left Zone group: {ZoneId}", zoneId);
+        var (_, _, role) = GetCurrentHubUser();
+
+        if (zoneId <= 0)
+            return;
+
+        if (role == "Worker")
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Zone_{zoneId}");
+            _logger.LogInformation("Worker left Zone group: {ZoneId}", zoneId);
+        }
     }
 
     #endregion
@@ -347,10 +418,10 @@ public class TrackingHub : Hub<ITrackingClient>
     // heartbeat to keep connection alive and update last activity
     public Task Heartbeat()
     {
-        // just update when we last heard from the client
+        // just update when we last heard from the client (thread-safe via lock inside UserConnection)
         if (_connections.TryGetValue(Context.ConnectionId, out var conn))
         {
-            conn.LastActivity = DateTime.UtcNow;
+            conn.TouchActivity();
         }
 
         return Task.CompletedTask;
@@ -400,6 +471,35 @@ public class TrackingHub : Hub<ITrackingClient>
         };
     }
 
+    // Remove connections that haven't had any activity (no heartbeat, no location update)
+    private void CleanupStaleConnections()
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastCleanup < CleanupInterval)
+            return;
+
+        _lastCleanup = now;
+
+        var staleKeys = _connections
+            .Where(kvp => (now - kvp.Value.LastActivity) > StaleConnectionTimeout)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in staleKeys)
+        {
+            if (_connections.TryRemove(key, out var stale))
+            {
+                _logger.LogInformation("Cleaned up stale connection for {UserName} (inactive {Minutes}min)",
+                    stale.UserName, (int)(now - stale.LastActivity).TotalMinutes);
+            }
+        }
+
+        if (staleKeys.Count > 0)
+        {
+            _logger.LogInformation("Cleaned up {Count} stale connections", staleKeys.Count);
+        }
+    }
+
     #endregion
 }
 
@@ -428,9 +528,9 @@ public class OnlineWorker
     public int UserId { get; set; }
     public string UserName { get; set; } = string.Empty;
     public DateTime ConnectedAt { get; set; }
-    public DateTime? LastActivity { get; set; }
-    public double? LastLatitude { get; set; }
-    public double? LastLongitude { get; set; }
+    public DateTime LastActivity { get; set; }
+    public double LastLatitude { get; set; }
+    public double LastLongitude { get; set; }
 }
 
 #endregion

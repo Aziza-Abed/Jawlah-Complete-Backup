@@ -59,6 +59,7 @@ public class UserRepository : Repository<User>, IUserRepository
     public async Task<IEnumerable<User>> GetByRoleAsync(UserRole role)
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(u => u.Department)
             .Include(u => u.Supervisor)
             .Include(u => u.AssignedZones)
@@ -71,6 +72,7 @@ public class UserRepository : Repository<User>, IUserRepository
     public async Task<IEnumerable<User>> GetActiveUsersAsync()
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(u => u.Department)
             .Include(u => u.Supervisor)
             .Include(u => u.AssignedZones)

@@ -260,11 +260,13 @@ describe('TC-05 — Worker Task Progress Update', () => {
 
   it('Step 3: Update progress percentage', async () => {
     if (!taskId) return;
-    const res = await clients.worker.put(`/tasks/${taskId}/progress`, {
+    // Endpoint requires multipart/form-data ([FromForm])
+    const { data, headers } = buildMultipart({
       progressPercentage: 50,
       progressNotes: 'Halfway through',
     });
-    // 200 = updated, 400 = rate limited (5 min cooldown)
+    const res = await clients.worker.put(`/tasks/${taskId}/progress`, data, { headers });
+    // 200 = updated, 400 = rate limited (5 min cooldown) or backward progress blocked
     expect([200, 400].includes(res.status)).toBe(true);
   });
 

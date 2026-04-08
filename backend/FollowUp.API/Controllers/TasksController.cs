@@ -1483,10 +1483,10 @@ public class TasksController : BaseApiController
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // CompleteTaskWithPhoto helper methods
+    // CompleteTaskWithPhoto  methods
     // ──────────────────────────────────────────────────────────────────────
 
-    // helper: validate task access, status lock, and photo requirement
+    //  validate task access, status lock, and photo requirement
     private async Task<IActionResult?> ValidateTaskAccess(TaskEntity task, int? userId, string? userRole, IFormFile? photo)
     {
         // workers can only complete their own tasks or team tasks they belong to
@@ -1510,7 +1510,7 @@ public class TasksController : BaseApiController
         return null;
     }
 
-    // helper: validate GPS coordinates and zone boundary for completion proof
+    //  validate GPS coordinates and zone boundary for completion proof
     private async Task<IActionResult?> ValidateCompletionLocation(TaskEntity task, int taskId, double latitude, double longitude)
     {
         var gpsValidation = ValidateGpsCoordinates(latitude, longitude);
@@ -1546,7 +1546,7 @@ public class TasksController : BaseApiController
         return null;
     }
 
-    // helper: handle first failed completion attempt - issue warning and keep task InProgress for retry
+    // ] handle first failed completion attempt - issue warning and keep task InProgress for retry
     private async Task<IActionResult> HandleFirstFailedAttempt(
         TaskEntity task, int taskId, int? userId,
         CompleteTaskWithPhotoRequest request, string? photoUrl, int completionDistanceMeters)
@@ -1612,7 +1612,7 @@ public class TasksController : BaseApiController
             $"يرجى التأكد من موقعك والمحاولة مرة أخرى."));
     }
 
-    // helper: handle second failed completion attempt - auto-reject and allow worker to appeal
+    //  handle second failed completion attempt - auto-reject and allow worker to appeal
     private async Task<IActionResult> HandleAutoRejection(
         TaskEntity task, int taskId, int? userId,
         CompleteTaskWithPhotoRequest request, string? photoUrl, int completionDistanceMeters)
@@ -1684,7 +1684,7 @@ public class TasksController : BaseApiController
             $"تم حفظ الصورة للمراجعة."));
     }
 
-    // helper: save completion photo to Photos table with GPS and device timestamp
+    // save completion photo to Photos table with GPS and device timestamp
     private async System.Threading.Tasks.Task SaveCompletionPhoto(
         int taskId, int? userId, CompleteTaskWithPhotoRequest request, string? photoUrl)
     {
@@ -1707,7 +1707,7 @@ public class TasksController : BaseApiController
         await _photos.AddAsync(photo);
     }
 
-    // helper: process the actual task completion - update task state and save photo record
+    //  process the actual task completion - update task state and save photo record
     private async System.Threading.Tasks.Task ProcessTaskCompletion(
         TaskEntity task, int taskId, int? userId,
         CompleteTaskWithPhotoRequest request, string? photoUrl,
@@ -1720,7 +1720,7 @@ public class TasksController : BaseApiController
         var taskHasLocationRequirement = task.ZoneId.HasValue || (task.Latitude.HasValue && task.Longitude.HasValue);
         if (taskHasLocationRequirement && (request.GpsUnavailable || (!request.Latitude.HasValue && !request.Longitude.HasValue)))
         {
-            var gpsNote = "⚠ لم يتوفر GPS عند الإنجاز";
+            var gpsNote = " لم يتوفر GPS عند الإنجاز";
             sanitizedNotes = string.IsNullOrEmpty(sanitizedNotes)
                 ? gpsNote
                 : $"{gpsNote}\n{sanitizedNotes}";

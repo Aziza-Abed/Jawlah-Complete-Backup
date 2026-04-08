@@ -35,15 +35,6 @@ public class GisFileRepository : Repository<GisFile>, IGisFileRepository
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<GisFile>> GetByTypeAsync(GisFileType fileType)
-    {
-        return await _dbSet
-            .Include(g => g.UploadedBy)
-            .Where(g => g.FileType == fileType)
-            .OrderByDescending(g => g.UploadedAt)
-            .ToListAsync();
-    }
-
     public override async Task<GisFile> AddAsync(GisFile gisFile)
     {
         await _dbSet.AddAsync(gisFile);

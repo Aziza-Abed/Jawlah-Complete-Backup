@@ -10,11 +10,12 @@
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
 
-  <!-- Exclude Storage folder from dotnet watch to prevent restart on file uploads -->
+  <!-- Exclude Storage and logs folders from dotnet watch to prevent restart on file uploads/log writes -->
   <ItemGroup>
     <Watch Remove="Storage\**" />
     <Content Remove="Storage\**" />
     <None Remove="Storage\**" />
+    <Watch Remove="logs\**" />
   </ItemGroup>
 
   <ItemGroup>

@@ -222,12 +222,9 @@ public class TaskRepository : Repository<TaskEntity>, ITaskRepository
             .Distinct()
             .ToListAsync();
 
+        // No includes needed — dashboard only uses task scalar fields (Status, CreatedAt, IsTeamTask, TeamId, AssignedToUserId)
         return await _dbSet
             .AsNoTracking()
-            .Include(t => t.AssignedToUser)
-            .Include(t => t.AssignedByUser)
-            .Include(t => t.Zone)
-            .Include(t => t.Team)
             .Where(t =>
                 // Individual tasks assigned to workers in the list
                 workerIdSet.Contains(t.AssignedToUserId) ||

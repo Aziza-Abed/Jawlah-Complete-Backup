@@ -15,5 +15,6 @@ public enum NotificationType
     IssueReported = 11,
     IssueResolved = 12,
     AppealSubmitted = 13,
-    IssueForwarded = 14
+    IssueForwarded = 14,
+    WorkerAssigned = 15
 }
